@@ -1277,7 +1277,6 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
 
     ## Figure Setup:
     fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
-    # fig = plt.figure(constrained_layout=True, figsize=(10, 4))
     subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
     ##########################
 
