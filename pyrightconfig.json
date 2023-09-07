@@ -20,10 +20,10 @@
     "**/dist",
     "**/build",
     "**/.idea",
-    "**/.venv",
   ],
 
   "ignore": [
+    "**/.venv",
     "**/pyphoplacecellanalysis/External"
   ],
 
