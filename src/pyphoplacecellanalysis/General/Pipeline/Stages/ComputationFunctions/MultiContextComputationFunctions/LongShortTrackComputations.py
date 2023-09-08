@@ -1587,7 +1587,8 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     if curr_active_pipeline.global_computation_results.computation_config is None:
         # Create a DynamicContainer-backed computation_config
         print(f'pipeline_complete_compute_long_short_fr_indicies is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
-        curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+        # curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+        curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=None) # disable inst frs indexS
     else:
         print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')	
 
