@@ -1477,6 +1477,7 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
     all_results_dict = {}
     out_frs_index_list = []
     for key, (long_epochs, short_epochs) in kwargs.items():
+        print(f'_generalized_compute_long_short_firing_rate_indicies(...): processing key: "{key}"')
         assert short_epochs.n_epochs > 0, f"No short epochs for '{key}'!\t long: ({key}: {long_epochs.n_epochs > 0}), \t short: ({key}: {short_epochs.n_epochs})"
         assert long_epochs.n_epochs > 0, f"No long epochs for '{key}'!\t long: ({key}: {long_epochs.n_epochs > 0}), \t short: ({key}: {short_epochs.n_epochs})"
 
@@ -1486,7 +1487,7 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
         short_mean_epochs_all_frs, short_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, short_epochs)
     
 
-        all_results_dict = dict(zip([f'long_mean_{key}_frs', f'short_mean_{key}_frs'], [long_mean_epochs_frs, short_mean_epochs_frs])) # all variables
+        all_results_dict.update(dict(zip([f'long_mean_{key}_frs', f'short_mean_{key}_frs'], [long_mean_epochs_frs, short_mean_epochs_frs]))) # all variables
         all_results_dict.update(dict(zip([f'long_mean_{key}_all_frs', f'short_mean_{key}_all_frs'], [long_mean_epochs_all_frs, short_mean_epochs_all_frs]))) # all variables
 
         a_frs_index = {aclu:_fr_index(long_mean_epochs_frs[aclu], short_mean_epochs_frs[aclu]) for aclu in long_mean_epochs_frs.keys()}
@@ -1510,8 +1511,10 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
             _an_inst_fr_values = _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)
             an_inst_fr_index = dict(zip(long_custom_InstSpikeRateTrends.included_neuron_ids, _an_inst_fr_values))
 
-            all_results_dict.update(dict(zip([f'{key}_inst_frs_index'], [an_inst_fr_index]))) # all variables
-            
+            # all_results_dict.update(dict(zip([f'{key}_inst_frs_index'], [an_inst_fr_index]))) # Is this update different than a direct assignment (below) is it because it only has a single key?
+            all_results_dict[f'{key}_inst_frs_index'] = an_inst_fr_index
+            # all_results_dict[f'replays_inst_frs_index'] = an_inst_fr_index
+
             # custom_InstSpikeRateTrends_df = pd.DataFrame({'aclu': long_custom_InstSpikeRateTrends.included_neuron_ids, 'long_inst_fr': long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list,  'short_inst_fr': short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list})
             # ,  'global_inst_fr': custom_InstSpikeRateTrends.cell_agg_inst_fr_list
 
@@ -1682,6 +1685,10 @@ def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron
         _out_rr_pagination_controller = RateRemappingPaginatedFigureController.init_from_rr_data(rr_aclus, rr_laps, rr_replays, rr_neuron_type, max_subplots_per_page=20, a_name='TestRateRemappingPaginatedFigureController', active_context=active_identifying_session_ctx)
         a_paginator = _out_rr_pagination_controller.plots_data.paginator
 
+        
+    x_frs_index: rr_replays
+    y_frs_index: rr_laps
+    
     """
     rr_aclus = np.array(list(long_short_fr_indicies_analysis.y_frs_index.keys())) # uses the .keys()
     rr_neuron_type = np.array([aclu_to_neuron_type_map[aclu] for aclu in rr_aclus])
