@@ -1523,7 +1523,12 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
 
             all_results_dict.update(dict(zip([f'long_mean_{key}_all_inst_frs', f'short_mean_{key}_all_inst_frs'], [long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list]))) # all variables
 
-            an_inst_fr_index = {aclu:_fr_index(long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu], short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu]) for aclu in long_custom_InstSpikeRateTrends.included_neuron_ids}
+            # an_inst_fr_index = {aclu:_fr_index(long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu], short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu]) for aclu in long_custom_InstSpikeRateTrends.included_neuron_ids}            
+            # an_inst_fr_index = dict(zip(['aclu', f'{key}_inst_frs_index'], [long_custom_InstSpikeRateTrends.included_neuron_ids, _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)]))
+        
+            _an_inst_fr_values = _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)
+            an_inst_fr_index = dict(zip(long_custom_InstSpikeRateTrends.included_neuron_ids, _an_inst_fr_values))
+
             all_results_dict.update(dict(zip([f'{key}_inst_frs_index'], [an_inst_fr_index]))) # all variables
             
             # custom_InstSpikeRateTrends_df = pd.DataFrame({'aclu': long_custom_InstSpikeRateTrends.included_neuron_ids, 'long_inst_fr': long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list,  'short_inst_fr': short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list})
