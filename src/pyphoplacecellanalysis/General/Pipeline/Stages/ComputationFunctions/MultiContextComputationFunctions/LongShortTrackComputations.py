@@ -1609,6 +1609,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, save_path=temp_save_filename)
 
     all_results_dict.update(updated_all_results_dict) # append the results dict
+    updated_all_results_dict.update({'x_frs_index': x_frs_index, 'y_frs_index': y_frs_index}) # make sure that [x,y]_frs_index key is present for backwards compatibility.
 
     # all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # append the indicies to the results dict
 
