@@ -604,7 +604,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
 
     @function_attributes(short_name='long_short_fr_indicies_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00', 
-                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['non_replays_frs_index']), is_global=True)
+                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['non_replays_frs_index']), is_global=True)
     def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Computes the firing rate indicies which is a measure of the changes in firing rate (rate-remapping) between the long and the short track
         
