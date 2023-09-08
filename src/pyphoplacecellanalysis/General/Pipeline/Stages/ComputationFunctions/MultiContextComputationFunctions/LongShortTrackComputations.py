@@ -1087,32 +1087,34 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # Find instantaneous firing rate for spikes outside of replays
         # 2023-09-06 - Method Kamran and I dicusssed in his office last Thursday
+        #TODO 2023-09-08 10:53: - [ ] Refactored into `pipeline_complete_compute_long_short_fr_indicies`
+
         # Uses instantaneous firing rates for each cell computed during any non-replay epoch. Kamran was concerned that some cells fire spikes on the end platforms during either short or long, but because we're only considering spikes that contribute to placefeields (of which the endcap spikes are omitted due to velocity requirements) these cells are said to be long/short exclusive despite firing frequently on the end caps.
         #TODO 2023-09-06 00:56: - [ ] Add the results to the output structure somehow:
 
-        long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
+        # long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
         
-        # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
-        non_replay_periods: Epoch = Epoch(Epoch.from_PortionInterval(owning_pipeline_reference.sess.replay.epochs.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry
-        long_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
-        short_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
+        # # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
+        # non_replay_periods: Epoch = Epoch(Epoch.from_PortionInterval(owning_pipeline_reference.sess.replay.epochs.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry
+        # long_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
+        # short_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
 
         
-        # custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-        #                                                                                            filter_epochs=non_replay_periods,
+        # # custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
+        # #                                                                                            filter_epochs=non_replay_periods,
+        # #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
+        # #                                                                                            instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+
+        # # ~20sec computation
+        # long_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
+        #                                                                                         filter_epochs=long_only_non_replay_periods,
         #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-        #                                                                                            instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+        #                                                                                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
 
-        # ~20sec computation
-        long_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-                                                                                                filter_epochs=long_only_non_replay_periods,
-                                                                                                #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-                                                                                                instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
-
-        short_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-                                                                                                filter_epochs=short_only_non_replay_periods,
-                                                                                                #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-                                                                                                instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+        # short_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
+        #                                                                                         filter_epochs=short_only_non_replay_periods,
+        #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
+        #                                                                                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
 
 
         custom_InstSpikeRateTrends_df = pd.DataFrame({'aclu': long_custom_InstSpikeRateTrends.included_neuron_ids, 'long_inst_fr': long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list,  'short_inst_fr': short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list})
@@ -1522,10 +1524,6 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
             
 
             all_results_dict.update(dict(zip([f'long_mean_{key}_all_inst_frs', f'short_mean_{key}_all_inst_frs'], [long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list]))) # all variables
-
-            # an_inst_fr_index = {aclu:_fr_index(long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu], short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu]) for aclu in long_custom_InstSpikeRateTrends.included_neuron_ids}            
-            # an_inst_fr_index = dict(zip(['aclu', f'{key}_inst_frs_index'], [long_custom_InstSpikeRateTrends.included_neuron_ids, _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)]))
-        
             _an_inst_fr_values = _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)
             an_inst_fr_index = dict(zip(long_custom_InstSpikeRateTrends.included_neuron_ids, _an_inst_fr_values))
 
