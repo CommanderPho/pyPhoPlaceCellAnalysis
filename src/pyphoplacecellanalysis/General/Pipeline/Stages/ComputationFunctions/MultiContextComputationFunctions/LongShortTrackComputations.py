@@ -1651,10 +1651,12 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, save_path=temp_save_filename)
 
     all_results_dict.update(updated_all_results_dict) # append the results dict
-    updated_all_results_dict.update({'x_frs_index': x_frs_index, 'y_frs_index': y_frs_index}) # make sure that [x,y]_frs_index key is present for backwards compatibility.
-
+   
+    ## Set the backwards compatibility variables:
+    all_results_dict.update({'x_frs_index': x_frs_index, 'y_frs_index': y_frs_index, 'z_frs_index': z_frs_index}) # make sure that [x,y]_frs_index key is present for backwards compatibility.
+    # long_short_fr_indicies_analysis_results['x_frs_index'] = long_short_fr_indicies_analysis_results['replays_inst_frs_index'].copy()
+    # long_short_fr_indicies_analysis_results['y_frs_index'] = long_short_fr_indicies_analysis_results['non_replays_inst_frs_index'].copy()
     # all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # append the indicies to the results dict
-
     return x_frs_index, y_frs_index, active_context, all_results_dict # TODO: add to computed_data instead
 
 @function_attributes(short_name=None, tags=['rr', 'rate_remapping', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-18 18:58', related_items=[])
