@@ -234,7 +234,12 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_computations(curr_active_pipeline, include_includelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool = False):
-    """ performs the remaining required global computations """
+    """ performs the remaining required global computations
+
+    """
+    #TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
+    #TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
+
     def _subfn_on_already_computed(_comp_name, computation_filter_name):
         """ captures: `progress_print`, `force_recompute`
         raises AttributeError if force_recompute is true to trigger recomputation """
@@ -270,11 +275,6 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
     ## Specify the computations and the requirements to validate them.
 
-    #TODO 2023-08-30 22:19: - [ ] Currently have ` validate_computation_test=...` part implemented in the decorator for _perform_baseline_placefield_computation and _perform_time_dependent_placefield_computation.
-        # - [ ] Need to build their SpecificComputationValidator from these instead of defining it below.
-
-
-
     ## Hardcoded comp_specifiers
     _comp_specifiers = []
     
@@ -288,8 +288,10 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
             # a_fn.validate_computation_test
             a_fn_validator: SpecificComputationValidator = SpecificComputationValidator.init_from_decorated_fn(a_fn) # (short_name=a_fn_name.short_name, computation_fn_name='_perform_baseline_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D']), is_global=False),
             _comp_specifiers.append(a_fn_validator)        
+        
             
-    #TODO 2023-08-31 11:05: - [ ] Do local computations first for all valid filter_epochs, then do global
+    ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
+    _comp_specifiers = reversed(_comp_specifiers)
 
     for _comp_specifier in _comp_specifiers:
         if (not _comp_specifier.is_global) or include_global_functions:
