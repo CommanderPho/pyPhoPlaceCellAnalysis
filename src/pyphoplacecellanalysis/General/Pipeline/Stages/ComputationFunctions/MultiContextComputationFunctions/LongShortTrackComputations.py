@@ -505,48 +505,53 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
     
 
-    # @function_attributes(tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=[], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57')
-    # def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
-    #     """ Computes rate remapping statistics
+    @function_attributes(tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=[], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57')
+    def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
+        """ Computes rate remapping statistics
         
-    #     Requires:
-    #         ['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis']
+        Requires:
+            ['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis']
             
-    #     Provides:
-    #         computation_result.computed_data['long_short_rate_remapping']
-    #             # ['long_short_rate_remapping']['rr_df']
-    #             # ['long_short_rate_remapping']['high_only_rr_df']
+        Provides:
+            computation_result.computed_data['long_short_rate_remapping']
+                # ['long_short_rate_remapping']['rr_df']
+                # ['long_short_rate_remapping']['high_only_rr_df']
         
-    #     """
+        """
         
-    #     from neuropy.core.neurons import NeuronType
-    #     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_rate_remapping_stats
+        from neuropy.core.neurons import NeuronType
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_rate_remapping_stats
         
-    #     ## long_short_decoding_analyses:
-    #     curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] # end long_short
-    #     ## Extract variables from results object:
-    #     long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
-    #     long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-    #     # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-    #     long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        
-        
-    #     ## Compute Rate Remapping Dataframe:
-    #     rate_remapping_df = compute_rate_remapping_stats(curr_long_short_decoding_analyses, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
-    #     high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
+        ## long_short_decoding_analyses:
+        # curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] # end long_short
+        # active_analyses_result = curr_long_short_decoding_analyses
+        long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis'] 
+        active_analyses_result = long_short_fr_indicies_analysis_results
 
-    #     # Add to computed results:
-    #     global_computation_results.computed_data['long_short_rate_remapping'] = ComputedResult(is_global=True, rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
+        ## Extract variables from results object:
+        long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         
-    #     """ Getting outputs:
         
-    #         ## long_short_rate_remapping:
-    #         curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
-    #         ## Extract variables from results object:
-    #         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+        ## Compute Rate Remapping Dataframe:
+        
+        rate_remapping_df: RateRemappingResult = compute_rate_remapping_stats(active_analyses_result, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
+        high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
 
-    #     """
-    #     return global_computation_results
+        # Add to computed results:
+        global_computation_results.computed_data['long_short_rate_remapping'] = ComputedResult(is_global=True, rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
+        
+        """ Getting outputs:
+        
+            ## long_short_rate_remapping:
+            curr_long_short_rr = curr_active_pipeline.global_computation_results.computed_data['long_short_rate_remapping']
+            ## Extract variables from results object:
+            rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
+
+        """
+        return global_computation_results
 
     
     @function_attributes(short_name='short_long_pf_overlap_analyses',  tags=['overlap', 'pf'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-05 11:10', related_items=[], 
@@ -599,7 +604,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
 
     @function_attributes(short_name='long_short_fr_indicies_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00', 
-                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], is_global=True)
+                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['non_replays_frs_index']), is_global=True)
     def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Computes the firing rate indicies which is a measure of the changes in firing rate (rate-remapping) between the long and the short track
         
@@ -977,6 +982,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
+        
+
+
     # InstantaneousSpikeRateGroupsComputation
     @function_attributes(short_name='long_short_inst_spike_rate_groups', tags=['long_short', 'LxC', 'SxC', 'Figure2','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=['global_computation_results.computed_data.long_short_inst_spike_rate_groups'], uses=[], used_by=[], creation_date='2023-08-21 16:52', related_items=[],
                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'].all_incl_endPlatforms_InstSpikeRateTrends_df), is_global=True)
@@ -1086,8 +1094,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         
         # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
         non_replay_periods: Epoch = Epoch(Epoch.from_PortionInterval(owning_pipeline_reference.sess.replay.epochs.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry
-        long_only_non_replay_periods = non_replay_periods.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
-        short_only_non_replay_periods = non_replay_periods.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
+        long_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
+        short_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
 
         
         # custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
@@ -1398,8 +1406,59 @@ def _fr_index(long_fr, short_fr):
     """ Pho's 2023 firing-rate-index [`fri`] measure."""
     return ((long_fr - short_fr) / (long_fr + short_fr))
 
-@function_attributes(short_name='_compute_long_short_firing_rate_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-01-19 00:00')
-def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=None):
+# @function_attributes(short_name='_compute_long_short_firing_rate_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-01-19 00:00')
+# def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=None):
+#     """A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
+
+#     Args:
+#         spikes_df (_type_): _description_
+#         long_laps (_type_): _description_
+#         long_replays (_type_): _description_
+#         short_laps (_type_): _description_
+#         short_replays (_type_): _description_
+
+#     Returns:
+#         _type_: _description_
+
+
+#     The backups saved with this function can be loaded via:
+
+#     # Load previously computed from data:
+#     long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index = loadData("data/temp_2023-01-20_results.pkl").values()
+
+#     """
+#     assert short_laps.n_epochs > 0, f"No short laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+#     assert long_laps.n_epochs > 0, f"No long laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+#     assert long_replays.n_epochs > 0, f"No short replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+#     assert short_replays.n_epochs > 0, f"No long replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+
+
+#     long_mean_laps_all_frs, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_laps)
+#     long_mean_replays_all_frs, long_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, long_replays)
+
+#     short_mean_laps_all_frs, short_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, short_laps)
+#     short_mean_replays_all_frs, short_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, short_replays)
+
+#     all_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs])) # all variables
+#     all_results_dict.update(dict(zip(['long_mean_laps_all_frs', 'long_mean_replays_all_frs', 'short_mean_laps_all_frs', 'short_mean_replays_all_frs'], [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]))) # all variables
+
+#     y_frs_index = {aclu:_fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
+#     x_frs_index = {aclu:_fr_index(long_mean_replays_frs[aclu], short_mean_replays_frs[aclu]) for aclu in long_mean_replays_frs.keys()}
+
+#     all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # all variables
+#     # long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs = [np.array(list(fr_dict.values())) for fr_dict in [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]]	
+
+#     # Save a backup of the data:
+#     if save_path is not None:
+#         # save_path: e.g. 'temp_2023-01-20_results.pkl'
+#         # backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs', 'x_frs_index', 'y_frs_index'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index])) # all variables
+#         backup_results_dict = all_results_dict # really all of the variables
+#         saveData(save_path, backup_results_dict)
+
+#     return x_frs_index, y_frs_index, all_results_dict
+
+@function_attributes(short_name=None, tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-09-07 19:49', related_items=[])
+def _generalized_compute_long_short_firing_rate_indicies(spikes_df, save_path=None, **kwargs):
     """A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
 
     Args:
@@ -1413,31 +1472,37 @@ def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays,
         _type_: _description_
 
 
-    The backups saved with this function can be loaded via:
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import _generalized_compute_long_short_firing_rate_indicies
 
-    # Load previously computed from data:
-    long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index = loadData("data/temp_2023-01-20_results.pkl").values()
+    Aims to replace:
+
+        x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
+
+    With:
+        x_frs_index, y_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays)}, save_path=temp_save_filename)
+
+
 
     """
-    assert short_laps.n_epochs > 0, f"No short laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
-    assert long_laps.n_epochs > 0, f"No long laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
-    assert long_replays.n_epochs > 0, f"No short replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
-    assert short_replays.n_epochs > 0, f"No long replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
+    # long_laps, long_replays, short_laps, short_replays = args
+    # kwargs={'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays)}
+    
+    all_results_dict = {}
+    out_frs_index_list = []
+    for key, (long_epochs, short_epochs) in kwargs.items():
+        assert short_epochs.n_epochs > 0, f"No short epochs for '{key}'!\t long: ({key}: {long_epochs.n_epochs > 0}), \t short: ({key}: {short_epochs.n_epochs})"
+        assert long_epochs.n_epochs > 0, f"No long epochs for '{key}'!\t long: ({key}: {long_epochs.n_epochs > 0}), \t short: ({key}: {short_epochs.n_epochs})"
 
+        long_mean_laps_all_frs, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_epochs)
+        short_mean_laps_all_frs, short_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, short_epochs)
+    
+        all_results_dict = dict(zip([f'long_mean_{key}_frs', f'short_mean_{key}_frs'], [long_mean_laps_frs, short_mean_laps_frs])) # all variables
+        all_results_dict.update(dict(zip([f'long_mean_{key}_all_frs', f'short_mean_{key}_all_frs'], [long_mean_laps_all_frs, short_mean_laps_all_frs]))) # all variables
 
-    long_mean_laps_all_frs, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_laps)
-    long_mean_replays_all_frs, long_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, long_replays)
-
-    short_mean_laps_all_frs, short_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, short_laps)
-    short_mean_replays_all_frs, short_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, short_replays)
-
-    all_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs])) # all variables
-    all_results_dict.update(dict(zip(['long_mean_laps_all_frs', 'long_mean_replays_all_frs', 'short_mean_laps_all_frs', 'short_mean_replays_all_frs'], [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]))) # all variables
-
-    y_frs_index = {aclu:_fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
-    x_frs_index = {aclu:_fr_index(long_mean_replays_frs[aclu], short_mean_replays_frs[aclu]) for aclu in long_mean_replays_frs.keys()}
-
-    all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # all variables
+        a_frs_index = {aclu:_fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
+        all_results_dict.update(dict(zip([f'{key}_frs_index'], [a_frs_index]))) # all variables
+        out_frs_index_list.append(a_frs_index)
+    
     # long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs = [np.array(list(fr_dict.values())) for fr_dict in [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]]	
 
     # Save a backup of the data:
@@ -1447,7 +1512,9 @@ def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays,
         backup_results_dict = all_results_dict # really all of the variables
         saveData(save_path, backup_results_dict)
 
-    return x_frs_index, y_frs_index, all_results_dict
+    return *out_frs_index_list, all_results_dict
+
+
 
 def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thresh=19.01):
     """Finds the number of unique cells that are included (as measured by their firing rate exceeding the `min_inclusion_fr_thresh`) in each epoch of interest.
@@ -1485,6 +1552,8 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06' # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
+    
     active_context = active_identifying_session_ctx.adding_context(collision_prefix='fn', fn_name='long_short_firing_rate_indicies')
 
     spikes_df = curr_active_pipeline.sess.spikes_df # TODO: CORRECTNESS: should I be using this spikes_df instead of the filtered ones?
@@ -1515,19 +1584,29 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].estimate_replay_epochs() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
 
+    
+
+    # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
+    global_non_replays: Epoch = Epoch(Epoch.from_PortionInterval(global_replays.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry
+    long_non_replays: Epoch  = global_non_replays.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
+    short_non_replays: Epoch  = global_non_replays.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
 
     ## Now we have replays either way:
 
 
     ## Build the output results dict:
     all_results_dict = dict(zip(['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays'], [long_laps, long_replays, short_laps, short_replays, global_laps, global_replays])) # all variables
-
+    # Add the non-replay periods
+    all_results_dict.update(dict(zip(['long_non_replays', 'short_non_replays', 'global_non_replays'], [long_non_replays, short_non_replays, global_non_replays])))
+    
 
     # temp_save_filename = f'{active_context.get_description()}_results.pkl'
     if temp_save_filename is not None:
         print(f'temp_save_filename: {temp_save_filename}')
 
-    x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
+    # x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
+
+    x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, save_path=temp_save_filename)
 
     all_results_dict.update(updated_all_results_dict) # append the results dict
 
