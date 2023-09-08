@@ -1523,8 +1523,8 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
 
             all_results_dict.update(dict(zip([f'long_mean_{key}_all_inst_frs', f'short_mean_{key}_all_inst_frs'], [long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list]))) # all variables
 
-            a_frs_index = {aclu:_fr_index(long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu], short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu]) for aclu in long_custom_InstSpikeRateTrends.included_neuron_ids}
-            all_results_dict.update(dict(zip([f'{key}_inst_frs_index'], [a_frs_index]))) # all variables
+            an_inst_fr_index = {aclu:_fr_index(long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu], short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu]) for aclu in long_custom_InstSpikeRateTrends.included_neuron_ids}
+            all_results_dict.update(dict(zip([f'{key}_inst_frs_index'], [an_inst_fr_index]))) # all variables
             
             # custom_InstSpikeRateTrends_df = pd.DataFrame({'aclu': long_custom_InstSpikeRateTrends.included_neuron_ids, 'long_inst_fr': long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list,  'short_inst_fr': short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list})
             # ,  'global_inst_fr': custom_InstSpikeRateTrends.cell_agg_inst_fr_list
@@ -1656,12 +1656,6 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         print(f'temp_save_filename: {temp_save_filename}')
 
     # x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
-
-
-
-
-
-
 
 
     x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, save_path=temp_save_filename)
