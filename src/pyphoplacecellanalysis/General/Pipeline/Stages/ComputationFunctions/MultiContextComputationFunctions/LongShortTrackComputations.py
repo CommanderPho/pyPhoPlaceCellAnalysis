@@ -1458,7 +1458,7 @@ def _fr_index(long_fr, short_fr):
 #     return x_frs_index, y_frs_index, all_results_dict
 
 @function_attributes(short_name=None, tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-09-07 19:49', related_items=[])
-def _generalized_compute_long_short_firing_rate_indicies(spikes_df, save_path=None, **kwargs):
+def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneous_time_bin_size_seconds: Optional[float]=None, save_path=None, **kwargs):
     """A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
 
     Args:
@@ -1486,6 +1486,8 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, save_path=No
     """
     # long_laps, long_replays, short_laps, short_replays = args
     # kwargs={'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays)}
+    # if instantaneous_time_bin_size_seconds is not None:
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends # for instantaneous-version analysis
     
     all_results_dict = {}
     out_frs_index_list = []
@@ -1493,15 +1495,45 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, save_path=No
         assert short_epochs.n_epochs > 0, f"No short epochs for '{key}'!\t long: ({key}: {long_epochs.n_epochs > 0}), \t short: ({key}: {short_epochs.n_epochs})"
         assert long_epochs.n_epochs > 0, f"No long epochs for '{key}'!\t long: ({key}: {long_epochs.n_epochs > 0}), \t short: ({key}: {short_epochs.n_epochs})"
 
-        long_mean_laps_all_frs, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_epochs)
-        short_mean_laps_all_frs, short_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, short_epochs)
-    
-        all_results_dict = dict(zip([f'long_mean_{key}_frs', f'short_mean_{key}_frs'], [long_mean_laps_frs, short_mean_laps_frs])) # all variables
-        all_results_dict.update(dict(zip([f'long_mean_{key}_all_frs', f'short_mean_{key}_all_frs'], [long_mean_laps_all_frs, short_mean_laps_all_frs]))) # all variables
 
-        a_frs_index = {aclu:_fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
+        ## The non-instantaneous (niaeve) firing rate computations
+        long_mean_epochs_all_frs, long_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, long_epochs)
+        short_mean_epochs_all_frs, short_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, short_epochs)
+    
+
+        all_results_dict = dict(zip([f'long_mean_{key}_frs', f'short_mean_{key}_frs'], [long_mean_epochs_frs, short_mean_epochs_frs])) # all variables
+        all_results_dict.update(dict(zip([f'long_mean_{key}_all_frs', f'short_mean_{key}_all_frs'], [long_mean_epochs_all_frs, short_mean_epochs_all_frs]))) # all variables
+
+        a_frs_index = {aclu:_fr_index(long_mean_epochs_frs[aclu], short_mean_epochs_frs[aclu]) for aclu in long_mean_epochs_frs.keys()}
         all_results_dict.update(dict(zip([f'{key}_frs_index'], [a_frs_index]))) # all variables
         out_frs_index_list.append(a_frs_index)
+
+        ## Instantaneous versions (2023-09-08) for comparison:
+        if instantaneous_time_bin_size_seconds is not None:
+            #TODO 2023-09-08 08:00: - [ ] Not yet fully implemented
+            # raise NotImplementedError
+            long_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=spikes_df.copy(),
+                                                                                                    filter_epochs=long_epochs,
+                                                                                                    instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+
+            short_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=spikes_df.copy(),
+                                                                                                    filter_epochs=short_epochs,
+                                                                                                    instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
+            
+
+            all_results_dict.update(dict(zip([f'long_mean_{key}_all_inst_frs', f'short_mean_{key}_all_inst_frs'], [long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list]))) # all variables
+
+            a_frs_index = {aclu:_fr_index(long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu], short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list[aclu]) for aclu in long_custom_InstSpikeRateTrends.included_neuron_ids}
+            all_results_dict.update(dict(zip([f'{key}_inst_frs_index'], [a_frs_index]))) # all variables
+            
+            # custom_InstSpikeRateTrends_df = pd.DataFrame({'aclu': long_custom_InstSpikeRateTrends.included_neuron_ids, 'long_inst_fr': long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list,  'short_inst_fr': short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list})
+            # ,  'global_inst_fr': custom_InstSpikeRateTrends.cell_agg_inst_fr_list
+
+            # Compute the single-dimensional firing rate index for the custom epochs and add it as a column to the dataframe:
+            # custom_InstSpikeRateTrends_df['custom_frs_index'] = _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)
+
+
+        
     
     # long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs = [np.array(list(fr_dict.values())) for fr_dict in [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]]	
 
@@ -1549,7 +1581,26 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         _type_: _description_
     """
     from neuropy.core.epoch import Epoch
+    from neuropy.utils.dynamic_container import DynamicContainer # for instantaneous firing rate versions
 
+    # Instantaneous firing rate config:
+    if curr_active_pipeline.global_computation_results.computation_config is None:
+        # Create a DynamicContainer-backed computation_config
+        print(f'pipeline_complete_compute_long_short_fr_indicies is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
+        curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+    else:
+        print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')	
+
+    # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
+    assert (curr_active_pipeline.global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
+    assert ('instantaneous_time_bin_size_seconds' in curr_active_pipeline.global_computation_results.computation_config)
+    ## TODO: get from active_configs or something similar
+    instantaneous_time_bin_size_seconds: float = curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
+
+    # Setting `instantaneous_time_bin_size_seconds = None` disables instantaneous computations
+
+
+    ## Begin Original:
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06' # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
@@ -1606,7 +1657,14 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
     # x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
 
-    x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, save_path=temp_save_filename)
+
+
+
+
+
+
+
+    x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, save_path=temp_save_filename)
 
     all_results_dict.update(updated_all_results_dict) # append the results dict
     updated_all_results_dict.update({'x_frs_index': x_frs_index, 'y_frs_index': y_frs_index}) # make sure that [x,y]_frs_index key is present for backwards compatibility.
