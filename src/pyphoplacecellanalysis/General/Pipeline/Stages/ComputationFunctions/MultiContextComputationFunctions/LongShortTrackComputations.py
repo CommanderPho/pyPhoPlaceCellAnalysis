@@ -1117,24 +1117,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         #                                                                                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
 
 
-        custom_InstSpikeRateTrends_df = pd.DataFrame({'aclu': long_custom_InstSpikeRateTrends.included_neuron_ids, 'long_inst_fr': long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list,  'short_inst_fr': short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list})
-        # ,  'global_inst_fr': custom_InstSpikeRateTrends.cell_agg_inst_fr_list
-
-        # Compute the single-dimensional firing rate index for the custom epochs and add it as a column to the dataframe:
-        custom_InstSpikeRateTrends_df['custom_frs_index'] = _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)
-        # Sort by column: 'custom_frs_index' (ascending)
-        custom_InstSpikeRateTrends_df = custom_InstSpikeRateTrends_df.sort_values(['custom_frs_index'])
         
-        inst_spike_rate_groups_result.all_incl_endPlatforms_InstSpikeRateTrends_df = custom_InstSpikeRateTrends_df
-        
-        # # Calculate 10th and 90th percentiles
-        # lower_bound = custom_InstSpikeRateTrends_df['custom_frs_index'].quantile(0.10)
-        # upper_bound = custom_InstSpikeRateTrends_df['custom_frs_index'].quantile(0.90)
-
-        # # Filter rows
-        # bottom_10_percent = custom_InstSpikeRateTrends_df[custom_InstSpikeRateTrends_df['custom_frs_index'] <= lower_bound]
-        # top_10_percent = custom_InstSpikeRateTrends_df[custom_InstSpikeRateTrends_df['custom_frs_index'] >= upper_bound]
-
         # Add to computed results:
         global_computation_results.computed_data['long_short_inst_spike_rate_groups'] = inst_spike_rate_groups_result
 
