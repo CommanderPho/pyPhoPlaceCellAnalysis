@@ -53,6 +53,11 @@ class PlacefieldOverlapMetricMode(ExtendedEnum):
     REL_ENTROPY = "REL_ENTROPY"
 
 
+def build_extra_cell_info_label_string(row) -> str:
+    """ used in `_display_jonathan_interactive_replay_firing_rate_comparison` to format the extra info labels for each aclu like it's firing rate indices. """
+    return '\n'.join([f"{k}: {round(v, 3)}" for k,v in dict(row._asdict()).items()])
+
+
 class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ LongShortTrackComparingDisplayFunctions
     These display functions compare results across several contexts.
@@ -203,8 +208,25 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 curr_fig_num = f'long|short fr indicies_{active_context.get_description(separator="/")}'
             kwargs['fignum'] = curr_fig_num
 
+
+            ## Have to pull out the rate-remapping stats for each neuron_id
+            try:
+                curr_long_short_fr_indicies_analysis = global_computation_results.computed_data['long_short_fr_indicies_analysis']
+
+                # extract one set of keys for the aclus
+                _curr_aclus = list(curr_long_short_fr_indicies_analysis['laps_frs_index'].keys())
+                _curr_frs_indicies_dict = {k:v.values() for k,v in curr_long_short_fr_indicies_analysis.items() if k in ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']} # extract the values
+                long_short_fr_indicies_df = pd.DataFrame(_curr_frs_indicies_dict, index=_curr_aclus)
+                
+                # build the labels for each cell using `build_extra_cell_info_label_string(...)`:
+                optional_cell_info_labels = {aclu:build_extra_cell_info_label_string(row) for aclu, row in zip(_curr_aclus, long_short_fr_indicies_df.itertuples(name='ExtraCellInfoLabels', index=False))}
+
+            except BaseException:
+                # set optional cell info labels to None
+                optional_cell_info_labels = {}
+
             graphics_output_dict: MatplotlibRenderPlots = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
-                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, **kwargs)
+                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, optional_cell_info_labels=optional_cell_info_labels, **kwargs)
 
             final_context = active_context
             graphics_output_dict['context'] = final_context
@@ -1150,6 +1172,11 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
     formatted_cell_label_string = (f"<size:22><weight:bold>{aclu:02d}</></>")
     
+    ## Optional additional information about the cell to be rendered next to its aclu, like it's firing rate indicies, etc:
+    optional_cell_info_labels_dict = kwargs.get('optional_cell_info_labels', {})
+    optional_cell_info_labels = optional_cell_info_labels_dict.get(aclu, None) # get the single set of optional labels for this aclu
+
+
     # the index passed into `plot_1D_placecell_validation(...)` must be in terms of the `pf1D_all` ratemap that's provided. the `rdf_aclu_to_idx` does NOT work and will result in indexing errors
     # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
 
@@ -1171,6 +1198,11 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
         # print(f'\tsubtitle_string: {subtitle_string}')
         formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
     
+    if optional_cell_info_labels is not None:
+        print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
+        optional_cell_info_labels_string: str = optional_cell_info_labels # already should be a string
+        formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{optional_cell_info_labels_string}</>'
+
     # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
     # title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
     # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
@@ -1247,7 +1279,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
 
 @function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
-def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, debug_print=False, defer_render=False, **kwargs) -> MatplotlibRenderPlots:
+def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, optional_cell_info_labels=None, debug_print=False, defer_render=False, **kwargs) -> MatplotlibRenderPlots:
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
@@ -1287,6 +1319,8 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, marker_split_mode=marker_split_mode, debug_print=debug_print)
     kwargs['custom_replay_scatter_markers_plot_kwargs_list'] = custom_replay_scatter_markers_plot_kwargs_list
 
+    # Set 'optional_cell_info_labels' on the kwargs passed to `_plot_pho_jonathan_batch_plot_single_cell`
+    kwargs['optional_cell_info_labels'] = optional_cell_info_labels
 
     # # Build all spikes interpolated positions/dfs:
     # cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
