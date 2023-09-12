@@ -55,7 +55,26 @@ class PlacefieldOverlapMetricMode(ExtendedEnum):
 
 def build_extra_cell_info_label_string(row) -> str:
     """ used in `_display_jonathan_interactive_replay_firing_rate_comparison` to format the extra info labels for each aclu like it's firing rate indices. """
-    return '\n'.join([f"{k}: {round(v, 3)}" for k,v in dict(row._asdict()).items()])
+    row_dict = dict(row._asdict())
+    has_instantaneous_version = np.all(np.isin(list(row_dict.keys()), ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']))
+    if has_instantaneous_version:
+        # if have inst
+        # pre-format row output values:
+        row = {k:f"<size:8><weight:bold>{round(v, 2)}</></>" for k,v in row_dict.items()}
+        return '\n'.join([f"<size:9><weight:bold>fri</></> (epochs: bin|inst)", 
+         f"laps: {row['laps_frs_index']}|{row['laps_inst_frs_index']}",
+         f"replays: {row['replays_frs_index']}|{row['replays_inst_frs_index']}",
+         f"non_replays: {row['non_replays_frs_index']}|{row['non_replays_inst_frs_index']}",
+        ])
+        # return '\n'.join([f"<size:12><weight:bold>fri</></> (epochs|bin|inst)", 
+        #  f"fri[laps]: {row['laps_frs_index']}|inst: {row['laps_inst_frs_index']}",
+        #  f"fri[replays]: {row['replays_frs_index']}|inst: {row['replays_inst_frs_index']}",
+        #  f"fri[non_replays]: {row['non_replays_frs_index']}|inst: {row['non_replays_inst_frs_index']}",
+        # ])
+    else:
+        return '\n'.join([f"{k}: {round(v, 3)}" for k,v in row_dict.items()])
+
+
 
 
 class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -199,7 +218,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             
             # Get the provided context or use the session context:
             active_context = kwargs.get('active_context', active_identifying_session_ctx)
-
+            kwargs['active_context'] = active_context
 
             active_context = active_context.adding_context_if_missing(display_fn_name='batch_pho_jonathan_replay_firing_rate_comparison')
             curr_fig_num = kwargs.pop('fignum', None)
@@ -447,7 +466,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
             return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior', 'needs_footer'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
+    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior', 'needs_footer', '1D'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
     def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
                 Usage:
@@ -1201,7 +1220,10 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     if optional_cell_info_labels is not None:
         print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
         optional_cell_info_labels_string: str = optional_cell_info_labels # already should be a string
-        formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{optional_cell_info_labels_string}</>'
+        # formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{optional_cell_info_labels_string}</>' # single label mode
+        optional_formatted_cell_label_string = f'<size:9>{optional_cell_info_labels_string}</>' # separate single mode
+    else:
+        optional_formatted_cell_label_string = ''
 
     # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
     # title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
@@ -1213,22 +1235,77 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     # gridspec mode:
     curr_fig.set_facecolor('0.65') # light grey
 
-    num_gridspec_columns = 8 # hardcoded
+    # num_gridspec_columns = 8 # hardcoded
+    # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+    # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+    # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+    # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
+    # curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
+    # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
+    # curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+
+
+    # # New Gridspec - Both left and right columns:
+    # num_gridspec_columns = 10 # hardcoded
+    # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+    # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][-2] = 0.2 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+    # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+    # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-2]) # the whole top row except the last element (to match the firing rates below)
+    # curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0]) # the last element of the first row contains the labels that identify the cell
+    # curr_ax_extra_information_labels = curr_fig.add_subplot(gs[0, -2:]) # the last two element of the first row contains the labels that identify the cell
+    # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-2]) # all up to excluding the last element of the row
+    # curr_ax_placefield = curr_fig.add_subplot(gs[1, -2], sharey=curr_ax_lap_spikes) # only the last element of the row
+    
+
+    # New Gridspec - Both left and right columns:
+    num_gridspec_columns = 9 # hardcoded
     gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
-    gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][1] = 0.0 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][-1] = 0.1 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
 
     gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-    curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
-    curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
-    curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
-    curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+    curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-1], label=f'ax_firing_rate[{aclu:02d}]') # the whole top row except the last element (to match the firing rates below)
+    curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
+    curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
 
+    curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
+    # curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
+    curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+
+
+    text_formatter = FormattedFigureText()
+    text_formatter.left_margin = 0.5
+    text_formatter.top_margin = 0.5
+    # text_formatter.left_margin = 0.025
+    # text_formatter.top_margin = 0.00
+    
+    title_axes_kwargs = dict(ha="center", va="center", xycoords='axes fraction') # , ma="left"
+    # title_axes_kwargs = dict(ha="left", va="bottom", ma="left", xycoords='axes fraction')
     # Setup the aclu number ("title axis"):
     # title_axes_kwargs = dict(ha="center", va="center", fontsize=22, color="black")
     # curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
     # flexitext version:
-    title_text_obj = flexitext(0.5, 0.5, formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_cell_label, ha="center", va="center")
+    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, formatted_cell_label_string, ax=curr_ax_cell_label, **title_axes_kwargs)
+    # curr_ax_cell_label.set_facecolor('0.95')
+    extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center")
+
+    # # # `flexitext` version:
+    
+    # plt.title('')
+    # plt.suptitle('')
+    # fig = plt.gcf() # get figure to setup the margins on.
+    # text_formatter.setup_margins(curr_fig)
+    # # flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:crimson, weight:bold>long ($L$)</>|<color:royalblue, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
+    # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+
     curr_ax_cell_label.axis('off')
+    curr_ax_extra_information_labels.axis('off')
 
     custom_replay_scatter_markers_plot_kwargs_list = kwargs.pop('custom_replay_scatter_markers_plot_kwargs_list', None)
     # Whether to plot the orange horizontal indicator lines that show where spikes occur. Slows down plots a lot.
@@ -1306,6 +1383,8 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)} 
 
     actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows 
+    active_context = kwargs.get('active_context', None)
+
 
     ## Figure Setup:
     fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
