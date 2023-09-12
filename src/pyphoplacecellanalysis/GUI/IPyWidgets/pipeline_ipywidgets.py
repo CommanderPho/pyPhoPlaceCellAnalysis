@@ -38,6 +38,34 @@ def fullwidth_path_widget(a_path):
 	return hbox
 
 
+# def interactive_pipeline_figure_widget(curr_active_pipeline):
+# 	import matplotlib
+# 	# configure backend here
+# 	matplotlib.use('Qt5Agg')
+# 	# backend_qt5agg
+# 	# %matplotlib qt5
+# 	# %matplotlib qt
+# 	# matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
+
+# 	import matplotlib as mpl
+# 	import matplotlib.pyplot as plt
+# 	_bak_rcParams = mpl.rcParams.copy()
+# 	# mpl.rcParams['toolbar'] = 'None' # disable toolbars
+
+# 	# Showing
+# 	restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+# 	from pyphoplacecellanalysis.External.pyqtgraph import QtWidgets, QtCore, QtGui
+# 	from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.LauncherWidget.LauncherWidget import LauncherWidget
+
+# 	widget = LauncherWidget()
+# 	treeWidget = widget.mainTreeWidget # QTreeWidget
+# 	widget.build_for_pipeline(curr_active_pipeline=curr_active_pipeline)
+# 	widget.show()
+
+
+
+
+
 def interactive_pipeline_widget(curr_active_pipeline):
 	""" 
 	Usage:
