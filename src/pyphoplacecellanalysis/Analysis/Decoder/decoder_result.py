@@ -1426,7 +1426,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
         print(f'{len(shared_aclus) = }')
 
     ## Create the raster plot:
-    app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
+    app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list, scatter_app_name=f"kourosh_activity_style_figure - Raster Epoch[{epoch_idx}]")
     
     ## Setup the aclu labels
     # Set the y range and ticks
