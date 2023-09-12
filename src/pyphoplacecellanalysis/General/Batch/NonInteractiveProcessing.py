@@ -280,11 +280,21 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
     _comp_specifiers = reversed(_comp_specifiers)
 
+    remaining_include_function_names = {k:False for k in include_includelist.copy()}
+
     for _comp_specifier in _comp_specifiers:
         if (not _comp_specifier.is_global) or include_global_functions:
-            if _comp_specifier.short_name in include_includelist:
+            if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
                 newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name='maze', on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                if (_comp_specifier.short_name in include_includelist):
+                    del remaining_include_function_names[_comp_specifier.short_name]
+                elif (_comp_specifier.computation_fn_name in include_includelist):
+                    del remaining_include_function_names[_comp_specifier.computation_fn_name]
+                else:
+                    raise NotImplementedError
 
+    if len(remaining_include_function_names) > 0:
+        print(f'WARNING: after execution of all _comp_specifiers found the functions: {remaining_include_function_names} still remain! Are they correct and do they have proper validator decorators?')
     if progress_print:
         print('done with all batch_extended_computations(...).')
 
