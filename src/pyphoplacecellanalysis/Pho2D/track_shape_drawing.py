@@ -1,7 +1,8 @@
 from typing import Tuple
 from attrs import define, field, Factory
 from collections import namedtuple
-
+import numpy as np
+import pandas as pd
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -16,7 +17,7 @@ ScaleFactors = namedtuple("ScaleFactors", ["major", "minor"])
 import matplotlib.axes
 import matplotlib.patches as patches # for matplotlib version of the plot
 
-
+import pyvista as pv # for 3D support in `LinearTrackDimensions3D`
 
 
 @function_attributes(short_name=None, tags=['graphics', 'track', 'shape', 'rendering'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-07 12:13', related_items=[])
@@ -150,6 +151,7 @@ class LinearTrackDimensions:
     def plot_rects(self, plot_item, offset=None):
         """ main function to plot """
         rects = self._build_component_rectangles()
+        rect_items = [] # probably do not need
         if offset is not None:
             offset_rects = []# [list(rect) for rect in rects]
             # for an_offset_rect in offset_rects:
@@ -165,12 +167,14 @@ class LinearTrackDimensions:
                 rect_item = QtGui.QGraphicsRectItem(x, y, w, h)
                 rect_item.setPen(pen)
                 rect_item.setBrush(brush)
+                rect_items.append(rect_item)
                 plot_item.addItem(rect_item)
             elif isinstance(plot_item, matplotlib.axes.Axes):
                 import matplotlib.patches as patches
                 # matplotlib ax was passed
                 rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='red', facecolor='red')
                 plot_item.add_patch(rect)                
+                rect_items.append(rect)
             else:
                 raise ValueError("Unsupported plot item type.")
 
@@ -181,4 +185,69 @@ class LinearTrackDimensions:
             plot_item.set_aspect('equal', 'box')    
         else:
             raise ValueError("Unsupported plot item type.")
-                
+        return rect_items, rects
+
+
+# ==================================================================================================================== #
+# 3D Support                                                                                                           #
+# ==================================================================================================================== #
+
+def get_bounds(center, x_length, y_length, z_length):
+	xMin, xMax = center[0] - x_length/2, center[0] + x_length/2
+	yMin, yMax = center[1] - y_length/2, center[1] + y_length/2
+	zMin, zMax = center[2] - z_length/2, center[2] + z_length/2
+	return (xMin, xMax, yMin, yMax, zMin, zMax)
+
+
+@define(slots=False)
+class LinearTrackDimensions3D(LinearTrackDimensions):
+	""" extends the linear track shape to 3D for use in pyvista 3D plots 
+     
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions3D
+
+    a_track_dims = LinearTrackDimensions3D()
+    merged_boxes_pdata = a_track_dims.build_maze_geometry()
+
+    ## Plotting:
+    plotter = pv.Plotter()
+
+    # # Add boxes to the plotter
+    # plotter.add_mesh(platform1, color="blue")
+    # plotter.add_mesh(platform2, color="red")
+    # plotter.add_mesh(track_body, color="green")
+
+    # Add the merged geometry to the plotter
+    plotter.add_mesh(merged_boxes_pdata, color="lightgray")
+
+    # Show the plot
+    plotter.show()
+
+     
+    """
+	box_thickness: float = field(default=1.0) #= size/10.0
+	track_thickness: float = field(default=1.0) # = size/10.0
+
+	def build_maze_geometry(self, position_offset=(0, 0, -0.01)):
+		size = self.platform_side_length
+
+		# Create two square boxes
+		platform1 = pv.Box(bounds=get_bounds([0, 0, 0], size, size, self.box_thickness))
+		platform2 = pv.Box(bounds=get_bounds([(self.platform_side_length + self.track_length), 0, 0], size, size, self.box_thickness))
+
+		# Create connecting box (rectangular)
+		track_body_center = [(platform1.bounds[1] + platform2.bounds[0])/2, 0, 0]
+		track_body = pv.Box(bounds=get_bounds(track_body_center, self.track_length, self.track_width, self.track_thickness))
+		
+
+		# Merge the three boxes into a single pv.PolyData object
+		merged_boxes_pdata = platform1 + platform2 + track_body
+		merged_boxes_pdata['occupancy heatmap'] = np.arange(np.shape(merged_boxes_pdata.points)[0])
+		merged_boxes_pdata.translate(position_offset)
+
+        # Separate meshes:
+		# _out_tuple = (platform1, platform2, track_body)
+		# _out_tuple = [a_mesh.translate((0, 0, -0.01)) for a_mesh in _out_tuple]
+        # return merged_boxes_pdata , _out_tuple # usage: `merged_boxes_pdata, (platform1, platform2, track_body) = a_track_dims.build_maze_geometry()`
+								
+		return merged_boxes_pdata
+     
