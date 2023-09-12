@@ -51,9 +51,7 @@ import awkward as ak # `simpler_compute_measured_vs_expected_firing_rates` new A
 
 
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
-from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
-from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
-from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from neuropy.utils.result_context import IdentifyingContext
 
 
@@ -2576,7 +2574,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
     SxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'})
 
     ## New
-    all_incl_endPlatforms_InstSpikeRateTrends_df: pd.DataFrame = serialized_field(init=False, repr=False, default=pd.DataFrame({}), is_computable=False)
+    all_incl_endPlatforms_InstSpikeRateTrends_df: Optional[pd.DataFrame] = non_serialized_field(init=False, repr=False, default=None, is_computable=False)
 
     def compute(self, curr_active_pipeline, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
