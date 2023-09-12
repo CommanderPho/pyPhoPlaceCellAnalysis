@@ -585,7 +585,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         del state['_persistance_state']
         del state['_plot_object']
         #TODO 2023-06-09 12:06: - [ ] What about the display objects?
-        
+        del state['display_output'] # self.stage.display_output
+        del state['render_actions']
+
         del state['_registered_output_files']
         del state['_outputs_specifier']
         # del state['_pickle_path']
@@ -635,6 +637,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # Reload both the computation and display functions to get the updated values:
         self.reload_default_computation_functions()
         self.reload_default_display_functions()
+        self.clear_display_outputs()
         self.clear_registered_output_files() # outputs are reset each load, should they be?
 
 
