@@ -26,7 +26,8 @@ class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Co
     _computationPrecidence = 1000
     _is_global = True
 
-
+    @function_attributes(short_name='PBE_stats', tags=['PBE', 'stats'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-09-12 17:37', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['PBE_stats_analyses'], curr_active_pipeline.global_computation_results.computed_data['pbe_analyses_result_df']), is_global=True)
     def _perform_PBE_stats_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ 
         

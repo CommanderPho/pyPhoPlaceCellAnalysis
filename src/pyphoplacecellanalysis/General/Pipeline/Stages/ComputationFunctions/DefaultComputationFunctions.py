@@ -31,6 +31,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     _computationPrecidence = 1 # must be done after PlacefieldComputations
     _is_global = False
 
+
+    @function_attributes(short_name=None, tags=['decoding', 'position'], input_requires=["computed_data['pf1D']", "computed_data['pf2D']"], output_provides=[], uses=['BayesianPlacemapPositionDecoder'], used_by=[], creation_date='2023-09-12 17:30', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_Decoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_Decoder']), is_global=False)
     def _perform_position_decoding_computation(computation_result: ComputationResult, **kwargs):
         """ Builds the 1D & 2D Placefield Decoder 
         
@@ -52,6 +55,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         placefield_computation_config = computation_result.computation_config.pf_params # should be a PlacefieldComputationParameters
         return position_decoding_computation(computation_result.sess, placefield_computation_config, computation_result)
     
+
+    @function_attributes(short_name=None, tags=['decoding', 'position', 'two-step'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_TwoStepDecoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_TwoStepDecoder']), is_global=False)
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         """
@@ -200,6 +206,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         return computation_result
 
+    @function_attributes(short_name=None, tags=['decoding', 'recursive', 'latent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 17:34', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_RecursiveLatent'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_RecursiveLatent']), is_global=False)
     def _perform_recursive_latent_placefield_decoding(computation_result: ComputationResult, **kwargs):
         """ note that currently the pf1D_Decoders are not built or used. 
 
@@ -310,7 +318,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         return computation_result
 
 
-    @function_attributes(short_name='_perform_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-07 02:16')
+    @function_attributes(short_name='_perform_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-07 02:16',
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['specific_epochs_decoding']), is_global=False)
     def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
         """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
         Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
