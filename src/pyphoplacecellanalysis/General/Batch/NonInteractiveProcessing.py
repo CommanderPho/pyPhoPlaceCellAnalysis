@@ -276,20 +276,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     ## Specify the computations and the requirements to validate them.
 
     ## Hardcoded comp_specifiers
-    _comp_specifiers = []
-    
-    ## From the registered computation functions, gather any validators and build the SpecificComputationValidator for them, then append them to `_comp_specifiers`:
-    for a_fn_name, a_fn in curr_active_pipeline.registered_merged_computation_function_dict.items():
-        # print(f'{a_fn_name}')
-        if hasattr(a_fn, 'validate_computation_test') and (a_fn.validate_computation_test is not None):
-            # Look for the validate_computation_test arguments specified in the @function_attributes decorator if they exist and use those to check if the computation have been done.
-            # print(f'{a_fn_name}')
-            # print(a_fn.__name__)
-            # a_fn.validate_computation_test
-            a_fn_validator: SpecificComputationValidator = SpecificComputationValidator.init_from_decorated_fn(a_fn) # (short_name=a_fn_name.short_name, computation_fn_name='_perform_baseline_placefield_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D']), is_global=False),
-            _comp_specifiers.append(a_fn_validator)        
-        
-            
+    _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
     ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
     _comp_specifiers = reversed(_comp_specifiers)
 

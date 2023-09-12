@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from datetime import datetime
 import pathlib
 from pathlib import Path
+import pandas as pd
+
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -168,6 +171,22 @@ class LoadableSessionInput:
     @session_name.setter
     def session_name(self, value):
         self.sess.name = value
+        
+
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        return self.sess.get_output_path()
+
+    def get_session_context(self) -> IdentifyingContext:
+        """ returns the context of the unfiltered session (self.sess) """
+        return self.sess.get_context()
+
+    def get_session_unique_aclu_information(self) -> pd.DataFrame:
+        """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'cell_type'] columns """
+        return self.sess.spikes_df.spikes.extract_unique_neuron_identities()
+    
+
+
 
 
 @metadata_attributes(short_name=None, tags=['registered_output_files', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-24 09:00', related_items=[])
@@ -372,4 +391,15 @@ class PipelineWithLoadableStage(RegisteredOutputsMixin):
         self.stage.post_load(progress_logger=self.logger)
 
         
+    ## Session passthroughs:
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        return self.stage.get_output_path()
 
+    def get_session_context(self) -> IdentifyingContext:
+        """ returns the context of the unfiltered session (self.sess) """
+        return self.stage.get_session_context()
+
+    def get_session_unique_aclu_information(self) -> pd.DataFrame:
+        """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'cell_type'] columns """
+        return self.stage.get_session_unique_aclu_information()

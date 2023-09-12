@@ -198,8 +198,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             active_registered_computation_function_dict = self.registered_computation_function_dict
         elif search_mode.name == FunctionsSearchMode.ANY.name:
             # build a merged function dictionary containing both global and non-global functions:
-            merged_computation_function_dict = (self.registered_global_computation_function_dict | self.registered_computation_function_dict)
-            active_registered_computation_function_dict = merged_computation_function_dict
+            active_registered_computation_function_dict = self.registered_merged_computation_function_dict
         else:
             raise NotImplementedError
 
@@ -836,6 +835,7 @@ class PipelineWithComputedPipelineStageMixin:
         return self.stage.registered_merged_computation_function_names
 
     def get_merged_computation_function_validators(self) -> Dict[str, SpecificComputationValidator]:
+        ## From the registered computation functions, gather any validators and build the SpecificComputationValidator for them, then append them to `_comp_specifiers`:
         return {k:SpecificComputationValidator.init_from_decorated_fn(v) for k,v in self.registered_merged_computation_function_dict.items() if hasattr(v, 'validate_computation_test') and (v.validate_computation_test is not None)}
 
 
@@ -977,6 +977,12 @@ class PipelineWithComputedPipelineStageMixin:
     def get_session_context(self) -> IdentifyingContext:
         """ returns the context of the unfiltered session (self.sess) """
         return self.sess.get_context()
+
+
+    def get_session_unique_aclu_information(self) -> pd.DataFrame:
+        """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'cell_type'] columns """
+        return self.sess.spikes_df.spikes.extract_unique_neuron_identities()
+
 
 
     # @property
