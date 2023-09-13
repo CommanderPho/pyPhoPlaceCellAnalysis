@@ -417,7 +417,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             ## Add the 3D Maze Shape
             assert self.active_config.computation_config.pf_params.grid_bin_bounds is not None, f"could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds"
             a_track_dims = LinearTrackDimensions3D()
-            a_track_dims, ideal_maze_pdata = LinearTrackDimensions3D.init_from_grid_bin_bounds(self.params.active_epoch_placefields.config.grid_bin_bounds, return_geoemtry=True)
+            a_track_dims, ideal_maze_pdata = LinearTrackDimensions3D.init_from_grid_bin_bounds(self.active_config.computation_config.pf_params.grid_bin_bounds, return_geoemtry=True)
             self.plots['maze_bg'] = perform_plot_flat_arena(self.p, ideal_maze_pdata, name='maze_bg', label='idealized_maze', color=[1.0, 0.3, 0.3]) # [0.3, 0.3, 0.3]
             
 
