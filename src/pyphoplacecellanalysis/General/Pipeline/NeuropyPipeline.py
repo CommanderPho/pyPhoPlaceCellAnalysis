@@ -814,9 +814,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         jonathan_firing_rate_analysis_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/jonathan_fr_analysis', active_context=session_context)
 
         # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
-        inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
-        # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
-        inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+        try:
+            inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+            # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
+            inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+        except KeyError:
+            print(f'long_short_inst_spike_rate_groups is missing and will be skipped')
+        except BaseException:
+            raise
 
         if not isinstance(expected_v_observed_result, ExpectedVsObservedResult):
             expected_v_observed_result = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
