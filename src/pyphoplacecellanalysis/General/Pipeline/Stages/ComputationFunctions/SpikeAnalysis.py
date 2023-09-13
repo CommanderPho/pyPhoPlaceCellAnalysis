@@ -2,6 +2,7 @@ from attrs import define, field, asdict
 import numpy as np
 import pandas as pd
 from indexed import IndexedOrderedDict
+from typing import Optional, Dict, List
 import itertools
 
 # from neurodsp.burst import detect_bursts_dual_threshold, compute_burst_stats
@@ -62,7 +63,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     #TODO 2023-07-31 08:36: - [ ] both of these properties would ideally be serialized to HDF, but they can't be right now.`
     inst_fr_df_list: list[pd.DataFrame] = non_serialized_field() # a list containing a inst_fr_df for each epoch. 
     inst_fr_signals_list: list[AnalogSignal] = non_serialized_field()
-    included_neuron_ids: np.ndarray = serialized_field(is_computable=False) # .shape (n_cells,)
+    included_neuron_ids: Optional[np.ndarray] = serialized_field(default=None, is_computable=False) # .shape (n_cells,)
     filter_epochs_df: pd.DataFrame = serialized_field(is_computable=False) # .shape (n_epochs, ...)
     
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01, is_computable=False)
