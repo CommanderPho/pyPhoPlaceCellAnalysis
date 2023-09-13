@@ -45,7 +45,7 @@ spike_geom_box = pv.Box(bounds=[-0.2, 0.2, -0.2, 0.2, -0.05, 0.05])
 
 
 def _build_flat_arena_data(x, y, z=-0.01, smoothing=True, extrude_height=-5):
-        # Builds the flat base maze map that the other data will be plot on top of
+        # Builds the flat base maze map from the x, y position data that the other data will be plot on top of
         ## Implicitly relies on: x, y
         # z = np.zeros_like(x)
         z = np.full_like(x, z) # offset just slightly in the z direction to account for the thickness of the caps that are added upon extrude
