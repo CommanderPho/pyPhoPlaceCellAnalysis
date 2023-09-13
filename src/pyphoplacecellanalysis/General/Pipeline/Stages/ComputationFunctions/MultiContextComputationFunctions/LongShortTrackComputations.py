@@ -221,7 +221,12 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         
         active_context = kwargs.pop('active_context', None) # TODO: requiring that the caller pass active_context isn't optimal
         _neuron_replay_stats_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(_neuron_replay_stats_df, active_context=active_context, aclu_column_name=None)
-        _neuron_replay_stats_df.to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True)
+        try:
+            _neuron_replay_stats_df.to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True) # TypeError: Cannot serialize the column [neuron_type] because its data contents are not [string] but [mixed] object dtype
+        except TypeError:
+            _neuron_replay_stats_df.astype(str).to_hdf(file_path, key=f'{key}/neuron_replay_stats_df', format='table', data_columns=True)
+        except BaseException:
+            raise
 
         self.rdf.rdf.to_hdf(file_path, key=f'{key}/rdf/df') # , format='table', data_columns=True Can't do 'table' format because `TypeError: Cannot serialize the column [firing_rates] because its data contents are not [string] but [mixed] object dtype`
         aclu_to_idx: Dict = self.rdf.aclu_to_idx
@@ -2574,7 +2579,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
     SxC_ThetaDeltaPlus: SpikeRateTrends = serialized_field(init=False, repr=False, default=None, is_computable=True, hdf_metadata={'track_eXclusive_cells': 'SxC', 'epochs': 'Laps', 'track_change_relative_period': 'DeltaPlus'})
 
     ## New
-    all_incl_endPlatforms_InstSpikeRateTrends_df: Optional[pd.DataFrame] = non_serialized_field(init=False, repr=False, default=None, is_computable=False)
+    all_incl_endPlatforms_InstSpikeRateTrends_df: Optional[pd.DataFrame] = non_serialized_field(repr=False, default=None, is_computable=False) # converter=attrs.converters.default_if_none("")
 
     def compute(self, curr_active_pipeline, **kwargs):
         """ full instantaneous computations for both Long and Short epochs:
