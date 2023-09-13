@@ -237,48 +237,58 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
     
 
     @classmethod
-    def init_from_grid_bin_bounds(cls, grid_bin_bounds, return_geoemtry=True):
+    def init_from_grid_bin_bounds(cls, grid_bin_bounds, return_geoemtry=True, debug_print=False):
+        """ Builds the object and the maze mesh data from the grid_bin_bounds provided.
+        
+        ## Add the 3D Maze Shape
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions, LinearTrackDimensions3D
+            from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import perform_plot_flat_arena
+
+            a_track_dims = LinearTrackDimensions3D()
+            a_track_dims, ideal_maze_pdata = LinearTrackDimensions3D.init_from_grid_bin_bounds(grid_bin_bounds, return_geoemtry=True)
+            ipspikesDataExplorer.plots['maze_bg_ideal'] = perform_plot_flat_arena(pActiveSpikesBehaviorPlotter, ideal_maze_pdata, name='idealized_maze_bg', label='idealized_maze', color=[1.0, 0.3, 0.3]) # [0.3, 0.3, 0.3]
+
+
+        """
         ((x, x2), (y, y2)) = grid_bin_bounds #TODO BUG 2023-09-13 13:19: - [ ] incorrect: `((x, y), (x2, y2)) = grid_bin_bounds` -> correction: `((x, x2), (y, y2)) = grid_bin_bounds` I think this is incorrect interpretation of grid_bin_bounds everywhere I used it in the LinearTrackDimensions and LinearTrackDimensions3D, maybe explains why `LinearTrackDimensions` wasn't working right either.
         _length, _width = abs(x2 - x), abs(y2 - y)
-        print(f'_length: {_length}, _width: {_width}')
+        if debug_print:
+            print(f'_length: {_length}, _width: {_width}')
         _obj = cls()
-        
-
         deduced_track_length: float = _length - (_obj.platform_side_length * 2.0)
-        print(f'deduced_track_length: {deduced_track_length}')
+        if debug_print:
+            print(f'deduced_track_length: {deduced_track_length}')
         _obj.track_length = deduced_track_length
         ## TODO for now just keep the track_width and platform_side_lengths fixed, ignoring the grid_bin_bounds, since we know those from physical dimension measurements        
-
-        grid_bin_bounds_extents = (x, y, _length, _width)
-        axis_scale_factors = (1.0/_length, 1.0/_width)
+        # grid_bin_bounds_extents = (x, y, _length, _width)
+        # axis_scale_factors = (1.0/_length, 1.0/_width)
         
         # BUILD THE GEOMETRY
         if return_geoemtry:
-            # grid_bin_bounds_center_point = (point_tuple_mid_point(grid_bin_bounds[0]), point_tuple_mid_point(grid_bin_bounds[1]))
-            # a_position_offset = (*grid_bin_bounds_center_point, 0.0) #- a_track_dims.get_center_point()
-            # a_center_correction_offset = ((_obj.platform_side_length/2.0)-_obj.get_center_point()[0], 0.0, 0.0)
-            # a_position_offset = np.array(a_position_offset) + np.array(a_center_correction_offset)
-            maze_pdata = _obj.build_maze_geometry(position_offset=a_position_offset, grid_bin_bounds=grid_bin_bounds)
+            maze_pdata = _obj.build_maze_geometry(grid_bin_bounds=grid_bin_bounds)
             return _obj, maze_pdata
         else:
             return _obj
         
-    def build_maze_geometry(self, position_offset=(0, 0, -0.01), from_grid_bin_bounds=None):
+    def build_maze_geometry(self, position_offset=None, grid_bin_bounds=None):
         """ builds the maze geometry for use with pyvista.
         
         """
         size = self.platform_side_length
         
-        if from_grid_bin_bounds is not None:
+        if grid_bin_bounds is not None:
             # This mode computes the correct position_offset point from the grid_bin_bounds provided and self's center properties
-            assert position_offset is None, f"from_grid_bin_bounds is provided and in this mode position_offset will not be used!"
-            grid_bin_bounds_center_point = (point_tuple_mid_point(from_grid_bin_bounds[0]), point_tuple_mid_point(from_grid_bin_bounds[1]))
+            assert position_offset is None, f"grid_bin_bounds is provided and in this mode position_offset will not be used!"
+            grid_bin_bounds_center_point = (point_tuple_mid_point(grid_bin_bounds[0]), point_tuple_mid_point(grid_bin_bounds[1]))
             a_position_offset = (*grid_bin_bounds_center_point, 0.0) #- a_track_dims.get_center_point()
             a_center_correction_offset = ((self.platform_side_length/2.0)-self.get_center_point()[0], 0.0, 0.0)
             a_position_offset = np.array(a_position_offset) + np.array(a_center_correction_offset)
-            return self.build_maze_geometry(position_offset=a_position_offset, from_grid_bin_bounds=None) # call `build_maze_geometry` in simple position_offset mode
+            return self.build_maze_geometry(position_offset=a_position_offset, grid_bin_bounds=None) # call `build_maze_geometry` in simple position_offset mode
             
         else:
+            if position_offset is None:
+                position_offset = (0, 0, -0.01) # set default
+                
             # Create two square boxes
             platform1 = pv.Box(bounds=get_bounds([0, 0, 0], size, size, self.box_thickness))
             platform2 = pv.Box(bounds=get_bounds([(self.platform_side_length + self.track_length), 0, 0], size, size, self.box_thickness))
