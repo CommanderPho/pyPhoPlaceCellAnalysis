@@ -32,7 +32,7 @@ from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsol
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import perform_plot_flat_arena
 #
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
-from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions, LinearTrackDimensions3D
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions3D
 
 
 # SpikesDataframeOwningFromSessionMixin
@@ -292,7 +292,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.p.enable_depth_peeling(number_of_peels=8, occlusion_ratio=0) # drastically improves rendering but bogs down performance
         
         # Plot the flat arena
-        if self.params.get('should_use_linear_track_geometry', False):
+        if not self.params.get('should_use_linear_track_geometry', False):
             # linear track geometry is not used to build the arena model, meaning for linear tracks it won't look as good as the geometry version.
             ## The track shape will be approximated from the positions and the positions of the spikes:
             self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
