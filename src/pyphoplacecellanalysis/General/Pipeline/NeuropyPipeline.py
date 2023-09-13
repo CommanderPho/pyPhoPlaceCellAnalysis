@@ -585,8 +585,28 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         del state['_persistance_state']
         del state['_plot_object']
         #TODO 2023-06-09 12:06: - [ ] What about the display objects?
-        del state['display_output'] # self.stage.display_output
-        del state['render_actions']
+
+        # ## self.stage approach:
+        # stage = state.get('stage', None)
+        # if stage is not None:
+        #     del stage['display_output'] # self.stage.display_output
+        #     del stage['display_output'] # self.stage.display_output
+
+        try:
+            del state['display_output'] # self.stage.display_output
+        except KeyError:
+            print(f'pipeline does not have "display_output"')
+            pass
+        except BaseException:
+            raise
+
+        try:
+            del state['render_actions'] # self.stage.display_output
+        except KeyError:
+            print(f'pipeline does not have "render_actions"')
+            pass
+        except BaseException:
+            raise
 
         del state['_registered_output_files']
         del state['_outputs_specifier']
