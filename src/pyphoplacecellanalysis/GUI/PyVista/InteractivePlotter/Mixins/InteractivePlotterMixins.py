@@ -111,6 +111,7 @@ class InteractivePyvistaPlotter_PointAndPathPlottingMixin:
         Updates the existing plot if the same plot_name is reused. """
         ## COMPAT: merge operator '|'requires Python 3.9
         pdata_current_point = pv.PolyData(curr_animal_point) # a mesh
+        
         pc_current_point = pdata_current_point.glyph(scale=False, geom=point_location_circle)
         
         self.plots_data[plot_name] = {'pdata_current_point':pdata_current_point, 'pc_current_point':pc_current_point}
