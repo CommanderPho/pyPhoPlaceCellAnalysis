@@ -40,7 +40,7 @@ class LinearTrackDimensions:
         # Variant:> Compute axis scale factors from grid_bin_bounds
         grid_bin_bounds = long_pf1D.config.grid_bin_bounds # ((29.16, 261.7), (130.23, 150.99))
 
-        ((x, y), (x2, y2)) = grid_bin_bounds
+        ((x, y), (x2, y2)) = grid_bin_bounds #TODO BUG 2023-09-13 13:19: - [ ] incorrect: `((x, y), (x2, y2)) = grid_bin_bounds` -> correction: `((x, x2), (y, y2)) = grid_bin_bounds` I think this is incorrect interpretation of grid_bin_bounds everywhere I used it in the LinearTrackDimensions and LinearTrackDimensions3D, maybe explains why `LinearTrackDimensions` wasn't working right either.
         _height = abs(y2 - y)
         _width = abs(x2 - x)
         print(f'_height: {_height}, _width: {_width}')
@@ -192,16 +192,19 @@ class LinearTrackDimensions:
 # 3D Support                                                                                                           #
 # ==================================================================================================================== #
 
+from pyphocorehelpers.geometry_helpers import point_tuple_mid_point
+
+
 def get_bounds(center, x_length, y_length, z_length):
-	xMin, xMax = center[0] - x_length/2, center[0] + x_length/2
-	yMin, yMax = center[1] - y_length/2, center[1] + y_length/2
-	zMin, zMax = center[2] - z_length/2, center[2] + z_length/2
-	return (xMin, xMax, yMin, yMax, zMin, zMax)
+    xMin, xMax = center[0] - x_length/2, center[0] + x_length/2
+    yMin, yMax = center[1] - y_length/2, center[1] + y_length/2
+    zMin, zMax = center[2] - z_length/2, center[2] + z_length/2
+    return (xMin, xMax, yMin, yMax, zMin, zMax)
 
 
 @define(slots=False)
 class LinearTrackDimensions3D(LinearTrackDimensions):
-	""" extends the linear track shape to 3D for use in pyvista 3D plots 
+    """ extends the linear track shape to 3D for use in pyvista 3D plots 
      
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions3D
 
@@ -224,30 +227,76 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
 
      
     """
-	box_thickness: float = field(default=1.0) #= size/10.0
-	track_thickness: float = field(default=1.0) # = size/10.0
+    box_thickness: float = field(default=1.0) #= size/10.0
+    track_thickness: float = field(default=1.0) # = size/10.0
 
-	def build_maze_geometry(self, position_offset=(0, 0, -0.01)):
-		size = self.platform_side_length
+    def get_center_point(self):
+        return (self.total_length/2.0,
+                self.total_width/2.0,
+                self.box_thickness/2.0)
+    
 
-		# Create two square boxes
-		platform1 = pv.Box(bounds=get_bounds([0, 0, 0], size, size, self.box_thickness))
-		platform2 = pv.Box(bounds=get_bounds([(self.platform_side_length + self.track_length), 0, 0], size, size, self.box_thickness))
+    @classmethod
+    def init_from_grid_bin_bounds(cls, grid_bin_bounds, return_geoemtry=True):
+        ((x, x2), (y, y2)) = grid_bin_bounds #TODO BUG 2023-09-13 13:19: - [ ] incorrect: `((x, y), (x2, y2)) = grid_bin_bounds` -> correction: `((x, x2), (y, y2)) = grid_bin_bounds` I think this is incorrect interpretation of grid_bin_bounds everywhere I used it in the LinearTrackDimensions and LinearTrackDimensions3D, maybe explains why `LinearTrackDimensions` wasn't working right either.
+        _length, _width = abs(x2 - x), abs(y2 - y)
+        print(f'_length: {_length}, _width: {_width}')
+        _obj = cls()
+        
 
-		# Create connecting box (rectangular)
-		track_body_center = [(platform1.bounds[1] + platform2.bounds[0])/2, 0, 0]
-		track_body = pv.Box(bounds=get_bounds(track_body_center, self.track_length, self.track_width, self.track_thickness))
-		
+        deduced_track_length: float = _length - (_obj.platform_side_length * 2.0)
+        print(f'deduced_track_length: {deduced_track_length}')
+        _obj.track_length = deduced_track_length
+        ## TODO for now just keep the track_width and platform_side_lengths fixed, ignoring the grid_bin_bounds, since we know those from physical dimension measurements        
 
-		# Merge the three boxes into a single pv.PolyData object
-		merged_boxes_pdata = platform1 + platform2 + track_body
-		merged_boxes_pdata['occupancy heatmap'] = np.arange(np.shape(merged_boxes_pdata.points)[0])
-		merged_boxes_pdata.translate(position_offset)
+        grid_bin_bounds_extents = (x, y, _length, _width)
+        axis_scale_factors = (1.0/_length, 1.0/_width)
+        
+        # BUILD THE GEOMETRY
+        if return_geoemtry:
+            # grid_bin_bounds_center_point = (point_tuple_mid_point(grid_bin_bounds[0]), point_tuple_mid_point(grid_bin_bounds[1]))
+            # a_position_offset = (*grid_bin_bounds_center_point, 0.0) #- a_track_dims.get_center_point()
+            # a_center_correction_offset = ((_obj.platform_side_length/2.0)-_obj.get_center_point()[0], 0.0, 0.0)
+            # a_position_offset = np.array(a_position_offset) + np.array(a_center_correction_offset)
+            maze_pdata = _obj.build_maze_geometry(position_offset=a_position_offset, grid_bin_bounds=grid_bin_bounds)
+            return _obj, maze_pdata
+        else:
+            return _obj
+        
+    def build_maze_geometry(self, position_offset=(0, 0, -0.01), from_grid_bin_bounds=None):
+        """ builds the maze geometry for use with pyvista.
+        
+        """
+        size = self.platform_side_length
+        
+        if from_grid_bin_bounds is not None:
+            # This mode computes the correct position_offset point from the grid_bin_bounds provided and self's center properties
+            assert position_offset is None, f"from_grid_bin_bounds is provided and in this mode position_offset will not be used!"
+            grid_bin_bounds_center_point = (point_tuple_mid_point(from_grid_bin_bounds[0]), point_tuple_mid_point(from_grid_bin_bounds[1]))
+            a_position_offset = (*grid_bin_bounds_center_point, 0.0) #- a_track_dims.get_center_point()
+            a_center_correction_offset = ((self.platform_side_length/2.0)-self.get_center_point()[0], 0.0, 0.0)
+            a_position_offset = np.array(a_position_offset) + np.array(a_center_correction_offset)
+            return self.build_maze_geometry(position_offset=a_position_offset, from_grid_bin_bounds=None) # call `build_maze_geometry` in simple position_offset mode
+            
+        else:
+            # Create two square boxes
+            platform1 = pv.Box(bounds=get_bounds([0, 0, 0], size, size, self.box_thickness))
+            platform2 = pv.Box(bounds=get_bounds([(self.platform_side_length + self.track_length), 0, 0], size, size, self.box_thickness))
 
-        # Separate meshes:
-		# _out_tuple = (platform1, platform2, track_body)
-		# _out_tuple = [a_mesh.translate((0, 0, -0.01)) for a_mesh in _out_tuple]
-        # return merged_boxes_pdata , _out_tuple # usage: `merged_boxes_pdata, (platform1, platform2, track_body) = a_track_dims.build_maze_geometry()`
-								
-		return merged_boxes_pdata
+            # Create connecting box (rectangular)
+            track_body_center = [(platform1.bounds[1] + platform2.bounds[0])/2, 0, 0]
+            track_body = pv.Box(bounds=get_bounds(track_body_center, self.track_length, self.track_width, self.track_thickness))
+            
+
+            # Merge the three boxes into a single pv.PolyData object
+            merged_boxes_pdata = platform1 + platform2 + track_body
+            merged_boxes_pdata['occupancy heatmap'] = np.arange(np.shape(merged_boxes_pdata.points)[0])
+            merged_boxes_pdata.translate(position_offset)
+
+            # Separate meshes:
+            # _out_tuple = (platform1, platform2, track_body)
+            # _out_tuple = [a_mesh.translate((0, 0, -0.01)) for a_mesh in _out_tuple]
+            # return merged_boxes_pdata , _out_tuple # usage: `merged_boxes_pdata, (platform1, platform2, track_body) = a_track_dims.build_maze_geometry()`
+                                    
+            return merged_boxes_pdata
      
