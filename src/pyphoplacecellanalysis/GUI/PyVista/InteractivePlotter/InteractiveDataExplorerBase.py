@@ -11,14 +11,14 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.Pho3D.PyVista.gui import customize_default_pyvista_theme, get_gradients, print_controls_helper_text
 from pyphoplacecellanalysis.PhoPositionalData.import_data import build_spike_positions_list # Used in _unpack_variables
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.InteractivePlotterMixins import InteractivePyvistaPlotter_ObjectManipulationMixin, InteractivePyvistaPlotter_PointAndPathPlottingMixin, InteractivePyvistaPlotterBuildIfNeededMixin
-
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecoderRenderingPyVistaMixin
 
 ######### MIXINS #############
 ##############################
 
 ######### InteractiveDataExplorerBase #############
 ##############################        
-class InteractiveDataExplorerBase(InteractivePyvistaPlotter_PointAndPathPlottingMixin, InteractivePyvistaPlotterBuildIfNeededMixin, InteractivePyvistaPlotter_ObjectManipulationMixin, QtCore.QObject):
+class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvistaPlotter_PointAndPathPlottingMixin, InteractivePyvistaPlotterBuildIfNeededMixin, InteractivePyvistaPlotter_ObjectManipulationMixin, QtCore.QObject):
     """The common abstract base class for building an interactive PyVistaQT BackgroundPlotter with extra GUI components and controls.
     
     Function call order:
