@@ -7,6 +7,7 @@ class InteractivePyvistaPlotter_MazeRenderingMixin:
 	""" 
 	from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.MazeRenderingMixin import InteractivePyvistaPlotter_MazeRenderingMixin
 
+	Renders the 3D track/maze shape on the 3D PyVista plot.
 
 	"""
 
