@@ -233,7 +233,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_extended_computations(curr_active_pipeline, include_includelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool = False):
+def batch_extended_computations(curr_active_pipeline, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False, dry_run:bool=False):
     """ performs the remaining required global computations
 
     """
@@ -265,14 +265,21 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
     ## Get computed relative entropy measures:
     global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
-    global_results = curr_active_pipeline.computation_results[global_epoch_name].computed_data #['computed_data']
+
+    if included_computation_filter_names is None:
+        included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
+        if progress_print:
+            print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
+
+    else:
+        if progress_print:
+            print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
+
 
     # ## Get existing `pf1D_dt`:
     # active_pf_1D = global_results.pf1D
     # active_pf_1D_dt = global_results.pf1D_dt
-    if progress_print:
-        print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
-
+    
     ## Specify the computations and the requirements to validate them.
 
     ## Hardcoded comp_specifiers
@@ -285,7 +292,21 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     for _comp_specifier in _comp_specifiers:
         if (not _comp_specifier.is_global) or include_global_functions:
             if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
-                newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name='maze', on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                if (not _comp_specifier.is_global):
+                    # Not Global-only, need to compute for all `included_computation_filter_names`:
+                    for a_computation_filter_name in included_computation_filter_names:
+                        if not dry_run:
+                            newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name=a_computation_filter_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                        else:
+                            print(f'dry-run: {_comp_specifier.short_name}, computation_filter_name={a_computation_filter_name}')
+
+                else:
+                    # Global-Only:
+                    if not dry_run:
+                        newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                    else:
+                        print(f'dry-run: {_comp_specifier.short_name}')
+
                 if (_comp_specifier.short_name in include_includelist):
                     del remaining_include_function_names[_comp_specifier.short_name]
                 elif (_comp_specifier.computation_fn_name in include_includelist):
