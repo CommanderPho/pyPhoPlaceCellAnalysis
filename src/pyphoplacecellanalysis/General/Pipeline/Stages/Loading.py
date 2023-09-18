@@ -47,6 +47,13 @@ def saveData(pkl_path, db, should_append=False):
 global_move_modules_list:Dict={
     'pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper.SingleBarResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.SingleBarResult',
     'pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper.InstantaneousSpikeRateGroupsComputation':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.InstantaneousSpikeRateGroupsComputation',
+    	# 'pyphoplacecellanalysis.General.Configs.DynamicConfigs.*':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.*', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.VideoOutputModeConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.VideoOutputModeConfig', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.PlottingConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.PlottingConfig',
+	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.InteractivePlaceCellConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.InteractivePlaceCellConfig',
+	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
+	'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.SingleNeuronPlottingExtended':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig.SingleNeuronPlottingExtended',
+	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
 }
 
 
