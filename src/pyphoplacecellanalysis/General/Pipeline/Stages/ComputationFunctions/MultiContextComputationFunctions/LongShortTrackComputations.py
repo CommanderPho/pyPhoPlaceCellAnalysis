@@ -984,9 +984,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-        
-
-
     # InstantaneousSpikeRateGroupsComputation
     @function_attributes(short_name='long_short_inst_spike_rate_groups', tags=['long_short', 'LxC', 'SxC', 'Figure2','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=['global_computation_results.computed_data.long_short_inst_spike_rate_groups'], uses=[], used_by=[], creation_date='2023-08-21 16:52', related_items=[],
                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']), is_global=True)
@@ -1132,6 +1129,80 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         """
         return global_computation_results
+
+
+    @function_attributes(short_name=None, tags=['long_short_endcap_analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-15 10:37', related_items=[],
+                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_endcap']), is_global=True)
+    def _perform_long_short_endcap_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+        """ Must be performed after `_perform_jonathan_replay_firing_rate_analyses`
+        
+        
+        
+    
+        Requires:
+            ['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis']
+            
+        Provides:
+            computation_result.computed_data['long_short_inst_spike_rate_groups']
+        
+        """
+        jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = global_computation_results.computed_data.jonathan_firing_rate_analysis
+
+        neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - 150 # this shift of 150.0 is to center the midpoint of the track at 0. 
+        is_left_cap = (long_pf_peaks < -72.0)
+        is_right_cap = (long_pf_peaks > 72.0)
+        # is_either_cap =  np.logical_or(is_left_cap, is_right_cap)
+
+        neuron_replay_stats_df['is_long_peak_left_cap'] = False
+        neuron_replay_stats_df['is_long_peak_right_cap'] = False
+        neuron_replay_stats_df.loc[is_left_cap.index, 'is_long_peak_left_cap'] = True
+        neuron_replay_stats_df.loc[is_right_cap.index, 'is_long_peak_right_cap'] = True
+
+        neuron_replay_stats_df['is_long_peak_either_cap'] = np.logical_or(neuron_replay_stats_df['is_long_peak_left_cap'], neuron_replay_stats_df['is_long_peak_right_cap'])
+
+        cap_cells_df = neuron_replay_stats_df[np.logical_and(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['is_long_peak_either_cap'])]
+        num_total_endcap_cells = len(cap_cells_df)
+
+        # "Disppearing" cells fall below the 1Hz firing criteria on the short track:
+        disappearing_endcap_cells_df = cap_cells_df[np.logical_not(cap_cells_df['has_short_pf'])]
+        num_disappearing_endcap_cells = len(disappearing_endcap_cells_df)
+        print(f'num_disappearing_endcap_cells/num_total_endcap_cells: {num_disappearing_endcap_cells}/{num_total_endcap_cells}')
+
+        non_disappearing_endcap_cells_df = cap_cells_df[cap_cells_df['has_short_pf']] # "non_disappearing" cells are those with a placefield on the short track as well
+        num_non_disappearing_endcap_cells = len(non_disappearing_endcap_cells_df)
+        print(f'num_non_disappearing_endcap_cells/num_total_endcap_cells: {num_non_disappearing_endcap_cells}/{num_total_endcap_cells}')
+
+        # display(non_disappearing_endcap_cells_df)
+        non_disappearing_endcap_cells_df['long_short_pf_peak_x_diff'] = non_disappearing_endcap_cells_df['long_pf_peak_x'] - non_disappearing_endcap_cells_df['short_pf_peak_x']
+        # display(non_disappearing_endcap_cells_df)
+
+        # Classify the non_disappearing cells into two groups:
+        # 1. Those that exhibit significant remapping onto somewhere else on the track
+        non_disappearing_endcap_cells_df['has_significant_distance_remapping'] = (np.abs(non_disappearing_endcap_cells_df['long_short_pf_peak_x_diff']) >= 40) # The most a placefield could translate intwards would be (35 + (pf_width/2.0)) I think.
+        num_significant_position_remappping_endcap_cells = len(non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == True])
+        print(f'num_significant_position_remappping_endcap_cells/num_non_disappearing_endcap_cells: {num_significant_position_remappping_endcap_cells}/{num_non_disappearing_endcap_cells}')
+
+
+        # 2. Those that seem to remain where they were on the long track, perhaps being "sampling-clipped" or translated adjacent to the platform. These two subcases can be distinguished by a change in the placefield's length (truncated cells would be a fraction of the length, although might need to account for scaling with new track length)
+        minorly_changed_endcap_cells_df = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == False]
+
+                
+        # # Add to computed results:
+        global_computation_results.computed_data['long_short_endcap'] = minorly_changed_endcap_cells_df
+
+
+        """ Getting outputs:
+        
+            ## long_short_post_decoding:
+            inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = curr_active_pipeline.global_computation_results.computed_data.long_short_inst_spike_rate_groups
+            inst_spike_rate_groups_result
+            
+
+        """
+        return global_computation_results
+
+    
 
 
 # ==================================================================================================================== #
