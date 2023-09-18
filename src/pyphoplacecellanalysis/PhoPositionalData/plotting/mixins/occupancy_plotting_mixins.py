@@ -2,7 +2,7 @@
 # from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.shared_helpers import PlotGroupWrapper
 import param
 from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_point_labels
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import BasePlotDataParams
+from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDataParams
 
 
 class OccupancyPlottingConfig(BasePlotDataParams):

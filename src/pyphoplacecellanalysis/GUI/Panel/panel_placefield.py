@@ -1,7 +1,7 @@
 import param
 import panel as pn
 from panel.viewable import Viewer
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
 
 """ 
 

@@ -8,7 +8,7 @@ import numpy as np
 from pathlib import Path
 
 # refactored to pyphoplacecellanalysis.General.Configs.DynamicConfigs
-from pyphoplacecellanalysis.General.Configs.DynamicConfigs import VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+from pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs import VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
 
 
 ## For building the configs used to filter the session by epoch: 

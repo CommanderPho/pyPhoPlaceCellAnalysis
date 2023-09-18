@@ -1,29 +1,30 @@
-import param
 import numpy as np
-import pandas as pd
-from qtpy import QtGui # for QColor
+import param
+from qtpy import QtGui
+
+from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import ExtendedPlotDataParams
 
 
 class NeuronConfigOwningMixin:
     """ Implementors own a series of visual configurations for each neuron.
-    
+
     Requirements:
         self.params.pf_active_configs
         self.params.pf_colors_hex
-        
+
         self.ratemap.neuron_ids
 
 
         Functions:
             self.update_spikes(): to apply the changes visually
-        
+
     Provides:
         self.active_neuron_render_configs
-    
-        
+
+
     """
     debug_logging = False
-    
+
     @property
     def active_neuron_render_configs(self):
         """The active_neuron_render_configs property."""
@@ -39,10 +40,10 @@ class NeuronConfigOwningMixin:
     @property
     def neuron_config_indicies(self):
         return np.arange(self.num_neuron_configs)
-    
-        
+
+
     ### Original Set of Functions:
-    
+
     # , neuron_IDXs=None, cell_IDs=None
     def update_neuron_render_configs_from_indicies(self, updated_config_indicies, updated_configs, defer_render=False):
         # TODO: NON-EXPLICIT INDEXING
@@ -53,7 +54,7 @@ class NeuronConfigOwningMixin:
         """
         if self.debug_logging:
             print(f'NeuronConfigOwningMixin.update_cell_configs(updated_config_indicies: {updated_config_indicies}, updated_configs: {updated_configs})')
-            
+
         ## Improved tuning_curve_display_config_changed(...) style:
         # recover cell_ids by parsing the name field:
         extracted_cell_ids = [int(a_config.name) for a_config in updated_configs]
@@ -61,20 +62,20 @@ class NeuronConfigOwningMixin:
          # Sets the configs:
         for an_updated_config_idx, an_updated_config in zip(extracted_config_indicies, updated_configs):
             self.active_neuron_render_configs[an_updated_config_idx] = an_updated_config # update the config with the new values:
-            
+
         # # Sets the configs:
         # for an_updated_config_idx, an_updated_config in zip(updated_config_indicies, updated_configs):
         #     self.active_neuron_render_configs[an_updated_config_idx] = an_updated_config # update the config with the new values:
-        
+
         ## Apply the changes visually:
         if not defer_render:
             self.update_spikes()
-        
-    
+
+
     def update_neuron_render_configs(self, updated_configs, defer_render=False):
-        """ 
+        """
             Actually performs updating the self.active_neuron_render_configs_map with the updated values provided in updated_configs
-        
+
         Inputs:
             updated_configs: dict<neuron_id (int), config>
         Requires:
@@ -86,7 +87,7 @@ class NeuronConfigOwningMixin:
         # self.active_neuron_render_configs_map[updated_configs
         updated_ids_list = []
         updated_configs_list = []
-        
+
         for neuron_id, updated_config in updated_configs.items():
             # didValueChange = (self.active_neuron_render_configs_map[neuron_id].color != updated_config)
             didValueChange = (self.active_neuron_render_configs_map[neuron_id] != updated_config)
@@ -95,19 +96,19 @@ class NeuronConfigOwningMixin:
                 # add to list that tracks which items changed:
                 updated_ids_list.append(neuron_id)
                 updated_configs_list.append(self.active_neuron_render_configs_map[neuron_id])
-        
+
         return updated_ids_list, updated_configs_list
 
 
 
-            
+
     def build_neuron_render_configs(self):
         """ Builds the render config models that are used to control the displayed settings for each cell
         Requires:
             self.params.pf_colors_hex: this should have one entry per num_neurons, which is the length of self.ratemap.neuron_ids
-            
+
             self.ratemap.neuron_ids: for some reason it also requires self.ratemap.neuron_ids, which it ultimately shouldn't if it's to be general.
-            
+
         Sets:
             self.active_neuron_render_configs: a list of configs
             self.active_neuron_render_configs_map: a Dict<neuron_id (int), config> mapping
@@ -119,14 +120,14 @@ class NeuronConfigOwningMixin:
         unit_labels = [f'{good_placefield_neuronIDs[i]}' for i in np.arange(num_neurons)]
         self.active_neuron_render_configs = [SingleNeuronPlottingExtended(name=unit_labels[i], isVisible=False, color=self.params.pf_colors_hex[i], spikesVisible=False) for i in np.arange(num_neurons)]
         self.active_neuron_render_configs_map = NeuronConfigOwningMixin._build_id_index_configs_dict(self.active_neuron_render_configs)
-        
-        
+
+
         ## TODO: POTENTIAL ERROR: This only builds configs for good neurons, but we should be building them for all neurons right?
-           
+
 
 #         return combined_active_pf_update_callbacks
-    
-        
+
+
     ### Modern Dict-based method (with neuron_id keys):
     @classmethod
     def _build_id_index_configs_dict(cls, configs):
@@ -138,19 +139,19 @@ class NeuronConfigOwningMixin:
         """ extracts a dictionary with keys of the neuron_ID (as an int) and values of the corresponding neuron's color as a hex string."""
         # return {a_neuron_id:color for a_neuron_id, color in configs.items()}
         return {int(a_config.name):a_config.color for a_config in configs}
-        
+
     @classmethod
     def apply_updated_colors_map_to_configs(cls, configs, updated_colors_map):
         """ Updates the **configs** from the updated_colors_map
-        
+
         Checks for which values are actually changing and returns the updated_ids_list, updated_configs_list
-        
+
         Inputs:
             updated_colors_map: a dictionary with keys of neuron_id and values of the hex_color to use.
-        
+
         Outputs:
             updated_ids_list, updated_configs_list: the neuron_ids and configs that actually changed as a result of this function.
-        
+
         """
         if isinstance(configs, dict):
             # already a config map:
@@ -158,10 +159,10 @@ class NeuronConfigOwningMixin:
         else:
             # make into a config map
             configs_map = cls._build_id_index_configs_dict(configs)
-        
+
         updated_ids_list = []
         updated_configs_list = []
-        
+
         for neuron_id, updated_value in updated_colors_map.items():
             didValueChange = (configs_map[neuron_id].color != updated_value)
             if didValueChange:
@@ -169,44 +170,18 @@ class NeuronConfigOwningMixin:
                 # add to list that tracks which items changed:
                 updated_ids_list.append(neuron_id)
                 updated_configs_list.append(configs_map[neuron_id])
-        
+
         return configs_map, updated_ids_list, updated_configs_list
-
-
-
-
-## Parameters (Param):
-class BasePlotDataParams(param.Parameterized):
-    # name = param.Parameter(default="Not editable", constant=True)
-    name = param.String(default='name', doc='The name of the placefield')
-    # name = param.Parameter(default='name', doc='The name of the placefield')
-    isVisible = param.Boolean(default=False, doc="Whether the plot is visible")
-
-
-class ExtendedPlotDataParams(BasePlotDataParams):
-    color = param.Color(default='#FF0000', doc="The placefield's Color")
-    extended_values_dictionary = param.Dict(default={}, doc="Extra values stored in a dictionary.")
-
-
-class ExampleExtended(BasePlotDataParams):
-    color                   = param.Color(default='#BBBBBB')
-    dictionary              = param.Dict(default={"a": 2, "b": 9})
-    select_string           = param.ObjectSelector(default="yellow", objects=["red", "yellow", "green"])
-    select_fn               = param.ObjectSelector(default=list,objects=[list, set, dict])
-    int_list                = param.ListSelector(default=[3, 5], objects=[1, 3, 5, 7, 9], precedence=0.5)
-
-# checkbutton_group = pn.widgets.CheckButtonGroup(name='Check Button Group', value=[], options=pf_options_list_strings) # checkbutton_group.value 
-# cross_selector = pn.widgets.CrossSelector(name='Active Placefields', value=[], options=pf_options_list_strings) # cross_selector.value
 
 
 class SingleNeuronPlottingExtended(ExtendedPlotDataParams):
     spikesVisible = param.Boolean(default=False, doc="Whether the spikes are visible")
-    
+
     @property
     def neuron_id(self):
         """The neuron_id <int> property."""
         return int(self.name)
-    
+
 
     @property
     def qcolor(self):
@@ -215,17 +190,17 @@ class SingleNeuronPlottingExtended(ExtendedPlotDataParams):
     @qcolor.setter
     def qcolor(self, value):
         if isinstance(value, QtGui.QColor):
-            self.color = value.name(QtGui.QColor.HexRgb) #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000' 
+            self.color = value.name(QtGui.QColor.HexRgb) #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
         else:
             print(f'ERROR: qcolor setter is being passed a value that is not a QtGui.QColor! Instead, it is of unknown type: {value}, type: {type(value)}')
             raise NotImplementedError
-        
-    
+
+
     # @param.depends(c.param.country, d.param.i, watch=True)
     # def g(country, i):
     #     print(f"g country={country} i={i}")
-    
-    
+
+
     # def panel(self):
     #     return pn.Row(
     #         pn.Column(
@@ -234,6 +209,3 @@ class SingleNeuronPlottingExtended(ExtendedPlotDataParams):
     #             })
     #         )
     #     )
-           
-
-
