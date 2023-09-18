@@ -24,7 +24,7 @@ Primary Function: build_qt_interactive_placefield_visibility_controls(...)
 """
 
 
-def build_single_placefield_output_widget(render_config):
+def build_single_placefield_output_widget(render_config) -> PlacefieldVisualSelectionWidget:
     """ An alternative to the whole SingleEditablePlacefieldDisplayConfiguration implementation 
     
     Called in build_all_placefield_output_panels(...) down below.
