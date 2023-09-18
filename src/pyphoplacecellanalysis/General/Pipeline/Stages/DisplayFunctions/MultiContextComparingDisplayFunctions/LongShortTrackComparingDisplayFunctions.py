@@ -1479,8 +1479,11 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
     # Shared/Common kwargs:
     plot_ratemap_1D_kwargs = (dict(pad=2, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True) | shared_kwargs)
     
-    single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: pfmap # flip over the y-axis
-    single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -1.0 * pfmap # flip over the y-axis
+    single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: 0.5 * pfmap # scale down by 1/2 so that both it and the flipped version fit on the same axis
+    single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -0.5 * pfmap # flip over the y-axis
+    
+    # single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: pfmap # flip over the y-axis
+    # single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -1.0 * pfmap # flip over the y-axis
 
     n_neurons = len(curr_any_context_neurons)
     shared_fragile_neuron_IDXs = np.arange(n_neurons)
