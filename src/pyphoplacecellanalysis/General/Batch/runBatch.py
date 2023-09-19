@@ -1102,6 +1102,7 @@ class BatchSessionCompletionHandler:
         return was_updated
 
 
+    # Plotting/Figures Helpers ___________________________________________________________________________________________ #
     def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
         try:
             ## To file only:
