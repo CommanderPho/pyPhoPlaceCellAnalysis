@@ -1477,14 +1477,20 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         short_kwargs = {}
 
     # Shared/Common kwargs:
-    plot_ratemap_1D_kwargs = (dict(pad=2, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True) | shared_kwargs)
+    plot_ratemap_1D_kwargs = (dict(pad=1, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True) | shared_kwargs)
     
-    single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: 0.5 * pfmap # scale down by 1/2 so that both it and the flipped version fit on the same axis
-    single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -0.5 * pfmap # flip over the y-axis
-    
+    y_baseline_offset = 0.0 # 0.5 does not work uniform offset to be added to all pfmaps so that the negative-flipped one isn't cut off
+    single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: (0.5 * pfmap) + y_baseline_offset # scale down by 1/2 so that both it and the flipped version fit on the same axis
+    single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: (-0.5 * pfmap) + y_baseline_offset # flip over the y-axis
+    if single_figure:
+        y_lims_offset = -0.5 # shift the y-lims down by (-0.5 * pad) so it isn't cut off
+    else:
+        y_lims_offset = None
+        
     # single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: pfmap # flip over the y-axis
     # single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -1.0 * pfmap # flip over the y-axis
-
+    # y_lims_offset = None
+    
     n_neurons = len(curr_any_context_neurons)
     shared_fragile_neuron_IDXs = np.arange(n_neurons)
     
@@ -1544,6 +1550,10 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         ax_short_pf_1D.set_xlim(ax_long_pf_1D.get_xlim())
         # ax_long_pf_1D.sharex(ax_short_pf_1D)
         
+    if y_lims_offset is not None:
+        ax_long_pf_1D.set_ylim((np.array(ax_long_pf_1D.get_ylim()) + y_lims_offset))
+        
+
     return (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array)
 
 
