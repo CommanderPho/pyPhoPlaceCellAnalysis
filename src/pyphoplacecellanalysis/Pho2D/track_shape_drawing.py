@@ -15,6 +15,7 @@ from pyphoplacecellanalysis.External.pyqtgraph import PlotItem
 ScaleFactors = namedtuple("ScaleFactors", ["major", "minor"])
 
 import matplotlib
+import matplotlib.pyplot as plt
 import matplotlib.axes
 import matplotlib.patches as patches # for matplotlib version of the plot
 from matplotlib.collections import PatchCollection
@@ -468,6 +469,11 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
      
 
 
+
+# ==================================================================================================================== #
+# General Functions                                                                                                    #
+# ==================================================================================================================== #
+
 def _test_LinearTrackDimensions_2D(long_track_dims=None, short_track_dims=None):
     """ 
     Usage:
@@ -504,3 +510,45 @@ def _test_LinearTrackDimensions_2D(long_track_dims=None, short_track_dims=None):
     short_track_combined_collection, short_rect_items, short_rects = short_track_dims.plot_rects(p2)
     
     return app, w, cw, (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects)
+
+
+
+def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=True, include_short:bool=True):
+    """ Plots eight vertical lines across ax representing the (start, stop) of each platform (long_left, short_left, short_right, long_right)
+    
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines
+        grid_bin_bounds = deepcopy(long_pf2D.config.grid_bin_bounds)
+        long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=None)
+
+    """
+    long_track_dims = LinearTrackDimensions(track_length=170.0)
+    short_track_dims = LinearTrackDimensions(track_length=100.0)
+
+    # Find center from `grid_bin_bounds` using `point_tuple_mid_point`
+    x_midpoint, y_midpoint = (point_tuple_mid_point(grid_bin_bounds[0]), point_tuple_mid_point(grid_bin_bounds[1])) # grid_bin_bounds_center_point: (145.43, 140.61)
+
+    long_notable_x_positions, _long_notable_y_positions = long_track_dims._build_component_notable_positions(offset_point=(x_midpoint, y_midpoint))
+    short_notable_x_positions, _short_notable_y_positions = short_track_dims._build_component_notable_positions(offset_point=(x_midpoint, y_midpoint))
+
+    # Omit the midpoint
+    long_notable_x_platform_positions = long_notable_x_positions[[0,1,3,4]]
+    short_notable_x_platform_positions = short_notable_x_positions[[0,1,3,4]]
+
+    ## Adds to current axes:
+    if ax is None:
+        fig = plt.gcf()
+        axs = fig.get_axes()
+        ax = axs[0]
+        
+    if include_long:
+        long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#0000FFAA', linestyles='dashed') # matplotlib.collections.LineCollection
+    else:
+        long_track_line_collection = None
+        
+    if include_short:
+        short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#FF0000AA', linestyles='dashed') # matplotlib.collections.LineCollection
+    else:
+        short_track_line_collection = None
+
+    return long_track_line_collection, short_track_line_collection
