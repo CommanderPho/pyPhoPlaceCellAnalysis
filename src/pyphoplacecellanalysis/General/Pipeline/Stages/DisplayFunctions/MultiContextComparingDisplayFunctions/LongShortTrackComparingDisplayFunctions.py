@@ -42,6 +42,8 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PlacefieldOverlapMetricMode
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _plot_pho_jonathan_batch_plot_single_cell
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines
 
 
 @unique
@@ -285,13 +287,16 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             single_figure = kwargs.pop('single_figure', True)
             debug_print = kwargs.pop('debug_print', False)
 
-
+        
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
             # Plot 1D Keywoard args:
             shared_kwargs = kwargs.pop('shared_kwargs', {})
             long_kwargs = kwargs.pop('long_kwargs', {})
             short_kwargs = kwargs.pop('short_kwargs', {})
+
+            shared_kwargs['active_context'] = active_context
+            
 
             if include_includelist is None:
                 include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
@@ -1461,10 +1466,12 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
 # ==================================================================================================================== #
 
 @mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
-def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, shared_kwargs=None, long_kwargs=None, short_kwargs=None, debug_print=False):
+def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, shared_kwargs=None, long_kwargs=None, short_kwargs=None, title_string=None, subtitle_string=None, should_plot_vertical_track_bounds_lines=False, debug_print=False):
     """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
     
     single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
+    should_plot_vertical_track_bounds_lines: bool - if True, vertical lines representing the bounds of the linear track are rendered
+    
     
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_short_v_long_pf1D_comparison
@@ -1478,6 +1485,8 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
 
     """
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines
+    
     if shared_kwargs is None:
         shared_kwargs = {}
     if long_kwargs is None:
@@ -1486,8 +1495,12 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         short_kwargs = {}
 
     # Shared/Common kwargs:
-    plot_ratemap_1D_kwargs = (dict(pad=1, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True) | shared_kwargs)
-    
+    plot_ratemap_1D_kwargs = (dict(pad=1, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True, skip_figure_titles=single_figure) | shared_kwargs)
+    active_context = shared_kwargs.get('active_context', None)
+    print(f'active_context: {active_context}')
+    if single_figure:
+        plot_ratemap_1D_kwargs['skip_figure_titles'] = True
+
     y_baseline_offset = 0.0 # 0.5 does not work uniform offset to be added to all pfmaps so that the negative-flipped one isn't cut off
     single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: (0.5 * pfmap) + y_baseline_offset # scale down by 1/2 so that both it and the flipped version fit on the same axis
     single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: (-0.5 * pfmap) + y_baseline_offset # flip over the y-axis
@@ -1551,18 +1564,43 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
     ax_short_pf_1D, short_sort_ind, short_neurons_colors_array = plot_ratemap_1D(short_results.pf1D.ratemap, **short_kwargs, name=f"short")
     fig_short_pf_1D = ax_short_pf_1D.get_figure()
     
+    # Do set_ylim before calling `add_vertical_track_bounds_lines(...)` to make sure full vertical span is used
+    if y_lims_offset is not None:
+        ax_long_pf_1D.set_ylim((np.array(ax_long_pf_1D.get_ylim()) + y_lims_offset))
+        if not single_figure:
+            ax_short_pf_1D.set_ylim((np.array(ax_short_pf_1D.get_ylim()) + y_lims_offset)) # TODO: I think this is right
+
     if single_figure:
-        fig_long_pf_1D.suptitle('Long vs. Short (hatched)')
+        if (title_string is not None) or (subtitle_string is not None):
+            perform_update_title_subtitle(fig=fig_long_pf_1D, ax=ax_long_pf_1D, title_string=title_string, subtitle_string=subtitle_string, active_context=active_context, use_flexitext_titles=True)
+        else:
+            fig_long_pf_1D.suptitle('Long vs. Short (hatched)')
+            
+        # Plot the track bounds:
+        if should_plot_vertical_track_bounds_lines:
+            long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=True)
+    
     else:
         fig_long_pf_1D.suptitle('Long')
         fig_short_pf_1D.suptitle('Short')
         ax_short_pf_1D.set_xlim(ax_long_pf_1D.get_xlim())
+
+        # Plot the track bounds:
+        if should_plot_vertical_track_bounds_lines:
+            long_track_line_collection, _ = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=False) # only long
+            _, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(short_results.pf1D.config.grid_bin_bounds), ax=ax_short_pf_1D, include_long=False, include_short=True) # only short
+
         # ax_long_pf_1D.sharex(ax_short_pf_1D)
         
-    if y_lims_offset is not None:
-        ax_long_pf_1D.set_ylim((np.array(ax_long_pf_1D.get_ylim()) + y_lims_offset))
-        
+    if not should_plot_vertical_track_bounds_lines:
+        long_track_line_collection = None 
+        short_track_line_collection = None
 
+    # Could return: long_track_line_collection, short_track_line_collection
+    # graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
+    # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
+    # long_plots = {'long_track_line_collection': long_track_line_collection}
+    
     return (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array)
 
 
