@@ -641,7 +641,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         
         """
         # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
-        x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
+        active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
         global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
         return global_computation_results
 
@@ -1769,7 +1769,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     # long_short_fr_indicies_analysis_results['x_frs_index'] = long_short_fr_indicies_analysis_results['replays_inst_frs_index'].copy()
     # long_short_fr_indicies_analysis_results['y_frs_index'] = long_short_fr_indicies_analysis_results['non_replays_inst_frs_index'].copy()
     # all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # append the indicies to the results dict
-    return x_frs_index, y_frs_index, active_context, all_results_dict # TODO: add to computed_data instead
+    return active_context, all_results_dict # TODO: add to computed_data instead
 
 @function_attributes(short_name=None, tags=['rr', 'rate_remapping', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-18 18:58', related_items=[])
 def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron_type_map, considerable_remapping_threshold:float=0.7) -> RateRemappingResult:
