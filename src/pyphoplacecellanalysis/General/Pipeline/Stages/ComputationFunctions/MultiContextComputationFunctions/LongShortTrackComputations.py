@@ -887,7 +887,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         Flat_all_epochs_computed_expected_cell_num_spikes_LONG = np.vstack([np.concatenate([all_epochs_computed_observed_from_expected_difference_LONG[decoded_epoch_idx][target_neuron_IDX, :] for decoded_epoch_idx in np.arange(decoder_result_LONG.num_filter_epochs)]) for target_neuron_IDX in decoder_1D_LONG.neuron_IDXs]) #.shape (20, 22)
 
         # call `simpler_compute_measured_vs_expected_firing_rates`
-        returned_shape_tuple_LONG, (observed_from_expected_diff_ptp_LONG, observed_from_expected_diff_mean_LONG, observed_from_expected_diff_std_LONG) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_LONG, a_decoder_result=decoder_result_LONG)
+        returned_shape_tuple_LONG, (observed_from_expected_diff_max_LONG, observed_from_expected_diff_ptp_LONG, observed_from_expected_diff_mean_LONG, observed_from_expected_diff_std_LONG) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_LONG, a_decoder_result=decoder_result_LONG)
         
 
         ## Short Specific:
@@ -902,7 +902,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         Flat_epoch_time_bins_mean = all_epochs_decoded_epoch_time_bins_mean_SHORT[:,0]
 
         # call `simpler_compute_measured_vs_expected_firing_rates`
-        returned_shape_tuple_SHORT, (observed_from_expected_diff_ptp_SHORT, observed_from_expected_diff_mean_SHORT, observed_from_expected_diff_std_SHORT) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_SHORT, a_decoder_result=decoder_result_SHORT)
+        returned_shape_tuple_SHORT, (observed_from_expected_diff_max_SHORT, observed_from_expected_diff_ptp_SHORT, observed_from_expected_diff_mean_SHORT, observed_from_expected_diff_std_SHORT) = simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D=decoder_1D_SHORT, a_decoder_result=decoder_result_SHORT)
 
         ## Sanity Checks that the LONG and SHORT decoders and their decoded results aren't identical:
         assert (Flat_decoder_time_bin_centers_SHORT == Flat_decoder_time_bin_centers_LONG).all()
@@ -2306,7 +2306,7 @@ def compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epoch
     
     return decoder_time_bin_centers, all_epochs_computed_expected_cell_num_spikes, all_epochs_computed_observed_from_expected_difference, measured_pos_window_centers, (all_epochs_decoded_epoch_time_bins_mean, all_epochs_computed_expected_cell_firing_rates_mean, all_epochs_computed_expected_cell_firing_rates_stddev, all_epochs_computed_observed_from_expected_difference_maximum)
 
-@function_attributes(short_name=None, tags=['measured_vs_expected', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-30 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['measured_vs_expected', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_long_short_post_decoding_analysis'], creation_date='2023-05-30 00:00', related_items=[])
 def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filter_epochs, a_decoder_1D: "BasePositionDecoder", a_decoder_result: "DecodedFilterEpochsResult", debug_print:bool=False):
     """ 2023-05-30 - Goal is to compute the expected and measured firing rates for each cell for each epoch. 
             Attempting a smarter and more refined implementation.
@@ -2321,12 +2321,13 @@ def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filt
 
     num_timebins_in_epoch: NDArray[Shape["Num_epochs"], Int] = np.array([np.shape(epoch_values)[0] for epoch_values in all_cells_decoded_expected_firing_rates_list])
     num_total_flat_timebins: int = np.sum(num_timebins_in_epoch) # number of timebins across all epochs
-    flat_epoch_idxs: NDArray[Shape["N_total_flat_timebins"], Int] = np.concatenate([np.repeat(i, np.shape(epoch_values)[0]) for i, epoch_values in enumerate(all_cells_decoded_expected_firing_rates_list)]) # for each time bin repeat the epoch_id so we can recover it if needed
+    # flat_epoch_idxs: NDArray[Shape["N_total_flat_timebins"], Int] = np.concatenate([np.repeat(i, np.shape(epoch_values)[0]) for i, epoch_values in enumerate(all_cells_decoded_expected_firing_rates_list)]) # for each time bin repeat the epoch_id so we can recover it if needed
     
-    flat_expected_firing_rates: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = np.vstack(all_cells_decoded_expected_firing_rates_list)
-    flat_expected_num_spikes: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = flat_expected_firing_rates * a_decoder_result.decoding_time_bin_size
-    flat_observed_num_spikes: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = np.hstack(a_decoder_result.spkcount).T
-    flat_observed_from_expected_difference: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = flat_expected_num_spikes - flat_observed_num_spikes
+    # Basic Numpy (Full-array) version:
+    # flat_expected_firing_rates: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = np.vstack(all_cells_decoded_expected_firing_rates_list)
+    # flat_expected_num_spikes: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = flat_expected_firing_rates * a_decoder_result.decoding_time_bin_size
+    # flat_observed_num_spikes: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = np.hstack(a_decoder_result.spkcount).T
+    # flat_observed_from_expected_difference: NDArray[Shape["N_total_flat_timebins, N_neurons"], Any] = flat_expected_num_spikes - flat_observed_num_spikes
 
     ## Awkward Array (Ragged-array) version:
     ragged_expected_firing_rates_arr = ak.Array(all_cells_decoded_expected_firing_rates_list) # awkward array
@@ -2340,11 +2341,12 @@ def simpler_compute_measured_vs_expected_firing_rates(active_pos_df, active_filt
 
 
     ## By epoch quantities, this is correct:
+    observed_from_expected_diff_max = ak.to_regular(ak.max(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
     observed_from_expected_diff_ptp = ak.to_regular(ak.ptp(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
     observed_from_expected_diff_mean = ak.to_regular(ak.mean(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
     observed_from_expected_diff_std = ak.to_regular(ak.std(ragged_observed_from_expected_diff, axis=1)).to_numpy().T # type: 120 * 30 * float64
 
-    return (num_neurons, num_timebins_in_epoch, num_total_flat_timebins), (observed_from_expected_diff_ptp, observed_from_expected_diff_mean, observed_from_expected_diff_std)
+    return (num_neurons, num_timebins_in_epoch, num_total_flat_timebins), (observed_from_expected_diff_max, observed_from_expected_diff_ptp, observed_from_expected_diff_mean, observed_from_expected_diff_std)
 
 
 # ==================================================================================================================== #
