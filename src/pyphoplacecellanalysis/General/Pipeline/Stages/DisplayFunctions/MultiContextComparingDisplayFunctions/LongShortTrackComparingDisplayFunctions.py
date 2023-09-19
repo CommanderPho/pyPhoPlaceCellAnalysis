@@ -630,11 +630,11 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         return graphics_output_dict
     
     @function_attributes(short_name='long_short_expected_v_observed_firing_rate', tags=['display','long_short','firing_rate', 'expected','observed'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 10:48', is_global=True)
-    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
+    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_neuron_IDs=None, defer_render=False, save_figure=True, **kwargs):
         """ Displays expected v observed firing rate for each cell independently
 
         """
-        def _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render:bool):
+        def _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline, included_neuron_IDs, defer_render:bool):
             """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
             Captures: 'save_figure'
             
@@ -655,6 +655,15 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             neuron_IDs = decoder_1D_LONG.neuron_IDs.copy()
             assert (decoder_1D_LONG.neuron_IDXs == decoder_1D_SHORT.neuron_IDXs).all()
             neuron_IDXs = decoder_1D_LONG.neuron_IDXs.copy()
+            
+            if included_neuron_IDs is None:
+                included_neuron_IDs = neuron_IDs
+            else:
+                assert len(included_neuron_IDs) > 0, f"{included_neuron_IDs} should not be empty."
+                is_included_neuronID = np.isin(neuron_IDs, included_neuron_IDs)
+                neuron_IDs = neuron_IDs[is_included_neuronID]
+                neuron_IDXs = neuron_IDXs[is_included_neuronID]
+                
 
             ## Get global 'long_short_post_decoding' results:
             curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
@@ -731,7 +740,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return fig, axes, final_context, active_out_figure_paths
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(owning_pipeline_reference, defer_render=defer_render)
+        fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(owning_pipeline_reference, included_neuron_IDs=included_neuron_IDs, defer_render=defer_render)
 
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), context=final_context, plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
