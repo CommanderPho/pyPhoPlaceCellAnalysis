@@ -1171,7 +1171,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
         neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df
         # Extract the peaks of the long placefields to find ones that have peaks outside the boundaries
-        long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - 150 # this shift of 150.0 is to center the midpoint of the track at 0. 
+        long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - 150.0 # this shift of 150.0 is to center the midpoint of the track at 0. 
         is_left_cap = (long_pf_peaks < -72.0)
         is_right_cap = (long_pf_peaks > 72.0)
         # is_either_cap =  np.logical_or(is_left_cap, is_right_cap)
@@ -1179,8 +1179,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # Adds ['is_long_peak_left_cap', 'is_long_peak_right_cap', 'is_long_peak_either_cap'] columns: 
         neuron_replay_stats_df['is_long_peak_left_cap'] = False
         neuron_replay_stats_df['is_long_peak_right_cap'] = False
-        neuron_replay_stats_df.loc[is_left_cap.index, 'is_long_peak_left_cap'] = True
-        neuron_replay_stats_df.loc[is_right_cap.index, 'is_long_peak_right_cap'] = True
+        neuron_replay_stats_df.loc[is_left_cap.index, 'is_long_peak_left_cap'] = is_left_cap # True
+        neuron_replay_stats_df.loc[is_right_cap.index, 'is_long_peak_right_cap'] = is_right_cap # True
 
         neuron_replay_stats_df['is_long_peak_either_cap'] = np.logical_or(neuron_replay_stats_df['is_long_peak_left_cap'], neuron_replay_stats_df['is_long_peak_right_cap'])
 
@@ -1206,7 +1206,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # Classify the non_disappearing cells into two groups:
         # 1. Those that exhibit significant remapping onto somewhere else on the track
-        non_disappearing_endcap_cells_df['has_significant_distance_remapping'] = (np.abs(non_disappearing_endcap_cells_df['LS_pf_peak_x_diff']) >= 40) # The most a placefield could translate intwards would be (35 + (pf_width/2.0)) I think.
+        non_disappearing_endcap_cells_df['has_significant_distance_remapping'] = (np.abs(non_disappearing_endcap_cells_df['LS_pf_peak_x_diff']) >= 40.0) # The most a placefield could translate intwards would be (35 + (pf_width/2.0)) I think.
         num_significant_position_remappping_endcap_cells = len(non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == True])
         print(f'num_significant_position_remappping_endcap_cells/num_non_disappearing_endcap_cells: {num_significant_position_remappping_endcap_cells}/{num_non_disappearing_endcap_cells}')
 
