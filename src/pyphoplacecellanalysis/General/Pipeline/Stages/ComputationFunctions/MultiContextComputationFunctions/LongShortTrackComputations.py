@@ -373,6 +373,26 @@ class RateRemappingResult(HDFMixin, ComputedResult):
         rate_remapping_df.to_hdf(file_path, key=f'{key}/rate_remapping', format='table', data_columns=True)
 
 
+@custom_define(slots=False)
+class TruncationCheckingResults(HDFMixin, ComputedResult):
+    """ result for `_perform_long_short_endcap_analysis`
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import TruncationCheckingResults
+        
+        global_computation_results.computed_data['long_short_endcap'].significant_distant_remapping_endcap_aclus = significant_distant_remapping_endcap_aclus
+        global_computation_results.computed_data['long_short_endcap'].minor_remapping_endcap_aclus = minorly_changed_endcap_cells_df.index
+        global_computation_results.computed_data['long_short_endcap'].non_disappearing_endcap_aclus = non_disappearing_endcap_cells_df.index
+        global_computation_results.computed_data['long_short_endcap'].disappearing_endcap_aclus = disappearing_endcap_cells_df.index
+        
+    """
+    disappearing_endcap_aclus: pd.Index = serialized_field()
+    non_disappearing_endcap_aclus: pd.Index = serialized_field()
+    significant_distant_remapping_endcap_aclus: pd.Index = serialized_field()
+    minor_remapping_endcap_aclus: pd.Index = serialized_field()
+    
+    
+
+
 
 @define(slots=False, repr=False)
 class LongShortPipelineTests:
@@ -1131,35 +1151,42 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name=None, tags=['long_short_endcap_analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-15 10:37', related_items=[],
+    @function_attributes(short_name='long_short_endcap_analysis', tags=['long_short_endcap_analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-15 10:37', related_items=[],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_endcap']), is_global=True)
     def _perform_long_short_endcap_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
-        """ Must be performed after `_perform_jonathan_replay_firing_rate_analyses`
+        """  2023-09-14 - Find cells outside the bounds of the short track
+
+        Must be performed after `_perform_jonathan_replay_firing_rate_analyses`
         
-        
-        
-    
         Requires:
             ['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis']
             
         Provides:
-            computation_result.computed_data['long_short_inst_spike_rate_groups']
+            global_computation_results.computed_data['long_short_endcap']
         
         """
         jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = global_computation_results.computed_data.jonathan_firing_rate_analysis
 
-        neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        # Modifies the `jonathan_firing_rate_analysis_result.neuron_replay_stats_df` in-place instead of creating a copy:
+        # neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df
+        # Extract the peaks of the long placefields to find ones that have peaks outside the boundaries
         long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - 150 # this shift of 150.0 is to center the midpoint of the track at 0. 
         is_left_cap = (long_pf_peaks < -72.0)
         is_right_cap = (long_pf_peaks > 72.0)
         # is_either_cap =  np.logical_or(is_left_cap, is_right_cap)
 
+        # Adds ['is_long_peak_left_cap', 'is_long_peak_right_cap', 'is_long_peak_either_cap'] columns: 
         neuron_replay_stats_df['is_long_peak_left_cap'] = False
         neuron_replay_stats_df['is_long_peak_right_cap'] = False
         neuron_replay_stats_df.loc[is_left_cap.index, 'is_long_peak_left_cap'] = True
         neuron_replay_stats_df.loc[is_right_cap.index, 'is_long_peak_right_cap'] = True
 
         neuron_replay_stats_df['is_long_peak_either_cap'] = np.logical_or(neuron_replay_stats_df['is_long_peak_left_cap'], neuron_replay_stats_df['is_long_peak_right_cap'])
+
+        # adds ['LS_pf_peak_x_diff'] column
+        neuron_replay_stats_df['LS_pf_peak_x_diff'] = neuron_replay_stats_df['long_pf_peak_x'] - neuron_replay_stats_df['short_pf_peak_x']
+
 
         cap_cells_df = neuron_replay_stats_df[np.logical_and(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['is_long_peak_either_cap'])]
         num_total_endcap_cells = len(cap_cells_df)
@@ -1174,12 +1201,12 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         print(f'num_non_disappearing_endcap_cells/num_total_endcap_cells: {num_non_disappearing_endcap_cells}/{num_total_endcap_cells}')
 
         # display(non_disappearing_endcap_cells_df)
-        non_disappearing_endcap_cells_df['long_short_pf_peak_x_diff'] = non_disappearing_endcap_cells_df['long_pf_peak_x'] - non_disappearing_endcap_cells_df['short_pf_peak_x']
+        # non_disappearing_endcap_cells_df['LS_pf_peak_x_diff'] = non_disappearing_endcap_cells_df['long_pf_peak_x'] - non_disappearing_endcap_cells_df['short_pf_peak_x']
         # display(non_disappearing_endcap_cells_df)
 
         # Classify the non_disappearing cells into two groups:
         # 1. Those that exhibit significant remapping onto somewhere else on the track
-        non_disappearing_endcap_cells_df['has_significant_distance_remapping'] = (np.abs(non_disappearing_endcap_cells_df['long_short_pf_peak_x_diff']) >= 40) # The most a placefield could translate intwards would be (35 + (pf_width/2.0)) I think.
+        non_disappearing_endcap_cells_df['has_significant_distance_remapping'] = (np.abs(non_disappearing_endcap_cells_df['LS_pf_peak_x_diff']) >= 40) # The most a placefield could translate intwards would be (35 + (pf_width/2.0)) I think.
         num_significant_position_remappping_endcap_cells = len(non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == True])
         print(f'num_significant_position_remappping_endcap_cells/num_non_disappearing_endcap_cells: {num_significant_position_remappping_endcap_cells}/{num_non_disappearing_endcap_cells}')
 
@@ -1187,16 +1214,28 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # 2. Those that seem to remain where they were on the long track, perhaps being "sampling-clipped" or translated adjacent to the platform. These two subcases can be distinguished by a change in the placefield's length (truncated cells would be a fraction of the length, although might need to account for scaling with new track length)
         minorly_changed_endcap_cells_df = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == False]
 
-                
+        significant_distant_remapping_endcap_aclus = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping']].index # Int64Index([3, 5, 7, 11, 14, 38, 41, 53, 57, 61, 62, 75, 78, 79, 82, 83, 85, 95, 98, 100, 102], dtype='int64')
+        
+        # make sure the result is copied back to the global_computations
+        global_computation_results.computed_data.jonathan_firing_rate_analysis.neuron_replay_stats_df = neuron_replay_stats_df # make sure the result is copied back to the global_computations
+        
         # # Add to computed results:
-        global_computation_results.computed_data['long_short_endcap'] = minorly_changed_endcap_cells_df
+        global_computation_results.computed_data['long_short_endcap'] = TruncationCheckingResults(is_global=True)
+        # global_computation_results.computed_data['long_short_endcap'].significant_distant_remapping_endcap_aclus = significant_distant_remapping_endcap_aclus
+        # global_computation_results.computed_data['long_short_endcap'].minorly_changed_endcap_cells_df = minorly_changed_endcap_cells_df.index
+        # global_computation_results.computed_data['long_short_endcap'].non_disappearing_endcap_cells_df = non_disappearing_endcap_cells_df.index
+        # global_computation_results.computed_data['long_short_endcap'].disappearing_endcap_cells_df = disappearing_endcap_cells_df.index
+        global_computation_results.computed_data['long_short_endcap'].significant_distant_remapping_endcap_aclus = significant_distant_remapping_endcap_aclus.copy()
+        global_computation_results.computed_data['long_short_endcap'].minor_remapping_endcap_aclus = minorly_changed_endcap_cells_df.index.copy()
+        global_computation_results.computed_data['long_short_endcap'].non_disappearing_endcap_aclus = non_disappearing_endcap_cells_df.index.copy()
+        global_computation_results.computed_data['long_short_endcap'].disappearing_endcap_aclus = disappearing_endcap_cells_df.index.copy()
 
-
+        
         """ Getting outputs:
         
-            ## long_short_post_decoding:
-            inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = curr_active_pipeline.global_computation_results.computed_data.long_short_inst_spike_rate_groups
-            inst_spike_rate_groups_result
+            ## long_short_endcap_analysis:
+            truncation_checking_result: TruncationCheckingResults = curr_active_pipeline.global_computation_results.computed_data.long_short_endcap
+            truncation_checking_result
             
 
         """
@@ -2718,66 +2757,66 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
 
 @function_attributes(short_name=None, tags=['merged', 'firing_rate_indicies', 'multi_result', 'neuron_indexed'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 18:10', related_items=[])
 def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_display_intermediate_results=False) -> pd.DataFrame:
-	""" 2023-09-12 - TODO - merges firing rate indicies computed in several different computations into a single dataframe for comparison.
-	
+    """ 2023-09-12 - TODO - merges firing rate indicies computed in several different computations into a single dataframe for comparison.
+    
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import build_merged_neuron_firing_rate_indicies
         joined_neruon_fri_df = build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_display_intermediate_results=False)
         joined_neruon_fri_df
         
-	"""
-	def join_on_index(*dfs) -> pd.DataFrame:
-		joined_df: pd.DataFrame = dfs[0]
-		for df in dfs[1:]:
-			# joined_df = joined_df.join(df, how='inner')
-			joined_df = joined_df.merge(df, on='aclu', how='inner')
-		return joined_df
-	
-	# Requires (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
-	
-	# 'long_short_fr_indicies_analysis'
-	curr_long_short_fr_indicies_analysis = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'] # 'lsfria'
-	_curr_aclus = list(curr_long_short_fr_indicies_analysis['laps_frs_index'].keys()) # extract one set of keys for the aclus
-	_curr_frs_indicies_dict = {k:v.values() for k,v in curr_long_short_fr_indicies_analysis.items() if k in ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']} # extract the values
+    """
+    def join_on_index(*dfs) -> pd.DataFrame:
+        joined_df: pd.DataFrame = dfs[0]
+        for df in dfs[1:]:
+            # joined_df = joined_df.join(df, how='inner')
+            joined_df = joined_df.merge(df, on='aclu', how='inner')
+        return joined_df
+    
+    # Requires (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
+    
+    # 'long_short_fr_indicies_analysis'
+    curr_long_short_fr_indicies_analysis = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'] # 'lsfria'
+    _curr_aclus = list(curr_long_short_fr_indicies_analysis['laps_frs_index'].keys()) # extract one set of keys for the aclus
+    _curr_frs_indicies_dict = {k:v.values() for k,v in curr_long_short_fr_indicies_analysis.items() if k in ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']} # extract the values
 
-	long_short_fr_indicies_df = pd.DataFrame(_curr_frs_indicies_dict, index=_curr_aclus)
-	long_short_fr_indicies_df = long_short_fr_indicies_df.add_prefix('lsfria_')
+    long_short_fr_indicies_df = pd.DataFrame(_curr_frs_indicies_dict, index=_curr_aclus)
+    long_short_fr_indicies_df = long_short_fr_indicies_df.add_prefix('lsfria_')
 
-	# columns_to_prefix = ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']
-	# rename_dict = {col:f'lsfria_{col}' for col in columns_to_prefix}
-	# df_prefixed = long_short_fr_indicies_df.rename(columns=rename_dict)
-	long_short_fr_indicies_df.index.name = 'aclu'
-	long_short_fr_indicies_df = long_short_fr_indicies_df.reset_index()
-	# long_short_fr_indicies_df_with_prefix = long_short_fr_indicies_df.add_prefix('lsfria_')
-	# Rename specific columns to skip the prefix
-	# columns_to_skip = ['aclu']
-	# for col in columns_to_skip:
-	#     df_with_prefix.rename(columns={f'prefix_{col}': col}, inplace=True)
-		
-	if enable_display_intermediate_results:
-		display(long_short_fr_indicies_df)
+    # columns_to_prefix = ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']
+    # rename_dict = {col:f'lsfria_{col}' for col in columns_to_prefix}
+    # df_prefixed = long_short_fr_indicies_df.rename(columns=rename_dict)
+    long_short_fr_indicies_df.index.name = 'aclu'
+    long_short_fr_indicies_df = long_short_fr_indicies_df.reset_index()
+    # long_short_fr_indicies_df_with_prefix = long_short_fr_indicies_df.add_prefix('lsfria_')
+    # Rename specific columns to skip the prefix
+    # columns_to_skip = ['aclu']
+    # for col in columns_to_skip:
+    #     df_with_prefix.rename(columns={f'prefix_{col}': col}, inplace=True)
+        
+    if enable_display_intermediate_results:
+        display(long_short_fr_indicies_df)
 
-	jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis # 'jfra'
-	neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
-	neuron_replay_stats_df = neuron_replay_stats_df.add_prefix('jfra_')
-	neuron_replay_stats_df.index.name = 'aclu'
-	neuron_replay_stats_df = neuron_replay_stats_df.reset_index()
-	if enable_display_intermediate_results: 
-		display(neuron_replay_stats_df)
+    jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis # 'jfra'
+    neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+    neuron_replay_stats_df = neuron_replay_stats_df.add_prefix('jfra_')
+    neuron_replay_stats_df.index.name = 'aclu'
+    neuron_replay_stats_df = neuron_replay_stats_df.reset_index()
+    if enable_display_intermediate_results: 
+        display(neuron_replay_stats_df)
 
-	## Get global 'long_short_post_decoding' results:
-	curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'] # 'lspd'
-	rate_remapping_df = deepcopy(curr_long_short_post_decoding.rate_remapping.rr_df[['laps', 'replays',	'skew',	'max_axis_distance_from_center', 'distance_from_center', 'has_considerable_remapping']]) # drops ['neuron_type', 'render_color']
-	rate_remapping_df = rate_remapping_df.add_prefix('lspd_')
-	rate_remapping_df.index.name = 'aclu'
-	rate_remapping_df = rate_remapping_df.reset_index() 
-	if enable_display_intermediate_results:
-		display(rate_remapping_df)
+    ## Get global 'long_short_post_decoding' results:
+    curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'] # 'lspd'
+    rate_remapping_df = deepcopy(curr_long_short_post_decoding.rate_remapping.rr_df[['laps', 'replays',	'skew',	'max_axis_distance_from_center', 'distance_from_center', 'has_considerable_remapping']]) # drops ['neuron_type', 'render_color']
+    rate_remapping_df = rate_remapping_df.add_prefix('lspd_')
+    rate_remapping_df.index.name = 'aclu'
+    rate_remapping_df = rate_remapping_df.reset_index() 
+    if enable_display_intermediate_results:
+        display(rate_remapping_df)
 
 
 
-	joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df, rate_remapping_df)
-	# joined_df = join_on_index(long_short_fr_indicies_df_with_prefix, neuron_replay_stats_df_with_prefix, rate_remapping_df_with_prefix)
+    joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df, rate_remapping_df)
+    # joined_df = join_on_index(long_short_fr_indicies_df_with_prefix, neuron_replay_stats_df_with_prefix, rate_remapping_df_with_prefix)
 
-	# joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df)
-	return joined_df
+    # joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df)
+    return joined_df
