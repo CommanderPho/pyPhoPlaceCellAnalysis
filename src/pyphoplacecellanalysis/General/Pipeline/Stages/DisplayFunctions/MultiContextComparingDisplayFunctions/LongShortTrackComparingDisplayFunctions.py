@@ -43,7 +43,7 @@ from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for Place
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _plot_pho_jonathan_batch_plot_single_cell
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
 
 
 @unique
@@ -1466,12 +1466,12 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
 # ==================================================================================================================== #
 
 @mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
-def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, shared_kwargs=None, long_kwargs=None, short_kwargs=None, title_string=None, subtitle_string=None, should_plot_vertical_track_bounds_lines=False, debug_print=False):
+def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, shared_kwargs=None, long_kwargs=None, short_kwargs=None, title_string=None, subtitle_string=None, should_plot_vertical_track_bounds_lines=False, should_plot_linear_track_shapes=False, debug_print=False):
     """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
     
     single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
     should_plot_vertical_track_bounds_lines: bool - if True, vertical lines representing the bounds of the linear track are rendered
-    
+    should_plot_linear_track_shapes: bool - if True, plots 2D linear tracks on the figure
     
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_short_v_long_pf1D_comparison
@@ -1485,7 +1485,7 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
 
     """
-    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
     
     if shared_kwargs is None:
         shared_kwargs = {}
@@ -1592,6 +1592,8 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         if should_plot_vertical_track_bounds_lines:
             long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=True)
     
+        if should_plot_linear_track_shapes:
+            long_rects_outputs, short_rects_outputs = add_track_shapes(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=True)
     else:
         fig_long_pf_1D.suptitle('Long')
         fig_short_pf_1D.suptitle('Short')
@@ -1602,11 +1604,20 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
             long_track_line_collection, _ = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=False) # only long
             _, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(short_results.pf1D.config.grid_bin_bounds), ax=ax_short_pf_1D, include_long=False, include_short=True) # only short
 
+        if should_plot_linear_track_shapes:
+            long_rects_outputs, _ = add_track_shapes(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=False) # only long
+            _, short_rects_outputs = add_track_shapes(grid_bin_bounds=deepcopy(short_results.pf1D.config.grid_bin_bounds), ax=ax_short_pf_1D, include_long=False, include_short=True) # only short
+            
+
         # ax_long_pf_1D.sharex(ax_short_pf_1D)
         
     if not should_plot_vertical_track_bounds_lines:
         long_track_line_collection = None 
         short_track_line_collection = None
+        
+    if not should_plot_linear_track_shapes:
+        long_rects_outputs = None
+        short_rects_outputs = None
 
     # Could return: long_track_line_collection, short_track_line_collection
     # graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
