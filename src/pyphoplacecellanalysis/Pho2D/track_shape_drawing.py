@@ -1,13 +1,18 @@
+from copy import deepcopy
 from typing import Tuple, Optional, List, Dict
 from attrs import define, field, Factory
 from collections import namedtuple
 import numpy as np
 import pandas as pd
 
+from neuropy.utils.dynamic_container import overriding_dict_with # required for safely_accepts_kwargs
+
 from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.color_helpers import convert_pen_brush_to_matplot_kwargs
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import long_epoch_matplotlib_config, short_epoch_matplotlib_config
+
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui
@@ -566,13 +571,18 @@ def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=
         axs = fig.get_axes()
         ax = axs[0]
         
+    
+    
+    
     if include_long:
-        long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#0000FFAA', linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
+        long_kwargs = deepcopy(long_epoch_matplotlib_config)
+        long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
     else:
         long_track_line_collection = None
         
     if include_short:
-        short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#FF0000AA', linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
+        short_kwargs = deepcopy(short_epoch_matplotlib_config)
+        short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=short_kwargs.get('edgecolor', '#FF0000AA'), linewidths=short_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
     else:
         short_track_line_collection = None
 
@@ -605,17 +615,9 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
     short_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
 
     # Centered above and below the y=0.0 line:
-    long_offset = (grid_bin_bounds.center_point[0], 0.5)
-    short_offset = (grid_bin_bounds.center_point[0], -0.5)
-    
-    # long_kwargs = dict(edgecolor='#0000FFFF', facecolor='#0000FFAA')
-    # short_kwargs = dict(edgecolor='#FF0000FF', facecolor='#FF0000AA')
-
-    long_kwargs = dict(edgecolor='#0000FFFF', facecolor='#0000FFAA')
-    short_kwargs = dict(edgecolor='#FF0000FF', facecolor='#FF0000AA')
-    
-
-
+    long_offset = (grid_bin_bounds.center_point[0], 0.75)
+    short_offset = (grid_bin_bounds.center_point[0], -0.75)
+        
     ## Adds to current axes:
     if ax is None:
         fig = plt.gcf()
@@ -623,14 +625,18 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
         ax = axs[0]
         
     if include_long:
-        # long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#0000FFAA', linestyles='dashed') # matplotlib.collections.LineCollection
-        long_rects_outputs = long_track_dims.plot_rects(ax, offset=long_offset, matplotlib_rect_kwargs_override=dict(linewidth=2, zorder=-100, **long_kwargs))
+        # long_kwargs = deepcopy(long_epoch_matplotlib_config)
+        # long_kwargs = dict(edgecolor='#0000FFFF', facecolor='#0000FFFF')
+        long_kwargs = dict(edgecolor='#000000ff', facecolor='#000000ff')
+        long_rects_outputs = long_track_dims.plot_rects(ax, offset=long_offset, matplotlib_rect_kwargs_override=overriding_dict_with(lhs_dict=long_kwargs, **dict(linewidth=2, zorder=-99)))
     else:
         long_rects_outputs = None
         
     if include_short:
-        short_rects_outputs = short_track_dims.plot_rects(ax, offset=short_offset, matplotlib_rect_kwargs_override=dict(linewidth=2, zorder=-100, **short_kwargs))
-        # short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#FF0000AA', linestyles='dashed') # matplotlib.collections.LineCollection
+        # short_kwargs = deepcopy(short_epoch_matplotlib_config)
+        # short_kwargs = dict(edgecolor='#FF0000FF', facecolor='#FF0000FF')
+        short_kwargs = dict(edgecolor='#000000ff', facecolor='#000000ff')
+        short_rects_outputs = short_track_dims.plot_rects(ax, offset=short_offset, matplotlib_rect_kwargs_override=overriding_dict_with(lhs_dict=short_kwargs, **dict(linewidth=2, zorder=-99)))
     else:
         short_rects_outputs = None
 
