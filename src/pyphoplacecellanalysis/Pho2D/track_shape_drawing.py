@@ -11,8 +11,7 @@ from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.color_helpers import convert_pen_brush_to_matplot_kwargs
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import long_epoch_matplotlib_config, short_epoch_matplotlib_config
-
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui
@@ -572,15 +571,18 @@ def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=
         ax = axs[0]
         
     
+    long_short_display_config_manager = LongShortDisplayConfigManager()
     
     
     if include_long:
+        long_epoch_matplotlib_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
         long_kwargs = deepcopy(long_epoch_matplotlib_config)
         long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
     else:
         long_track_line_collection = None
         
     if include_short:
+        short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
         short_kwargs = deepcopy(short_epoch_matplotlib_config)
         short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=short_kwargs.get('edgecolor', '#FF0000AA'), linewidths=short_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
     else:
@@ -624,7 +626,10 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
         axs = fig.get_axes()
         ax = axs[0]
         
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    
     if include_long:
+        long_epoch_matplotlib_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
         # long_kwargs = deepcopy(long_epoch_matplotlib_config)
         # long_kwargs = dict(edgecolor='#0000FFFF', facecolor='#0000FFFF')
         long_kwargs = dict(edgecolor='#000000ff', facecolor='#000000ff')
@@ -633,6 +638,7 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
         long_rects_outputs = None
         
     if include_short:
+        short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
         # short_kwargs = deepcopy(short_epoch_matplotlib_config)
         # short_kwargs = dict(edgecolor='#FF0000FF', facecolor='#FF0000FF')
         short_kwargs = dict(edgecolor='#000000ff', facecolor='#000000ff')

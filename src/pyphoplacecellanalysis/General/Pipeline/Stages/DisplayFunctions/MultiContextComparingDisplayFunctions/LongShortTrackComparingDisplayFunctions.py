@@ -45,21 +45,12 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import long_short_display_config_manager
 
 # ==================================================================================================================== #
 # Long/Short Epoch Configs                                                                                             #
 # ==================================================================================================================== #
-""" 
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import long_epoch_config, short_epoch_config
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import long_epoch_config, short_epoch_config, long_epoch_matplotlib_config, short_epoch_matplotlib_config
 
-
-"""
-long_epoch_config = dict(epoch_label='long', pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00'))
-short_epoch_config = dict(epoch_label='short', pen=pg.mkPen('#490000'), brush=pg.mkBrush('#f5161659'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00'))
-
-long_epoch_matplotlib_config = convert_pen_brush_to_matplot_kwargs(pen=long_epoch_config['pen'], brush=long_epoch_config['brush'])
-short_epoch_matplotlib_config = convert_pen_brush_to_matplot_kwargs(pen=short_epoch_config['pen'], brush=short_epoch_config['brush'])
 
 
 @unique
@@ -1835,7 +1826,13 @@ def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoc
             long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
             short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items
     """
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions # Add session indicators to pyqtgraph plot
+
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
     long_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=long_epoch.t_start, t_stop=long_epoch.t_stop, **long_epoch_config)
     short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
     return long_epoch_indicator_region_items, short_epoch_indicator_region_items
