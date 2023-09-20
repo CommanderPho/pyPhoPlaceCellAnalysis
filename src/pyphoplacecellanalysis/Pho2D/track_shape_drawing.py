@@ -458,16 +458,17 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
             return merged_boxes_pdata
      
 
+
 # ==================================================================================================================== #
-# General Functions                                                                                                    #
+# Test Plots                                                                                                           #
 # ==================================================================================================================== #
 
-def _test_LinearTrackDimensions_2D(long_track_dims=None, short_track_dims=None):
+def test_LinearTrackDimensions_2D_pyqtgraph(long_track_dims=None, short_track_dims=None):
     """ 
     Usage:
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _test_LinearTrackDimensions_2D
 
-        app, w, cw, (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects) = _test_LinearTrackDimensions_2D()
+        app, w, cw, (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects) = test_LinearTrackDimensions_2D_pyqtgraph(long_track_dims, short_track_dims)
 
     """
     import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -532,6 +533,11 @@ def test_LinearTrackDimensions_2D_Matplotlib(long_track_dims=None, short_track_d
     return fig, ax1, ax2
 
 
+# ==================================================================================================================== #
+# General Functions                                                                                                    #
+# ==================================================================================================================== #
+
+
 def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=True, include_short:bool=True):
     """ Plots eight vertical lines across ax representing the (start, stop) of each platform (long_left, short_left, short_right, long_right)
     
@@ -561,17 +567,16 @@ def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=
         ax = axs[0]
         
     if include_long:
-        long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#0000FFAA', linestyles='dashed') # matplotlib.collections.LineCollection
+        long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#0000FFAA', linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
     else:
         long_track_line_collection = None
         
     if include_short:
-        short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#FF0000AA', linestyles='dashed') # matplotlib.collections.LineCollection
+        short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#FF0000AA', linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
     else:
         short_track_line_collection = None
 
     return long_track_line_collection, short_track_line_collection
-
 
 
 def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_short:bool=True):
@@ -585,8 +590,10 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
     """
 
     grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
-    long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
-    short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+    # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+    # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+    long_track_dims = LinearTrackDimensions(track_length=170.0)
+    short_track_dims = LinearTrackDimensions(track_length=100.0)
 
     ## Overrides for 1D
     common_1D_platform_height = 0.25
@@ -601,6 +608,14 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
     long_offset = (grid_bin_bounds.center_point[0], 0.5)
     short_offset = (grid_bin_bounds.center_point[0], -0.5)
     
+    # long_kwargs = dict(edgecolor='#0000FFFF', facecolor='#0000FFAA')
+    # short_kwargs = dict(edgecolor='#FF0000FF', facecolor='#FF0000AA')
+
+    long_kwargs = dict(edgecolor='#0000FFFF', facecolor='#0000FFAA')
+    short_kwargs = dict(edgecolor='#FF0000FF', facecolor='#FF0000AA')
+    
+
+
     ## Adds to current axes:
     if ax is None:
         fig = plt.gcf()
@@ -609,12 +624,12 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
         
     if include_long:
         # long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#0000FFAA', linestyles='dashed') # matplotlib.collections.LineCollection
-        long_rects_outputs = long_track_dims.plot_rects(ax, offset=long_offset, matplotlib_rect_kwargs_override=dict(linewidth=2, edgecolor='#0000FFCC', facecolor='#0000FFAA'))
+        long_rects_outputs = long_track_dims.plot_rects(ax, offset=long_offset, matplotlib_rect_kwargs_override=dict(linewidth=2, zorder=-100, **long_kwargs))
     else:
         long_rects_outputs = None
         
     if include_short:
-        short_rects_outputs = short_track_dims.plot_rects(ax, offset=short_offset, matplotlib_rect_kwargs_override=dict(linewidth=2, edgecolor='#FF0000CC', facecolor='#FF0000AA'))
+        short_rects_outputs = short_track_dims.plot_rects(ax, offset=short_offset, matplotlib_rect_kwargs_override=dict(linewidth=2, zorder=-100, **short_kwargs))
         # short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#FF0000AA', linestyles='dashed') # matplotlib.collections.LineCollection
     else:
         short_rects_outputs = None
