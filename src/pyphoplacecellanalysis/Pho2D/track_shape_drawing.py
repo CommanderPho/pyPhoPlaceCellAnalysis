@@ -4,9 +4,11 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 
-from pyphocorehelpers.geometry_helpers import point_tuple_mid_point
+from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.gui.Qt.color_helpers import convert_pen_brush_to_matplot_kwargs
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui
 from pyphoplacecellanalysis.External.pyqtgraph import PlotItem
@@ -102,6 +104,7 @@ class LinearTrackDimensions:
     platform_side_length: float = 22.0
     minor_axis_platform_side_width: Optional[float] = None
 
+    # grid_bin_bounds: Optional[BoundsRect] = None #TODO 2023-09-20 12:33: - [ ] Allow storing grid_bin_bounds to help with offset computations
 
     alignment_axis: str = field(default='x')
     axis_scale_factors: ScaleFactors = field(default=ScaleFactors(1.0, 1.0))  # Major and minor axis scale factors
@@ -209,10 +212,10 @@ class LinearTrackDimensions:
 
         if self.alignment_axis == 'x':
             scaled_track_length = (major_axis_factor * self.track_length)
-            scaled_track_width = (minor_axis_factor * (self.minor_axis_platform_side_width or self.platform_side_length))
+            scaled_track_width = (minor_axis_factor * self.track_width)
             scaled_platform_size = ((major_axis_factor * self.platform_side_length), (minor_axis_factor * (self.minor_axis_platform_side_width or self.platform_side_length)))
             
-            track_center_y = (scaled_platform_size[1] / 2.0) # assumes platform is thicker than track.
+            track_center_y = (max(scaled_platform_size[1], scaled_track_width) / 2.0) # assumes platform is thicker than track.
             track_origin_y = track_center_y - (scaled_track_width / 2.0) # find the bottom of the track rectangle
             track_top_y = track_center_y + (scaled_track_width / 2.0)
 
@@ -274,8 +277,12 @@ class LinearTrackDimensions:
 
         return rects
         
-    def plot_rects(self, plot_item, offset=None):
-        """ main function to plot """
+    def plot_rects(self, plot_item, offset=None, matplotlib_rect_kwargs_override=None):
+        """ main function to plot 
+
+        
+        combined_item, rect_items, rects = item.plot_rect(ax, offset=None)
+        """
         rects = self._build_component_rectangles(is_zero_centered=True, offset_point=offset)
         rect_items = [] # probably do not need
         for x, y, w, h, pen, brush in rects:
@@ -288,7 +295,11 @@ class LinearTrackDimensions:
             elif isinstance(plot_item, matplotlib.axes.Axes):
                 import matplotlib.patches as patches
                 # matplotlib ax was passed
-                rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='red', facecolor='red')
+                if matplotlib_rect_kwargs_override is not None:
+                    matplotlib_rect_kwargs = matplotlib_rect_kwargs_override
+                else:
+                    matplotlib_rect_kwargs = convert_pen_brush_to_matplot_kwargs(pen, brush) # linewidth=2, edgecolor='red', facecolor='red'                
+                rect = patches.Rectangle((x, y), w, h, **matplotlib_rect_kwargs)
                 plot_item.add_patch(rect)                
                 rect_items.append(rect)
             else:
@@ -302,7 +313,7 @@ class LinearTrackDimensions:
             # Combine patches into a PatchCollection
             # patches = [rect1, rect2, rect3]
             # combined_item = PatchCollection(rect_items, linewidth=2, edgecolor='red', facecolor='red', alpha=0.5)
-            plot_item.set_aspect('equal', 'box')    
+            # plot_item.set_aspect('equal', 'box')
             combined_item = None
 
         else:
@@ -319,9 +330,6 @@ class LinearTrackDimensions:
 # ==================================================================================================================== #
 # 3D Support                                                                                                           #
 # ==================================================================================================================== #
-
-
-
 
 def get_bounds(center, x_length, y_length, z_length):
     xMin, xMax = center[0] - x_length/2, center[0] + x_length/2
@@ -450,8 +458,6 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
             return merged_boxes_pdata
      
 
-
-
 # ==================================================================================================================== #
 # General Functions                                                                                                    #
 # ==================================================================================================================== #
@@ -565,3 +571,52 @@ def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=
         short_track_line_collection = None
 
     return long_track_line_collection, short_track_line_collection
+
+
+
+def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_short:bool=True):
+    """ Plots the two track shapes on the plot. Kinda inflexible right now. 
+    
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines
+        grid_bin_bounds = deepcopy(long_pf2D.config.grid_bin_bounds)
+        long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=None)
+
+    """
+
+    grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
+    long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+    short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+
+    ## Overrides for 1D
+    common_1D_platform_height = 0.25
+    common_1D_track_height = 0.1
+    long_track_dims.minor_axis_platform_side_width = common_1D_platform_height
+    long_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
+
+    short_track_dims.minor_axis_platform_side_width = common_1D_platform_height
+    short_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
+
+    # Centered above and below the y=0.0 line:
+    long_offset = (grid_bin_bounds.center_point[0], 0.5)
+    short_offset = (grid_bin_bounds.center_point[0], -0.5)
+    
+    ## Adds to current axes:
+    if ax is None:
+        fig = plt.gcf()
+        axs = fig.get_axes()
+        ax = axs[0]
+        
+    if include_long:
+        # long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#0000FFAA', linestyles='dashed') # matplotlib.collections.LineCollection
+        long_rects_outputs = long_track_dims.plot_rects(ax, offset=long_offset, matplotlib_rect_kwargs_override=dict(linewidth=2, edgecolor='#0000FFCC', facecolor='#0000FFAA'))
+    else:
+        long_rects_outputs = None
+        
+    if include_short:
+        short_rects_outputs = short_track_dims.plot_rects(ax, offset=short_offset, matplotlib_rect_kwargs_override=dict(linewidth=2, edgecolor='#FF0000CC', facecolor='#FF0000AA'))
+        # short_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors='#FF0000AA', linestyles='dashed') # matplotlib.collections.LineCollection
+    else:
+        short_rects_outputs = None
+
+    return long_rects_outputs, short_rects_outputs
