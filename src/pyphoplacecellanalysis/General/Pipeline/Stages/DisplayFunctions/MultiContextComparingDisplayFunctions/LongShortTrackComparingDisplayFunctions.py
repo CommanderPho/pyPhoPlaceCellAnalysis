@@ -1501,18 +1501,23 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
     if single_figure:
         plot_ratemap_1D_kwargs['skip_figure_titles'] = True
 
+    flat_stack_mode:bool = shared_kwargs.get('flat_stack_mode', False)
+
     y_baseline_offset = 0.0 # 0.5 does not work uniform offset to be added to all pfmaps so that the negative-flipped one isn't cut off
     single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: (0.5 * pfmap) + y_baseline_offset # scale down by 1/2 so that both it and the flipped version fit on the same axis
     single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: (-0.5 * pfmap) + y_baseline_offset # flip over the y-axis
     
         
-
-    if single_figure:
-        y_lims_offset = -0.5 # shift the y-lims down by (-0.5 * pad) so it isn't cut off
+    if flat_stack_mode:
+        y_lims_offset = None
         ytick_location_shift:float = 0.0 # overrides with zero
     else:
-        y_lims_offset = None
-        ytick_location_shift:float = 0.5 # default
+        if single_figure:
+            y_lims_offset = -0.5 # shift the y-lims down by (-0.5 * pad) so it isn't cut off
+            ytick_location_shift:float = 0.0 # overrides with zero
+        else:
+            y_lims_offset = None
+            ytick_location_shift:float = 0.5 # default
         
     plot_ratemap_1D_kwargs['ytick_location_shift'] = ytick_location_shift
 
