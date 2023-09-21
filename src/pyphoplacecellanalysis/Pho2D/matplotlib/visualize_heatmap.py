@@ -91,6 +91,12 @@ def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="
     defer_show: if True, do not show the plot immediately. Instead, return the plot object.
 
     Returns: the PlotWidget object
+    
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph
+        
     """
 
     # Reshape the 1D array into a 2D array with a single row
