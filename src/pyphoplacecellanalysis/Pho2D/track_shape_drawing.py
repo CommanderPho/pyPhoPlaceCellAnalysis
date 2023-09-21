@@ -113,6 +113,9 @@ class LinearTrackDimensions:
     alignment_axis: str = field(default='x')
     axis_scale_factors: ScaleFactors = field(default=ScaleFactors(1.0, 1.0))  # Major and minor axis scale factors
 
+    XPositions = namedtuple("XPositions", ["platform_start_x", "track_start_x", "track_midpoint_x", "track_end_x", "platform_stop_x"])
+    YPositions = namedtuple("YPositions", ["platform_start_y", "track_start_y", "track_center_y", "track_end_y", "platform_stop_y"])
+
     @property
     def total_length(self) -> float:
         # unscaled total length including both end platforms
@@ -123,6 +126,50 @@ class LinearTrackDimensions:
         # unscaled total width including both end platforms
         return max(self.track_width, (self.minor_axis_platform_side_width or self.platform_side_length))
 
+
+    @property
+    def scaled_track_length(self) -> float:
+        major_axis_factor, minor_axis_factor = self.axis_scale_factors
+        return major_axis_factor * self.track_length
+
+    @property
+    def scaled_track_width(self) -> float:
+        major_axis_factor, minor_axis_factor = self.axis_scale_factors
+        return minor_axis_factor * self.track_width
+
+    @property
+    def scaled_platform_size(self) -> tuple:
+        major_axis_factor, minor_axis_factor = self.axis_scale_factors
+        minor_axis_width = (self.minor_axis_platform_side_width or self.platform_side_length)
+        return ((major_axis_factor * self.platform_side_length), (minor_axis_factor * minor_axis_width))
+
+    @property
+    def scaled_total_length(self) -> float:
+        major_axis_factor, minor_axis_factor = self.axis_scale_factors
+        return major_axis_factor * self.total_length
+
+    @property
+    def scaled_total_width(self) -> float:
+        major_axis_factor, minor_axis_factor = self.axis_scale_factors
+        return minor_axis_factor * self.total_width
+
+    @property
+    def notable_x_positions(self) -> XPositions: # np.ndarray:
+        major_axis_factor, minor_axis_factor = self.axis_scale_factors
+        track_midpoint_x = major_axis_factor * (self.total_length / 2.0)
+        track_end_x = major_axis_factor * (self.platform_side_length + self.track_length)
+        platform_end_x = self.scaled_total_length # major_axis_factor * self.total_length
+        # return np.array((0.0, self.scaled_platform_size[0], track_midpoint_x, track_end_x, platform_end_x))
+        return self.XPositions(0.0, self.scaled_platform_size[0], track_midpoint_x, track_end_x, platform_end_x)
+
+    @property
+    def notable_y_positions(self) -> YPositions: # np.ndarray:
+        major_axis_factor, minor_axis_factor = self.axis_scale_factors
+        track_center_y = max(self.scaled_platform_size[1], self.scaled_track_width) / 2.0
+        track_origin_y = track_center_y - (self.scaled_track_width / 2.0)
+        track_top_y = track_center_y + (self.scaled_track_width / 2.0)
+        # return np.array((0.0, track_origin_y, track_center_y, track_top_y, self.scaled_platform_size[1]))
+        return self.YPositions(0.0, track_origin_y, track_center_y, track_top_y, self.scaled_platform_size[1])
 
     def get_center_point(self):
         return (self.total_length/2.0,
@@ -138,6 +185,71 @@ class LinearTrackDimensions:
         a_position_offset = np.array(a_position_offset) + np.array(a_center_correction_offset)
         assert len(a_position_offset) == 2, f"{a_position_offset} should be of length 2"
         return a_position_offset
+
+    @classmethod
+    def compute_offset_notable_positions(cls, notable_x_positions, notable_y_positions, is_zero_centered:bool=False, offset_point=None):
+        """ computes offset
+
+        notable_x_positions, notable_y_positions = self.compute_offset_notable_positions(notable_x_positions, notable_y_positions, is_zero_centered=is_zero_centered, offset_point=offset_point)
+
+        factored out of `_build_component_notable_positions`
+        """
+        if offset_point is not None:
+            assert len(offset_point) == 2, f"offset_point should be a point like (offset_x, offset_y) but was {offset_point}"
+            # assert is_zero_centered == True, f"is_zero_centered should always be True when using offset_point!"
+            is_zero_centered = True # always uses zero-centered
+
+        if is_zero_centered:
+            # returns: array([-107, -85, 0, 85, 107])
+            notable_x_positions = notable_x_positions - (notable_x_positions[-1]/2.0)
+            notable_y_positions = notable_y_positions - (notable_y_positions[-1]/2.0)
+            
+        if offset_point is not None:
+            notable_x_positions = notable_x_positions + offset_point[0]
+            notable_y_positions = notable_y_positions + offset_point[1]
+
+        return notable_x_positions, notable_y_positions
+
+    @classmethod
+    def compute_offset_rects(cls, total_length, total_width, rects, is_zero_centered:bool=False, offset_point=None):
+        """ 
+
+        rects = compute_offset_rects(self.total_length, self.total_width, rects, is_zero_centered=is_zero_centered, offset_point=offset_point)
+        
+        factored out of `_build_component_rectangles`
+
+        """
+        if offset_point is not None:
+            assert len(offset_point) == 2, f"offset_point should be a point like (offset_x, offset_y) but was {offset_point}"
+            # assert is_zero_centered == True, f"is_zero_centered should always be True when using offset_point!"
+            is_zero_centered = True # always uses zero-centered
+            
+
+        x_extent_midpoint: float = (total_length/2.0) # must capture these before updating them
+        y_extent_midpoint: float = (total_width/2.0) # must capture these before updating them
+
+        # x_extent_midpoint: float = (notable_x_positions[-1]/2.0) # must capture these before updating them
+        # y_extent_midpoint: float = (notable_y_positions[-1]/2.0) # must capture these before updating them
+
+        if is_zero_centered:
+            offset_rects = []
+            for a_rect in rects:
+                an_offset_rect = list(a_rect)
+                an_offset_rect[0] = a_rect[0] - x_extent_midpoint
+                an_offset_rect[1] = a_rect[1] - y_extent_midpoint
+                offset_rects.append(tuple(an_offset_rect))
+            rects = offset_rects
+
+        if offset_point is not None:
+            offset_rects = []
+            for a_rect in rects:
+                an_offset_rect = list(a_rect)
+                an_offset_rect[0] = a_rect[0] + offset_point[0]
+                an_offset_rect[1] = a_rect[1] + offset_point[1]
+                offset_rects.append(tuple(an_offset_rect))
+            rects = offset_rects
+
+        return rects
 
 
     @classmethod
@@ -171,11 +283,13 @@ class LinearTrackDimensions:
         
 
     def _build_component_notable_positions(self, major_axis_factor:float=1.0, minor_axis_factor:float=1.0, is_zero_centered:bool=False, offset_point=None):
-        """ builds 1D dimension lines """
+        """ builds 1D dimension lines 
+        Allows specifying arbitrary `major_axis_factor:float=1.0, minor_axis_factor:float=1.0` unlike the `self` version
+        """
         if self.alignment_axis == 'x':
             scaled_track_length = (major_axis_factor * self.track_length)
             scaled_track_width = (minor_axis_factor * self.track_width)
-            scaled_platform_size = ((major_axis_factor * self.platform_side_length), (minor_axis_factor * self.platform_side_length))
+            scaled_platform_size = ((major_axis_factor * self.platform_side_length), (minor_axis_factor * (self.minor_axis_platform_side_width or self.platform_side_length)))
             
             track_center_y = minor_axis_factor * (self.platform_side_length / 2.0)
             track_origin_y = track_center_y - (scaled_track_width / 2.0) # find the bottom of the track rectangle
@@ -188,96 +302,72 @@ class LinearTrackDimensions:
             # (platform_start, track_start, track_midpoint, track_end, platform_stop)
             notable_x_positions = np.array((0.0, scaled_platform_size[0], track_midpoint_x, track_end_x, platform_end_x)) # (platform_start_x, track_start_x, track_midpoint_x, track_end_x, platform_stop_x)
             notable_y_positions = np.array((0.0, track_origin_y, track_center_y, track_top_y, scaled_platform_size[1])) # (platform_start_y, track_start_y, track_center_y, track_end_y, platform_stop_y)
+
+            # TODO 2023-09-20 - Use new self.notable_*_positions properties:
+            # notable_x_positions = np.array(self.notable_x_positions) # (platform_start_x, track_start_x, track_midpoint_x, track_end_x, platform_stop_x)
+            # notable_y_positions = np.array(self.notable_y_positions) # (platform_start_y, track_start_y, track_center_y, track_end_y, platform_stop_y)
+
         elif self.alignment_axis == 'y':
             raise NotImplementedError
         else:
             raise ValueError(f"Unsupported alignment_axis: {self.alignment_axis}")
-
-        if offset_point is not None:
-            assert len(offset_point) == 2, f"offset_point should be a point like (offset_x, offset_y) but was {offset_point}"
-            # assert is_zero_centered == True, f"is_zero_centered should always be True when using offset_point!"
-            is_zero_centered = True # always uses zero-centered
             
-        if is_zero_centered:
-            # returns: array([-107, -85, 0, 85, 107])
-            notable_x_positions = notable_x_positions - (notable_x_positions[-1]/2.0)
-            notable_y_positions = notable_y_positions - (notable_y_positions[-1]/2.0)
-            
-        if offset_point is not None:
-            notable_x_positions = notable_x_positions + offset_point[0]
-            notable_y_positions = notable_y_positions + offset_point[1]
-            
+        notable_x_positions, notable_y_positions = self.compute_offset_notable_positions(notable_x_positions, notable_y_positions, is_zero_centered=is_zero_centered, offset_point=offset_point)
         return notable_x_positions, notable_y_positions
 
-    def _build_component_rectangles(self, is_zero_centered:bool=False, offset_point=None):
+    def _build_component_rectangles(self, is_zero_centered:bool=False, offset_point=None, include_rendering_properties:bool=True):
         major_axis_factor, minor_axis_factor = self.axis_scale_factors
-        pen = pg.mkPen({'color': "#FF0", 'width': 2})
-        brush = pg.mkBrush("#FF0")
+        if include_rendering_properties:
+            pen = pg.mkPen({'color': "#FF0", 'width': 2})
+            brush = pg.mkBrush("#FF0")
+            rendering_properties_tuple = (pen, brush)
+        else:
+            # rendering_properties_tuple = tuple() # omit entirely?
+            rendering_properties_tuple = (None, None) # include two None values to allow for loop unwrapping
 
         if self.alignment_axis == 'x':
-            scaled_track_length = (major_axis_factor * self.track_length)
-            scaled_track_width = (minor_axis_factor * self.track_width)
-            scaled_platform_size = ((major_axis_factor * self.platform_side_length), (minor_axis_factor * (self.minor_axis_platform_side_width or self.platform_side_length)))
+            # self.scaled_track_length = (major_axis_factor * self.track_length)
+            # self.scaled_track_width = (minor_axis_factor * self.track_width)
+            # self.scaled_platform_size = ((major_axis_factor * self.platform_side_length), (minor_axis_factor * (self.minor_axis_platform_side_width or self.platform_side_length)))
             
-            track_center_y = (max(scaled_platform_size[1], scaled_track_width) / 2.0) # assumes platform is thicker than track.
-            track_origin_y = track_center_y - (scaled_track_width / 2.0) # find the bottom of the track rectangle
-            track_top_y = track_center_y + (scaled_track_width / 2.0)
+            track_center_y = (max(self.scaled_platform_size[1], self.scaled_track_width) / 2.0) # assumes platform is thicker than track.
+            track_origin_y = track_center_y - (self.scaled_track_width / 2.0) # find the bottom of the track rectangle
+            # track_top_y = track_center_y + (self.scaled_track_width / 2.0)
 
-            # Aims to position the bottom-left corner of each rect appropriately
-            track_midpoint_x: float = (major_axis_factor * (self.total_length/2.0))
+            # # Aims to position the bottom-left corner of each rect appropriately
+            # track_midpoint_x: float = (major_axis_factor * (self.total_length/2.0))
             track_end_x: float = (major_axis_factor * (self.platform_side_length + self.track_length))
-            platform_end_x: float = (major_axis_factor * self.total_length)
-            notable_x_positions = np.array((0.0, scaled_platform_size[0], track_midpoint_x, track_end_x, platform_end_x)) # (platform_start_x, track_start_x, track_midpoint_x, track_end_x, platform_stop_x)
-            notable_y_positions = np.array((0.0, track_origin_y, track_center_y, track_top_y, scaled_platform_size[1])) # (platform_start_y, track_start_y, track_center_y, track_end_y, platform_stop_y)
+            # platform_end_x: float = self.scaled_total_length
+            # notable_x_positions = np.array((0.0, self.scaled_platform_size[0], track_midpoint_x, track_end_x, platform_end_x)) # (platform_start_x, track_start_x, track_midpoint_x, track_end_x, platform_stop_x)
+            # notable_y_positions = np.array((0.0, track_origin_y, track_center_y, track_top_y, self.scaled_platform_size[1])) # (platform_start_y, track_start_y, track_center_y, track_end_y, platform_stop_y)
+
+            notable_x_positions = np.array(self.notable_x_positions) # (platform_start_x, track_start_x, track_midpoint_x, track_end_x, platform_stop_x)
+            notable_y_positions = np.array(self.notable_y_positions) # (platform_start_y, track_start_y, track_center_y, track_end_y, platform_stop_y)
 
             rects = [
-                (0, 0, *scaled_platform_size, pen, brush),
-                (scaled_platform_size[0], track_origin_y, scaled_track_length, scaled_track_width, pen, brush),
-                (track_end_x, 0, *scaled_platform_size, pen, brush)
+                (0, 0, *self.scaled_platform_size, *rendering_properties_tuple),
+                (self.scaled_platform_size[0], track_origin_y, self.scaled_track_length, self.scaled_track_width, *rendering_properties_tuple),
+                (track_end_x, 0, *self.scaled_platform_size, *rendering_properties_tuple)
             ]
 
         elif self.alignment_axis == 'y':
             raise NotImplementedError # never converted to `(self.minor_axis_platform_side_width or self.platform_side_length)` or maintained
             track_center_x = major_axis_factor * self.platform_side_length / 2.0
             track_origin_x = track_center_x - minor_axis_factor * self.track_width / 2.0
-            scaled_platform_size = ((minor_axis_factor * self.platform_side_length), (major_axis_factor * self.platform_side_length))
+            self.scaled_platform_size = ((minor_axis_factor * self.platform_side_length), (major_axis_factor * self.platform_side_length))
             rects = [
-                (0, 0, *scaled_platform_size, pen, brush),
+                (0, 0, *self.scaled_platform_size, *rendering_properties_tuple),
                 (track_origin_x, major_axis_factor * self.platform_side_length,
                     (minor_axis_factor * self.track_width), 
                     (major_axis_factor * self.track_length),
-                    pen, brush),
-                (0, major_axis_factor * (self.platform_side_length + self.track_length),*scaled_platform_size, pen, brush)
+                    *rendering_properties_tuple),
+                (0, major_axis_factor * (self.platform_side_length + self.track_length),*self.scaled_platform_size, *rendering_properties_tuple)
             ]
         else:
             raise ValueError(f"Unsupported alignment_axis: {self.alignment_axis}")
 
-
-        if offset_point is not None:
-            assert len(offset_point) == 2, f"offset_point should be a point like (offset_x, offset_y) but was {offset_point}"
-            # assert is_zero_centered == True, f"is_zero_centered should always be True when using offset_point!"
-            is_zero_centered = True # always uses zero-centered
             
-        x_extent_midpoint: float = (notable_x_positions[-1]/2.0) # must capture these before updating them
-        y_extent_midpoint: float = (notable_y_positions[-1]/2.0) # must capture these before updating them
-
-        if is_zero_centered:
-            offset_rects = []
-            for a_rect in rects:
-                an_offset_rect = list(a_rect)
-                an_offset_rect[0] = a_rect[0] - x_extent_midpoint
-                an_offset_rect[1] = a_rect[1] - y_extent_midpoint
-                offset_rects.append(tuple(an_offset_rect))
-            rects = offset_rects
-
-        if offset_point is not None:
-            offset_rects = []
-            for a_rect in rects:
-                an_offset_rect = list(a_rect)
-                an_offset_rect[0] = a_rect[0] + offset_point[0]
-                an_offset_rect[1] = a_rect[1] + offset_point[1]
-                offset_rects.append(tuple(an_offset_rect))
-            rects = offset_rects
+        rects = self.compute_offset_rects(self.total_length, self.total_width, rects, is_zero_centered=is_zero_centered, offset_point=offset_point)
 
         return rects
         
@@ -287,7 +377,7 @@ class LinearTrackDimensions:
         
         combined_item, rect_items, rects = item.plot_rect(ax, offset=None)
         """
-        rects = self._build_component_rectangles(is_zero_centered=True, offset_point=offset)
+        rects = self._build_component_rectangles(is_zero_centered=True, offset_point=offset, include_rendering_properties=True)
         rect_items = [] # probably do not need
         for x, y, w, h, pen, brush in rects:
             if isinstance(plot_item, PlotItem):
@@ -462,6 +552,32 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
             return merged_boxes_pdata
      
 
+
+@define(slots=False)
+class LinearTrackInstance:
+    """ 
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+    
+    """
+    track_dimensions: LinearTrackDimensions
+    grid_bin_bounds: BoundsRect #= None #TODO 2023-09-20 12:33: - [ ] Allow storing grid_bin_bounds to help with offset computations
+    
+    @classmethod
+    def init_from_grid_bin_bounds(cls, grid_bin_bounds: BoundsRect, debug_print=False):
+        """ Builds the object and the maze mesh data from the grid_bin_bounds provided.
+        
+        ## Add the 3D Maze Shape
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions, LinearTrackDimensions3D
+            from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import perform_plot_flat_arena
+
+            a_track_dims = LinearTrackDimensions3D()
+            a_track_dims, ideal_maze_pdata = LinearTrackDimensions3D.init_from_grid_bin_bounds(grid_bin_bounds, return_geoemtry=True)
+            ipspikesDataExplorer.plots['maze_bg_ideal'] = perform_plot_flat_arena(pActiveSpikesBehaviorPlotter, ideal_maze_pdata, name='idealized_maze_bg', label='idealized_maze', color=[1.0, 0.3, 0.3]) # [0.3, 0.3, 0.3]
+
+
+        """
+        _obj = cls(LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds), grid_bin_bounds=grid_bin_bounds)
+        return _obj
 
 # ==================================================================================================================== #
 # Test Plots                                                                                                           #
