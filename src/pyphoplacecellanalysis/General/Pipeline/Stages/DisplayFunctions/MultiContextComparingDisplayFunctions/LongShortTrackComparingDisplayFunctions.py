@@ -275,7 +275,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison', 'determine_long_short_pf1D_indicies_sort_by_peak'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
-    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
+    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
                 Usage:
 
@@ -294,7 +294,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             single_figure = kwargs.pop('single_figure', True)
             debug_print = kwargs.pop('debug_print', False)
 
-        
+            active_config_name = kwargs.pop('active_config_name', None)
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
             # Plot 1D Keywoard args:
@@ -303,7 +303,16 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             short_kwargs = kwargs.pop('short_kwargs', {})
 
             shared_kwargs['active_context'] = active_context
-            
+
+            # Allow overriding the sortby for both long and short if a top-level sortby kwarg is passed:
+            override_sortby = kwargs.pop('sortby', None)
+            if (override_sortby is not None and isinstance(override_sortby, str)):
+                print(f'override_sortby: {override_sortby} is being used.')
+                # long_sortby = long_kwargs.get('sortby', None)
+                # short_sortby = short_kwargs.get('sortby', None)
+                # assert (not (long_sortby is not None and isinstance(long_sortby, str)) and (short_sortby is not None and isinstance(short_sortby, str))) # assert no valid sortby values are set for the individual kwargs
+                long_kwargs['sortby'] = override_sortby
+                short_kwargs['sortby'] = override_sortby
 
             if include_includelist is None:
                 include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
@@ -317,8 +326,15 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     
             long_results = computation_results[long_epoch_name]['computed_data']
             short_results = computation_results[short_epoch_name]['computed_data']
+
             # curr_any_context_neurons = _find_any_context_neurons(*[owning_pipeline_reference.computation_results[k].computed_data.pf1D.ratemap.neuron_ids for k in [long_epoch_name, short_epoch_name]])
             curr_any_context_neurons = _find_any_context_neurons(*[a_result.pf1D.ratemap.neuron_ids for a_result in [long_results, short_results]])
+
+            if included_any_context_neuron_ids is None:
+                included_any_context_neuron_ids = curr_any_context_neurons
+            else:
+                # include only the specified neuron_ids:
+                included_any_context_neuron_ids = curr_any_context_neurons[np.isin(curr_any_context_neurons, included_any_context_neuron_ids)]
 
             # SORT BY LONG PEAK LOCATION: Determine the sort indicies to align the placefields by the position on the long:
             ### to use this mode, you must pass the string 'peak_long' for both long_kwargs['sortby'] and short_kwargs['sortby']
@@ -327,14 +343,14 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             if (long_sortby is not None and isinstance(long_sortby, str)) and (short_sortby is not None and isinstance(short_sortby, str)):
                 assert long_sortby == 'peak_long'
                 assert short_sortby == 'peak_long'
-                new_all_aclus_sort_indicies = determine_long_short_pf1D_indicies_sort_by_peak(owning_pipeline_reference, curr_any_context_neurons, debug_print=False)
+                new_all_aclus_sort_indicies = determine_long_short_pf1D_indicies_sort_by_peak(owning_pipeline_reference, included_any_context_neuron_ids, debug_print=False)
                 # shared_kwargs['sortby'] = (shared_kwargs.get('sortby', None) or new_all_aclus_sort_indicies)
                 long_kwargs['sortby'] = new_all_aclus_sort_indicies # (long_kwargs.get('sortby', None) or 
                 short_kwargs['sortby'] = new_all_aclus_sort_indicies # (short_kwargs.get('sortby', None) or 
                 print(f'DEBUG: new_all_aclus_sort_indicies: {new_all_aclus_sort_indicies}')
             
-            (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure,
-                shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print)
+            (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, included_any_context_neuron_ids, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure,
+                shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print, **kwargs)
 
             if single_figure:
                 final_context = active_context.adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
@@ -356,7 +372,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 active_out_figure_paths = []
 
             graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
-            graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
+            graphics_output_dict['plot_data'] = {'included_any_context_neuron_ids': included_any_context_neuron_ids, 'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
             return graphics_output_dict
 
