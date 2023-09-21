@@ -1,13 +1,13 @@
 from copy import deepcopy
 from typing import Tuple, Optional, List, Dict
+from enum import Enum # for TrackPositionClassification
 from attrs import define, field, Factory
 from collections import namedtuple
 import numpy as np
 import pandas as pd
 
 from neuropy.utils.dynamic_container import overriding_dict_with # required for safely_accepts_kwargs
-
-from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect
+from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect, is_point_in_rect
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.color_helpers import convert_pen_brush_to_matplot_kwargs
@@ -27,6 +27,50 @@ import matplotlib.patches as patches # for matplotlib version of the plot
 from matplotlib.collections import PatchCollection
 
 import pyvista as pv # for 3D support in `LinearTrackDimensions3D`
+
+
+
+class TrackPositionClassification(Enum):
+    """ classifying various x-positions as belonging to outside the outside_maze, the track_endcaps, or the track_body
+
+        # TrackPositionClassification.TRACK_ENDCAPS
+        # TrackPositionClassification.TRACK_BODY
+        # TrackPositionClassification.OUTSIDE_MAZE
+    """
+    OUTSIDE_MAZE = "outside_maze"
+    TRACK_ENDCAPS = "track_endcaps"
+    TRACK_BODY = "track_body"
+
+    @property
+    def is_on_maze(self) -> bool:
+        """ returns True if the point is anywhere on the track (including endcaps) """
+        return self.value != TrackPositionClassification.OUTSIDE_MAZE.value
+
+    @property
+    def is_endcap(self) -> bool:
+        return self.value == TrackPositionClassification.TRACK_ENDCAPS.value
+
+
+def classify_test_point(test_point, rects) -> "TrackPositionClassification":
+    """ 
+        rects = [
+            (-107.0, -0.125, 22.0, 0.25),
+            (-85.0, -0.05, 170.0, 0.1),
+            (85.0, -0.125, 22.0, 0.25)
+        ]
+    """
+    assert len(rects) == 3, f"rects should contain three elements for (left_platform, track_body, right_platform). {rects}"
+    if is_point_in_rect(test_point, rects[0]) or is_point_in_rect(test_point, rects[2]):
+        return TrackPositionClassification.TRACK_ENDCAPS
+    elif is_point_in_rect(test_point, rects[1]):
+        return TrackPositionClassification.TRACK_BODY
+    else:
+        return TrackPositionClassification.OUTSIDE_MAZE
+
+def classify_x_position(x, rects) -> "TrackPositionClassification":
+    return classify_test_point((x, None), rects)
+
+
 
 
 @function_attributes(short_name=None, tags=['graphics', 'track', 'shape', 'rendering'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-07 12:13', related_items=[])
@@ -562,6 +606,11 @@ class LinearTrackInstance:
     track_dimensions: LinearTrackDimensions
     grid_bin_bounds: BoundsRect #= None #TODO 2023-09-20 12:33: - [ ] Allow storing grid_bin_bounds to help with offset computations
     
+    @property
+    def rects(self):
+        offset_point = self.grid_bin_bounds.center_point # (self.grid_bin_bounds.center_point[0], 0.75)
+        return self.track_dimensions._build_component_rectangles(is_zero_centered=True, offset_point=offset_point, include_rendering_properties=False)
+
     @classmethod
     def init_from_grid_bin_bounds(cls, grid_bin_bounds: BoundsRect, debug_print=False):
         """ Builds the object and the maze mesh data from the grid_bin_bounds provided.
@@ -578,6 +627,20 @@ class LinearTrackInstance:
         """
         _obj = cls(LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds), grid_bin_bounds=grid_bin_bounds)
         return _obj
+
+    def classify_point(self, test_point) -> "TrackPositionClassification":
+        return classify_test_point(test_point, self.rects)
+    
+    def classify_x_position(self, x) -> "TrackPositionClassification":
+        return self.classify_point((x, None))
+    
+    # TODO: Note that these currently take only x-positions, not real points
+    def is_on_maze(self, points):
+        return np.array([self.classify_x_position(test_x).is_on_maze for test_x in points])
+
+    def is_on_endcap(self, points):
+        return np.array([self.classify_x_position(test_x).is_endcap for test_x in points])
+
 
 # ==================================================================================================================== #
 # Test Plots                                                                                                           #
