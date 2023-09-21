@@ -68,7 +68,7 @@ class LauncherWidget(QWidget):
 
     # Define a function to be executed when a tree widget item is double-clicked
     # @QtCore.Slot(object, int)
-    @pyqtExceptionRaisingSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_tree_item_double_clicked(self, item, column):
         print(f"Item double-clicked: {item}, column: {column}\n\t", item.text(column))
         # print(f'\titem.data: {item.data}')

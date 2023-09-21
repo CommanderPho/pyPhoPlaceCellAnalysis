@@ -31,6 +31,8 @@ from neuropy.core.epoch import Epoch
 from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
+from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
+
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 
@@ -46,7 +48,7 @@ from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
 from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations, InstantaneousFiringRatesDataframeAccessor
-
+from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import generate_batch_single_session_scripts
 
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
@@ -609,7 +611,7 @@ class BatchRun(HDF_SerializationMixin):
         return session_identifiers, pkl_output_paths, hdf5_output_paths
 
     @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
-    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True):
+    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True, create_slurm_scripts:bool=True):
         """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
         output_directory
@@ -625,47 +627,47 @@ class BatchRun(HDF_SerializationMixin):
             self.session_batch_basedirs
             
         """
+        return generate_batch_single_session_scripts(self.global_data_root_parent_path, included_session_contexts, session_batch_basedirs=self.session_batch_basedirs, output_directory=output_directory, use_separate_run_directories=use_separate_run_directories, create_slurm_scripts=create_slurm_scripts)
+        # # Set up Jinja2 environment
+        # template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+        # env = Environment(loader=FileSystemLoader(template_path))
+        # python_template = env.get_template('slurm_python_template.py.j2')
+        # slurm_template = env.get_template('slurm_template.sh.j2')
+
+
+        # output_python_scripts = []
+        # output_slurm_scripts = []
+        # # Make sure the output directory exists
+        # os.makedirs(output_directory, exist_ok=True)
         
-        # Set up Jinja2 environment
-        template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
-        env = Environment(loader=FileSystemLoader(template_path))
-        python_template = env.get_template('slurm_python_template.py.j2')
-        slurm_template = env.get_template('slurm_template.sh.j2')
+        # for curr_session_context in included_session_contexts:
+        #     curr_session_basedir = self.session_batch_basedirs[curr_session_context]
+        #     if use_separate_run_directories:
+        #         curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}")
+        #         os.makedirs(curr_batch_script_rundir, exist_ok=True)
+        #     else:
+        #         curr_batch_script_rundir = output_directory
 
-
-        output_python_scripts = []
-        output_slurm_scripts = []
-        # Make sure the output directory exists
-        os.makedirs(output_directory, exist_ok=True)
-        
-        for curr_session_context in included_session_contexts:
-            curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-            if use_separate_run_directories:
-                curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}")
-                os.makedirs(curr_batch_script_rundir, exist_ok=True)
-            else:
-                curr_batch_script_rundir = output_directory
-
-            # Create the Python script
-            python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
-            with open(python_script_path, 'w') as script_file:
-                script_content = python_template.render(global_data_root_parent_path=self.global_data_root_parent_path,
-                                                        curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-                                                        curr_session_basedir=curr_session_basedir)
-                script_file.write(script_content)
+        #     # Create the Python script
+        #     python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
+        #     with open(python_script_path, 'w') as script_file:
+        #         script_content = python_template.render(global_data_root_parent_path=self.global_data_root_parent_path,
+        #                                                 curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+        #                                                 curr_session_basedir=curr_session_basedir)
+        #         script_file.write(script_content)
             
 
-            # Create the SLURM script
-            slurm_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.sh')
-            with open(slurm_script_path, 'w') as script_file:
-                script_content = slurm_template.render(curr_session_context=f"{curr_session_context}", python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
-                script_file.write(script_content)
+        #     # Create the SLURM script
+        #     slurm_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.sh')
+        #     with open(slurm_script_path, 'w') as script_file:
+        #         script_content = slurm_template.render(curr_session_context=f"{curr_session_context}", python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
+        #         script_file.write(script_content)
 
-            # Add the output files:
-            output_python_scripts.append(python_script_path)
-            output_slurm_scripts.append(slurm_script_path)
+        #     # Add the output files:
+        #     output_python_scripts.append(python_script_path)
+        #     output_slurm_scripts.append(slurm_script_path)
         
-        return included_session_contexts, output_python_scripts, output_slurm_scripts
+        # return included_session_contexts, output_python_scripts, output_slurm_scripts
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
 
@@ -1505,51 +1507,27 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
         print(f'resusing extant_batch_run: {extant_batch_run}')
         active_batch_run = extant_batch_run
 
-
     active_data_mode_name = 'kdiba'
 
-    ## Data must be pre-processed using the MATLAB script located here: 
-    #     neuropy/data_session_pre_processing_scripts/KDIBA/IIDataMat_Export_ToPython_2022_08_01.m
-    # From pre-computed .mat files:
+    output_session_basedir_dict = KDibaOldDataSessionFormatRegisteredClass.build_session_basedirs_dict(global_data_root_parent_path)
+    
+    ## Initialize `session_batch_status` with the NOT_STARTED status if it doesn't already have a different status
+    for curr_session_context, curr_session_basedir in output_session_basedir_dict.items():
+        # basedir might be different (e.g. on different platforms), but context should be the same
+        curr_session_status = active_batch_run.session_batch_status.get(curr_session_context, None)
+        if curr_session_status is None:
+            active_batch_run.session_batch_basedirs[curr_session_context] = curr_session_basedir # use the current basedir if we're compute from this machine instead of loading a previous computed session
+            active_batch_run.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
+            active_batch_run.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
+            active_batch_run.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
 
-    local_session_root_parent_context = IdentifyingContext(format_name=active_data_mode_name) # , animal_name='', configuration_name='one', session_name=self.session_name
-    local_session_root_parent_path = global_data_root_parent_path.joinpath('KDIBA')
+            ## TODO: 2023-03-14 - Kick off computation?
+            if execute_all:
+                active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run.global_data_root_parent_path, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
 
-    animal_names = ['gor01', 'vvp01', 'pin01']
-    experiment_names_lists = [['one', 'two'], ['one', 'two'], ['one']] # there is no 'two' for animal 'pin01'
-    exclude_lists = [['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'], [], [], [], ['redundant','showclus','sleep','tmaze']]
-
-    for animal_name, an_experiment_names_list, exclude_list in zip(animal_names, experiment_names_lists, exclude_lists):
-        for an_experiment_name in an_experiment_names_list:
-            local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal=animal_name, exper_name=an_experiment_name)
-            local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-            local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=exclude_list)
-
-            if debug_print:
-                print(f'local_session_paths_list: {local_session_paths_list}')
-                print(f'local_session_names_list: {local_session_names_list}')
-
-            ## Build session contexts list:
-            local_session_contexts_list = [local_session_parent_context.adding_context(collision_prefix='sess', session_name=a_name) for a_name in local_session_names_list] # [IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>, ..., IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-13_14-42-6')>]
-
-            ## Initialize `session_batch_status` with the NOT_STARTED status if it doesn't already have a different status
-            for curr_session_basedir, curr_session_context in zip(local_session_paths_list, local_session_contexts_list):
-                # basedir might be different (e.g. on different platforms), but context should be the same
-                curr_session_status = active_batch_run.session_batch_status.get(curr_session_context, None)
-                if curr_session_status is None:
-                    active_batch_run.session_batch_basedirs[curr_session_context] = curr_session_basedir # use the current basedir if we're compute from this machine instead of loading a previous computed session
-                    active_batch_run.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
-                    active_batch_run.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
-                    active_batch_run.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
-
-                    ## TODO: 2023-03-14 - Kick off computation?
-                    if execute_all:
-                        active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run.global_data_root_parent_path, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
-
-                else:
-                    print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
-                    ## TODO 2023-04-19: shouldn't computation happen here too if needed?
-
+        else:
+            print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
+            ## TODO 2023-04-19: shouldn't computation happen here too if needed?
 
     ## end for
     return active_batch_run
