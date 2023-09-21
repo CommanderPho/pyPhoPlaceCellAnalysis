@@ -63,7 +63,7 @@ class PlacefieldOverlapMetricMode(ExtendedEnum):
 
 
 def build_extra_cell_info_label_string(row) -> str:
-    """ used in `_display_jonathan_interactive_replay_firing_rate_comparison` to format the extra info labels for each aclu like it's firing rate indices. """
+    """ used in `_display_jonathan_interactive_replay_firing_rate_comparison` to format the extra info labels for each aclu like its firing rate indices. """
     row_dict = dict(row._asdict())
     has_instantaneous_version = np.all(np.isin(list(row_dict.keys()), ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']))
     if has_instantaneous_version:
@@ -83,6 +83,32 @@ def build_extra_cell_info_label_string(row) -> str:
     else:
         return '\n'.join([f"{k}: {round(v, 3)}" for k,v in row_dict.items()])
 
+
+
+
+@function_attributes(short_name=None, tags=['pyqtgraph', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=['pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.build_pyqtgraph_epoch_indicator_regions'], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 19:04')
+def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch):
+    """Add session indicators to pyqtgraph plot for the long and the short epoch
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions
+
+            long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
+            short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
+            long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
+
+            long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
+            short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items
+    """
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions # Add session indicators to pyqtgraph plot
+
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+    long_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=long_epoch.t_start, t_stop=long_epoch.t_stop, **long_epoch_config)
+    short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
+    return long_epoch_indicator_region_items, short_epoch_indicator_region_items
 
 
 
@@ -155,7 +181,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             return graphics_output_dict
 
-    @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
+    @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch', 'inefficient', 'slow'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display.
                 Usage:
@@ -379,7 +405,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     @function_attributes(short_name='short_long_pf1D_scalar_overlap_comparison', tags=['display','long_short'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 12:44', is_global=True)
     def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
             """ Displays a figure for comparing the scalar comparison quantities computed for 1D placefields across-epochs (between the short and long tracks)
-                This currently renders as a bar-graph
+                This currently renders as a colorful bar-graph with one bar for each aclu
 
                 Usage:
 
@@ -773,7 +799,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), context=final_context, plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices', 'epoch'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
+    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices', 'epoch', 'needs_improvement', 'inefficient'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
     def _display_long_and_short_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_epoch_indicies=None, defer_render=False, save_figure=True, **kwargs):
         """ Plots two figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
@@ -1826,34 +1852,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 # 2023-04-19 Surprise                                                                                                  #
 # ==================================================================================================================== #
 
-
-
-
-@function_attributes(short_name=None, tags=['pyqtgraph', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=['pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.build_pyqtgraph_epoch_indicator_regions'], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 19:04')
-def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch):
-    """Add session indicators to pyqtgraph plot for the long and the short epoch
-
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions
-
-            long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
-            short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
-            long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
-
-            long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
-            short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items
-    """
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
-    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions # Add session indicators to pyqtgraph plot
-
-    long_short_display_config_manager = LongShortDisplayConfigManager()
-    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
-    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
-
-    long_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=long_epoch.t_start, t_stop=long_epoch.t_stop, **long_epoch_config)
-    short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
-    return long_epoch_indicator_region_items, short_epoch_indicator_region_items
-
-
 @function_attributes(short_name='plot_long_short_expected_vs_observed_firing_rates', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 17:26', is_global=True)
 def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_results_obj, limit_aclus=None):
     """ 2023-03-28 4:30pm - Expected vs. Observed Firing Rates for each cell and each epoch 
@@ -2001,7 +1999,7 @@ def plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_
     
     Usage: 
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_long_short_surprise_difference_plot
-        win, self.plots = plot_long_short_surprise_difference_plot(long_results_obj, short_results_obj)
+        win, plots = plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_obj, short_results_obj, long_epoch_name, short_epoch_name)
     
     """
     # Private Subfunctions _______________________________________________________________________________________________ #
