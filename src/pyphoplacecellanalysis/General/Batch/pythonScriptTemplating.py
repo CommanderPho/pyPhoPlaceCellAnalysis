@@ -44,6 +44,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
 		
 	"""
+	assert isinstance(session_batch_basedirs, dict)
 	
 	# Set up Jinja2 environment
 	template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')

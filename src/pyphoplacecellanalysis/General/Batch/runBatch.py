@@ -627,47 +627,8 @@ class BatchRun(HDF_SerializationMixin):
             self.session_batch_basedirs
             
         """
-        return generate_batch_single_session_scripts(self.global_data_root_parent_path, included_session_contexts, session_batch_basedirs=self.session_batch_basedirs, output_directory=output_directory, use_separate_run_directories=use_separate_run_directories, create_slurm_scripts=create_slurm_scripts)
-        # # Set up Jinja2 environment
-        # template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
-        # env = Environment(loader=FileSystemLoader(template_path))
-        # python_template = env.get_template('slurm_python_template.py.j2')
-        # slurm_template = env.get_template('slurm_template.sh.j2')
-
-
-        # output_python_scripts = []
-        # output_slurm_scripts = []
-        # # Make sure the output directory exists
-        # os.makedirs(output_directory, exist_ok=True)
+        return generate_batch_single_session_scripts(self.global_data_root_parent_path, session_batch_basedirs=self.session_batch_basedirs, included_session_contexts=included_session_contexts, output_directory=output_directory, use_separate_run_directories=use_separate_run_directories, create_slurm_scripts=create_slurm_scripts)
         
-        # for curr_session_context in included_session_contexts:
-        #     curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-        #     if use_separate_run_directories:
-        #         curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}")
-        #         os.makedirs(curr_batch_script_rundir, exist_ok=True)
-        #     else:
-        #         curr_batch_script_rundir = output_directory
-
-        #     # Create the Python script
-        #     python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
-        #     with open(python_script_path, 'w') as script_file:
-        #         script_content = python_template.render(global_data_root_parent_path=self.global_data_root_parent_path,
-        #                                                 curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-        #                                                 curr_session_basedir=curr_session_basedir)
-        #         script_file.write(script_content)
-            
-
-        #     # Create the SLURM script
-        #     slurm_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.sh')
-        #     with open(slurm_script_path, 'w') as script_file:
-        #         script_content = slurm_template.render(curr_session_context=f"{curr_session_context}", python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
-        #         script_file.write(script_content)
-
-        #     # Add the output files:
-        #     output_python_scripts.append(python_script_path)
-        #     output_slurm_scripts.append(slurm_script_path)
-        
-        # return included_session_contexts, output_python_scripts, output_slurm_scripts
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
 
@@ -1534,7 +1495,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn:Optional[Callable]=None, **kwargs):
+def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)
             
@@ -1587,7 +1548,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
                                             '_perform_firing_rate_trends_computation',
                                         ]
     
-    saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
+    # saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
     skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)

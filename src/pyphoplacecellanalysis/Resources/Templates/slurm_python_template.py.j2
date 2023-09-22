@@ -16,8 +16,8 @@ should_force_reload_all = False
 # should_force_reload_all = True
 
 # Whether to output figures:
-# should_perform_figure_generation_to_file=False
-should_perform_figure_generation_to_file=True
+should_perform_figure_generation_to_file=False
+#should_perform_figure_generation_to_file=True
 
 
 if should_force_reload_all:
@@ -41,7 +41,8 @@ run_status, run_errors, run_outputs = run_specific_batch(Path(global_data_root_p
 												curr_session_basedir = Path(r'{{ curr_session_basedir }}'),
 												force_reload = result_handler.force_reload_all,
 												post_run_callback_fn=result_handler.on_complete_success_execution_session,
-												fail_on_exception=True)
+												fail_on_exception=True,
+												saving_mode=result_handler.saving_mode)
 
 print(f'finished run: {run_status}, errors: {run_errors}, outputs: {run_outputs}')
 
