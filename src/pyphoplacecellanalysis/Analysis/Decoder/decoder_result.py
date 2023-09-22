@@ -884,7 +884,8 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
 
 
 
-@function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], uses=['perform_leave_one_aclu_out_decoding_analysis', '_analyze_leave_one_out_decoding_results', 'LeaveOneOutDecodingAnalysisResult'], creation_date='2023-03-17 00:00')
+@function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo', 'surprise'], input_requires=[], output_provides=[],
+                      uses=['perform_leave_one_aclu_out_decoding_analysis', '_analyze_leave_one_out_decoding_results', 'LeaveOneOutDecodingAnalysisResult'], used_by=['_long_short_decoding_analysis_from_decoders'], creation_date='2023-03-17 00:00')
 def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = '', skip_cache_save:bool = True, perform_cache_load:bool = False) -> LeaveOneOutDecodingAnalysisResult:
     """ 2023-03-17 - Performs a leave one out decoding analysis for a full session
 
