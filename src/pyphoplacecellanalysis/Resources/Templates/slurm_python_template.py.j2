@@ -38,14 +38,24 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=False,
 					should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_generate_all_plots=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.SKIP_SAVING, force_global_recompute=False)
 {% endif %}
 
+curr_session_context = {{ curr_session_context }}
+curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
 
 run_status, run_errors, run_outputs = run_specific_batch(Path(global_data_root_parent_path=r'{{ global_data_root_parent_path }}'),
-												curr_session_context={{ curr_session_context }},
-												curr_session_basedir = Path(r'{{ curr_session_basedir }}'),
+												curr_session_context=curr_session_context,
+												curr_session_basedir=curr_session_basedir,
 												force_reload = result_handler.force_reload_all,
 												post_run_callback_fn=result_handler.on_complete_success_execution_session,
 												fail_on_exception=True,
 												saving_mode=result_handler.saving_mode)
 
-print(f'finished run: {run_status}, errors: {run_errors}, outputs: {run_outputs}')
 
+print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
+
+print(f'\n/* ================================================================================================================== */ \n')
+print(f'/* Finished {curr_session_context} __________________________________________________________________________________ */')
+print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
+print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
+print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
+print(f'\n ALL DONE! \n')
+print(f'/* ================================================================================================================== */\n')
