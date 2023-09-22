@@ -222,9 +222,10 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 global_results.sess.spikes_df['is_included_global_pf1D'] = False
                 global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
 
-            cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
+            use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
+            cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions=use_filtered_positions) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
             time_variable_name = global_results.sess.spikes_df.spikes.time_variable_name
-
+            
             # pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
             # pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
             pf1D_all = global_results['computed_data']['pf1D'] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
@@ -280,7 +281,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 optional_cell_info_labels = {}
 
             graphics_output_dict: MatplotlibRenderPlots = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
-                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, optional_cell_info_labels=optional_cell_info_labels, **kwargs)
+                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, optional_cell_info_labels=optional_cell_info_labels,
+                use_filtered_positions=use_filtered_positions, **kwargs)
 
             final_context = active_context
             graphics_output_dict['context'] = final_context
@@ -1156,14 +1158,26 @@ def _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, uni
     return graphics_output_dict, neuron_replay_stats_df
 # ==================================================================================================================== #
 
-def _build_spikes_df_interpolated_props(global_results):
+def _build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions:bool=False):
+    """ Interpolates the spikes_df's spike positions and other properties from the measured positions, etc. 
+
+    IMPORTANT: the position to be used for interpolation for each spike depends on whether we're only using the filtered positions or not.
+        2023-09-22 - as of now, deciding to NOT use filtered positions so the spike dots will render appropriately for the endcaps.
+
+    """
     # Group by the aclu (cluster indicator) column
     cell_grouped_spikes_df = global_results.sess.spikes_df.groupby(['aclu'])
     cell_spikes_dfs = [cell_grouped_spikes_df.get_group(a_neuron_id) for a_neuron_id in global_results.sess.spikes_df.spikes.neuron_ids] # a list of dataframes for each neuron_id
     aclu_to_fragile_linear_idx_map = {a_neuron_id:i for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}
     # get position variables usually used within pfND.setup(...) - self.t, self.x, self.y:
     ndim = global_results.computed_data.pf1D.ndim
-    pos_df = global_results.computed_data.pf1D.filtered_pos_df
+    if should_interpolate_to_filtered_positions:
+        # restrict to only the filtered positions. I think this is usually NOT what we want.
+        pos_df = global_results.computed_data.pf1D.filtered_pos_df
+    else:
+        # pos_df = global_results.computed_data.pf1D.pos_df
+        pos_df = global_results.computed_data.pf1D.position.to_dataframe()
+
     t = pos_df.t.to_numpy()
     x = pos_df.x.to_numpy()
     if (ndim > 1):
@@ -1396,7 +1410,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     curr_ax_placefield.sharey(curr_ax_lap_spikes)
 
 
-    ## I think that `plot_1D_placecell_validation` is used to plot the little placefield on the right
+    ## I think that `plot_1D_placecell_validation` is used to plot the position v time and the little placefield on the right
     _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
             **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield, 
                 'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,

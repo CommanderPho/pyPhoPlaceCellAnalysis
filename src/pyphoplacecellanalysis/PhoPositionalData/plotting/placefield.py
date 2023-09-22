@@ -186,6 +186,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     should_include_trajectory = kwargs.get('should_include_trajectory', True) # whether the plot should include 
     should_include_labels = kwargs.get('should_include_labels', True) # whether the plot should include text labels, like the title, axes labels, etc
     should_include_plotRaw_v_time_spikes = kwargs.get('should_include_spikes', True) # whether the plot should include plotRaw_v_time-spikes, should be set to False to plot completely with the new all spikes mode
+    use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
 
     if extant_fig is not None:
         fig = extant_fig # use the existing passed figure
@@ -221,7 +222,8 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_alpha=spikes_alpha,
             position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5},
             spike_plot_kwargs=spike_plot_kwargs,
-            should_include_labels=should_include_labels, should_include_trajectory=should_include_trajectory, should_include_spikes=should_include_plotRaw_v_time_spikes
+            should_include_labels=should_include_labels, should_include_trajectory=should_include_trajectory, should_include_spikes=should_include_plotRaw_v_time_spikes,
+            use_filtered_positions=use_filtered_positions,
         ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
     t_start = kwargs.get('t_start', active_epoch_placefields1D.t[0])
     t_end = kwargs.get('t_end', active_epoch_placefields1D.t[-1])
