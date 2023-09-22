@@ -19,6 +19,21 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions
 import matplotlib.pyplot as plt
 
+def fig_example_nontopo_remap(curr_active_pipeline):
+	"""Specific Figure: Example of non-neighbor preserving remapping
+	Usage:
+		from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_example_nontopo_remap
+
+		graphics_output_dict = fig_example_nontopo_remap(curr_active_pipeline)
+	"""
+	example_aclus = [7, 95]
+	# # flat_stack_mode: all placefields are stacked up (z-wise) on top of each other on a single axis with no offsets:
+	example_shared_kwargs = dict(pad=1, active_context=curr_active_pipeline.get_session_context(), plot_zero_baselines=True, skip_figure_titles=True, use_flexitext_titles=True, flat_stack_mode=True)
+	example_top_level_shared_kwargs = dict(should_plot_vertical_track_bounds_lines=True, should_plot_linear_track_shapes=True) # Renders the linear track shape on the maze. Assumes `flat_stack_mode=True`
+
+	# (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, example_aclus, reuse_axs_tuple=None, single_figure=True, title_string="Example Non-Neighbor Preserving Remapping Cells", subtitle_string=f"2 Example Cells {example_aclus}", shared_kwargs=example_shared_kwargs, **example_top_level_shared_kwargs)
+	return curr_active_pipeline.display('_display_short_long_pf1D_comparison', curr_active_pipeline.get_session_context(), included_any_context_neuron_ids=example_aclus, reuse_axs_tuple=None, single_figure=True, title_string="Example Non-Neighbor Preserving Remapping Cells", subtitle_string=f"2 Example Cells {example_aclus}", shared_kwargs=example_shared_kwargs, **example_top_level_shared_kwargs)
+	 
 
 def fig_remapping_cells(curr_active_pipeline):
 	"""
@@ -87,6 +102,15 @@ def fig_remapping_cells(curr_active_pipeline):
 	graphics_output_dict['trivially_remapping_endcap_aclus'] = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_context.adding_context_if_missing(cell_subset='triv_remap_endcap'), included_any_context_neuron_ids=trivially_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Trivially Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
 
 	return graphics_output_dict
+
+
+def fig_example_handpicked_pho_jonathan_active_set_cells(curr_active_pipeline, save_figure=False, included_unit_neuron_IDs=[4, 58]):
+	# 2023-09-07 - Build Example LxC/SxC cells from handpicked examples: aclus = [4, 58]
+	# from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import build_extra_cell_info_label_string
+	curr_active_pipeline.reload_default_display_functions()
+	_out1 = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', n_max_plot_rows=2, save_figure=save_figure, included_unit_neuron_IDs=included_unit_neuron_IDs) # , included_unit_neuron_IDs=[4, 58]
+	_out2 = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', n_max_plot_rows=2, save_figure=save_figure, included_unit_neuron_IDs=[2]) # handpicked long-exclusive
+	return _out1, _out2
 
 
 def fig_surprise_results(curr_active_pipeline):
