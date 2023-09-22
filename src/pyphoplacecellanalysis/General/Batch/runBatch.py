@@ -1030,6 +1030,8 @@ class BatchSessionCompletionHandler:
                                         # '_perform_position_decoding_computation', 
                                         'firing_rate_trends',
                                         # '_perform_pf_find_ratemap_peaks_computation',
+                                        # 'ratemap_peaks_prominence2d',
+                                        'long_short_endcap_analysis',
                                         #  'long_short_inst_spike_rate_groups', # broken as of 2023-09-13
                                          'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'long_short_post_decoding', 'pf_dt_sequential_surprise', 'long_short_rate_remapping']) # do only specified
     
