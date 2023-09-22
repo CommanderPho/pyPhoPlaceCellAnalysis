@@ -45,7 +45,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
-from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import long_short_display_config_manager
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
 # ==================================================================================================================== #
 # Long/Short Epoch Configs                                                                                             #
@@ -1026,10 +1026,15 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
         pass
 
 
+    ## Get the track configs for the colors:
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+    
     # Highlight the two epochs with their characteristic colors ['r','b'] - ideally this would be at the very back
     x_start, x_stop = ax.get_xlim()
-    ax.axvspan(x_start, t_split, color='red', alpha=0.2, zorder=0)
-    ax.axvspan(t_split, x_stop, color='blue', alpha=0.2, zorder=0)
+    ax.axvspan(x_start, t_split, color=long_epoch_config['facecolor'], alpha=0.2, zorder=0)
+    ax.axvspan(t_split, x_stop, color=short_epoch_config['facecolor'], alpha=0.2, zorder=0)
 
     # Draw the vertical epoch splitter line:
     required_epoch_bar_height = ax.get_ylim()[-1]

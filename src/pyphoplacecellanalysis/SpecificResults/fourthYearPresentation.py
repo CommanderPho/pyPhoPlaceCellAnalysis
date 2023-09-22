@@ -4,6 +4,9 @@ Contains code related to Pho Hale's 4th Year PhD Presentation on 2023-09-25
 """
 import numpy as np
 import pandas as pd
+
+import matplotlib.pyplot as plt
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import TruncationCheckingResults
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
@@ -17,9 +20,17 @@ from neuropy.core.epoch import Epoch
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions
-import matplotlib.pyplot as plt
+
+from neuropy.utils.matplotlib_helpers import FormattedFigureText
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_long_short_surprise_difference_plot, plot_long_short, plot_long_short_any_values
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
+long_short_display_config_manager = LongShortDisplayConfigManager()
+long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
 
 
 def fig_example_nontopo_remap(curr_active_pipeline):
@@ -143,6 +154,14 @@ def fig_surprise_results(curr_active_pipeline):
 		active_filter_epoch_obj = Epoch(active_filter_epochs)
 		return active_filter_epoch_obj
 
+
+	active_context = curr_active_pipeline.get_session_context().adding_context('display_fn', display_fn_name='fig_surprise_results')
+	
+
+	# epoch_region_facecolor=('red','cyan')
+	epoch_region_facecolor=[a_kwargs['facecolor'] for a_kwargs in (long_epoch_config, short_epoch_config)]
+	
+
 	# Prepare active_filter_epochs:
 	active_filter_epochs = curr_active_pipeline.sess.replay
 	active_filter_epoch_obj: Epoch = _helper_prepare_epoch_df_for_draw_epoch_regions(active_filter_epochs)
@@ -160,33 +179,109 @@ def fig_surprise_results(curr_active_pipeline):
 	flat_jensen_shannon_distance_across_all_positions = np.sum(np.abs(flat_jensen_shannon_distance_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
 	flat_surprise_across_all_positions = np.sum(np.abs(flat_relative_entropy_results), axis=1) # sum across all position bins # (4152,) - (nSnapshots)
 
-	fig, ax = plt.subplots()
-	ax.plot(post_update_times, flat_surprise_across_all_positions)
-	ax.set_ylabel('Relative Entropy across all positions')
-	ax.set_xlabel('t (seconds)')
-	epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=('red','cyan'), alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
-	laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.laps.as_epoch_obj(), ax, facecolor='red', edgecolors='black', labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False)
-	replays_epochs_collection, replays_epoch_labels = draw_epoch_regions(active_filter_epoch_obj, ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
-	fig.suptitle('flat_surprise_across_all_positions')
-	fig.show()
-
-	fig, ax = plt.subplots()
-	ax.plot(post_update_times, flat_jensen_shannon_distance_across_all_positions, label='JS_Distance')
-	ax.set_ylabel('J-S Distance across all positions')
-	ax.set_xlabel('t (seconds)')
-	epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=('red','cyan'), alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
-	laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.laps.as_epoch_obj(), ax, facecolor='red', edgecolors='black', labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False)
-	replays_epochs_collection, replays_epoch_labels = draw_epoch_regions(active_filter_epoch_obj, ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
-	fig.suptitle('flat_jensen_shannon_distance_across_all_positions')
-	fig.show()
-
-	# Show basic relative entropy vs. time plot:
-	fig, ax = plt.subplots()
-	ax.plot(post_update_times, flat_relative_entropy_results)
-	ax.set_ylabel('Relative Entropy')
-	ax.set_xlabel('t (seconds)')
-	epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=('red','cyan'), alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=False, debug_print=False)
-	fig.show()
 
 
-	return fig, ax
+	def plot_data_and_epochs(x_data, y_data, xlabel, ylabel, title, epochs, laps_epochs, filter_epochs, epoch_region_facecolor, defer_render=True, debug_print=False, save_figure=True):
+		final_context = active_context.adding_context('title', title=title)
+		print(f'final_context: {final_context}')
+
+
+		fig, ax = plt.subplots(figsize=(16, 3), dpi=120) # fignum=str(final_context)
+		ax.set_xlabel(xlabel)
+		ax.set_ylabel(ylabel)
+
+		time_range = (np.nanmin(x_data), np.nanmax(x_data))
+		ax.plot(x_data, y_data, label=title, zorder=100) # plot line in front
+
+		lap_labels_kwargs = None
+		# lap_labels_kwargs = {'y_offset': -16.0, 'size': 8}
+		
+		draw_epoch_regions(epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, 
+						edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 12}, 
+						defer_render=defer_render, debug_print=debug_print, zorder=-20)
+
+		draw_epoch_regions(laps_epochs, ax, facecolor='red', edgecolors='black', 
+						labels_kwargs=lap_labels_kwargs, 
+						defer_render=defer_render, debug_print=debug_print, zorder=-10)
+
+		draw_epoch_regions(filter_epochs, ax, facecolor='orange', edgecolors=None, 
+						labels_kwargs=None, defer_render=defer_render, debug_print=debug_print, zorder=-9)
+
+		ax.set_xlim(*time_range)
+		fig.suptitle(title)
+		plt.subplots_adjust(top=0.847, bottom=0.201, left=0.045, right=0.972, hspace=0.2, wspace=0.2)
+		fig.show()
+		# fig.save
+
+		
+		
+		def _perform_write_to_file_callback():
+			## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+			return curr_active_pipeline.output_figure(final_context, fig)
+
+
+		if save_figure:
+			active_out_figure_paths = _perform_write_to_file_callback()
+		else:
+			active_out_figure_paths = []
+
+		graphics_output_dict = MatplotlibRenderPlots(name='fig_surprise_results', figures=(fig), axes=(ax), plot_data={}, context=final_context) # saved_figures=active_out_figure_paths
+		# graphics_output_dict['plot_data'] = {'included_any_context_neuron_ids': included_any_context_neuron_ids, 'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
+
+		return graphics_output_dict
+
+	
+
+	epochs = curr_active_pipeline.sess.epochs
+	laps_epochs = curr_active_pipeline.sess.laps.as_epoch_obj()
+	filter_epochs = active_filter_epoch_obj
+
+	graphics_outputs = [plot_data_and_epochs(post_update_times, flat_surprise_across_all_positions, 
+						't (seconds)', 'Relative Entropy across all positions', 
+						'flat_surprise_across_all_positions', 
+						epochs, laps_epochs, filter_epochs, epoch_region_facecolor),
+	plot_data_and_epochs(post_update_times, flat_jensen_shannon_distance_across_all_positions, 
+						't (seconds)', 'J-S Distance across all positions', 
+						'flat_jensen_shannon_distance_across_all_positions', 
+						epochs, laps_epochs, filter_epochs, epoch_region_facecolor),
+	plot_data_and_epochs(post_update_times, flat_relative_entropy_results, 
+						't (seconds)', 'Relative Entropy', 
+						'Relative Entropy vs Time', 
+						epochs, laps_epochs, filter_epochs, epoch_region_facecolor, defer_render=False)]
+
+	# for (fig, ax) in graphics_outputs:
+
+
+	# fig, ax = plt.subplots()
+	# ax.plot(post_update_times, flat_surprise_across_all_positions)
+	# ax.set_ylabel('Relative Entropy across all positions')
+	# ax.set_xlabel('t (seconds)')
+	# epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
+	# laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.laps.as_epoch_obj(), ax, facecolor='red', edgecolors='black', labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False)
+	# replays_epochs_collection, replays_epoch_labels = draw_epoch_regions(active_filter_epoch_obj, ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
+	# fig.suptitle('flat_surprise_across_all_positions')
+	# fig.show()
+
+	# fig, ax = plt.subplots()
+	# ax.plot(post_update_times, flat_jensen_shannon_distance_across_all_positions, label='JS_Distance')
+	# ax.set_ylabel('J-S Distance across all positions')
+	# ax.set_xlabel('t (seconds)')
+	# epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
+	# laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.laps.as_epoch_obj(), ax, facecolor='red', edgecolors='black', labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False)
+	# replays_epochs_collection, replays_epoch_labels = draw_epoch_regions(active_filter_epoch_obj, ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
+	# fig.suptitle('flat_jensen_shannon_distance_across_all_positions')
+	# fig.show()
+
+	# # Show basic relative entropy vs. time plot:
+	# fig, ax = plt.subplots()
+	# ax.plot(post_update_times, flat_relative_entropy_results)
+	# ax.set_ylabel('Relative Entropy')
+	# ax.set_xlabel('t (seconds)')
+	# epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=False, debug_print=False)
+	# fig.show()
+
+	# outputs = (fig, ax)
+	# outputs = (None, None)
+	# return outputs
+
+	return graphics_outputs
