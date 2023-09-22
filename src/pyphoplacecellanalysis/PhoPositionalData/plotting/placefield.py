@@ -202,8 +202,8 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
         # Layout Subplots in Figure:
         gs = fig.add_gridspec(1, 8)
         gs.update(wspace=0, hspace=0.05) # set the spacing between axes.
-        ax_activity_v_time = fig.add_subplot(gs[0, :-1])
-        ax_pf_tuning_curve = fig.add_subplot(gs[0, -1], sharey=ax_activity_v_time)
+        ax_activity_v_time = fig.add_subplot(gs[0, :-1]) # all except the last element are the trajectory over time
+        ax_pf_tuning_curve = fig.add_subplot(gs[0, -1], sharey=ax_activity_v_time) # The last element is the tuning curve
         if should_include_labels:
             ax_pf_tuning_curve.set_title('Normalized Placefield', fontsize='14')
         ax_pf_tuning_curve.set_xticklabels([])

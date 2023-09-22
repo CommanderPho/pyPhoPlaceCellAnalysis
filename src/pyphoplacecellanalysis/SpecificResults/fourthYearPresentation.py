@@ -104,13 +104,13 @@ def fig_remapping_cells(curr_active_pipeline):
 	return graphics_output_dict
 
 
-def fig_example_handpicked_pho_jonathan_active_set_cells(curr_active_pipeline, save_figure=False, included_unit_neuron_IDs=[4, 58]):
+def fig_example_handpicked_pho_jonathan_active_set_cells(curr_active_pipeline, save_figure=False, included_LxC_example_neuron_IDs=[4, 58], included_SxC_example_neuron_IDs=[2]):
 	# 2023-09-07 - Build Example LxC/SxC cells from handpicked examples: aclus = [4, 58]
 	# from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import build_extra_cell_info_label_string
 	curr_active_pipeline.reload_default_display_functions()
-	_out1 = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', n_max_plot_rows=2, save_figure=save_figure, included_unit_neuron_IDs=included_unit_neuron_IDs) # , included_unit_neuron_IDs=[4, 58]
-	_out2 = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', n_max_plot_rows=2, save_figure=save_figure, included_unit_neuron_IDs=[2]) # handpicked long-exclusive
-	return _out1, _out2
+	_LxC_out = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', n_max_plot_rows=2, save_figure=save_figure, included_unit_neuron_IDs=included_LxC_example_neuron_IDs, active_context=curr_active_pipeline.get_session_context().adding_context_if_missing(example='short_exclusive')) # , included_unit_neuron_IDs=[4, 58]
+	_SxC_out = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', n_max_plot_rows=2, save_figure=save_figure, included_unit_neuron_IDs=included_SxC_example_neuron_IDs, active_context=curr_active_pipeline.get_session_context().adding_context_if_missing(example='long_exclusive')) # handpicked long-exclusive
+	return _LxC_out, _SxC_out
 
 
 def fig_surprise_results(curr_active_pipeline):
