@@ -244,29 +244,9 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 
-def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
-    """ Pre 2023-03-10 Refactoring:
-    Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
-    Returns a dictionary containing the results in both directions
-
-    TODO 2023-03-08 02:41: - [ ] Convert naming convention from long_, short_ to lhs_, rhs_ to be general
-    TODO 2023-03-08 02:47: - [ ] Convert output dict to a dataclass
-
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_surprise_relative_entropy_divergence
-
-    """
-    long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
-    long_short_relative_entropy = sum(long_short_rel_entr_curve) 
-    short_long_rel_entr_curve = rel_entr(short_curve, long_curve)
-    short_long_relative_entropy = sum(short_long_rel_entr_curve)
-    # Jensen-Shannon distance is an average of KL divergence:
-    mixture_distribution = 0.5 * (long_curve + short_curve)
-    jensen_shannon_distance = 0.5 * (sum(rel_entr(mixture_distribution, long_curve)) + sum(rel_entr(mixture_distribution, short_curve)))
-
-    return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy,
-            jensen_shannon_distance=jensen_shannon_distance)
 
 
+@function_attributes(short_name=None, tags=['surprise', 'snapshot', 'pfdt', 'relative_entropy'], input_requires=[], output_provides=[], uses=['compute_surprise_relative_entropy_divergence'], used_by=[], creation_date='2023-09-22 07:18', related_items=[])
 def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_dict):
     """
     Computes the surprise between consecutive pairs of placefield snapshots extracted from a computed `active_pf_1D_dt`
@@ -277,6 +257,32 @@ def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_
 
 
     """
+
+    # Subfunctions _______________________________________________________________________________________________________ #
+    def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
+        """ Pre 2023-03-10 Refactoring:
+        Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
+        Returns a dictionary containing the results in both directions
+
+        TODO 2023-03-08 02:41: - [ ] Convert naming convention from long_, short_ to lhs_, rhs_ to be general
+        TODO 2023-03-08 02:47: - [ ] Convert output dict to a dataclass
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_surprise_relative_entropy_divergence
+
+        """
+        long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
+        long_short_relative_entropy = sum(long_short_rel_entr_curve) 
+        short_long_rel_entr_curve = rel_entr(short_curve, long_curve)
+        short_long_relative_entropy = sum(short_long_rel_entr_curve)
+        # Jensen-Shannon distance is an average of KL divergence:
+        mixture_distribution = 0.5 * (long_curve + short_curve)
+        jensen_shannon_distance = 0.5 * (sum(rel_entr(mixture_distribution, long_curve)) + sum(rel_entr(mixture_distribution, short_curve)))
+
+        return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy,
+                jensen_shannon_distance=jensen_shannon_distance)
+
+
+    # Begin Function Body ________________________________________________________________________________________________ #
     # Lists with one entry per snapshot in historical_snapshots_dict
     pf_overlap_results = []
     flat_relative_entropy_results = []
@@ -295,7 +301,7 @@ def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_
         earlier_snapshot, later_snapshot = snapshots[earlier_snapshot_idx], snapshots[later_snapshot_idx]
         earlier_snapshot_t, later_snapshot_t = snapshot_times[earlier_snapshot_idx], snapshot_times[later_snapshot_idx]
 
-        ## Proof of concept, comute surprise between the two snapshots:
+        ## Proof of concept, compute surprise between the two snapshots:
         # relative_entropy_overlap_dict, relative_entropy_overlap_scalars_df = compute_relative_entropy_divergence_overlap(earlier_snapshot, later_snapshot, debug_print=False)
         # print(earlier_snapshot['occupancy_weighted_tuning_maps_matrix'].shape) # (108, 63)
         # print(later_snapshot['occupancy_weighted_tuning_maps_matrix'].shape) # (108, 63)

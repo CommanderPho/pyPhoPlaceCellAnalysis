@@ -19,6 +19,9 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions
 import matplotlib.pyplot as plt
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_long_short_surprise_difference_plot, plot_long_short, plot_long_short_any_values
+
+
 def fig_example_nontopo_remap(curr_active_pipeline):
 	"""Specific Figure: Example of non-neighbor preserving remapping
 	Usage:
@@ -113,8 +116,37 @@ def fig_example_handpicked_pho_jonathan_active_set_cells(curr_active_pipeline, s
 	return _LxC_out, _SxC_out
 
 
+
+
 def fig_surprise_results(curr_active_pipeline):
-	
+	""" 
+
+	from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_surprise_results
+
+
+	"""
+	def _helper_prepare_epoch_df_for_draw_epoch_regions(active_filter_epochs) -> Epoch:
+		"""	Prepare active_filter_epochs:
+			
+		Usage:
+			active_filter_epochs = curr_active_pipeline.sess.replay
+			active_filter_epoch_obj: Epoch = _helper_prepare_epoch_df_for_draw_epoch_regions(active_filter_epochs)
+		"""
+		if not 'stop' in active_filter_epochs.columns:
+			# Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+			active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
+			
+		if not 'label' in active_filter_epochs.columns:
+			# Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+			active_filter_epochs['label'] = active_filter_epochs['flat_replay_idx'].copy()
+
+		active_filter_epoch_obj = Epoch(active_filter_epochs)
+		return active_filter_epoch_obj
+
+	# Prepare active_filter_epochs:
+	active_filter_epochs = curr_active_pipeline.sess.replay
+	active_filter_epoch_obj: Epoch = _helper_prepare_epoch_df_for_draw_epoch_regions(active_filter_epochs)
+
 	global_results = curr_active_pipeline.computation_results['maze'].computed_data
 	active_extended_stats = global_results['extended_stats']
 	active_relative_entropy_results = active_extended_stats['pf_dt_sequential_surprise']
@@ -137,5 +169,24 @@ def fig_surprise_results(curr_active_pipeline):
 	replays_epochs_collection, replays_epoch_labels = draw_epoch_regions(active_filter_epoch_obj, ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
 	fig.suptitle('flat_surprise_across_all_positions')
 	fig.show()
+
+	fig, ax = plt.subplots()
+	ax.plot(post_update_times, flat_jensen_shannon_distance_across_all_positions, label='JS_Distance')
+	ax.set_ylabel('J-S Distance across all positions')
+	ax.set_xlabel('t (seconds)')
+	epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=('red','cyan'), alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
+	laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.laps.as_epoch_obj(), ax, facecolor='red', edgecolors='black', labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False)
+	replays_epochs_collection, replays_epoch_labels = draw_epoch_regions(active_filter_epoch_obj, ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
+	fig.suptitle('flat_jensen_shannon_distance_across_all_positions')
+	fig.show()
+
+	# Show basic relative entropy vs. time plot:
+	fig, ax = plt.subplots()
+	ax.plot(post_update_times, flat_relative_entropy_results)
+	ax.set_ylabel('Relative Entropy')
+	ax.set_xlabel('t (seconds)')
+	epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=('red','cyan'), alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=False, debug_print=False)
+	fig.show()
+
 
 	return fig, ax
