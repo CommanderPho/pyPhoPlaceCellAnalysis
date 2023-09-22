@@ -26,7 +26,7 @@ from neuropy.utils.result_context import IdentifyingContext
 
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
-def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: List[IdentifyingContext], output_directory, use_separate_run_directories:bool=True, create_slurm_scripts:bool=False):
+def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/generated_slurm_scripts/', use_separate_run_directories:bool=True, create_slurm_scripts:bool=False, **script_generation_kwargs):
 	""" Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
 	output_directory
@@ -45,7 +45,19 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 		
 	"""
 	assert isinstance(session_batch_basedirs, dict)
-	
+
+	if not isinstance(output_directory, Path):
+		output_directory = Path(output_directory).resolve()
+
+	# if script_generation_kwargs is None:
+	# 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
+
+	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False) | script_generation_kwargs
+	# script_generation_kwargs
+
+	if included_session_contexts is None:
+		included_session_contexts = list(session_batch_basedirs.keys())
+
 	# Set up Jinja2 environment
 	template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
 	env = Environment(loader=FileSystemLoader(template_path))
@@ -70,7 +82,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 		with open(python_script_path, 'w') as script_file:
 			script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
 													curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-													curr_session_basedir=curr_session_basedir)
+													curr_session_basedir=curr_session_basedir, 
+													**script_generation_kwargs)
 			script_file.write(script_content)
 		output_python_scripts.append(python_script_path)
 
