@@ -276,7 +276,7 @@ def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_
         short_long_relative_entropy = sum(short_long_rel_entr_curve)
         # Jensen-Shannon distance is an average of KL divergence:
         mixture_distribution = 0.5 * (long_curve + short_curve)
-        jensen_shannon_distance = 0.5 * (sum(rel_entr(mixture_distribution, long_curve)) + sum(rel_entr(mixture_distribution, short_curve)))
+        jensen_shannon_distance = 0.5 * (sum(rel_entr(mixture_distribution, long_curve)) + sum(rel_entr(mixture_distribution, short_curve))) # is this right? I'm confused by sum(...)
 
         return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy,
                 jensen_shannon_distance=jensen_shannon_distance)
