@@ -195,7 +195,7 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
     
 @function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[],
     uses=['plot_position_curves_figure','_plot_helper_add_span_where_ranges','_plot_helper_render_laps'], used_by=['estimation_session_laps'], creation_date='2023-05-09 05:13', related_items=[])
-def plot_laps_2d(sess, legacy_plotting_mode=True):
+def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     """ This generates a position/velocity/acceleration curve for the animal and highlights the currently recognized track epochs using green and red span overlays (corresponding to egress and ingress directions) 
         TODO: currently legacy_plotting_mode=True does not function if the session has been filtered because the indicies no longer line up. 
             I think that perhaps excluding invalid laps (filtering sess.laps just like the other session members) would prevent this issue, but partially out-of-bounds laps might also need to be dealt with.
@@ -211,7 +211,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     
     curr_laps_df = sess.laps.to_dataframe()
     
-    fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))
+    fig, out_axes_list = plot_position_curves_figure(position_obj, **(dict(include_velocity=True, include_accel=True, figsize=(24, 10)) | kwargs)) #include_velocity=True, include_accel=True, figsize=(24, 10))
 
     ## Draw on top of the existing position curves with the lap colors:
     if legacy_plotting_mode:

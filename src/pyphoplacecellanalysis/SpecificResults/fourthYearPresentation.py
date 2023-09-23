@@ -196,15 +196,17 @@ def fig_surprise_results(curr_active_pipeline):
 		lap_labels_kwargs = None
 		# lap_labels_kwargs = {'y_offset': -16.0, 'size': 8}
 		
-		draw_epoch_regions(epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, 
+		epochs_collection, epoch_labels = draw_epoch_regions(epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, 
 						edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 12}, 
 						defer_render=defer_render, debug_print=debug_print, zorder=-20)
 
-		draw_epoch_regions(laps_epochs, ax, facecolor='red', edgecolors='black', 
+		
+		epochs_collection, epoch_labels = draw_epoch_regions(laps_epochs, ax, facecolor='#33FF00', 
+						edgecolors=None,#'black', 
 						labels_kwargs=lap_labels_kwargs, 
 						defer_render=defer_render, debug_print=debug_print, zorder=-10)
 
-		draw_epoch_regions(filter_epochs, ax, facecolor='orange', edgecolors=None, 
+		epochs_collection, epoch_labels = draw_epoch_regions(filter_epochs, ax, facecolor='orange', edgecolors=None, 
 						labels_kwargs=None, defer_render=defer_render, debug_print=debug_print, zorder=-9)
 
 		ax.set_xlim(*time_range)
