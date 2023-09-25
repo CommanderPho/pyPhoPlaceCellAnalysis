@@ -40,7 +40,7 @@ def fig_example_nontopo_remap(curr_active_pipeline):
 
 		graphics_output_dict = fig_example_nontopo_remap(curr_active_pipeline)
 	"""
-	example_aclus = [7, 95]
+	example_aclus = [7, 38] # 95 was BAAAAD
 	# # flat_stack_mode: all placefields are stacked up (z-wise) on top of each other on a single axis with no offsets:
 	example_shared_kwargs = dict(pad=1, active_context=curr_active_pipeline.get_session_context(), plot_zero_baselines=True, skip_figure_titles=True, use_flexitext_titles=True, flat_stack_mode=True)
 	example_top_level_shared_kwargs = dict(should_plot_vertical_track_bounds_lines=True, should_plot_linear_track_shapes=True) # Renders the linear track shape on the maze. Assumes `flat_stack_mode=True`
@@ -164,7 +164,8 @@ def fig_surprise_results(curr_active_pipeline):
 
 	# Prepare active_filter_epochs:
 	active_filter_epochs = curr_active_pipeline.sess.replay
-	active_filter_epoch_obj: Epoch = _helper_prepare_epoch_df_for_draw_epoch_regions(active_filter_epochs)
+	active_filter_epoch_obj: Epoch = _helper_prepare_epoch_df_for_draw_epoch_regions(active_filter_epochs) # these are the replays!
+	
 
 	global_results = curr_active_pipeline.computation_results['maze'].computed_data
 	active_extended_stats = global_results['extended_stats']
@@ -201,12 +202,12 @@ def fig_surprise_results(curr_active_pipeline):
 						defer_render=defer_render, debug_print=debug_print, zorder=-20)
 
 		
-		epochs_collection, epoch_labels = draw_epoch_regions(laps_epochs, ax, facecolor='#33FF00', 
+		laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(laps_epochs, ax, facecolor='#33FF00', 
 						edgecolors=None,#'black', 
 						labels_kwargs=lap_labels_kwargs, 
 						defer_render=defer_render, debug_print=debug_print, zorder=-10)
-
-		epochs_collection, epoch_labels = draw_epoch_regions(filter_epochs, ax, facecolor='orange', edgecolors=None, 
+		
+		track_epochs_collection, track_epoch_labels = draw_epoch_regions(filter_epochs, ax, facecolor='orange', edgecolors=None, 
 						labels_kwargs=None, defer_render=defer_render, debug_print=debug_print, zorder=-9)
 
 		ax.set_xlim(*time_range)
@@ -233,57 +234,28 @@ def fig_surprise_results(curr_active_pipeline):
 		return graphics_output_dict
 
 	
+	# Change the two track epoch labels to ['maze1', 'maze2'] before preceeding:
+	track_epochs = curr_active_pipeline.sess.epochs
+	assert len(track_epochs._df['label']) == 2, f"labels should be ['maze1', 'maze2']!"
+	track_epochs._df['label'] = ['long', 'short'] # access private methods to set the proper labels
+	# track_epochs
 
-	epochs = curr_active_pipeline.sess.epochs
 	laps_epochs = curr_active_pipeline.sess.laps.as_epoch_obj()
 	filter_epochs = active_filter_epoch_obj
 
-	graphics_outputs = [plot_data_and_epochs(post_update_times, flat_surprise_across_all_positions, 
-						't (seconds)', 'Relative Entropy across all positions', 
-						'flat_surprise_across_all_positions', 
-						epochs, laps_epochs, filter_epochs, epoch_region_facecolor),
-	plot_data_and_epochs(post_update_times, flat_jensen_shannon_distance_across_all_positions, 
+	graphics_outputs = [
+			# plot_data_and_epochs(post_update_times, flat_surprise_across_all_positions, 
+			# 			't (seconds)', 'Relative Entropy across all positions', 
+			# 			'flat_surprise_across_all_positions', 
+			# 			track_epochs, laps_epochs, filter_epochs, epoch_region_facecolor),
+			plot_data_and_epochs(post_update_times, flat_jensen_shannon_distance_across_all_positions, 
 						't (seconds)', 'J-S Distance across all positions', 
 						'flat_jensen_shannon_distance_across_all_positions', 
-						epochs, laps_epochs, filter_epochs, epoch_region_facecolor),
-	plot_data_and_epochs(post_update_times, flat_relative_entropy_results, 
-						't (seconds)', 'Relative Entropy', 
-						'Relative Entropy vs Time', 
-						epochs, laps_epochs, filter_epochs, epoch_region_facecolor, defer_render=False)]
-
-	# for (fig, ax) in graphics_outputs:
-
-
-	# fig, ax = plt.subplots()
-	# ax.plot(post_update_times, flat_surprise_across_all_positions)
-	# ax.set_ylabel('Relative Entropy across all positions')
-	# ax.set_xlabel('t (seconds)')
-	# epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
-	# laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.laps.as_epoch_obj(), ax, facecolor='red', edgecolors='black', labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False)
-	# replays_epochs_collection, replays_epoch_labels = draw_epoch_regions(active_filter_epoch_obj, ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
-	# fig.suptitle('flat_surprise_across_all_positions')
-	# fig.show()
-
-	# fig, ax = plt.subplots()
-	# ax.plot(post_update_times, flat_jensen_shannon_distance_across_all_positions, label='JS_Distance')
-	# ax.set_ylabel('J-S Distance across all positions')
-	# ax.set_xlabel('t (seconds)')
-	# epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
-	# laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.laps.as_epoch_obj(), ax, facecolor='red', edgecolors='black', labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False)
-	# replays_epochs_collection, replays_epoch_labels = draw_epoch_regions(active_filter_epoch_obj, ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
-	# fig.suptitle('flat_jensen_shannon_distance_across_all_positions')
-	# fig.show()
-
-	# # Show basic relative entropy vs. time plot:
-	# fig, ax = plt.subplots()
-	# ax.plot(post_update_times, flat_relative_entropy_results)
-	# ax.set_ylabel('Relative Entropy')
-	# ax.set_xlabel('t (seconds)')
-	# epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=epoch_region_facecolor, alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=False, debug_print=False)
-	# fig.show()
-
-	# outputs = (fig, ax)
-	# outputs = (None, None)
-	# return outputs
+						track_epochs, laps_epochs, filter_epochs, epoch_region_facecolor),
+			# plot_data_and_epochs(post_update_times, flat_relative_entropy_results, 
+			# 					't (seconds)', 'Relative Entropy', 
+			# 					'Relative Entropy vs Time', 
+			# 					track_epochs, laps_epochs, filter_epochs, epoch_region_facecolor, defer_render=False)
+	]
 
 	return graphics_outputs

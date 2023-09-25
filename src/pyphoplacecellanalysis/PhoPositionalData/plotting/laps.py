@@ -196,7 +196,7 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
 # ==================================================================================================================== #
 # MAIN FUNCTIONS                                                                                                       #
 # ==================================================================================================================== #
-    
+
 @function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[],
     uses=['plot_position_curves_figure','_plot_helper_add_span_where_ranges','_plot_helper_render_laps'], used_by=['estimation_session_laps'], creation_date='2023-05-09 05:13', related_items=[])
 def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
