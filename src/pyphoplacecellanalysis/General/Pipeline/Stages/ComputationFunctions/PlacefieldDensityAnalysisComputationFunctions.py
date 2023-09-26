@@ -679,8 +679,10 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             
             # active_tuning_curves = active_pf_2D.ratemap.tuning_curves # Raw Tuning Curves
             active_tuning_curves = active_pf_2D.ratemap.unit_max_tuning_curves # Unit-max scaled tuning curves
-            tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_peak_firing_rates # the peak firing rates of each tuning curve
-            
+            # tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_peak_firing_rates # the peak firing rates of each tuning curve
+            tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_unsmoothed_peak_firing_rates
+             
+
             #  Build the results:
             out_results = {}
             out_cell_peak_dfs_list = []
