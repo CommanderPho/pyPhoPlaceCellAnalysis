@@ -24,7 +24,6 @@ from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set
 from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 from pyphocorehelpers.function_helpers import function_attributes
 
-
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
 from neuropy.core.epoch import Epoch
@@ -1180,17 +1179,26 @@ class BatchSessionCompletionHandler:
         hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
         print(f'pipeline hdf5_output_path: {hdf5_output_path}')
         e = None
-        try:
-            curr_active_pipeline.export_pipeline_to_h5()
-            return (hdf5_output_path, None)
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
-            if self.fail_on_exception:
-                raise e.exc
-            hdf5_output_path = None # set to None because it failed.
-            return (hdf5_output_path, e)
+        # Only get files newer than date
+        newest_file_to_overwrite_date = datetime.now() - timedelta(days=1) # don't overwrite any files more recent than 1 day ago
+        if hdf5_output_path.exists() and (FilesystemMetadata.get_last_modified_time(hdf5_output_path)<=newest_file_to_overwrite_date):
+            # file is folder than the date to overwrite, so overwrite it
+            print(f'OVERWRITING (or writing) the file {hdf5_output_path}!')
+            try:
+                curr_active_pipeline.export_pipeline_to_h5()
+                return (hdf5_output_path, None)
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
+                if self.fail_on_exception:
+                    raise e.exc
+                hdf5_output_path = None # set to None because it failed.
+                return (hdf5_output_path, e)
+
+        else:
+            print(f'WARNING: file {hdf5_output_path} is newer than the allowed overwrite date, so it will be skipped.')
+            return (hdf5_output_path, None)            
     
 
     ## Main function that's called with the complete pipeline:
