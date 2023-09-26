@@ -111,6 +111,8 @@ def add_custom_plotting_options_if_needed(active_config, should_smooth_maze):
     active_config.plotting_config.use_smoothed_maze_rendering = should_smooth_maze
     return active_config
 
+
+@function_attributes(tags=['output_files', 'filesystem'], related_items=[])
 def update_figure_files_output_path(computation_result, active_config, root_output_dir='output', debug_print=False):
     """ Changes the plotting_config's output path to a path with the style of  f'{root_output_dir}/2022-01-16/{active_session_name}/{active_epoch_name}'
     Called by prepare_for_display(...) to build the output file paths for saving figures to one that dynamically contains the current day date and relevent parameters.
@@ -190,6 +192,7 @@ class DisplayPipelineStage(ComputedPipelineStage):
         self.global_computation_results = computed_stage.global_computation_results
         self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
         self.registered_global_computation_function_dict = computed_stage.registered_global_computation_function_dict
+        self.override_output_root = (computed_stage.override_output_root or None)
 
         # Initialize custom fields:
         self.display_output = display_output or DynamicParameters()
@@ -470,7 +473,7 @@ class PipelineWithDisplaySavingMixin:
         display_subcontext = IdentifyingContext(display_fn_name=display_fn_name, **kwargs)
         return active_identifying_session_ctx.merging_context('display_', display_subcontext)
 
-    @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['build_and_write_to_file'], used_by=[], creation_date='2023-06-14 19:26', related_items=[])
+    @function_attributes(short_name=None, tags=['save','figure', 'output'], input_requires=[], output_provides=[], uses=['build_and_write_to_file'], used_by=[], creation_date='2023-06-14 19:26', related_items=[])
     def output_figure(self, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
         """ outputs the figure using the provided context. """
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
