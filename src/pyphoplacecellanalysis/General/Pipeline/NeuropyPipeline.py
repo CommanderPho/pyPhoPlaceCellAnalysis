@@ -94,7 +94,6 @@ class LoadedObjectPersistanceState:
     file_path: Path = field(converter=Path)
     load_compare_state: Dict = field(alias='compare_state_on_load', converter=deepcopy)
 
-    @function_attributes(tags=['output_files', 'filesystem'], related_items=[])
     def needs_save(self, curr_object) -> bool:
         """Compares the curr_object's state to its state when loaded from disk to see if anything changed and it needs to be re-persisted (by saving)"""
         # lhs_compare_dict = NeuropyPipeline.build_pipeline_compare_dict(curr_object)

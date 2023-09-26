@@ -79,10 +79,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
     computation_results: Optional[DynamicParameters] = None
     global_computation_results: Optional[ComputationResult] = None
 
-    # Added 2023-09-26
-    override_output_root: Optional[Path] = None
-
-
     def __init__(self, loaded_stage: LoadedPipelineStage):
         # super(ClassName, self).__init__()
         self.stage_name = loaded_stage.stage_name
@@ -100,9 +96,6 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         self.registered_computation_function_dict = OrderedDict()
         self.registered_global_computation_function_dict = OrderedDict()
         self.reload_default_computation_functions() # registers the default
-
-        self.override_output_root = None # initialize to None, indicating no override
-
 
     @property
     def active_completed_computation_result_names(self):
@@ -976,17 +969,9 @@ class PipelineWithComputedPipelineStageMixin:
 
         # print(f'\tpost keys: {list(self.active_configs.keys())}')
 
-
-    @function_attributes(tags=['output_files', 'filesystem'], related_items=[])
     def get_output_path(self) -> Path:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
-        ## This can be overriden:
-        if self.stage.override_output_root is not None:
-            if not isinstance(self.stage.override_output_root, Path):
-                self.stage.override_output_root = Path(self.stage.override_output_root).resolve()
-                return self.stage.override_output_root
-        else:
-            return self.sess.get_output_path()
+        return self.sess.get_output_path()
 
 
     def get_session_context(self) -> IdentifyingContext:
@@ -1000,7 +985,7 @@ class PipelineWithComputedPipelineStageMixin:
 
 
 
-    @function_attributes(tags=['output_files', 'filesystem'], related_items=[])
+    # @property
     def get_output_manager(self) -> FileOutputManager:
         """ returns the FileOutputManager that specifies where outputs are stored. """
         # return FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
@@ -1045,7 +1030,6 @@ class PipelineWithComputedPipelineStageMixin:
         return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
 
     ## Global Computation Result Persistance Hacks:
-    @function_attributes(tags=['save', 'output_files', 'filesystem', 'global_computation_results'], related_items=[])
     def save_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
         Usage:
@@ -1079,7 +1063,6 @@ class PipelineWithComputedPipelineStageMixin:
         saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
         return global_computation_results_pickle_path
 
-    @function_attributes(tags=['load', 'output_files', 'filesystem', 'global_computation_results'], related_items=[])
     def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
         Usage:
@@ -1096,5 +1079,3 @@ class PipelineWithComputedPipelineStageMixin:
         loaded_global_computation_results = ComputationResult(**loaded_global_computation_dict)
 
         self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
-
-
