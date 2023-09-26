@@ -731,24 +731,28 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     summit_slice_peak_level_arr[peak_idx, :] = a_peak_dict['probe_levels']
                     included_computed_contours = _find_contours_at_levels(active_pf_2D.xbin_centers, active_pf_2D.ybin_centers, slab, a_peak_dict['center'], a_peak_dict['probe_levels']) # DONE: efficiency: This would be more efficient to do for all peaks at once I believe. CONCLUSION: No, this needs to be done separately for each peak as they each have separate prominences which determine the levels they should be sliced at.
                     ## Build the dict that contains the output level slices
-                    a_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # 
+                    a_peak_dict['level_slices'] = {probe_lvl:{'contour':contour, 'bbox':contour.get_extents(), 'size':contour.get_extents().size} for probe_lvl, contour in included_computed_contours.items() if (contour is not None)} # if contour is None, it looks like the 'build flat output' step fails below
 
                     if debug_print:
                         print(f"probe_levels: {a_peak_dict['probe_levels']}")
 
                     ## Build flat output:
                     for lvl_idx, probe_lvl in enumerate(a_peak_dict['probe_levels']):
-                        a_slice = a_peak_dict['level_slices'][probe_lvl]
-                        slice_bbox = a_slice['bbox']
-                        (x0, y0, width, height) = slice_bbox.bounds        
-                        summit_slice_peak_id_arr[peak_idx, lvl_idx] = peak_id
-                        summit_slice_x_side_length_arr[peak_idx, lvl_idx] = width
-                        summit_slice_y_side_length_arr[peak_idx, lvl_idx] = height
-                        # summit_slice_center_x_arr[peak_idx, lvl_idx] = slice_bbox.center[0]
-                        # summit_slice_center_y_arr[peak_idx, lvl_idx] = slice_bbox.center[1]
-                        summit_slice_center_x_arr[peak_idx, lvl_idx] = float(x0) + (0.5 * float(width))
-                        summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
-                        
+                        # a_slice = a_peak_dict['level_slices'][probe_lvl]
+                        a_slice = a_peak_dict['level_slices'].get(probe_lvl, None) # allow missing entries. This will occur when (contour is None) above.
+                        #TODO 2023-09-25 23:59: - [ ] Do I need to do anything else to handle this case, like remove the invalid curve from 
+                        if a_slice is None:
+                            print(f'WARNING: a_slice is None. 2023-09-25 - Unsure if this is okay, used to be a fatal error. a_peak_dict: {a_peak_dict}')
+                        else:
+                            slice_bbox = a_slice['bbox']
+                            (x0, y0, width, height) = slice_bbox.bounds        
+                            summit_slice_peak_id_arr[peak_idx, lvl_idx] = peak_id
+                            summit_slice_x_side_length_arr[peak_idx, lvl_idx] = width
+                            summit_slice_y_side_length_arr[peak_idx, lvl_idx] = height
+                            # summit_slice_center_x_arr[peak_idx, lvl_idx] = slice_bbox.center[0]
+                            # summit_slice_center_y_arr[peak_idx, lvl_idx] = slice_bbox.center[1]
+                            summit_slice_center_x_arr[peak_idx, lvl_idx] = float(x0) + (0.5 * float(width))
+                            summit_slice_center_y_arr[peak_idx, lvl_idx] = float(y0) + (0.5 * float(height))
                     
                 if debug_print:
                     print(f'building peak_df for neuron[{neuron_idx}] with {n_peaks}...')
