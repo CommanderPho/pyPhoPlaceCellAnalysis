@@ -1180,8 +1180,12 @@ class BatchSessionCompletionHandler:
         print(f'pipeline hdf5_output_path: {hdf5_output_path}')
         e = None
         # Only get files newer than date
+        skip_overwriting_files_newer_than_specified:bool = False
+        
         newest_file_to_overwrite_date = datetime.now() - timedelta(days=1) # don't overwrite any files more recent than 1 day ago
-        if hdf5_output_path.exists() and (FilesystemMetadata.get_last_modified_time(hdf5_output_path)<=newest_file_to_overwrite_date):
+        can_skip_if_allowed: bool = (hdf5_output_path.exists() and (FilesystemMetadata.get_last_modified_time(hdf5_output_path)<=newest_file_to_overwrite_date))
+        if (not skip_overwriting_files_newer_than_specified) or (not can_skip_if_allowed):
+            # if skipping is disabled OR skipping is enabled but it's not valid to skip, overwrite.
             # file is folder than the date to overwrite, so overwrite it
             print(f'OVERWRITING (or writing) the file {hdf5_output_path}!')
             try:
@@ -1198,7 +1202,8 @@ class BatchSessionCompletionHandler:
 
         else:
             print(f'WARNING: file {hdf5_output_path} is newer than the allowed overwrite date, so it will be skipped.')
-            return (hdf5_output_path, None)            
+            print(f'\t\tnewest_file_to_overwrite_date: {newest_file_to_overwrite_date}\t can_skip_if_allowed: {can_skip_if_allowed}\n')
+            return (hdf5_output_path, None)
     
 
     ## Main function that's called with the complete pipeline:
