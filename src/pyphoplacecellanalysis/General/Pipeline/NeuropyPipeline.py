@@ -887,13 +887,35 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         return hdf5_output_path
 
 
-    def export_pipeline_to_h5(self, fail_on_exception:bool=True):
+    @function_attributes(short_name=None, tags=['h5', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-26 06:38', related_items=[])
+    def export_pipeline_to_h5(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True):
         """ Export the pipeline's HDF5 as 'pipeline_results.h5'
 
         TODO: check timestamp of last computed file.
 
         """
-        hdf5_output_path: Path = self.h5_export_path # get_output_path().joinpath('pipeline_results.h5').resolve()
+        ## Case 1. `override_path` is provided:
+        if override_path is not None:
+            ## override_path is provided:
+            if not isinstance(override_path, Path):
+                override_path = Path(override_path).resolve()
+            # Case 1a: `override_path` is a complete file path
+            if not override_path.is_dir():
+                # a full filepath, just use that directly
+                hdf5_output_path = override_path.resolve()
+            else:
+                # default case, assumed to be a directory and we'll use the normal filename.
+                active_global_pickle_filename: str = (override_filename or self.h5_export_path.name or 'pipeline_results.h5')
+                hdf5_output_path = override_path.joinpath(active_global_pickle_filename).resolve()
+        else:
+            # No override path provided
+            if override_filename is None:
+                # no filename provided either, use default global pickle path:
+                hdf5_output_path = self.h5_export_path
+            else:
+                # Otherwise use default output path but specified override_global_pickle_filename:
+                hdf5_output_path = self.get_output_path().joinpath(override_filename).resolve() 
+
         print(f'pipeline hdf5_output_path: {hdf5_output_path}')
         e = None
         try:
@@ -907,7 +929,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 raise e.exc
             hdf5_output_path = None # set to None because it failed.
             return (hdf5_output_path, e)
-        
+
     
 
 
