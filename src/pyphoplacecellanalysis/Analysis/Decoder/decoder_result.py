@@ -247,20 +247,6 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 
-
-
-# def _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs, neuron_IDs):
-#     """ UNUSED: Reshape to -for-each-epoch instead of -for-each-cell
-#         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_reshape_for_each_epoch_to_for_each_cell
-#         flat_all_epochs_cell_data, all_epochs_cell_data = _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs=np.arange(active_filter_epochs.n_epochs), neuron_IDs=original_1D_decoder.neuron_IDs)
-#     """
-#     all_epochs_cell_data = []
-#     for decoded_epoch_idx in epoch_IDXs:
-#         all_epochs_cell_data.append(np.array([data[aclu][decoded_epoch_idx] for aclu in neuron_IDs]))
-#     flat_all_epochs_cell_data = np.hstack(all_epochs_cell_data) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
-#     return flat_all_epochs_cell_data, all_epochs_cell_data
-
-
 def _convert_dict_to_hdf_attrs_fn(f, key: str, value):
     """ value: dict-like """
     # if isinstance(f, h5py.File):
@@ -280,8 +266,6 @@ def _convert_optional_ndarray_to_hdf_attrs_fn(f, key: str, value):
             f[f'{key}'] = value
         else:
             f[f'{key}'] = np.ndarray([])
-
-
 
 
 @custom_define(slots=False, repr=False)
@@ -313,9 +297,6 @@ class LeaveOneOutDecodingResult(HDFMixin):
     decoded_timebins_p_x_given_n: Dict[int, np.ndarray] = serialized_field(default=Factory(dict), serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v)))
 
     
-    
-
-
 @custom_define(slots=False, repr=False)
 class TimebinnedNeuronActivity(HDFMixin):
     """ 2023-04-18 - keeps track of which neurons are active and inactive in each decoded timebin
