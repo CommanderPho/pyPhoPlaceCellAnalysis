@@ -180,6 +180,7 @@ class LoadableSessionInput:
         self.sess.name = value
         
 
+    @function_attributes(tags=['output_files', 'filesystem'], related_items=[])
     def get_output_path(self) -> Path:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
         return self.sess.get_output_path()
@@ -399,6 +400,7 @@ class PipelineWithLoadableStage(RegisteredOutputsMixin):
 
         
     ## Session passthroughs:
+    @function_attributes(tags=['output_files', 'filesystem'], related_items=[])
     def get_output_path(self) -> Path:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
         return self.stage.get_output_path()
