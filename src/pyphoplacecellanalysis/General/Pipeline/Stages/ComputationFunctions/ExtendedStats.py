@@ -198,7 +198,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         if 'extended_stats' not in computation_result.computed_data:
             computation_result.computed_data['extended_stats'] = DynamicParameters() # new 'extended_stats' dict
  
-
+        # Here is where we use `DynamicParameters`
         computation_result.computed_data['extended_stats']['pf_dt_sequential_surprise'] = DynamicParameters.init_from_dict({
             'time_bin_size_seconds': time_bin_size_seconds,
             'historical_snapshots': historical_snapshots,

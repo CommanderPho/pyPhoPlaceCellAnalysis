@@ -1,18 +1,25 @@
 import ipywidgets as widgets
 from IPython.display import display
-from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import JupyterButtonRowWidget
-from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
-
-import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
-# from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
-from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDialog
+import matplotlib
 
 from pathlib import Path
 from silx.gui import qt
 from silx.gui.dialog.ImageFileDialog import ImageFileDialog
 from silx.gui.dialog.DataFileDialog import DataFileDialog
 import silx.io
+
+
+from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
+from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import JupyterButtonRowWidget
+from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
+
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+# from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDialog
+
 
 # AbstractDataFileDialog
 
@@ -147,7 +154,7 @@ def fullwidth_path_widget(a_path):
 
 
 
-
+@function_attributes(short_name=None, tags=['ipywidgets', 'ipython', 'jupyterwidgets', 'interactive'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-26 12:01', related_items=[])
 def interactive_pipeline_widget(curr_active_pipeline):
 	""" 
 	Usage:
@@ -174,8 +181,34 @@ def interactive_pipeline_widget(curr_active_pipeline):
 	updating_button_executor = JupyterButtonRowWidget(button_defns=updating_button_defns, defer_display=True)
 	# combined_button_executor = widgets.VBox((widgets.HBox(button_executor.button_list), widgets.HBox(updating_button_executor.button_list)))
 
-	# _out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget])
-	_out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget, updating_button_executor.root_widget])
+	
+	def toggle_figure_displaying_function(change):
+		if change['new']:
+			print("Figure windows enabled")
+			# Showing
+			# configure backend here
+			matplotlib.use('Qt5Agg')
+			# backend_qt5agg
+			# %matplotlib qt5
+			# %matplotlib qt
+			# matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
 
+			import matplotlib as mpl
+			import matplotlib.pyplot as plt
+			_bak_rcParams = mpl.rcParams.copy()
+			_restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+		else:
+			print("Figure windows disabled (file only)")
+			# Showing
+			_restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=False, backend='AGG')
+
+	figure_display_toggle_button = widgets.ToggleButton(description="Figures Displaying", value=True)
+	figure_display_toggle_button.observe(toggle_figure_displaying_function, names='value')
+	
+
+
+
+	# _out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget])
+	_out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget, updating_button_executor.root_widget, figure_display_toggle_button])
 
 	return _out_widget

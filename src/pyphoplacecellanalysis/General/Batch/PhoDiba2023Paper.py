@@ -41,6 +41,8 @@ from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import interactive_good_e
 import pyphoplacecellanalysis.External.pyqtgraph as pg # pyqtgraph
 import matplotlib.pyplot as plt
 
+from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_surprise_results, fig_remapping_cells
+
 
 # Testing:
 
@@ -1048,6 +1050,27 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
     # plot_aclus = EITHER_subset.track_exclusive_aclus[new_all_aclus_sort_indicies].copy()
     # _out_A = plot_kourosh_activity_style_figure(long_results_obj, long_session, plot_aclus, unit_sort_order=new_all_aclus_sort_indicies, epoch_idx=13, callout_epoch_IDXs=None, skip_rendering_callouts=False)
     # app, win, plots, plots_data = _out_A
+
+
+    # ==================================================================================================================== #
+    # 2023-09-26 - Presentation Figures:                                                                                   #
+    # ==================================================================================================================== #
+    
+    graphics_output_dict = {}
+
+    try:
+        # 2023-09-21 - Plot All
+        graphics_output_dict = graphics_output_dict | fig_remapping_cells(curr_active_pipeline)
+    except Exception:
+        print(f'plotting `fig_remapping_cells(...)` failed. Continuing.') 
+
+
+    try:
+        # 2023-09-21 - Plot All
+        graphics_outputs_list = fig_surprise_results(curr_active_pipeline)
+    except Exception:
+        print(f'plotting `fig_surprise_results(...)` failed. Continuing.')
+        
 
     # Unwrapping:
     # pf1d_compare_graphics, (example_epoch_rasters_L, example_epoch_rasters_S), example_stacked_epoch_graphics = _out_fig_1

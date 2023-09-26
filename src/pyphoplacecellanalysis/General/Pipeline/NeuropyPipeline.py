@@ -873,7 +873,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             a_computed_data.pf2D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D")
             ## TODO: encode the rest of the computed_data
 
-
+            try:
+                a_computed_data.pf1D_dt.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D_dt") # damn this will be called with the `tb` still having the thingy open
+                a_computed_data.pf2D_dt.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D_dt")
+            except BaseException:
+                print(f'could not output time-dependent placefields to .h5. Skipping.')
+                pass
 
         # Done, in future could potentially return the properties that it couldn't serialize so the defaults can be tried on them.
         # or maybe returns groups? a_filter_group

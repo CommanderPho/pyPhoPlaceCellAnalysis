@@ -3,6 +3,8 @@ from typing import OrderedDict
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Model.RenderDataseries import RenderDataseries
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import CurveDatasource
 
@@ -341,6 +343,7 @@ class MUA_RenderTimeCurves(GeneralRenderTimeCurves):
 # ==================================================================================================================== #
 # Animal RelativeEntropySurprise Curves                                                                                               #
 # ==================================================================================================================== #
+@metadata_attributes(short_name=None, tags=['surprise', 'relative_entropy', 'render_time_curve'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-26 13:53', related_items=[])
 class RelativeEntropySurpriseRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
     """ 
     add_render_time_curves
