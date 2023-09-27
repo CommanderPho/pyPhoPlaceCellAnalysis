@@ -610,7 +610,7 @@ class BatchRun(HDF_SerializationMixin):
         return session_identifiers, pkl_output_paths, hdf5_output_paths
 
     @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
-    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True, create_slurm_scripts:bool=True):
+    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True, create_slurm_scripts:bool=True, **script_generation_kwargs):
         """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
         output_directory
@@ -619,14 +619,14 @@ class BatchRun(HDF_SerializationMixin):
 
         Usage:
             ## Build Slurm Scripts:
-            global_batch_run.generate_batch_slurm_jobs(included_session_contexts, Path('output/generated_slurm_scripts/').resolve(), use_separate_run_directories=True)
+            output_included_session_contexts, output_python_scripts, output_slurm_scripts = global_batch_run.generate_batch_slurm_jobs(included_session_contexts, Path('output/generated_slurm_scripts/').resolve(), use_separate_run_directories=True)
 
         Uses:
             self.global_data_root_parent_path
             self.session_batch_basedirs
             
         """
-        return generate_batch_single_session_scripts(self.global_data_root_parent_path, session_batch_basedirs=self.session_batch_basedirs, included_session_contexts=included_session_contexts, output_directory=output_directory, use_separate_run_directories=use_separate_run_directories, create_slurm_scripts=create_slurm_scripts)
+        return generate_batch_single_session_scripts(self.global_data_root_parent_path, session_batch_basedirs=self.session_batch_basedirs, included_session_contexts=included_session_contexts, output_directory=output_directory, use_separate_run_directories=use_separate_run_directories, create_slurm_scripts=create_slurm_scripts, **script_generation_kwargs)
         
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
@@ -1114,6 +1114,8 @@ class BatchSessionCompletionHandler:
         If computations are needed, they are performed with the `batch_extended_computations(...)` function.
 
         
+        If `.global_computations_options.should_compute` then computations will be tried and saved out as needed. If an error occurs, those will not be saved.
+        
         """
         if self.global_computations_options.should_load:
             if not self.force_global_recompute: # not just force_reload, needs to recompute whenever the computation fails.
@@ -1151,7 +1153,7 @@ class BatchSessionCompletionHandler:
                             if self.fail_on_exception:
                                 raise e.exc
                     else:
-                        print(f'\n\n!!WARNING!!: self.global_computations_options.should_save == False, so the global results are unsaved!')
+                        print(f'\n\n!!WARNING!!: self.global_computations_options.should_save == SavingOptions.NEVER, so the global results are unsaved!')
                 else:
                     print(f'no changes in global results.')
                     if self.global_computations_options.should_save == SavingOptions.ALWAYS:
@@ -1169,7 +1171,7 @@ class BatchSessionCompletionHandler:
                 ## TODO: catch/log saving error and indicate that it isn't saved.
                 exception_info = sys.exc_info()
                 e = CapturedException(e, exception_info)
-                print(f'ERROR SAVING GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
+                print(f'ERROR perform `batch_extended_computations` or saving GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
                 if self.fail_on_exception:
                     raise e.exc
 
