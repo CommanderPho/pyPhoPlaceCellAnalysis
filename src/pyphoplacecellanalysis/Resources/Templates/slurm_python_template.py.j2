@@ -9,7 +9,7 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
 from neuropy.utils.result_context import IdentifyingContext
 
-
+from pyphoplacecellanalysis.General.Batch.runBatch import build_batch_task_logger
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 from pyphoplacecellanalysis.General.Batch.runBatch import SavingOptions, run_specific_batch, BatchRun, BatchResultDataframeAccessor, run_diba_batch, BatchComputationProcessOptions, BatchSessionCompletionHandler
@@ -20,6 +20,26 @@ script_file_path = os.path.abspath(__file__)
 script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
 log_file_path = script_file_parent_path.joinpath('log_file.log')
 
+curr_session_context = {{ curr_session_context }}
+curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
+
+curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path) # create logger , file_logging_dir=
+_line_sweep = '=========================='
+## REPLACES THE `print` function within this scope
+_original_print = print
+def new_print(*args, **kwargs):
+    # Call both regular print and logger.info
+    _original_print(*args, **kwargs)
+    curr_task_logger.info(*args)
+
+# Replace the print function within this scope
+# _original_print = print
+print = new_print # should redefine print too?
+
+new_print(f'{_line_sweep} Script {script_file_path} STARTING {_line_sweep}')
+new_print(f'\tsession_context: {curr_session_context}')
+new_print(f'\tsession_basedir: {str(curr_session_basedir)}')    
+new_print('__________________________________________________________________')
 
 # Whether to output figures:
 {% if should_perform_figure_generation_to_file %}
@@ -32,7 +52,7 @@ should_perform_figure_generation_to_file=False
 {% if should_force_reload_all %}
 # Forced Reloading:
 should_force_reload_all = True
-print(f'forced reloading...')
+new_print(f'forced reloading...')
 result_handler = BatchSessionCompletionHandler(force_reload_all=True,
                     session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
                     global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
@@ -46,8 +66,7 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=False,
                     should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_generate_all_plots=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.SKIP_SAVING, force_global_recompute=False)
 {% endif %}
 
-curr_session_context = {{ curr_session_context }}
-curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
+
 
 with open(log_file_path, 'a') as f:
     with redirect_stdout(f):
@@ -60,16 +79,16 @@ with open(log_file_path, 'a') as f:
                                                         saving_mode=result_handler.saving_mode)
 
 
-        print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
+        new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
 
-        print(f'\n/* ================================================================================================================== */ \n')
-        print(f'/* Finished {curr_session_context} __________________________________________________________________________________ */')
+        new_print(f'\n/* ================================================================================================================== */ \n')
+        new_print(f'/* Finished {curr_session_context} __________________________________________________________________________________ */')
 
-        print(f'/* script_file_parent_path: {script_file_parent_path} __________________________________________________________________________________ */')
-        print(f'/* script_file_path: {script_file_path} __________________________________________________________________________________ */')
-        print(f'/* log_file_path: {log_file_path} __________________________________________________________________________________ */')
-        print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
-        print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
-        print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
-        print(f'\n ALL DONE! \n')
-        print(f'/* ================================================================================================================== */\n')
+        new_print(f'/* script_file_parent_path: {script_file_parent_path} __________________________________________________________________________________ */')
+        new_print(f'/* script_file_path: {script_file_path} __________________________________________________________________________________ */')
+        new_print(f'/* log_file_path: {log_file_path} __________________________________________________________________________________ */')
+        new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
+        new_print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
+        new_print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
+        new_print(f'\n ALL DONE! \n')
+        new_print(f'/* ================================================================================================================== */\n')

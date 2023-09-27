@@ -1521,9 +1521,9 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     curr_task_logger = build_batch_task_logger(session_context=curr_session_context) # create logger , file_logging_dir=
     _line_sweep = '=========================='
     ## REPLACES THE `print` function within this scope
-    def new_print(*args):
+    def new_print(*args, **kwargs):
         # Call both regular print and logger.info
-        print(*args)
+        print(*args, **kwargs)
         curr_task_logger.info(*args)
 
     # Replace the print function within this scope
