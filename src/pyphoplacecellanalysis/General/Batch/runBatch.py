@@ -1027,6 +1027,7 @@ class BatchSessionCompletionHandler:
     global_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
     extended_computations_include_includelist: list = field(default=['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'extended_stats',
                                         'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping',
+                                        'ratemap_peaks_prominence2d',
                                         #  'long_short_inst_spike_rate_groups',
                                         'long_short_endcap_analysis']) # do only specified
     
@@ -1667,7 +1668,7 @@ def main(active_result_suffix:str='CHANGEME_TEST', included_session_contexts: Op
         # No Reloading
         result_handler = BatchSessionCompletionHandler(force_reload_all=False,
                                                         session_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=SavingOptions.NEVER),
-                                                        global_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=SavingOptions.IF_CHANGED),
+                                                        global_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED),
                                                         should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.SKIP_SAVING, force_global_recompute=False,
                                                         **multiprocessing_kwargs)
 

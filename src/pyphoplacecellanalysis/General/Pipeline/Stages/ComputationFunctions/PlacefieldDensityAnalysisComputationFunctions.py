@@ -742,7 +742,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                         a_slice = a_peak_dict['level_slices'].get(probe_lvl, None) # allow missing entries. This will occur when (contour is None) above.
                         #TODO 2023-09-25 23:59: - [ ] Do I need to do anything else to handle this case, like remove the invalid curve from 
                         if a_slice is None:
-                            print(f'WARNING: a_slice is None. 2023-09-25 - Unsure if this is okay, used to be a fatal error. a_peak_dict: {a_peak_dict}')
+                            print(f'WARNING: a_slice is None. 2023-09-25 - Unsure if this is okay, used to be a fatal error.') # a_peak_dict: {a_peak_dict}
                         else:
                             slice_bbox = a_slice['bbox']
                             (x0, y0, width, height) = slice_bbox.bounds        
