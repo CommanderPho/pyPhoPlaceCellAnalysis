@@ -32,7 +32,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     _is_global = False
 
 
-    @function_attributes(short_name=None, tags=['decoding', 'position'], input_requires=["computed_data['pf1D']", "computed_data['pf2D']"], output_provides=[], uses=['BayesianPlacemapPositionDecoder'], used_by=[], creation_date='2023-09-12 17:30', related_items=[],
+    @function_attributes(short_name='position_decoding', tags=['decoding', 'position'], input_requires=["computed_data['pf1D']", "computed_data['pf2D']"], output_provides=[], uses=['BayesianPlacemapPositionDecoder'], used_by=[], creation_date='2023-09-12 17:30', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_Decoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_Decoder']), is_global=False)
     def _perform_position_decoding_computation(computation_result: ComputationResult, **kwargs):
         """ Builds the 1D & 2D Placefield Decoder 
@@ -56,7 +56,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         return position_decoding_computation(computation_result.sess, placefield_computation_config, computation_result)
     
 
-    @function_attributes(short_name=None, tags=['decoding', 'position', 'two-step'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
+    @function_attributes(short_name='position_decoding_two_step', tags=['decoding', 'position', 'two-step'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_TwoStepDecoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_TwoStepDecoder']), is_global=False)
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
