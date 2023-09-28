@@ -826,48 +826,59 @@ def save_filelist_to_text_file(output_paths, filelist_path: Path):
     return _out_string, filelist_path
 
 
-def build_output_filelists(filelist_save_parent_path: Path, included_session_basedirs: List[Path], BATCH_DATE_TO_USE:str, dest_computer_name:str='LabWorkstation'):
+def build_output_filelists(filelist_save_parent_path: Path, included_session_basedirs: List[Path], BATCH_DATE_TO_USE:str, source_computer_name:str='GreatLakes', dest_computer_name:str='LabWorkstation'):
     """ 
     Usage:
         from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import build_output_filelists
-        output_filelists = build_output_filelists(filelist_save_parent_path=global_data_root_parent_path, included_session_basedirs=included_session_basedirs, BATCH_DATE_TO_USE=BATCH_DATE_TO_USE, dest_computer_name='LabWorkstation')
+        
+        output_filelist_transfer_dict = build_output_filelists(filelist_save_parent_path=global_data_root_parent_path, included_session_basedirs=included_session_basedirs, BATCH_DATE_TO_USE=BATCH_DATE_TO_USE, dest_computer_name='LabWorkstation')
         
     """
     _dest_computers_dict = {'Apogee':Path(r'/~/W/Data/'), 'LabWorkstation':Path(r'/media/MAX/cloud/turbo/Data'), 'GreatLakes':Path(r'/nfs/turbo/umms-kdiba/Data')}
-    output_filelist_paths = []
+    # output_filelist_paths = []
+    output_filelist_transfer_dict = {}
+    
     included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_basedirs]
     included_pkl_output_paths = [a_dir.joinpath('loadedSessPickle.pkl').resolve() for a_dir in included_session_basedirs]
     included_global_computation_pkl_paths = [a_dir.joinpath('output','global_computation_results.pkl').resolve() for a_dir in included_session_basedirs]
     # included_global_computation_h5_paths = [a_dir.joinpath('output','global_computations.h5').resolve() for a_dir in included_session_basedirs] 
 
-
     filelist_dict = dict(zip(['pkls', 'global_pkls', 'HDF5'], (included_pkl_output_paths, included_global_computation_pkl_paths, included_h5_paths)))
+
     # Save output filelist:
-    h5_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_HDF5_{BATCH_DATE_TO_USE}.txt').resolve()
-    _out_string, src_filelist_HDF5_savepath = save_filelist_to_text_file(included_h5_paths, h5_filelist_path)
-    output_filelist_paths.append(src_filelist_HDF5_savepath)
+    # h5_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_HDF5_{BATCH_DATE_TO_USE}.txt').resolve()
+    # _out_string, src_filelist_HDF5_savepath = save_filelist_to_text_file(included_h5_paths, h5_filelist_path)
+    # output_filelist_paths.append(src_filelist_HDF5_savepath)
     
-    pkls_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_pkls_{BATCH_DATE_TO_USE}.txt').resolve()
-    _out_string, src_filelist_pkls_savepath = save_filelist_to_text_file(included_pkl_output_paths, pkls_filelist_path)
-    output_filelist_paths.append(src_filelist_pkls_savepath)
+    # pkls_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_pkls_{BATCH_DATE_TO_USE}.txt').resolve()
+    # _out_string, src_filelist_pkls_savepath = save_filelist_to_text_file(included_pkl_output_paths, pkls_filelist_path)
+    # output_filelist_paths.append(src_filelist_pkls_savepath)
     
-    global_pkls_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_global_pkls_{BATCH_DATE_TO_USE}.txt').resolve()
-    _out_string, src_filelist_global_pkls_savepath = save_filelist_to_text_file(included_global_computation_pkl_paths, global_pkls_filelist_path)
-    output_filelist_paths.append(src_filelist_global_pkls_savepath)
+    # global_pkls_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_global_pkls_{BATCH_DATE_TO_USE}.txt').resolve()
+    # _out_string, src_filelist_global_pkls_savepath = save_filelist_to_text_file(included_global_computation_pkl_paths, global_pkls_filelist_path)
+    # output_filelist_paths.append(src_filelist_global_pkls_savepath)
     
     # source_parent_path = Path(r'/media/MAX/cloud/turbo/Data')
-    source_parent_path = Path(r'/nfs/turbo/umms-kdiba/Data')
+    # source_parent_path = Path(r'/nfs/turbo/umms-kdiba/Data')
+    source_parent_path: Path = _dest_computers_dict[source_computer_name]
     # dest_parent_path = Path(r'/~/W/Data/')
     dest_parent_path: Path = _dest_computers_dict[dest_computer_name]
     # # Build the destination filelist from the source_filelist and the two paths:
-    for a_filelist_name, a_filelist_source in filelist_dict.items():
-        filelist_dest_paths = convert_filelist_to_new_parent(a_filelist_source, original_parent_path=source_parent_path, dest_parent_path=dest_parent_path)
+    for a_filelist_name, a_source_filelist in filelist_dict.items():
+        # Non-converted:
+        source_filelist_path = filelist_save_parent_path.joinpath(f'fileList_{source_computer_name}_{a_filelist_name}_{BATCH_DATE_TO_USE}.txt').resolve()
+        _out_string, a_src_filelist_savepath = save_filelist_to_text_file(a_source_filelist, source_filelist_path)
+        # output_filelist_paths.append(a_src_filelist_savepath)
+    
+        ## Converted
+        filelist_dest_paths = convert_filelist_to_new_parent(a_source_filelist, original_parent_path=source_parent_path, dest_parent_path=dest_parent_path)
         dest_Computer_h5_filelist_path = filelist_save_parent_path.joinpath(f'dest_fileList_{dest_computer_name}_{a_filelist_name}_{BATCH_DATE_TO_USE}.txt').resolve()
         _out_string, dest_filelist_savepath = save_filelist_to_text_file(filelist_dest_paths, dest_Computer_h5_filelist_path)
-        output_filelist_paths.append(dest_filelist_savepath)
+        # output_filelist_paths.append(dest_filelist_savepath)
+        
+        output_filelist_transfer_dict[a_src_filelist_savepath] = dest_filelist_savepath
     
-    return output_filelist_paths
-
+    return output_filelist_transfer_dict
 
 
 
