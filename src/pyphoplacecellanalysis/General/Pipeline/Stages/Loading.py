@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 import pathlib
 from pathlib import Path
+import shutil # for _backup_extant_file(...)
+
 import pandas as pd
 
 from neuropy.utils.result_context import IdentifyingContext
@@ -28,19 +30,93 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.LoadFunctions.LoadFunctionRe
 import dill as pickle # requires mamba install dill -c conda-forge
 
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter
+from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
 
-# Its important to use binary mode
-def saveData(pkl_path, db, should_append=False):
+
+def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_original:bool=False, backup_minimum_difference_MB:int=5):
+    """ saves the output data in a way that doesn't corrupt it if the pickling fails and the original file is retained.
+    
+    backup_file_if_smaller_than_original:bool - if True, creates a backup of the old file if the new file is smaller.
+    backup_minimum_difference_MB:int = 5 # don't backup for an increase of 5MB or less, ignored unless backup_file_if_smaller_than_original==True
+    """
+    if not isinstance(pkl_path, Path):
+        pkl_path = Path(pkl_path).resolve()
     if should_append:
         file_mode = 'ab' # 'ab' opens the file as binary and appends to the end
     else:
         file_mode = 'w+b' # 'w+b' opens and truncates the file to 0 bytes (overwritting)
-    with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
-        with open(pkl_path, file_mode) as dbfile: 
-            # source, destination
-            pickle.dump(db, dbfile)
-            dbfile.close()
 
+    is_temporary_file_used:bool = False
+    _desired_final_pickle_path = None
+    if pkl_path.exists():
+        # file already exists:
+        
+        ## Save under a temporary name in the same output directory, and then compare post-hoc
+        _desired_final_pickle_path = pkl_path
+        pkl_path, _ = build_unique_filename(pkl_path, additional_postfix_extension='tmp') # changes the final path to the temporary file created.
+        is_temporary_file_used = True # this is the only condition where this is true
+            
+    # Save reloaded pipeline out to pickle for future loading
+    with ProgressMessagePrinter(_desired_final_pickle_path, f"Saving (file mode '{_desired_final_pickle_path}')", 'saved session pickle file'):
+        try:
+            with open(pkl_path, file_mode) as dbfile: 
+                # source, destination
+                pickle.dump(db, dbfile)
+                dbfile.close()
+            # Pickling succeeded
+
+            # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
+            if is_temporary_file_used:
+                assert _desired_final_pickle_path is not None
+                if backup_file_if_smaller_than_original:
+                    prev_extant_file_size_MB = print_filesystem_file_size(_desired_final_pickle_path, enable_print=False)
+                    new_temporary_file_size_MB = print_filesystem_file_size(pkl_path, enable_print=False)
+                    if (backup_minimum_difference_MB < (prev_extant_file_size_MB - new_temporary_file_size_MB)):
+                        print(f'\tWARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) > new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
+                        # Backup old file:
+                        backup_extant_file(_desired_final_pickle_path) # only backup if the new file is smaller than the older one (meaning the older one has more info)
+                
+                # replace the old file with the new one:
+                print(f"\tmoving new output at '{pkl_path}' -> to desired location: '{_desired_final_pickle_path}'")
+                shutil.move(pkl_path, _desired_final_pickle_path) # move the temporary file to the desired destination, overwriting it
+
+        except Exception as e:
+            print(f"pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!")
+            # delete the incomplete pickle file
+            if is_temporary_file_used:
+                pkl_path.unlink(missing_ok=True) # removes the incomplete file. The user's file located at _desired_final_pickle_path is still intact.
+                
+            raise e
+    
+    
+        
+
+# Its important to use binary mode
+def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
+    """ 
+    
+    safe_save: If True, a temporary extension is added to the save path if the file already exists and the file is only overwritten if pickling doesn't throw an exception.
+        This temporarily requires double the disk space.
+        
+    """
+    if safe_save:
+        safeSaveData(pkl_path, db=db, should_append=should_append)
+    else:
+        if should_append:
+            file_mode = 'ab' # 'ab' opens the file as binary and appends to the end
+        else:
+            file_mode = 'w+b' # 'w+b' opens and truncates the file to 0 bytes (overwritting)
+        if not isinstance(pkl_path, Path):
+            pkl_path = Path(pkl_path).resolve()
+            
+        with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
+            with open(pkl_path, file_mode) as dbfile: 
+                # source, destination
+                pickle.dump(db, dbfile)
+                dbfile.close()
+
+    
 
 # global_move_modules_list: Dict[str, str] - a dict with keys equal to the old full path to a class and values equal to the updated (replacement) full path to the class. Used to update the path to class definitions for loading previously pickled results after refactoring.
 
