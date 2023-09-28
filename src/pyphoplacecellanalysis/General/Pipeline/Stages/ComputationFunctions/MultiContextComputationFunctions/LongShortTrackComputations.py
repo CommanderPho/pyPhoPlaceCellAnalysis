@@ -1186,21 +1186,26 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
 
         # Store the Long and Short exclusive ACLUs:
-        inst_spike_rate_groups_result.LxC_aclus = long_exclusive.track_exclusive_aclus
-        inst_spike_rate_groups_result.SxC_aclus = short_exclusive.track_exclusive_aclus
+        # inst_spike_rate_groups_result.LxC_aclus = long_exclusive.track_exclusive_aclus
+        # inst_spike_rate_groups_result.SxC_aclus = short_exclusive.track_exclusive_aclus
+        
+        # 2023-09-28 - "Refined" LxC/SxC based on firing rate index:
+        inst_spike_rate_groups_result.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
+        inst_spike_rate_groups_result.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
+
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=inst_spike_rate_groups_result.LxC_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
         # ReplayDeltaPlus: `short_replays`
-        LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=inst_spike_rate_groups_result.LxC_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=inst_spike_rate_groups_result.SxC_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
         # ReplayDeltaPlus: `short_replays`
-        SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=inst_spike_rate_groups_result.SxC_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
 
         inst_spike_rate_groups_result.LxC_ReplayDeltaMinus, inst_spike_rate_groups_result.LxC_ReplayDeltaPlus, inst_spike_rate_groups_result.SxC_ReplayDeltaMinus, inst_spike_rate_groups_result.SxC_ReplayDeltaPlus = LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus
 
@@ -1211,22 +1216,20 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=inst_spike_rate_groups_result.LxC_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
         # ThetaDeltaPlus: `short_laps`
-        LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=inst_spike_rate_groups_result.LxC_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=inst_spike_rate_groups_result.SxC_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
         # ThetaDeltaPlus: `short_laps`
-        SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
+        SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=inst_spike_rate_groups_result.SxC_aclus, instantaneous_time_bin_size_seconds=inst_spike_rate_groups_result.instantaneous_time_bin_size_seconds)
 
         inst_spike_rate_groups_result.LxC_ThetaDeltaMinus, inst_spike_rate_groups_result.LxC_ThetaDeltaPlus, inst_spike_rate_groups_result.SxC_ThetaDeltaMinus, inst_spike_rate_groups_result.SxC_ThetaDeltaPlus = LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         inst_spike_rate_groups_result.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
-        
-
         
 
         # Find instantaneous firing rate for spikes outside of replays
@@ -2823,7 +2826,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         else:
             jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
 
-        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
+        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.5)
 
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
@@ -2838,15 +2841,15 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
         # ReplayDeltaPlus: `short_replays`
-        LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
         # ReplayDeltaPlus: `short_replays`
-        SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
 
         self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus = LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus
 
@@ -2857,15 +2860,15 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
         # ThetaDeltaPlus: `short_laps`
-        LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=long_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
         # ThetaDeltaPlus: `short_laps`
-        SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=short_exclusive.track_exclusive_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
 
         self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus = LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus
 
