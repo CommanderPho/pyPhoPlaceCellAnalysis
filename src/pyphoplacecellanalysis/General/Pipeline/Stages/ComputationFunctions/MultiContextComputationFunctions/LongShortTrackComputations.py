@@ -70,7 +70,7 @@ class TrackExclusivePartitionSubset(HDFMixin, AttrsBasedClassHelperMixin):
         return self.track_exclusive_aclus[self.track_exclusive_df['is_refined_exclusive']]
 
 
-    def refine_exclusivity_by_inst_frs_index(self, custom_InstSpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5): 
+    def refine_exclusivity_by_inst_frs_index(self, custom_SpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5): 
         """ 2023-09-28
         
         inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
@@ -78,37 +78,33 @@ class TrackExclusivePartitionSubset(HDFMixin, AttrsBasedClassHelperMixin):
 
         Adds ['custom_frs_index', 'is_refined_exclusive'] to both: (short_exclusive.track_exclusive_df, long_exclusive.track_exclusive_df)
         """
-        assert 'custom_frs_index' in custom_InstSpikeRateTrends_df.columns
-        instSpikeRate_values_SxC_df = custom_InstSpikeRateTrends_df[np.isin(custom_InstSpikeRateTrends_df.aclu, self.track_exclusive_aclus)]
-        refined_short_exclusive_aclus = instSpikeRate_values_SxC_df[(instSpikeRate_values_SxC_df.custom_frs_index < -frs_index_inclusion_magnitude)].aclu.to_numpy()
+        if 'aclu' not in custom_SpikeRateTrends_df.columns:
+            custom_SpikeRateTrends_df['aclu'] = custom_SpikeRateTrends_df.index
+        if 'custom_frs_index' not in custom_SpikeRateTrends_df.columns:
+            custom_SpikeRateTrends_df['custom_frs_index'] = custom_SpikeRateTrends_df['non_replays_frs_index'] 
+
+        instSpikeRate_values_SxC_df = custom_SpikeRateTrends_df[np.isin(custom_SpikeRateTrends_df.aclu, self.track_exclusive_aclus)]
+        refined_track_exclusive_aclus = instSpikeRate_values_SxC_df[(instSpikeRate_values_SxC_df.custom_frs_index < -frs_index_inclusion_magnitude)].aclu.to_numpy()
         self.track_exclusive_df['aclu'] = self.track_exclusive_df.index
         self.track_exclusive_df['custom_frs_index'] = instSpikeRate_values_SxC_df.custom_frs_index
         self.track_exclusive_df['is_refined_exclusive'] = (self.track_exclusive_df['custom_frs_index'] < -frs_index_inclusion_magnitude)
         
 
     @classmethod
-    def _refine_XxC_aclus_by_inst_frs_index(cls, custom_InstSpikeRateTrends_df: pd.DataFrame, long_exclusive, short_exclusive, frs_index_inclusion_magnitude: float = 0.5): 
+    def _refine_XxC_aclus_by_inst_frs_index(cls, custom_SpikeRateTrends_df: pd.DataFrame, long_exclusive, short_exclusive, frs_index_inclusion_magnitude: float = 0.5): 
         """
         inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
 
 
         Adds ['custom_frs_index', 'is_refined_exclusive'] to both: (short_exclusive.track_exclusive_df, long_exclusive.track_exclusive_df)
         """
-        assert 'custom_frs_index' in custom_InstSpikeRateTrends_df.columns
-        # instSpikeRate_values_SxC_df = custom_InstSpikeRateTrends_df[np.isin(custom_InstSpikeRateTrends_df.aclu, short_exclusive.track_exclusive_aclus)]
-        # refined_short_exclusive_aclus = instSpikeRate_values_SxC_df[(instSpikeRate_values_SxC_df.custom_frs_index < -inst_frs_index_inclusion_magnitude)].aclu.to_numpy()
-        # short_exclusive.track_exclusive_df['aclu'] = short_exclusive.track_exclusive_df.index
-        # short_exclusive.track_exclusive_df['custom_frs_index'] = instSpikeRate_values_SxC_df.custom_frs_index
-        # short_exclusive.track_exclusive_df['is_refined_exclusive'] = (short_exclusive.track_exclusive_df['custom_frs_index'] < -inst_frs_index_inclusion_magnitude)
-        
-        # instSpikeRate_values_LxC_df = custom_InstSpikeRateTrends_df[np.isin(custom_InstSpikeRateTrends_df.aclu, long_exclusive.track_exclusive_aclus)]
-        # long_exclusive.track_exclusive_df['aclu'] = long_exclusive.track_exclusive_df.index
-        # long_exclusive.track_exclusive_df['custom_frs_index'] = instSpikeRate_values_LxC_df.custom_frs_index
-        # long_exclusive.track_exclusive_df['is_refined_exclusive'] = (long_exclusive.track_exclusive_df['custom_frs_index'] > inst_frs_index_inclusion_magnitude)
-        # refined_long_exclusive_aclus = instSpikeRate_values_LxC_df[(instSpikeRate_values_LxC_df.custom_frs_index > inst_frs_index_inclusion_magnitude)].aclu.to_numpy()
-        
-        long_exclusive.refine_exclusivity_by_inst_frs_index(custom_InstSpikeRateTrends_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
-        short_exclusive.refine_exclusivity_by_inst_frs_index(custom_InstSpikeRateTrends_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+        if 'aclu' not in custom_SpikeRateTrends_df.columns:
+            custom_SpikeRateTrends_df['aclu'] = custom_SpikeRateTrends_df.index
+        if 'custom_frs_index' not in custom_SpikeRateTrends_df.columns:
+            custom_SpikeRateTrends_df['custom_frs_index'] = custom_SpikeRateTrends_df['non_replays_frs_index'] 
+
+        long_exclusive.refine_exclusivity_by_inst_frs_index(custom_SpikeRateTrends_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+        short_exclusive.refine_exclusivity_by_inst_frs_index(custom_SpikeRateTrends_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
         return long_exclusive, short_exclusive
     
 
