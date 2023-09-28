@@ -49,7 +49,7 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
         super().__init__(application_name=application_name, window_name=(window_name or TimeSynchronizedPlacefieldsPlotter.windowName), parent=parent) # Call the inherited classes __init__ method
         
         self.active_time_dependent_placefields = active_time_dependent_placefields2D
-        
+        assert self.active_time_dependent_placefields.ndim > 1, f"TimeSynchronizedPlacefieldsPlotter only works for 2D currently!"
         self.setup()
         self.params.drop_below_threshold = drop_below_threshold
         self.params.max_num_columns = max_num_columns
