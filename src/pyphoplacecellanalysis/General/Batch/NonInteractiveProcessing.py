@@ -510,12 +510,12 @@ class BatchPhoJonathanFiguresHelper:
 
         else:
             # original (non-refined) mode
-        short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
-        short_only_aclus = short_only_df.index.values.tolist()
-        long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
-        long_only_aclus = long_only_df.index.values.tolist()
-        shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
-        shared_aclus = shared_df.index.values.tolist()
+            short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
+            short_only_aclus = short_only_df.index.values.tolist()
+            long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
+            long_only_aclus = long_only_df.index.values.tolist()
+            shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+            shared_aclus = shared_df.index.values.tolist()
 
 
         if debug_print:
