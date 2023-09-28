@@ -26,6 +26,8 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import programmatic_dis
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metadata_from_display_context # newer version of build_pdf_export_metadata
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
 
+from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
+
 """ 
 
 filters should be checkable to express whether we want to build that one or not
@@ -442,6 +444,26 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
         
+    ## Exports the video of the surprise:
+    try:
+        # Relative Entropy/Surprise Results:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        active_relative_entropy_results = global_results['extended_stats']['pf_dt_sequential_surprise'] # DynamicParameters
+        historical_snapshots = active_relative_entropy_results['historical_snapshots']
+        ## Get the placefield dt matrix:
+        if 'snapshot_occupancy_weighted_tuning_maps' not in active_relative_entropy_results:
+            ## Compute it if missing:
+            occupancy_weighted_tuning_maps_over_time = np.stack([placefield_snapshot.occupancy_weighted_tuning_maps_matrix for placefield_snapshot in historical_snapshots.values()])
+            active_relative_entropy_results['snapshot_occupancy_weighted_tuning_maps'] = occupancy_weighted_tuning_maps_over_time
+        else:
+            occupancy_weighted_tuning_maps_over_time = active_relative_entropy_results['snapshot_occupancy_weighted_tuning_maps'] # (n_post_update_times, n_neurons, n_xbins)
+
+        video_output_parent_path = export_active_relative_entropy_results_videos(active_relative_entropy_results, active_context=curr_active_pipeline.get_session_context())
+
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): export_active_relative_entropy_results_videos failed with error: {e}\n skipping.')
+    
 
 
 

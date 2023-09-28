@@ -2,6 +2,7 @@
 Contains code related to Pho Hale's 4th Year PhD Presentation on 2023-09-25
 
 """
+from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -27,6 +28,9 @@ from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_long_short_surprise_difference_plot, plot_long_short, plot_long_short_any_values
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 long_short_display_config_manager = LongShortDisplayConfigManager()
 long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
@@ -259,3 +263,34 @@ def fig_surprise_results(curr_active_pipeline):
 	]
 
 	return graphics_outputs
+
+
+@function_attributes(short_name=None, tags=['surprise', 'video', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-27 20:54', related_items=[])
+def export_active_relative_entropy_results_videos(active_relative_entropy_results, active_context):
+	""" 
+
+	from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
+
+	video_output_parent_path = export_active_relative_entropy_results_videos(active_relative_entropy_results, active_context=curr_active_pipeline.get_session_context())
+
+	"""
+	import cv2
+	from pyphocorehelpers.plotting.video_output_helpers import save_array_as_video
+
+	video_output_parent_path = Path('output/videos').resolve()
+	video_output_dict = {}
+	video_properties_dict = {
+		'snapshot_occupancy_weighted_tuning_maps': dict(isColor=False),
+	#  'flat_jensen_shannon_distance_results': dict(blending='additive', colormap='gray'),
+		# 'long_short_rel_entr_curves_frames': dict(isColor=False),
+		# 'short_long_rel_entr_curves_frames': dict(isColor=False),
+	}
+
+	for a_name, video_properties in video_properties_dict.items():
+		# image_layer_dict[a_name] = viewer.add_image(active_relative_entropy_results_xr_dict[a_name].to_numpy().astype(float), name=a_name)
+		video_out_path = video_output_parent_path.joinpath(f'{active_context.get_description()}_{a_name}.avi')
+		video_output_dict[a_name] = save_array_as_video(array=active_relative_entropy_results[a_name], video_filename=video_out_path, isColor=False)
+		print(f'video_output_dict[a_name]: {video_output_dict[a_name]}')
+
+	# 
+	return video_output_parent_path
