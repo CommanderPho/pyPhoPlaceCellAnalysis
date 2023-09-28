@@ -82,11 +82,10 @@ def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_
                 shutil.move(pkl_path, _desired_final_pickle_path) # move the temporary file to the desired destination, overwriting it
 
         except Exception as e:
-            print(f"pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!")
+            print(f"pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!\nException: {e}")
             # delete the incomplete pickle file
             if is_temporary_file_used:
                 pkl_path.unlink(missing_ok=True) # removes the incomplete file. The user's file located at _desired_final_pickle_path is still intact.
-                
             raise e
     
     

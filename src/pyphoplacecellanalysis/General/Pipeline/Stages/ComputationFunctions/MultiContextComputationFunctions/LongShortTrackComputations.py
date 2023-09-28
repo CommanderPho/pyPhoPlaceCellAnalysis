@@ -63,6 +63,55 @@ class TrackExclusivePartitionSubset(HDFMixin, AttrsBasedClassHelperMixin):
     track_exclusive_df: pd.DataFrame = serialized_field()
     
 
+    def get_refined_track_exclusive_aclus(self) -> np.ndarray:
+        """ 2023-09-28 - Uses the exclusivity definitions refined by the firing rate indicies 
+        
+        """
+        return self.track_exclusive_aclus[self.track_exclusive_df['is_refined_exclusive']]
+
+
+    def refine_exclusivity_by_inst_frs_index(self, custom_InstSpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5): 
+        """ 2023-09-28
+        
+        inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
+
+
+        Adds ['custom_frs_index', 'is_refined_exclusive'] to both: (short_exclusive.track_exclusive_df, long_exclusive.track_exclusive_df)
+        """
+        assert 'custom_frs_index' in custom_InstSpikeRateTrends_df.columns
+        instSpikeRate_values_SxC_df = custom_InstSpikeRateTrends_df[np.isin(custom_InstSpikeRateTrends_df.aclu, self.track_exclusive_aclus)]
+        refined_short_exclusive_aclus = instSpikeRate_values_SxC_df[(instSpikeRate_values_SxC_df.custom_frs_index < -frs_index_inclusion_magnitude)].aclu.to_numpy()
+        self.track_exclusive_df['aclu'] = self.track_exclusive_df.index
+        self.track_exclusive_df['custom_frs_index'] = instSpikeRate_values_SxC_df.custom_frs_index
+        self.track_exclusive_df['is_refined_exclusive'] = (self.track_exclusive_df['custom_frs_index'] < -frs_index_inclusion_magnitude)
+        
+
+    @classmethod
+    def _refine_XxC_aclus_by_inst_frs_index(cls, custom_InstSpikeRateTrends_df: pd.DataFrame, long_exclusive, short_exclusive, frs_index_inclusion_magnitude: float = 0.5): 
+        """
+        inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
+
+
+        Adds ['custom_frs_index', 'is_refined_exclusive'] to both: (short_exclusive.track_exclusive_df, long_exclusive.track_exclusive_df)
+        """
+        assert 'custom_frs_index' in custom_InstSpikeRateTrends_df.columns
+        # instSpikeRate_values_SxC_df = custom_InstSpikeRateTrends_df[np.isin(custom_InstSpikeRateTrends_df.aclu, short_exclusive.track_exclusive_aclus)]
+        # refined_short_exclusive_aclus = instSpikeRate_values_SxC_df[(instSpikeRate_values_SxC_df.custom_frs_index < -inst_frs_index_inclusion_magnitude)].aclu.to_numpy()
+        # short_exclusive.track_exclusive_df['aclu'] = short_exclusive.track_exclusive_df.index
+        # short_exclusive.track_exclusive_df['custom_frs_index'] = instSpikeRate_values_SxC_df.custom_frs_index
+        # short_exclusive.track_exclusive_df['is_refined_exclusive'] = (short_exclusive.track_exclusive_df['custom_frs_index'] < -inst_frs_index_inclusion_magnitude)
+        
+        # instSpikeRate_values_LxC_df = custom_InstSpikeRateTrends_df[np.isin(custom_InstSpikeRateTrends_df.aclu, long_exclusive.track_exclusive_aclus)]
+        # long_exclusive.track_exclusive_df['aclu'] = long_exclusive.track_exclusive_df.index
+        # long_exclusive.track_exclusive_df['custom_frs_index'] = instSpikeRate_values_LxC_df.custom_frs_index
+        # long_exclusive.track_exclusive_df['is_refined_exclusive'] = (long_exclusive.track_exclusive_df['custom_frs_index'] > inst_frs_index_inclusion_magnitude)
+        # refined_long_exclusive_aclus = instSpikeRate_values_LxC_df[(instSpikeRate_values_LxC_df.custom_frs_index > inst_frs_index_inclusion_magnitude)].aclu.to_numpy()
+        
+        long_exclusive.refine_exclusivity_by_inst_frs_index(custom_InstSpikeRateTrends_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+        short_exclusive.refine_exclusivity_by_inst_frs_index(custom_InstSpikeRateTrends_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+        return long_exclusive, short_exclusive
+    
+
     #TODO 2023-08-02 05:58: - [ ] These (`to_hdf`, `read_hdf`) were auto-generated and not sure if they work:
 
     def to_hdf(self, file_path):
@@ -627,7 +676,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
 
     @function_attributes(short_name='long_short_fr_indicies_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00', 
-                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['non_replays_frs_index']), is_global=True)
+                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['non_replays_frs_index'], curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['long_short_fr_indicies_df']), is_global=True)
     def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Computes the firing rate indicies which is a measure of the changes in firing rate (rate-remapping) between the long and the short track
         
@@ -638,6 +687,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             global_computation_results.computed_data['long_short_post_decoding']
                 ['long_short_post_decoding']['expected_v_observed_result']
                 ['long_short_post_decoding']['rate_remapping']
+                ['long_short_fr_indicies_analysis']['long_short_fr_indicies_df']
         
         """
         # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
@@ -1764,6 +1814,11 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, save_path=temp_save_filename)
 
     all_results_dict.update(updated_all_results_dict) # append the results dict
+    
+    # Computing consolidated `long_short_fr_indicies_df`
+    _curr_aclus = list(all_results_dict['laps_frs_index'].keys()) # extract one set of keys for the aclus
+    _curr_frs_indicies_dict = {k:v.values() for k,v in all_results_dict.items() if k in ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']} # extract the values
+    all_results_dict['long_short_fr_indicies_df'] = long_short_fr_indicies_df = pd.DataFrame(_curr_frs_indicies_dict, index=_curr_aclus)
    
     ## Set the backwards compatibility variables:
     all_results_dict.update({'x_frs_index': x_frs_index, 'y_frs_index': y_frs_index, 'z_frs_index': z_frs_index}) # make sure that [x,y]_frs_index key is present for backwards compatibility.
