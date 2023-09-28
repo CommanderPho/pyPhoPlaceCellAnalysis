@@ -162,16 +162,22 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
 
             #TODO 2023-05-23 - Can do more detailed peaks analysis with: long_results.RatemapPeaksAnalysis and short_results.RatemapPeaksAnalysis
 
-            As a side-effect it also updates `self.neuron_replay_stats_df` with the 'is_refined_exclusive' column
+            As a side-effect it also updates `self.neuron_replay_stats_df` with the 'is_refined_exclusive', 'is_refined_LxC', 'is_refined_SxC' column
         """
         # needs `neuron_replay_stats_df`
-        neuron_replay_stats_df = self.neuron_replay_stats_df.copy()
+        neuron_replay_stats_df = self.neuron_replay_stats_df #.copy()
         # neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
         use_refined_aclus = True
-        neuron_replay_stats_df['is_refined_exclusive'] = False # fill all with False to start
+
+        
         if 'custom_frs_index' not in neuron_replay_stats_df.columns:
             print(f"WARNINGL: neuron_replay_stats_df must have refindments added")
             use_refined_aclus = False
+
+        if use_refined_aclus:
+            neuron_replay_stats_df['is_refined_exclusive'] = False # fill all with False to start
+            neuron_replay_stats_df['is_refined_LxC'] = False # fill all with False to start
+            neuron_replay_stats_df['is_refined_SxC'] = False # fill all with False to start
 
         ## 2023-05-19 - Get S-only pfs
         is_S_pf_only = np.logical_and(np.logical_not(neuron_replay_stats_df['has_long_pf']), neuron_replay_stats_df['has_short_pf'])
@@ -182,6 +188,7 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         if use_refined_aclus:
             _is_refined_S_only = np.logical_and(_is_S_only, (neuron_replay_stats_df['custom_frs_index'] < -frs_index_inclusion_magnitude))
             neuron_replay_stats_df.loc[_is_refined_S_only, 'is_refined_exclusive'] = True
+            neuron_replay_stats_df.loc[_is_refined_S_only, 'is_refined_SxC'] = True
             # _is_S_only = _is_refined_S_only
         S_only_aclus = neuron_replay_stats_df.index[_is_S_only].to_numpy()
         S_only_df = neuron_replay_stats_df[is_S_pf_only]
@@ -195,6 +202,7 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         if use_refined_aclus:
             _is_refined_L_only = np.logical_and(_is_L_only, (neuron_replay_stats_df['custom_frs_index'] > frs_index_inclusion_magnitude))
             neuron_replay_stats_df.loc[_is_refined_L_only, 'is_refined_exclusive'] = True
+            neuron_replay_stats_df.loc[_is_refined_L_only, 'is_refined_LxC'] = True
             # _is_L_only = _is_refined_L_only
         L_only_aclus = neuron_replay_stats_df.index[_is_L_only].to_numpy()
         L_only_df = neuron_replay_stats_df[_is_L_only]
@@ -244,10 +252,7 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         NEITHER_subset = TrackExclusivePartitionSubset(is_NEITHER_pf_only, NEITHER_pf_only_aclus, NEITHER_only_df)
         
         # Sort dataframe by 'long_pf_peak_x' now so the aclus aren't out of order.
-        neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=True, ascending=True)
-
-
-        return neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
+        return neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True), short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     
@@ -329,15 +334,22 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         
         ## Setup the 'is_refined_exclusive' column
         self.neuron_replay_stats_df['is_refined_exclusive'] = False # fill all with False to start
+        self.neuron_replay_stats_df['is_refined_LxC'] = False # fill all with False to start
+        self.neuron_replay_stats_df['is_refined_SxC'] = False # fill all with False to start
 
         _is_L_only = self.neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY
         _is_refined_L_only = np.logical_and(_is_L_only, (self.neuron_replay_stats_df['custom_frs_index'] > frs_index_inclusion_magnitude))
         self.neuron_replay_stats_df.loc[_is_refined_L_only, 'is_refined_exclusive'] = True
+        self.neuron_replay_stats_df.loc[_is_refined_L_only, 'is_refined_LxC'] = True
 
         # _is_S_only = np.logical_and(np.logical_not(self.neuron_replay_stats_df['has_long_pf']), self.neuron_replay_stats_df['has_short_pf'])
         _is_S_only = self.neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY
         _is_refined_S_only = np.logical_and(_is_S_only, (self.neuron_replay_stats_df['custom_frs_index'] < -frs_index_inclusion_magnitude))
         self.neuron_replay_stats_df.loc[_is_refined_S_only, 'is_refined_exclusive'] = True
+        self.neuron_replay_stats_df.loc[_is_refined_S_only, 'is_refined_SxC'] = True
+
+
+
 
 
 
