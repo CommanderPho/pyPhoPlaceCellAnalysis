@@ -155,17 +155,20 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
     time_binned_instantaneous_unit_specific_spike_rate: DynamicParameters = non_serialized_field(is_computable=False)
     neuron_replay_stats_df: pd.DataFrame = non_serialized_field() # serialized_field(is_hdf_handled_custom=True, metadata={'tags':['custom_hdf_implementation', 'is_hdf_handled_custom']})
     
-    def get_cell_track_partitions(self, frs_index_inclusion_magnitude: float = 0.5):
+    def get_cell_track_partitions(self, frs_index_inclusion_magnitude:float=0.5):
         """ 2023-06-20 - Partition the neuron_replay_stats_df into subsets by seeing whether each aclu has a placefield for the long/short track.
             # Four distinct subgroups are formed:  pf on neither, pf on both, pf on only long, pf on only short
             # L_only_aclus, S_only_aclus
 
             #TODO 2023-05-23 - Can do more detailed peaks analysis with: long_results.RatemapPeaksAnalysis and short_results.RatemapPeaksAnalysis
+
+            As a side-effect it also updates `self.neuron_replay_stats_df` with the 'is_refined_exclusive' column
         """
         # needs `neuron_replay_stats_df`
         neuron_replay_stats_df = self.neuron_replay_stats_df.copy()
         # neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
         use_refined_aclus = True
+        neuron_replay_stats_df['is_refined_exclusive'] = False # fill all with False to start
         if 'custom_frs_index' not in neuron_replay_stats_df.columns:
             print(f"WARNINGL: neuron_replay_stats_df must have refindments added")
             use_refined_aclus = False
@@ -178,7 +181,8 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         assert 'custom_frs_index' in neuron_replay_stats_df.columns, f"neuron_replay_stats_df must have refindments added"
         if use_refined_aclus:
             _is_refined_S_only = np.logical_and(_is_S_only, (neuron_replay_stats_df['custom_frs_index'] < -frs_index_inclusion_magnitude))
-            _is_S_only = _is_refined_S_only
+            neuron_replay_stats_df.loc[_is_refined_S_only, 'is_refined_exclusive'] = True
+            # _is_S_only = _is_refined_S_only
         S_only_aclus = neuron_replay_stats_df.index[_is_S_only].to_numpy()
         S_only_df = neuron_replay_stats_df[is_S_pf_only]
 
@@ -189,14 +193,15 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         ## Refine based on ['is_rate_extrema'] computed from `custom_frs_index`
         assert 'custom_frs_index' in neuron_replay_stats_df.columns, f"neuron_replay_stats_df must have refindments added"
         if use_refined_aclus:
-            _is_refined_L_only = np.logical_and(_is_S_only, (neuron_replay_stats_df['custom_frs_index'] > frs_index_inclusion_magnitude))
-            _is_L_only = _is_refined_L_only
+            _is_refined_L_only = np.logical_and(_is_L_only, (neuron_replay_stats_df['custom_frs_index'] > frs_index_inclusion_magnitude))
+            neuron_replay_stats_df.loc[_is_refined_L_only, 'is_refined_exclusive'] = True
+            # _is_L_only = _is_refined_L_only
         L_only_aclus = neuron_replay_stats_df.index[_is_L_only].to_numpy()
         L_only_df = neuron_replay_stats_df[_is_L_only]
 
         #TODO 2023-09-28 16:15: - [ ] fix the combination properties. Would work if we directly used the computed _is_L_only and _is_S_only above
+        print(f'WARN: 2023-09-28 16:15: - [ ] fix the combination properties. Would work if we directly used the computed _is_L_only and _is_S_only above')
 
-        assert 
         ## For ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43') - Have L-only cells [24, 98] that have ['short_num_replays'] = [8, 7]. We were hoping that there would be few to no replays on the S-track that involved L-only cells.
         ## 2023-05-23 - Get Common (SHARED) placefields
         ## Goal 1: From the cells with the placefields on both tracks, compute the degree to which they remap in position and sort them according to their distance.
@@ -321,8 +326,18 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         self.neuron_replay_stats_df['aclu'] = all_aclus
         self.neuron_replay_stats_df['custom_frs_index'] = instSpikeRate_values_df.custom_frs_index
         self.neuron_replay_stats_df['is_rate_extrema'] = (np.abs(self.neuron_replay_stats_df['custom_frs_index'].to_numpy()) > frs_index_inclusion_magnitude)
-        # self.neuron_replay_stats_df['is_refined_exclusive'] = False
-        # # self.neuron_replay_stats_df['is_refined_exclusive'] = (self.neuron_replay_stats_df['custom_frs_index'] < -frs_index_inclusion_magnitude)
+        
+        ## Setup the 'is_refined_exclusive' column
+        self.neuron_replay_stats_df['is_refined_exclusive'] = False # fill all with False to start
+
+        _is_L_only = self.neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY
+        _is_refined_L_only = np.logical_and(_is_L_only, (self.neuron_replay_stats_df['custom_frs_index'] > frs_index_inclusion_magnitude))
+        self.neuron_replay_stats_df.loc[_is_refined_L_only, 'is_refined_exclusive'] = True
+
+        # _is_S_only = np.logical_and(np.logical_not(self.neuron_replay_stats_df['has_long_pf']), self.neuron_replay_stats_df['has_short_pf'])
+        _is_S_only = self.neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY
+        _is_refined_S_only = np.logical_and(_is_S_only, (self.neuron_replay_stats_df['custom_frs_index'] < -frs_index_inclusion_magnitude))
+        self.neuron_replay_stats_df.loc[_is_refined_S_only, 'is_refined_exclusive'] = True
 
 
 
@@ -731,8 +746,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='jonathan_firing_rate_analysis',
-                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df, is_global=True)
+    @function_attributes(short_name='jonathan_firing_rate_analysis', input_requires=['_perform_long_short_firing_rate_analyses'],
+                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df, curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df['is_refined_exclusive']), is_global=True)
     def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Ported from Jonathan's `Gould_22-09-29.ipynb` Notebook
         
@@ -914,17 +929,18 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         global_computation_results.computed_data['jonathan_firing_rate_analysis'] = jonathan_firing_rate_analysis_result # set the actual result object
         
 
+        ## Refine the LxC/SxC designators using the firing rate index metric:
+        frs_index_inclusion_magnitude:float = 0.5
+
         ## Get global `long_short_fr_indicies_analysis`:
         long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
         long_short_fr_indicies_df = long_short_fr_indicies_analysis_results['long_short_fr_indicies_df']
+        jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
 
-
-        neuron_replay_stats_df
-
-        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
+        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
         ## Update long_exclusive/short_exclusive properties with `long_short_fr_indicies_df`
-        long_exclusive.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=0.5)
-        short_exclusive.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=0.5)
+        # long_exclusive.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=0.5)
+        # short_exclusive.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=0.5)
 
         return global_computation_results
 
@@ -2801,8 +2817,11 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
 
         # Store the Long and Short exclusive ACLUs:
-        self.LxC_aclus = long_exclusive.track_exclusive_aclus
-        self.SxC_aclus = short_exclusive.track_exclusive_aclus
+        # self.LxC_aclus = long_exclusive.track_exclusive_aclus
+        # self.SxC_aclus = short_exclusive.track_exclusive_aclus
+
+        self.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
+        self.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
         # LxC: `long_exclusive.track_exclusive_aclus`
