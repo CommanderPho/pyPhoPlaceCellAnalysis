@@ -781,7 +781,7 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
 
     """
     if not isinstance(grid_bin_bounds, BoundsRect):
-    grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
+        grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
     
     # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
     # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
