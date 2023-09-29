@@ -41,7 +41,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 
 from attrs import define, field, Factory
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import LongShortPipelineTests
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult, LongShortPipelineTests
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations  # for `BatchSessionCompletionHandler`
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
@@ -1110,6 +1110,37 @@ class BatchSessionCompletionHandler:
             return False
 
 
+    def _try_save_global_computations_if_needed(self, curr_active_pipeline, curr_session_context, newly_computed_values):
+        if (len(newly_computed_values) > 0):
+            print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
+            if (self.saving_mode.value == 'skip_saving'):
+                print(f'WARNING: supposed to skip_saving because of self.saving_mode: {self.saving_mode} but supposedly has new global results! Figure out if these are actually new.')
+            if self.global_computations_options.should_save != SavingOptions.NEVER:
+                try:
+                    # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
+                    # Try to write out the global computation function results:
+                    curr_active_pipeline.save_global_computation_results()
+                except Exception as e:
+                    print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
+                    print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
+                    if self.fail_on_exception:
+                        raise e.exc
+            else:
+                print(f'\n\n!!WARNING!!: self.global_computations_options.should_save == SavingOptions.NEVER, so the global results are unsaved!')
+        else:
+            print(f'no changes in global results.')
+            if self.global_computations_options.should_save == SavingOptions.ALWAYS:
+                print(f'Saving mode == ALWAYS so trying to save despite no changes.')
+                try:
+                    # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
+                    # Try to write out the global computation function results:
+                    curr_active_pipeline.save_global_computation_results()
+                except Exception as e:
+                    print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
+                    if self.fail_on_exception:
+                        raise e.exc
+
+
     def try_compute_global_computations_if_needed(self, curr_active_pipeline, curr_session_context):
         """ tries to load/compute the global computations if needed depending on the self.global_computations_options specifications.
         
@@ -1122,6 +1153,7 @@ class BatchSessionCompletionHandler:
         If `.global_computations_options.should_compute` then computations will be tried and saved out as needed. If an error occurs, those will not be saved.
         
         """
+        newly_computed_values = []
         if self.global_computations_options.should_load:
             if not self.force_global_recompute: # not just force_reload, needs to recompute whenever the computation fails.
                 try:
@@ -1142,35 +1174,7 @@ class BatchSessionCompletionHandler:
                 curr_active_pipeline.reload_default_computation_functions()
                 newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=self.extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
                 #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
-
-                if (len(newly_computed_values) > 0):
-                    print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
-                    if (self.saving_mode.value == 'skip_saving'):
-                        print(f'WARNING: supposed to skip_saving because of self.saving_mode: {self.saving_mode} but supposedly has new global results! Figure out if these are actually new.')
-                    if self.global_computations_options.should_save != SavingOptions.NEVER:
-                        try:
-                            # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
-                            # Try to write out the global computation function results:
-                            curr_active_pipeline.save_global_computation_results()
-                        except Exception as e:
-                            print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
-                            print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
-                            if self.fail_on_exception:
-                                raise e.exc
-                    else:
-                        print(f'\n\n!!WARNING!!: self.global_computations_options.should_save == SavingOptions.NEVER, so the global results are unsaved!')
-                else:
-                    print(f'no changes in global results.')
-                    if self.global_computations_options.should_save == SavingOptions.ALWAYS:
-                        print(f'Saving mode == ALWAYS so trying to save despite no changes.')
-                        try:
-                            # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
-                            # Try to write out the global computation function results:
-                            curr_active_pipeline.save_global_computation_results()
-                        except Exception as e:
-                            print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
-                            if self.fail_on_exception:
-                                raise e.exc
+                return newly_computed_values # return the list of newly computed values
                             
             except Exception as e:
                 ## TODO: catch/log saving error and indicate that it isn't saved.
@@ -1179,6 +1183,8 @@ class BatchSessionCompletionHandler:
                 print(f'ERROR perform `batch_extended_computations` or saving GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
                 if self.fail_on_exception:
                     raise e.exc
+
+            return newly_computed_values # return 
 
 
     def try_export_pipeline_hdf5_if_needed(self, curr_active_pipeline, curr_session_context) -> Tuple[Optional[Path], Optional[CapturedException]]:
@@ -1212,6 +1218,26 @@ class BatchSessionCompletionHandler:
             print(f'\t\tnewest_file_to_overwrite_date: {newest_file_to_overwrite_date}\t can_skip_if_allowed: {can_skip_if_allowed}\n')
             return (hdf5_output_path, None)
     
+
+
+    def try_require_pipeline_has_refined_pfs(self, curr_active_pipeline, frs_index_inclusion_magnitude:float):
+        """ Refine the LxC/SxC designators using the firing rate index metric:
+        """
+        try:
+            jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+            ## Get global `long_short_fr_indicies_analysis`:
+            long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
+            long_short_fr_indicies_df = long_short_fr_indicies_analysis_results['long_short_fr_indicies_df']
+            jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+            return ['jonathan_firing_rate_analysis']
+        except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {e} while trying run `_require_pipeline_has_refined_pfs(...)")
+            if self.fail_on_exception:
+                raise e.exc
+            return []
+
 
     ## Main function that's called with the complete pipeline:
     def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
@@ -1279,7 +1305,11 @@ class BatchSessionCompletionHandler:
             print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
 
-        self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)     
+        newly_computed_values = self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
+        ## Try to ensure the 2023-09-29 LxC and SxCs are "refined" by the rate remapping firing rate:
+        newly_computed_values = newly_computed_values + self.try_require_pipeline_has_refined_pfs(curr_active_pipeline, frs_index_inclusion_magnitude=0.5)
+        self._try_save_global_computations_if_needed(curr_active_pipeline, curr_session_context, newly_computed_values) # Save if needed
+
 
         # ### Programmatic Figure Outputs:
         if self.should_perform_figure_generation_to_file:
