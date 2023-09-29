@@ -1228,8 +1228,12 @@ class BatchSessionCompletionHandler:
             ## Get global `long_short_fr_indicies_analysis`:
             long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
             long_short_fr_indicies_df = long_short_fr_indicies_analysis_results['long_short_fr_indicies_df']
-            jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
-            return ['jonathan_firing_rate_analysis']
+            did_compute = jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+            if did_compute:
+                return ['jonathan_firing_rate_analysis']
+            else:
+                return [] # no computations needed
+
         except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
