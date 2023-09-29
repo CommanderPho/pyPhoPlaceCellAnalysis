@@ -388,6 +388,7 @@ class LinearTrackDimensions:
             notable_x_positions = np.array(self.notable_x_positions) # (platform_start_x, track_start_x, track_midpoint_x, track_end_x, platform_stop_x)
             notable_y_positions = np.array(self.notable_y_positions) # (platform_start_y, track_start_y, track_center_y, track_end_y, platform_stop_y)
 
+            # a_rect: [x, y, length, width, *rendering_properties_tuple]
             rects = [
                 (0, 0, *self.scaled_platform_size, *rendering_properties_tuple),
                 (self.scaled_platform_size[0], track_origin_y, self.scaled_track_length, self.scaled_track_width, *rendering_properties_tuple),
@@ -599,7 +600,7 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
 
 @define(slots=False)
 class LinearTrackInstance:
-    """ 
+    """ Aims to combine the dimensions specified by `track_dimensions: LinearTrackDimensions` and the position/bounds information specified by `grid_bin_bounds: BoundsRect`
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
     
     """
@@ -779,8 +780,9 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
         long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=None)
 
     """
-
+    if not isinstance(grid_bin_bounds, BoundsRect):
     grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
+    
     # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
     # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
     long_track_dims = LinearTrackDimensions(track_length=170.0)
