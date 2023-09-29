@@ -2840,7 +2840,8 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         
         if ((len(self.LxC_aclus) == 0) or (len(self.SxC_aclus) == 0)):
             print(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.")
-        assert ((len(self.LxC_aclus) > 0) and (len(self.SxC_aclus) > 0)), f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.\n\tself.SxC_aclus: {self.SxC_aclus}\n\tself.LxC_aclus: {self.LxC_aclus}\n"
+            raise ValueError(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.\n\tself.SxC_aclus: {self.SxC_aclus}\n\tself.LxC_aclus: {self.LxC_aclus}\n")
+        # assert ((len(self.LxC_aclus) > 0) and (len(self.SxC_aclus) > 0)), f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.\n\tself.SxC_aclus: {self.SxC_aclus}\n\tself.LxC_aclus: {self.LxC_aclus}\n"
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
         # LxC: `long_exclusive.track_exclusive_aclus`
