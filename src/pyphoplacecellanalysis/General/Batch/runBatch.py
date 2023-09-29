@@ -1043,6 +1043,8 @@ class BatchSessionCompletionHandler:
     
     # Cross-session Results:
     across_sessions_instantaneous_fr_dict: dict = Factory(dict) # Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation
+    enable_hdf5_output: bool = field(default=False)
+
 
     @classmethod
     def post_compute_validate(cls, curr_active_pipeline) -> bool:
@@ -1297,7 +1299,8 @@ class BatchSessionCompletionHandler:
         print(f'\t time since last computation: {delta_since_last_compute}')
 
         # Export the pipeline's HDF5:
-        hdf5_output_path, hdf5_output_err = self.try_export_pipeline_hdf5_if_needed(curr_active_pipeline=curr_active_pipeline, curr_session_context=curr_session_context)
+        if self.enable_hdf5_output:
+            hdf5_output_path, hdf5_output_err = self.try_export_pipeline_hdf5_if_needed(curr_active_pipeline=curr_active_pipeline, curr_session_context=curr_session_context)
         
 
         # print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
