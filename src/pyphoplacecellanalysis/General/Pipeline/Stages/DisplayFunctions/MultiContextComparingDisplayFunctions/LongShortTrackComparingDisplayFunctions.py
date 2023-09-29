@@ -263,22 +263,22 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 curr_fig_num = f'long|short fr indicies_{active_context.get_description(separator="/")}'
             kwargs['fignum'] = curr_fig_num
 
-
             ## Have to pull out the rate-remapping stats for each neuron_id
             try:
                 curr_long_short_fr_indicies_analysis = global_computation_results.computed_data['long_short_fr_indicies_analysis']
 
                 # extract one set of keys for the aclus
-                _curr_aclus = list(curr_long_short_fr_indicies_analysis['laps_frs_index'].keys())
-                _curr_frs_indicies_dict = {k:v.values() for k,v in curr_long_short_fr_indicies_analysis.items() if k in ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']} # extract the values
-                long_short_fr_indicies_df = pd.DataFrame(_curr_frs_indicies_dict, index=_curr_aclus)
                 
+                long_short_fr_indicies_df = curr_long_short_fr_indicies_analysis.long_short_fr_indicies_df # already has `long_short_fr_indicies_df` property now
+                _curr_aclus = list(long_short_fr_indicies_df['aclu'].to_numpy())
                 # build the labels for each cell using `build_extra_cell_info_label_string(...)`:
                 optional_cell_info_labels = {aclu:build_extra_cell_info_label_string(row) for aclu, row in zip(_curr_aclus, long_short_fr_indicies_df.itertuples(name='ExtraCellInfoLabels', index=False))}
 
             except BaseException:
                 # set optional cell info labels to None
+                print(f'WARNING: could not get optional cell info labels from long_short_fr_indicies_df. Skipping.')
                 optional_cell_info_labels = {}
+
 
             graphics_output_dict: MatplotlibRenderPlots = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
                 show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, optional_cell_info_labels=optional_cell_info_labels,
