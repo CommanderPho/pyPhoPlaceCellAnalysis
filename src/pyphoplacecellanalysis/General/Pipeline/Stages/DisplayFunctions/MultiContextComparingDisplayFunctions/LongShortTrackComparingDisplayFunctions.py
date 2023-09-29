@@ -325,6 +325,14 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             active_config_name = kwargs.pop('active_config_name', None)
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+            
+
+            defer_render = kwargs.pop('defer_render', False) 
+                        
+
             # Plot 1D Keywoard args:
             shared_kwargs = kwargs.pop('shared_kwargs', {})
             long_kwargs = kwargs.pop('long_kwargs', {})
