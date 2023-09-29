@@ -12,6 +12,12 @@ from pyphocorehelpers.indexing_helpers import find_neighbours
 # Layers are accessible via:
 # viewer.layers[a_name].contrast_limits=(100, 175)
 
+""" 
+
+# viewer.dims. # Dims(ndim=3, ndisplay=2, last_used=0, range=((0.0, 3309.0, 1.0), (-0.2906298631133275, 85.0, 1.0), (-0.24635407377607876, 108.0, 1.0)), current_step=(1654, 42, 53), order=(0, 1, 2), axis_labels=('0', '1', '2'))
+
+"""
+
 def napari_add_surprise_data_layers(viewer: napari.viewer.Viewer, active_relative_entropy_results):
     ## Add multiple layers to the viewer:
 
@@ -33,6 +39,10 @@ def napari_add_surprise_data_layers(viewer: napari.viewer.Viewer, active_relativ
         # image_layer_dict[a_name] = viewer.add_image(active_relative_entropy_results_xr_dict[a_name].to_numpy().astype(float), name=a_name)
         image_layer_dict[a_name] = viewer.add_image(active_relative_entropy_results[a_name].astype(float), **(dict(name=a_name)|layer_properties))
 
+    assert viewer.dims.ndim == 3
+    ## Set the dimensions appropriately
+    viewer.dims.axis_labels = ('t', 'neuron_id', 'xbin')
+    
     return image_layer_dict
 
 
