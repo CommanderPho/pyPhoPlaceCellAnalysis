@@ -274,7 +274,7 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
 
-    def refine_exclusivity_by_inst_frs_index(self, custom_SpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5) -> bool: 
+    def refine_exclusivity_by_inst_frs_index(self, custom_SpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5, override_existing_frs_index_values:bool=False) -> bool: 
         """ 2023-09-28
         
         inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
@@ -285,7 +285,7 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         Returns: bool - Indiciating whether the `custom_SpikeRateTrends_df` was updated or whether it already had all of the needed columns and computation was skipped.
         
         """
-        if np.isin(['aclu','custom_frs_index','is_rate_extrema','is_refined_exclusive','is_refined_LxC','is_refined_SxC'], custom_SpikeRateTrends_df.columns).all():
+        if (not override_existing_frs_index_values) and np.isin(['aclu','custom_frs_index','is_rate_extrema','is_refined_exclusive','is_refined_LxC','is_refined_SxC'], custom_SpikeRateTrends_df.columns).all():
             # all columns already present. We can skip.
             return False
     

@@ -1046,6 +1046,11 @@ class BatchSessionCompletionHandler:
     enable_hdf5_output: bool = field(default=False)
 
 
+    # the firing rate LxC/SxC refinment criteria
+    frs_index_inclusion_magnitude: float = field(default=0.35)
+    override_existing_frs_index_values:bool = field(default=False)
+
+
     @classmethod
     def post_compute_validate(cls, curr_active_pipeline) -> bool:
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
@@ -1228,7 +1233,7 @@ class BatchSessionCompletionHandler:
             ## Get global `long_short_fr_indicies_analysis`:
             long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
             long_short_fr_indicies_df = long_short_fr_indicies_analysis_results['long_short_fr_indicies_df']
-            did_compute = jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+            did_compute = jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=self.frs_index_inclusion_magnitude, override_existing_frs_index_values=self.override_existing_frs_index_values)
             if did_compute:
                 return ['jonathan_firing_rate_analysis']
             else:
