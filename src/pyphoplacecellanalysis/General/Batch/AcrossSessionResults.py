@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from attrs import define, field, Factory
+import shutil # copy_files_in_filelist_to_dest
 from pyphocorehelpers.print_helpers import CapturedException
 import tables as tb
 from tables import (
@@ -31,6 +32,7 @@ from tables import (
 )
 import seaborn as sns
 # from pyphocorehelpers.indexing_helpers import partition, safe_pandas_get_group
+
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
@@ -881,6 +883,28 @@ def build_output_filelists(filelist_save_parent_path: Path, included_session_bas
     return output_filelist_transfer_dict
 
 
+def copy_files_in_filelist_to_dest(filelist_text_file='fileList_GreatLakes_HDF5_2023-09-29-GL.txt', target_directory='/path/to/target/directory'):
+    """ 
+    from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import copy_files_in_filelist_to_dest
+    
+    copy_files_in_filelist_to_dest(filelist_text_file="/nfs/turbo/umms-kdiba/Data/fileList_GreatLakes_HDF5_2023-09-29-GL.txt", target_directory=Path('output/extracted_hdf5_files/').resolve())
+    
+    
+    """
+    # Read the file paths from the text file
+    with open(filelist_text_file, 'r') as f:
+        file_paths = f.readlines()
+
+    # Remove newline characters from each line
+    file_paths = [x.strip() for x in file_paths]
+
+    # Target directory where files will be copied
+
+    # Copy each file to the target directory
+    for file_path in file_paths:
+        print(f'copying {file_path} to {target_directory}...')
+        shutil.copy(file_path, target_directory)
+    print(f'done.')
 
 
 
