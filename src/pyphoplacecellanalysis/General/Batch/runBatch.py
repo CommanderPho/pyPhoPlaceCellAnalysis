@@ -1026,7 +1026,7 @@ class BatchSessionCompletionHandler:
 
     global_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
     extended_computations_include_includelist: list = field(default=['pf_computation', 'pfdt_computation', 'firing_rate_trends',
-                                                                    'pf_dt_sequential_surprise',
+                                                                    # 'pf_dt_sequential_surprise',
                                                                     'extended_stats',
                                         'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping',
                                         # 'ratemap_peaks_prominence2d',
@@ -1301,7 +1301,9 @@ class BatchSessionCompletionHandler:
         # Export the pipeline's HDF5:
         if self.enable_hdf5_output:
             hdf5_output_path, hdf5_output_err = self.try_export_pipeline_hdf5_if_needed(curr_active_pipeline=curr_active_pipeline, curr_session_context=curr_session_context)
-        
+        else:
+            hdf5_output_path, hdf5_output_err = None, None
+            
 
         # print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
         # ## Specify the output file:
