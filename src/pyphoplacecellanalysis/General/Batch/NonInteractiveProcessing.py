@@ -485,7 +485,7 @@ class BatchPhoJonathanFiguresHelper:
 
 
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, show_only_refined_cells:bool=False):
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, show_only_refined_cells:bool=False, disable_top_row=False):
         """ The only public function. Performs the batch plotting. """
         if included_unit_neuron_IDs is not None:
             ## pre-filter the `neuron_replay_stats_df` by the included_unit_neuron_IDs only:
@@ -525,13 +525,13 @@ class BatchPhoJonathanFiguresHelper:
 
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
-        _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
+        _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows, _extra_kwargs=dict(disable_top_row=disable_top_row))
         active_out_figures_dict = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
         
         return active_out_figures_dict
 
     @classmethod
-    def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10):
+    def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10, disable_top_row=False):
         """ the a programmatic wrapper for automated output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`. The specific plot function called. 
         Called ONLY by `_perform_batch_plot(...)`
 
@@ -546,17 +546,19 @@ class BatchPhoJonathanFiguresHelper:
         desired_figure_size_inches[1] = desired_figure_size_inches[1] * num_cells
         graphics_output_dict = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
                                                             n_max_plot_rows=n_max_page_rows, included_unit_neuron_IDs=included_unit_neuron_IDs,
-                                                            show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=False, defer_render=True) # save_figure will be false because we're saving afterwards
+                                                            show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=False, defer_render=True, disable_top_row=disable_top_row) # save_figure will be false because we're saving afterwards
         # fig, subfigs, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['subfigs'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
         fig, subfigs, axs, plot_data = graphics_output_dict.figures[0], graphics_output_dict.subfigs, graphics_output_dict.axes, graphics_output_dict.plot_data
         fig.suptitle(active_identifying_ctx.get_description()) # 'kdiba_2006-6-08_14-26-15_[4, 13, 36, 58, 60]'
         return fig
 
     @classmethod
-    def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10):
+    def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10, _extra_kwargs=None):
         """ builds the list of kwargs for all aclus. """
         _batch_plot_kwargs_list = [] # empty list to start
 
+        _extra_kwargs = _extra_kwargs or {}
+        
         # _aclu_indicies_list_str_formatter = lambda a_list: ('[' + ','.join(map(str, a_list)) + ']') # Prints an array of integer aclu indicies without spaces and comma separated, surrounded by hard brackets. e.g. '[5,6,7,8,11,12,15,17,18,19,20,21,24,25,26,27,28,31,34,35,39,40,41,43,44,45,48,49,50,51,52,53,55,56,60,62,63,64,65]'
         _aclu_indicies_list_str_formatter = lambda a_list: ('(' + ','.join(map(str, a_list)) + ')')
 
@@ -566,7 +568,7 @@ class BatchPhoJonathanFiguresHelper:
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
                 display_fn_name=cls._display_fn_context_display_name, plot_result_set='long_only', aclus=f"{_aclu_indicies_list_str_formatter(long_only_aclus)}"
             ),
-            fignum='long_only', n_max_page_rows=len(long_only_aclus)))
+            fignum='long_only', n_max_page_rows=len(long_only_aclus), **_extra_kwargs))
         else:
             print(f'WARNING: long_only_aclus is empty, so not adding kwargs for these.')
         
@@ -575,7 +577,7 @@ class BatchPhoJonathanFiguresHelper:
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
                 display_fn_name=cls._display_fn_context_display_name, plot_result_set='short_only', aclus=f"{_aclu_indicies_list_str_formatter(short_only_aclus)}"
             ),
-            fignum='short_only', n_max_page_rows=len(short_only_aclus)))
+            fignum='short_only', n_max_page_rows=len(short_only_aclus), **_extra_kwargs))
         else:
             print(f'WARNING: short_only_aclus is empty, so not adding kwargs for these.')
 
@@ -589,7 +591,7 @@ class BatchPhoJonathanFiguresHelper:
             included_unit_indicies_pages = [[curr_included_unit_index for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in v] for page_idx, v in enumerate(included_combined_indicies_pages)] # a list of length `num_pages` containing up to 10 items
             paginated_shared_cells_kwarg_list = [dict(included_unit_neuron_IDs=curr_included_unit_indicies,
                 active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{_aclu_indicies_list_str_formatter(curr_included_unit_indicies)}"),
-                fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
+                fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows, **_extra_kwargs) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
             _batch_plot_kwargs_list.extend(paginated_shared_cells_kwarg_list) # add paginated_shared_cells_kwarg_list to the list
         else:
             print(f'WARNING: shared_aclus is empty, so not adding kwargs for these.')
