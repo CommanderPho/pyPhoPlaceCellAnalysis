@@ -908,6 +908,7 @@ def copy_files_in_filelist_to_dest(filelist_text_file='fileList_GreatLakes_HDF5_
 
 
 
+
 class AcrossSessionTables:
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
@@ -1004,7 +1005,6 @@ class AcrossSessionTables:
         ## Potentially:
         # neuron_replay_stats_table = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(neuron_replay_stats_table, active_context=curr_active_pipeline.get_session_context(), aclu_column_name=None)
 
-
         # Build the output paths:
         out_parent_path = Path('output/across_session_results').resolve()
         out_parent_path.mkdir(parents=True, exist_ok=True)
@@ -1020,6 +1020,9 @@ class AcrossSessionTables:
             csv_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.csv'))
             print(f'writing {csv_out_path}.')
             v.to_csv(csv_out_path)
+            pkl_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.pkl'))
+            print(f'writing {pkl_out_path}.')
+            saveData(pkl_out_path, db=v, safe_save=False)
             # v.to_hdf(k, key=f'/{a_name}', format='table', data_columns=True)    # TypeError: objects of type ``StringArray`` are not supported in this context, sorry; supported objects are: NumPy array, record or scalar; homogeneous list or tuple, integer, float, complex or bytes
             
 
