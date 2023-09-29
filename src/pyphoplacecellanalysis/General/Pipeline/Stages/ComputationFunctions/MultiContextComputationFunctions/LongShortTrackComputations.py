@@ -70,43 +70,6 @@ class TrackExclusivePartitionSubset(HDFMixin, AttrsBasedClassHelperMixin):
         return self.track_exclusive_aclus[self.track_exclusive_df['is_refined_exclusive']]
 
 
-    def refine_exclusivity_by_inst_frs_index(self, custom_SpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5): 
-        """ 2023-09-28
-        
-        inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
-
-
-        Adds ['custom_frs_index', 'is_refined_exclusive'] to both: (short_exclusive.track_exclusive_df, long_exclusive.track_exclusive_df)
-        """
-        if 'aclu' not in custom_SpikeRateTrends_df.columns:
-            custom_SpikeRateTrends_df['aclu'] = custom_SpikeRateTrends_df.index
-        if 'custom_frs_index' not in custom_SpikeRateTrends_df.columns:
-            custom_SpikeRateTrends_df['custom_frs_index'] = custom_SpikeRateTrends_df['non_replays_frs_index'] 
-
-        instSpikeRate_values_SxC_df = custom_SpikeRateTrends_df[np.isin(custom_SpikeRateTrends_df.aclu, self.track_exclusive_aclus)]
-        refined_track_exclusive_aclus = instSpikeRate_values_SxC_df[(instSpikeRate_values_SxC_df.custom_frs_index < -frs_index_inclusion_magnitude)].aclu.to_numpy()
-        self.track_exclusive_df['aclu'] = self.track_exclusive_df.index
-        self.track_exclusive_df['custom_frs_index'] = instSpikeRate_values_SxC_df.custom_frs_index
-        self.track_exclusive_df['is_refined_exclusive'] = (self.track_exclusive_df['custom_frs_index'] < -frs_index_inclusion_magnitude)
-        
-
-    @classmethod
-    def _refine_XxC_aclus_by_inst_frs_index(cls, custom_SpikeRateTrends_df: pd.DataFrame, long_exclusive, short_exclusive, frs_index_inclusion_magnitude: float = 0.5): 
-        """
-        inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
-
-
-        Adds ['custom_frs_index', 'is_refined_exclusive'] to both: (short_exclusive.track_exclusive_df, long_exclusive.track_exclusive_df)
-        """
-        if 'aclu' not in custom_SpikeRateTrends_df.columns:
-            custom_SpikeRateTrends_df['aclu'] = custom_SpikeRateTrends_df.index
-        if 'custom_frs_index' not in custom_SpikeRateTrends_df.columns:
-            custom_SpikeRateTrends_df['custom_frs_index'] = custom_SpikeRateTrends_df['non_replays_frs_index'] 
-
-        long_exclusive.refine_exclusivity_by_inst_frs_index(custom_SpikeRateTrends_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
-        short_exclusive.refine_exclusivity_by_inst_frs_index(custom_SpikeRateTrends_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
-        return long_exclusive, short_exclusive
-    
 
     #TODO 2023-08-02 05:58: - [ ] These (`to_hdf`, `read_hdf`) were auto-generated and not sure if they work:
 
@@ -2826,6 +2789,8 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         else:
             jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
 
+
+        # jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=0.5) ## This has to be done first. No clue where to do it.
         neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.5)
 
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']

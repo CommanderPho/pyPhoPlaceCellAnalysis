@@ -1295,7 +1295,6 @@ class BatchSessionCompletionHandler:
         
         
         delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
-        
         print(f'\t time since last computation: {delta_since_last_compute}')
 
         # Export the pipeline's HDF5:
