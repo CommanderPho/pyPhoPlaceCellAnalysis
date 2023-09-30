@@ -463,6 +463,22 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): export_active_relative_entropy_results_videos failed with error: {e}\n skipping.')
+
+
+    ## Exports all cells to the `BatchPhoJonathanFiguresHelper` but without the top part:
+    try:
+        # Relative Entropy/Surprise Results:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.2)
+        ## all cells:
+        fig_1c_figures_all_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=20, write_vector_format=False, write_png=True, show_only_refined_cells=False, disable_top_row=True)
+    
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): BatchPhoJonathanFiguresHelper.run(...) failed for all cells. failed with error: {e}\n skipping.')
+        
+
     
 
 
