@@ -794,6 +794,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         else:
             all_scatter_props = [{}, {}, {}, {}]
 
+        all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
+
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
@@ -814,6 +816,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         else:
             all_scatter_props = [{}, {}, {}, {}]
             
+        all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
         # label_list = [LxC_aclus, LxC_aclus, SxC_aclus, SxC_aclus]
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
