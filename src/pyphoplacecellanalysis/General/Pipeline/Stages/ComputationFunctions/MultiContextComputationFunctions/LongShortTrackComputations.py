@@ -1184,8 +1184,16 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         inst_spike_rate_groups_result.LxC_ReplayDeltaMinus, inst_spike_rate_groups_result.LxC_ReplayDeltaPlus, inst_spike_rate_groups_result.SxC_ReplayDeltaMinus, inst_spike_rate_groups_result.SxC_ReplayDeltaPlus = LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus
 
         # Note that in general LxC and SxC might have differing numbers of cells.
-        if are_LxC_empty or are_SxC_empty:
-            inst_spike_rate_groups_result.Fig2_Replay_FR = None # cannot do this yet
+        if (are_LxC_empty or are_SxC_empty):
+            # inst_spike_rate_groups_result.Fig2_Replay_FR = None # None mode
+            # initialize with an empty array and None values for the mean and std.
+            # inst_spike_rate_groups_result.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(None, None, np.array([], dtype=float), inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+            inst_spike_rate_groups_result.Fig2_Replay_FR: list[SingleBarResult] = []
+            for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus):
+                if v is not None:
+                    inst_spike_rate_groups_result.Fig2_Replay_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None))
+                else:
+                    inst_spike_rate_groups_result.Fig2_Replay_FR.append(SingleBarResult(None, None, np.array([], dtype=float), inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None))
         else:            
             # inst_spike_rate_groups_result.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
             inst_spike_rate_groups_result.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
@@ -1206,8 +1214,14 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         inst_spike_rate_groups_result.LxC_ThetaDeltaMinus, inst_spike_rate_groups_result.LxC_ThetaDeltaPlus, inst_spike_rate_groups_result.SxC_ThetaDeltaMinus, inst_spike_rate_groups_result.SxC_ThetaDeltaPlus = LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus
 
         if are_LxC_empty or are_SxC_empty:
-            inst_spike_rate_groups_result.Fig2_Laps_FR = None
-            
+            # inst_spike_rate_groups_result.Fig2_Laps_FR = None # NONE mode
+            inst_spike_rate_groups_result.Fig2_Laps_FR: list[SingleBarResult] = []
+            for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus):
+                if v is not None:
+                    inst_spike_rate_groups_result.Fig2_Laps_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None))
+                else:
+                    inst_spike_rate_groups_result.Fig2_Laps_FR.append(SingleBarResult(None, None, np.array([], dtype=float), inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None))
+                    
         else:
             # Note that in general LxC and SxC might have differing numbers of cells.
             inst_spike_rate_groups_result.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, inst_spike_rate_groups_result.LxC_aclus, inst_spike_rate_groups_result.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
@@ -2822,9 +2836,12 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         self.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
         self.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
         
-        if ((len(self.LxC_aclus) == 0) or (len(self.SxC_aclus) == 0)):
-            print(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.")
-            raise ValueError(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.\n\tself.SxC_aclus: {self.SxC_aclus}\n\tself.LxC_aclus: {self.LxC_aclus}\n")
+        are_LxC_empty: bool = (len(self.LxC_aclus) == 0)
+        are_SxC_empty: bool = (len(self.SxC_aclus) == 0)
+
+        # if ((len(self.LxC_aclus) == 0) or (len(self.SxC_aclus) == 0)):
+        #     print(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.")
+        #     raise ValueError(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.\n\tself.SxC_aclus: {self.SxC_aclus}\n\tself.LxC_aclus: {self.LxC_aclus}\n")
         # assert ((len(self.LxC_aclus) > 0) and (len(self.SxC_aclus) > 0)), f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.\n\tself.SxC_aclus: {self.SxC_aclus}\n\tself.LxC_aclus: {self.LxC_aclus}\n"
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
@@ -2845,6 +2862,22 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         # Note that in general LxC and SxC might have differing numbers of cells.
         # self.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
         self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        if (are_LxC_empty or are_SxC_empty):
+            # self.Fig2_Replay_FR = None # None mode
+            # initialize with an empty array and None values for the mean and std.
+            # self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(None, None, np.array([], dtype=float), self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+            self.Fig2_Replay_FR: list[SingleBarResult] = []
+            for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus):
+                if v is not None:
+                    self.Fig2_Replay_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None))
+                else:
+                    self.Fig2_Replay_FR.append(SingleBarResult(None, None, np.array([], dtype=float), self.LxC_aclus, self.SxC_aclus, None, None))
+        else:            
+            # self.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+            self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        
+
+
 
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
         # LxC: `long_exclusive.track_exclusive_aclus`
@@ -2862,7 +2895,21 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus = LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus
 
         # Note that in general LxC and SxC might have differing numbers of cells.
-        self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
+        if are_LxC_empty or are_SxC_empty:
+            # self.Fig2_Laps_FR = None # NONE mode
+            self.Fig2_Laps_FR: list[SingleBarResult] = []
+            for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus):
+                if v is not None:
+                    self.Fig2_Laps_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None))
+                else:
+                    self.Fig2_Laps_FR.append(SingleBarResult(None, None, np.array([], dtype=float), self.LxC_aclus, self.SxC_aclus, None, None))
+                    
+        else:
+            # Note that in general LxC and SxC might have differing numbers of cells.
+            self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
+        
+
+        # self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
 
 
     def get_summary_dataframe(self) -> pd.DataFrame:
