@@ -795,6 +795,8 @@ def check_output_h5_files(included_file_paths, minimum_good_file_size_GB:float=0
 
         for a_file in included_file_paths:
             # if not a_file.exists():
+            if not isinstance(a_file, Path):
+                a_file = Path(a_file).resolve()
             fetched_metadata = get_file_metadata(a_file)
             if fetched_metadata is None:
                 print(f'file {a_file} does not exist. Skipping.')

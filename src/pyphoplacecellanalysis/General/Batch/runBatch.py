@@ -117,6 +117,32 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
 
 
 
+@custom_define(slots=False)
+class ConcreteSessionFolder:
+    """ a concrete representation of a session on disk """
+    context: IdentifyingContext = serialized_attribute_field()
+    path: Path = serialized_attribute_field()
+    
+    @property 
+    def session_pickle(self) -> Path:
+        return self.path.joinpath('loadedSessPickle.pkl').resolve()
+    
+    @property 
+    def output_folder(self) -> Path:
+        return self.path.joinpath('output').resolve()
+    
+    @property 
+    def pipeline_results_h5(self) -> Path:
+        return self.output_folder.joinpath('pipeline_results.h5').resolve()
+    
+    @property 
+    def global_computation_result_pickle(self) -> Path:
+        return self.output_folder.joinpath('global_computation_results.pkl').resolve()
+
+
+
+
+
 @unique
 class SessionBatchProgress(Enum):
     """Indicates the progress state for a given session in a batch processing queue """
