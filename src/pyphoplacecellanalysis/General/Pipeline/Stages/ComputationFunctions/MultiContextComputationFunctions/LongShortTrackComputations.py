@@ -1112,7 +1112,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             ['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis']
             
         Provides:
-            computation_result.computed_data['long_short_inst_spike_rate_groups']
+            global_computation_results.computed_data['long_short_inst_spike_rate_groups']
         
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends # for `_perform_long_short_instantaneous_spike_rate_groups_analysis`
