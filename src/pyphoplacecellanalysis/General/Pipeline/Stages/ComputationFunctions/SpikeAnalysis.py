@@ -74,15 +74,19 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms)) -> "SpikeRateTrends":
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
-        if isinstance(filter_epochs, pd.DataFrame):
-            filter_epochs_df = filter_epochs
+        if len(included_neuron_ids)>0:
+            if isinstance(filter_epochs, pd.DataFrame):
+                filter_epochs_df = filter_epochs
+            else:
+                filter_epochs_df = filter_epochs.to_dataframe()
+                
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
+            _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
+                        instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
+            _out.recompute_on_update()
         else:
-            filter_epochs_df = filter_epochs.to_dataframe()
-            
-        epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
-        _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
-                    instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
-        _out.recompute_on_update()
+            _out = None # return None if included_neuron_ids are empty
+
         return _out
 
     def recompute_on_update(self):
