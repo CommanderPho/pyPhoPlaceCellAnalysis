@@ -1228,6 +1228,18 @@ class BatchSessionCompletionHandler:
                     if self.fail_on_exception:
                         raise e.exc
 
+        # 2023-10-03 - Temporarily override the existing 
+        if curr_active_pipeline.global_computation_results.computation_config is None:
+            # Create a DynamicContainer-backed computation_config
+            print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
+            curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+        else:
+            print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')	
+            if curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
+                print(f'\t curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None, overriding with 0.01')
+                curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.01
+
+
         if self.global_computations_options.should_save == SavingOptions.ALWAYS:
             assert self.global_computations_options.should_compute, f"currently  SavingOptions.ALWAYS requires that self.global_computations_options.should_compute == True also but this is not the case!"
 
@@ -1328,19 +1340,6 @@ class BatchSessionCompletionHandler:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
-
-        if curr_active_pipeline.global_computation_results.computation_config is None:
-            # Create a DynamicContainer-backed computation_config
-            print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
-            curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
-        else:
-            print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')	
-            if curr_active_pipeline.global_computation_results.computation_config is None:
-                print(f'\t curr_active_pipeline.global_computation_results.computation_config is None, overriding with 0.01')
-                curr_active_pipeline.global_computation_results.computation_config = 0.01
-                
-
         # Get existing laps from session:
         long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
