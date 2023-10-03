@@ -1,5 +1,6 @@
 import sys
 import os
+from neuropy.utils.dynamic_container import DynamicContainer
 import pkg_resources # for Slurm templating
 from jinja2 import Environment, FileSystemLoader # for Slurm templating
 import logging
@@ -1282,7 +1283,7 @@ class BatchSessionCompletionHandler:
     
 
 
-    def try_require_pipeline_has_refined_pfs(self, curr_active_pipeline, frs_index_inclusion_magnitude:float):
+    def try_require_pipeline_has_refined_pfs(self, curr_active_pipeline):
         """ Refine the LxC/SxC designators using the firing rate index metric:
         """
         try:
@@ -1327,6 +1328,18 @@ class BatchSessionCompletionHandler:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+
+
+        if curr_active_pipeline.global_computation_results.computation_config is None:
+            # Create a DynamicContainer-backed computation_config
+            print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
+            curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+        else:
+            print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')	
+            if curr_active_pipeline.global_computation_results.computation_config is None:
+                print(f'\t curr_active_pipeline.global_computation_results.computation_config is None, overriding with 0.01')
+                curr_active_pipeline.global_computation_results.computation_config = 0.01
+                
 
         # Get existing laps from session:
         long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -1373,7 +1386,7 @@ class BatchSessionCompletionHandler:
 
         newly_computed_values = self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
         ## Try to ensure the 2023-09-29 LxC and SxCs are "refined" by the rate remapping firing rate:
-        newly_computed_values = newly_computed_values + self.try_require_pipeline_has_refined_pfs(curr_active_pipeline, frs_index_inclusion_magnitude=0.5)
+        newly_computed_values = newly_computed_values + self.try_require_pipeline_has_refined_pfs(curr_active_pipeline)
         self._try_save_global_computations_if_needed(curr_active_pipeline, curr_session_context, newly_computed_values) # Save if needed
 
 
