@@ -988,7 +988,7 @@ class AcrossSessionTables:
 
 
     @classmethod
-    def save_out_to_combined_file(cls, included_session_contexts, included_h5_paths):
+    def save_out_to_combined_file(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
         """Save converted back to .h5 file, .csv file, and several others
         
         Usage:
@@ -1000,10 +1000,8 @@ class AcrossSessionTables:
         """
 
         # Get the combined tables: 
-        neuron_replay_stats_table = AcrossSessionTables.build_neuron_replay_stats_table(included_session_contexts, included_h5_paths)
-        long_short_fr_indicies_analysis_table = AcrossSessionTables.build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths)
-        neuron_identities_table = AcrossSessionTables.build_neuron_identities_table(included_session_contexts, included_h5_paths)
-        
+        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=should_restore_native_column_types)
+
         ## Potentially:
         # neuron_replay_stats_table = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(neuron_replay_stats_table, active_context=curr_active_pipeline.get_session_context(), aclu_column_name=None)
 
@@ -1027,14 +1025,14 @@ class AcrossSessionTables:
             saveData(pkl_out_path, db=v, safe_save=False)
             # v.to_hdf(k, key=f'/{a_name}', format='table', data_columns=True)    # TypeError: objects of type ``StringArray`` are not supported in this context, sorry; supported objects are: NumPy array, record or scalar; homogeneous list or tuple, integer, float, complex or bytes
             
-
-    def build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
+    @classmethod
+    def build_all_known_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
         """ Extracts the neuron identities table from across the .h5 files.
         One row for each neuron.
 
         Usage:
             
-            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths)
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=Falsee)
             
         """
         neuron_identities_table = AcrossSessionTables.build_neuron_identities_table(included_session_contexts, included_h5_paths, should_restore_native_column_types=should_restore_native_column_types)
