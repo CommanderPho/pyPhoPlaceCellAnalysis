@@ -501,8 +501,12 @@ class BatchPhoJonathanFiguresHelper:
 
 
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, show_only_refined_cells:bool=False, disable_top_row=False):
-        """ The only public function. Performs the batch plotting. """
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True):
+        """ The only public function. Performs the batch plotting.
+        
+        # split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
+        
+        """
         if included_unit_neuron_IDs is not None:
             ## pre-filter the `neuron_replay_stats_df` by the included_unit_neuron_IDs only:
             neuron_replay_stats_df = neuron_replay_stats_df[np.isin(neuron_replay_stats_df.index, included_unit_neuron_IDs)]
@@ -510,27 +514,34 @@ class BatchPhoJonathanFiguresHelper:
         ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
         # %matplotlib qt
 
-        
-        ## 2023-09-28 - Refined Outputs
-        if show_only_refined_cells:
-            short_only_df = neuron_replay_stats_df[neuron_replay_stats_df['is_refined_SxC']]
-            short_only_aclus = short_only_df.index.values.tolist()
-            long_only_df = neuron_replay_stats_df[neuron_replay_stats_df['is_refined_LxC']]
-            long_only_aclus = long_only_df.index.values.tolist()
+         
+        if split_by_short_long_shared:
+            ## 2023-09-28 - Refined Outputs
+            if show_only_refined_cells:
+                short_only_df = neuron_replay_stats_df[neuron_replay_stats_df['is_refined_SxC']]
+                short_only_aclus = short_only_df.index.values.tolist()
+                long_only_df = neuron_replay_stats_df[neuron_replay_stats_df['is_refined_LxC']]
+                long_only_aclus = long_only_df.index.values.tolist()
 
-            ## Note that the above ("refined" LxC and SxC) omit long_only and short_only place cells that don't meant the "exclusive" criteria. That means these cells will be omitted entirely (and not even included in the shared)
-            # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
-            # shared_aclus = shared_df.index.values.tolist()
-            shared_aclus = [] # skip shared aclus for this mode
-            print(f"WARNING: 2023-09-28 - Note that the above ('refined' LxC and SxC) omit long_only and short_only place cells that don't meant the 'exclusive' criteria. That means these cells will be omitted entirely (and not even included in the shared)")
+                ## Note that the above ("refined" LxC and SxC) omit long_only and short_only place cells that don't meant the "exclusive" criteria. That means these cells will be omitted entirely (and not even included in the shared)
+                # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+                # shared_aclus = shared_df.index.values.tolist()
+                shared_aclus = [] # skip shared aclus for this mode
+                print(f"WARNING: 2023-09-28 - Note that the above ('refined' LxC and SxC) omit long_only and short_only place cells that don't meant the 'exclusive' criteria. That means these cells will be omitted entirely (and not even included in the shared)")
 
+            else:
+                # original (non-refined) mode
+                short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
+                short_only_aclus = short_only_df.index.values.tolist()
+                long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
+                long_only_aclus = long_only_df.index.values.tolist()
+                shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+                shared_aclus = shared_df.index.values.tolist()
         else:
-            # original (non-refined) mode
-            short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
-            short_only_aclus = short_only_df.index.values.tolist()
-            long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
-            long_only_aclus = long_only_df.index.values.tolist()
-            shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+            # don't split the short/long/shared, treat all as shared.
+            short_only_aclus = []
+            long_only_aclus = []
+            shared_df = neuron_replay_stats_df.copy()
             shared_aclus = shared_df.index.values.tolist()
 
 
