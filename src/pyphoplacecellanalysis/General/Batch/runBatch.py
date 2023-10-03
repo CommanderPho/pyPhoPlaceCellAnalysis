@@ -139,6 +139,37 @@ class ConcreteSessionFolder:
     def global_computation_result_pickle(self) -> Path:
         return self.output_folder.joinpath('global_computation_results.pkl').resolve()
 
+    @classmethod
+    def backup_output_files(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], target_dir: Path, debug_print=False):
+        """ backs up the list of backup files to a specified target_dir. 
+        
+        
+        copy_dict = ConcreteSessionFolder.backup_output_files(good_session_concrete_folders, target_dir=target_dir)
+        
+        """        
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        copy_dict = {}
+
+        for a_session_folder in good_session_concrete_folders:
+            session_descr: str = a_session_folder.context.get_description()
+            if debug_print:
+                print(f'a_session_folder: {session_descr}')
+            src_files_dict = {'h5':a_session_folder.pipeline_results_h5, 'local_pkl':a_session_folder.session_pickle, 'global_pkl':a_session_folder.global_computation_result_pickle}
+            for src_file_kind, src_file in src_files_dict.items():
+                if debug_print:
+                    print(f'a_session_folder.src_file: {src_file}')
+                # src_file: Path = a_session_folder.pipeline_results_h5
+                basename: str = src_file.stem
+                final_dest_basename:str = '_'.join([session_descr, basename])
+                final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
+                if debug_print:
+                    print(f'\tfinal_dest_name: {final_dest_name}')
+                dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
+                copy_dict[src_file] = dest_path
+        return copy_dict
+
 
 
 
