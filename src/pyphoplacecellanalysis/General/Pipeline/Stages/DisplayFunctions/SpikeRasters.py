@@ -120,20 +120,31 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
             
         
         """
-        use_separate_windows = kwargs.get('separate_windows', False)
-        type_of_3d_plotter = kwargs.get('type_of_3d_plotter', 'pyqtgraph')
+        use_separate_windows = kwargs.pop('separate_windows', False)
+        type_of_3d_plotter = kwargs.pop('type_of_3d_plotter', 'pyqtgraph')
         # active_plotting_config = active_config.plotting_config # active_config is unused
-        active_config_name = kwargs.get('active_config_name', 'Unknown')
-        active_identifying_context = kwargs.get('active_context', None)
+        active_config_name = kwargs.pop('active_config_name', 'Unknown')
+        active_identifying_context = kwargs.pop('active_context', None)
         assert active_identifying_context is not None
-        owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
+        owning_pipeline_reference = kwargs.pop('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
+        neuron_colors=kwargs.pop('neuron_colors', None)
+        neuron_sort_order=kwargs.pop('neuron_sort_order', None)
+        
+        included_neuron_ids = kwargs.pop('included_neuron_ids', None)
+        spikes_df = computation_result.sess.spikes_df
+        if included_neuron_ids is None:
+            included_neuron_ids = spikes_df.spikes.neuron_ids
+
+        # TODO: slice neuron_sort_order, neuron_colors as well now
+
+        spikes_df = spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids).copy()
         
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_spike_rasters_window')
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
 
         ## It's passed a specific computation_result which has a .sess attribute that's used to determine which spikes are displayed or not.
-        spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}')
+        spike_raster_window = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
         # Set Window Title Options:
         a_file_prefix = str(computation_result.sess.filePrefix.resolve())
         spike_raster_window.setWindowFilePath(a_file_prefix)
