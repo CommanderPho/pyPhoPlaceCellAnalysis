@@ -1159,20 +1159,20 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # inst_spike_rate_groups_result.LxC_aclus = long_exclusive.track_exclusive_aclus
         # inst_spike_rate_groups_result.SxC_aclus = short_exclusive.track_exclusive_aclus
         
-        # 2023-09-28 - "Refined" LxC/SxC based on firing rate index:
-        inst_spike_rate_groups_result.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
-        inst_spike_rate_groups_result.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
+        # # 2023-09-28 - "Refined" LxC/SxC based on firing rate index:
+        # inst_spike_rate_groups_result.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
+        # inst_spike_rate_groups_result.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
 
         ## 2023-10-04 - Manual User-annotation mode:
         annotation_man: UserAnnotationsManager = UserAnnotationsManager()
         session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[inst_spike_rate_groups_result.active_identifying_session_ctx].get('session_cell_exclusivity', None)
         if session_cell_exclusivity is not None:
             print(f'setting LxC_aclus/SxC_aclus from user annotation.')
-            self.LxC_aclus = session_cell_exclusivity.LxC
-            self.SxC_aclus = session_cell_exclusivity.SxC
+            inst_spike_rate_groups_result.LxC_aclus = session_cell_exclusivity.LxC
+            inst_spike_rate_groups_result.SxC_aclus = session_cell_exclusivity.SxC
             # Make sure those aclus are included in the valid placefields
-            # self.LxC_aclus = session_cell_exclusivity.LxC[np.isin(session_cell_exclusivity.LxC, EITHER_subset.track_exclusive_aclus)]
-            # self.SxC_aclus = session_cell_exclusivity.SxC[np.isin(session_cell_exclusivity.SxC, EITHER_subset.track_exclusive_aclus)]
+            # inst_spike_rate_groups_result.LxC_aclus = session_cell_exclusivity.LxC[np.isin(session_cell_exclusivity.LxC, EITHER_subset.track_exclusive_aclus)]
+            # inst_spike_rate_groups_result.SxC_aclus = session_cell_exclusivity.SxC[np.isin(session_cell_exclusivity.SxC, EITHER_subset.track_exclusive_aclus)]
         else:
             print(f'WARN: no user annotation for session_cell_exclusivity')
 
