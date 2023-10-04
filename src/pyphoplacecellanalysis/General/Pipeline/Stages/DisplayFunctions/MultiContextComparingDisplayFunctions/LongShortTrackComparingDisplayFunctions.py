@@ -814,7 +814,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         """ Plots two figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
         """
-        def _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, included_epoch_indicies=None, defer_render=True, save_figure=True):
+        def _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, included_epoch_indicies=None, defer_render=True, save_figure=True, **kwargs):
             """ 2023-06-01 - 
             
             ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
@@ -830,7 +830,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
             long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-            pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure)
+            pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
             fig_L = pagination_controller_L.plots.fig
             ax_L = fig_L.get_axes()
             if defer_render:
@@ -839,7 +839,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 pagination_controller_L = None
 
             
-            pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='short_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure)
+            pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='short_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
             fig_S = pagination_controller_S.plots.fig
             ax_S = fig_S.get_axes()
             if defer_render:
@@ -850,7 +850,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S)
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        pagination_controllers, figs, axs, ctxts, out_figure_paths = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(owning_pipeline_reference, included_epoch_indicies=included_epoch_indicies, defer_render=defer_render, save_figure=save_figure)
+        pagination_controllers, figs, axs, ctxts, out_figure_paths = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(owning_pipeline_reference, included_epoch_indicies=included_epoch_indicies, defer_render=defer_render, save_figure=save_figure, **kwargs)
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_stacked_epoch_slices', figures=figs, axes=axs, context=ctxts, plot_data={'context': ctxts, 'path': out_figure_paths})
         if not defer_render:
             graphics_output_dict.plot_data['controllers'] = pagination_controllers
