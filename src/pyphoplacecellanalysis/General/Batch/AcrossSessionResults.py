@@ -991,7 +991,7 @@ class AcrossSessionTables:
 
 
     @classmethod
-    def build_and_save_all_combined_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True, output_path_suffix:Optional[str]=None):
+    def build_and_save_all_combined_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True, output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
         """Save converted back to .h5 file, .csv file, and several others
         
         Usage:
@@ -1013,7 +1013,8 @@ class AcrossSessionTables:
         # neuron_replay_stats_table = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(neuron_replay_stats_table, active_context=curr_active_pipeline.get_session_context(), aclu_column_name=None)
 
         # Build the output paths:
-        out_parent_path = Path('output/across_session_results').resolve()
+        out_parent_path = out_parent_path or Path('output/across_session_results')
+        out_parent_path = out_parent_path.resolve()
 
         if output_path_suffix is not None:
             out_parent_path = out_parent_path.joinpath(output_path_suffix).resolve()
