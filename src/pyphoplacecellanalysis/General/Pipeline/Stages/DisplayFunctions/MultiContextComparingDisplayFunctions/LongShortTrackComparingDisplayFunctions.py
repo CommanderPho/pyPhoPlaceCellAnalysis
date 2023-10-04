@@ -1802,7 +1802,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
     return fig, ax
 
 
-@function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison'], creation_date='2023-03-28 14:20')
+@function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
 def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
@@ -2437,22 +2437,8 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # 2023-05-25 - Long_replay|Long_laps and Short_replay|Short_laps plots                                                 #
 # ==================================================================================================================== #
 
-def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, defer_render=False):
-    """ 2023-05-25 - Plots a comparison of the lap vs. replay firing rates for a single track.
-    
-    Inputs:
-        `curr_active_pipeline`: is needed to register_output_file(...)
-        
-    Example:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_session_long_short_track_firing_rate_figures
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
-
-        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
-        long_plots, short_plots = _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
-        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S) = long_plots, short_plots
-
-    """
-    def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered = False):
+@function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
+def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered=False, defer_render=False):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
@@ -2530,6 +2516,24 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
 
         return fig, ax, active_display_context
 
+
+@function_attributes(short_name=None, tags=['private', 'long_short'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare', 'fit_both_axes'], used_by=[], creation_date='2023-05-25 00:00', related_items=[])
+def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, defer_render=False):
+    """ 2023-05-25 - Plots a comparison of the lap vs. replay firing rates for a single track.
+    
+    Inputs:
+        `curr_active_pipeline`: is needed to register_output_file(...)
+        
+    Example:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_session_long_short_track_firing_rate_figures
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
+
+        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        long_plots, short_plots = _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
+        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S) = long_plots, short_plots
+
+    """
+    
         
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()

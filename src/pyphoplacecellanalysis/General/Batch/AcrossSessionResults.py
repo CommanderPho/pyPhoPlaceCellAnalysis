@@ -59,9 +59,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, PaperFigureTwo # for `BatchSessionCompletionHandler`
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation # for `BatchSessionCompletionHandler`, `AcrossSessionsAggregator`
 from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
 
 """
 from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -1040,6 +1041,51 @@ class AcrossSessionTables:
         return neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table
     
 
+    @classmethod
+    def load_all_combined_tables(cls, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
+        """Save converted back to .h5 file, .csv file, and several others
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+ 
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(override_output_parent_path=global_data_root_parent_path, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
+            
+
+        """
+        # Build the output paths:
+        out_parent_path: Path = override_output_parent_path or Path('output/across_session_results')
+        out_parent_path = out_parent_path.resolve()
+
+        if output_path_suffix is not None:
+            out_parent_path = out_parent_path.joinpath(output_path_suffix).resolve()
+
+        # out_parent_path.mkdir(parents=True, exist_ok=True)
+        assert out_parent_path.exists(), f"out_parent_path: '{out_parent_path}' must exist to load the tables!"
+        
+        across_session_outputs = {'neuron_identities_table': None,
+        'long_short_fr_indicies_analysis_table': None,
+        'neuron_replay_stats_table': None}
+
+        _loaded_tables = []
+        
+        for k, v in across_session_outputs.items():
+            k = Path(k)
+            a_name = k.name
+            print(f'a_name: {a_name}')
+            # csv_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.csv'))
+            # print(f'loading {csv_out_path}.')
+            # v.to_csv(csv_out_path)
+            pkl_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.pkl'))
+            print(f'loading {pkl_out_path}.')
+            v = loadData(pkl_out_path)
+            _loaded_tables.append(v)
+
+
+        return _loaded_tables
+
+
+    
+
 
     @classmethod
     def build_all_known_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
@@ -1064,6 +1110,22 @@ class AcrossSessionTables:
 class AcrossSessionsVisualizations:
     # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
 
+    # _registered_output_files = {}
+
+    @classmethod
+    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
+        """ outputs the figure using the provided context, replacing the pipeline's curr_active_pipeline.output_figure(...) callback which isn't usually accessible for across session figures. """
+        
+        def register_output_file(output_path, output_metadata=None):
+            """ registers a new output file for the pipeline """
+            print(f'register_output_file(output_path: {output_path}, ...)')
+            # registered_output_files[output_path] = output_metadata or {}
+
+        fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file)
+        return active_out_figure_paths, final_context
+        
+
     @classmethod
     def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, **kwargs):
         """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
@@ -1083,23 +1145,10 @@ class AcrossSessionsVisualizations:
         # Set callback, the only self-specific property
         # _out_fig_2._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
 
-        registered_output_files = {}
-
-        def output_figure(final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
-            """ outputs the figure using the provided context. """
-            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
-            def register_output_file(output_path, output_metadata=None):
-                """ registers a new output file for the pipeline """
-                print(f'register_output_file(output_path: {output_path}, ...)')
-                registered_output_files[output_path] = output_metadata or {}
-
-            fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
-            active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file)
-            return active_out_figure_paths, final_context
-
+        # registered_output_files = {}
 
         # Set callback, the only self-specific property
-        _out_aggregate_fig_2._pipeline_file_callback_fn = output_figure
+        _out_aggregate_fig_2._pipeline_file_callback_fn = cls.output_figure
 
         # Showing
         matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
@@ -1114,7 +1163,18 @@ class AcrossSessionsVisualizations:
 
     @classmethod
     def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results, num_sessions:int, save_figure=True, **kwargs):
-        """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3. """
+        """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3. 
+
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsVisualizations
+
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=True)
+            matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            graphics_output_dict = AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions)
+
+        
+        """
         # _out2 = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=defer_render, save_figure=save_figure)
 
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
@@ -1128,11 +1188,17 @@ class AcrossSessionsVisualizations:
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
         active_context = global_multi_session_context
         final_context = active_context.adding_context('display_fn', display_fn_name='display_long_short_laps')
-        fig = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, enable_hover_labels=True, enable_tiny_point_labels=False)
+        fig = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False)
         
-        active_out_figure_paths = []
-        # if not defer_render:
-        fig.show()
+        def _perform_write_to_file_callback():
+            active_out_figure_path, *args_L = cls.output_figure(final_context, fig)
+            return (active_out_figure_path,)
+
+        if save_figure:
+            active_out_figure_paths = _perform_write_to_file_callback()
+        else:
+            active_out_figure_paths = []
+
         graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=(fig), axes=tuple(fig.axes), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
         # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
         return graphics_output_dict
@@ -1140,3 +1206,60 @@ class AcrossSessionsVisualizations:
 
 
 
+    @classmethod
+    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table, num_sessions:int, save_figure=True, **kwargs):
+        """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
+        
+        Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions._plot_session_long_short_track_firing_rate_figures`
+        
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsVisualizations
+            
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=True)
+            matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            graphics_output_dict = AcrossSessionsVisualizations.across_sessions_long_and_short_firing_rate_replays_v_laps_figure(neuron_replay_stats_table=neuron_replay_stats_table, num_sessions=num_sessions)
+
+
+        """
+
+        from neuropy.utils.matplotlib_helpers import fit_both_axes
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_single_track_firing_rate_compare
+
+
+        global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
+        active_context = global_multi_session_context
+        final_context = active_context.adding_context('display_fn', display_fn_name='plot_single_track_firing_rate_compare')
+
+        # (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, defer_render=defer_render)
+
+        ## Long Track Replay|Laps FR Figure
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
+        x_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
+        y_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()}
+        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'))
+
+
+        ## Short Track Replay|Laps FR Figure
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
+        x_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
+        y_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()}
+        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'))
+
+        ## Fit both the axes:
+        fit_both_axes(ax_L, ax_S)
+
+        def _perform_write_to_file_callback():
+            active_out_figure_paths_L, *args_L = cls.output_figure(active_display_context_L, fig_L)
+            active_out_figure_paths_S, *args_S = cls.output_figure(active_display_context_S, fig_S)
+            return (active_out_figure_paths_L + active_out_figure_paths_S)
+
+        if save_figure:
+            active_out_figure_paths = _perform_write_to_file_callback()
+        else:
+            active_out_figure_paths = []
+
+        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), context=(active_display_context_L, active_display_context_S), plot_data={'context': (active_display_context_L, active_display_context_S)}, saved_figures=active_out_figure_paths)
+
+        return graphics_output_dict
