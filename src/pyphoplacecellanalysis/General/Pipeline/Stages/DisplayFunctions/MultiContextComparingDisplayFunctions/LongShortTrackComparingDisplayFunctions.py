@@ -867,6 +867,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
 
 # ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['make_fr', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
 def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
     """ Draws the time binned firing rates and the replay firing rates for a single cell
 
@@ -1221,13 +1222,15 @@ def _build_spikes_df_interpolated_props(global_results, should_interpolate_to_fi
     # return cell_spikes_dfs_list, aclu_to_fragile_linear_idx_map #, (spk_t, spk_pos)
     return {a_neuron_id:cell_spikes_dfs[i] for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}, aclu_to_fragile_linear_idx_map # return a dict instead
 
-
+@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_general_all_spikes'], creation_date='2023-10-03 19:42', related_items=[])
 def _simple_plot_spikes(ax, a_spk_t, a_spk_pos, spikes_color_RGB=(1, 0, 0), spikes_alpha=0.2, **kwargs):
     spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
     spike_plot_kwargs = ({'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGBA, 'markeredgecolor':spikes_color_RGBA, 'zorder':10} | kwargs)
     ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
     return ax
 
+
+@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_simple_plot_spikes'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
 def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable_name='t', spikes_alpha=0.9, defer_render=True):
     """ Plots all spikes for a given cell from that cell's complete `active_spikes_df`
     There are three different classes of spikes: all (black), long (red), short (blue)
@@ -1264,7 +1267,7 @@ def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable
     return ax_activity_v_time
 
 
-@function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
+@function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
 def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
     """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `plot_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
@@ -1469,7 +1472,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
 
 
-@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
+@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
 def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, optional_cell_info_labels=None, debug_print=False, defer_render=False, disable_top_row=False, **kwargs) -> MatplotlibRenderPlots:
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`

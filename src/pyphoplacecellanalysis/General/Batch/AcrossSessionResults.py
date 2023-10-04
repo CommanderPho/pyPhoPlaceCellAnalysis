@@ -234,7 +234,8 @@ class InstantaneousFiringRatesDataframeAccessor():
             cell_firing_rate_summary_df: pd.DataFrame = _out_inst_fr_comps.get_summary_dataframe() # Returns the dataframe with columns ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
 
             # Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'cell_type'] columns
-            unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.sess.spikes_df.spikes.extract_unique_neuron_identities()
+            # unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.sess.spikes_df.spikes.extract_unique_neuron_identities()
+            unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.get_session_unique_aclu_information()
 
             # Horizontally join (merge) the dataframes
             result_df: pd.DataFrame = pd.merge(unique_aclu_information_df, cell_firing_rate_summary_df, left_on='aclu', right_on='aclu', how='inner')
