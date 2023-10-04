@@ -2438,7 +2438,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
-def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered=False, defer_render=False):
+def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
@@ -2462,7 +2462,7 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
             point_colors = None
             # point_colors = 'black'
         
-        point_hover_labels = [f'{i}' for i in list(x_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints
+        point_hover_labels = [f'{i}' for i in list(x_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints. Don't do anything I don't think. , enable_hover_labels=False
         fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True)
         
         # TODO 2023-05-25 - build the display context:
@@ -2495,10 +2495,13 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
         footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
-        text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
-        texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
-        # texts = [ax.text(x, y, label, ha='center', va='center', fontsize=8) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
-        
+        if enable_tiny_point_labels:
+            text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
+            texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
+            # texts = [ax.text(x, y, label, ha='center', va='center', fontsize=8) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
+        else:
+            texts = []
+                    
         ## get current axes:
         # ax = plt.gca()
 
