@@ -991,16 +991,18 @@ class AcrossSessionTables:
 
 
     @classmethod
-    def save_out_to_combined_file(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True, output_path_suffix:Optional[str]=None):
+    def build_and_save_all_combined_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True, output_path_suffix:Optional[str]=None):
         """Save converted back to .h5 file, .csv file, and several others
         
         Usage:
             from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
 
-            AcrossSessionTables.save_out_to_combined_h5(included_session_contexts, included_h5_paths)
+            AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths)
             included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
         
-            _{BATCH_DATE_TO_USE}
+            
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
+            
 
         """
 
@@ -1034,6 +1036,10 @@ class AcrossSessionTables:
             saveData(pkl_out_path, db=v, safe_save=False)
             # v.to_hdf(k, key=f'/{a_name}', format='table', data_columns=True)    # TypeError: objects of type ``StringArray`` are not supported in this context, sorry; supported objects are: NumPy array, record or scalar; homogeneous list or tuple, integer, float, complex or bytes
             
+        return neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table
+    
+
+
     @classmethod
     def build_all_known_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
         """ Extracts the neuron identities table from across the .h5 files.
