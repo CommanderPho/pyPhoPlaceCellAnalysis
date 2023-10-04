@@ -49,7 +49,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 from nptyping import NDArray, DataFrame, Shape, assert_isinstance, Int, Structure as S
 import awkward as ak # `simpler_compute_measured_vs_expected_firing_rates` new Awkward array for ragged arrays
 
-
+from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from neuropy.utils.result_context import IdentifyingContext
@@ -1163,7 +1163,21 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         inst_spike_rate_groups_result.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
         inst_spike_rate_groups_result.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
 
+        ## 2023-10-04 - Manual User-annotation mode:
+        annotation_man: UserAnnotationsManager = UserAnnotationsManager()
+        session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[inst_spike_rate_groups_result.active_identifying_session_ctx].get('session_cell_exclusivity', None)
+        if session_cell_exclusivity is not None:
+            print(f'setting LxC_aclus/SxC_aclus from user annotation.')
+            self.LxC_aclus = session_cell_exclusivity.LxC
+            self.SxC_aclus = session_cell_exclusivity.SxC
+            # Make sure those aclus are included in the valid placefields
+            # self.LxC_aclus = session_cell_exclusivity.LxC[np.isin(session_cell_exclusivity.LxC, EITHER_subset.track_exclusive_aclus)]
+            # self.SxC_aclus = session_cell_exclusivity.SxC[np.isin(session_cell_exclusivity.SxC, EITHER_subset.track_exclusive_aclus)]
+        else:
+            print(f'WARN: no user annotation for session_cell_exclusivity')
 
+
+        # Common:
         are_LxC_empty: bool = (len(inst_spike_rate_groups_result.LxC_aclus) == 0)
         are_SxC_empty: bool = (len(inst_spike_rate_groups_result.SxC_aclus) == 0)
 
@@ -2833,9 +2847,26 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         # self.LxC_aclus = long_exclusive.track_exclusive_aclus
         # self.SxC_aclus = short_exclusive.track_exclusive_aclus
 
-        self.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
-        self.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
+        # ## get_refined_track_exclusive_aclus() mode:
+        # self.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
+        # self.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
         
+
+        ## Manual User-annotation mode:
+        annotation_man: UserAnnotationsManager = UserAnnotationsManager()
+        session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[self.active_identifying_session_ctx].get('session_cell_exclusivity', None)
+        if session_cell_exclusivity is not None:
+            print(f'setting LxC_aclus/SxC_aclus from user annotation.')
+            self.LxC_aclus = session_cell_exclusivity.LxC
+            self.SxC_aclus = session_cell_exclusivity.SxC
+            # Make sure those aclus are included in the valid placefields
+            # self.LxC_aclus = session_cell_exclusivity.LxC[np.isin(session_cell_exclusivity.LxC, EITHER_subset.track_exclusive_aclus)]
+            # self.SxC_aclus = session_cell_exclusivity.SxC[np.isin(session_cell_exclusivity.SxC, EITHER_subset.track_exclusive_aclus)]
+        else:
+            print(f'WARN: no user annotation for session_cell_exclusivity')
+
+
+        # Common:
         are_LxC_empty: bool = (len(self.LxC_aclus) == 0)
         are_SxC_empty: bool = (len(self.SxC_aclus) == 0)
 
@@ -2872,12 +2903,9 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
                     self.Fig2_Replay_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None))
                 else:
                     self.Fig2_Replay_FR.append(SingleBarResult(None, None, np.array([], dtype=float), self.LxC_aclus, self.SxC_aclus, None, None))
-        else:            
-            # self.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
+        else:
             self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
         
-
-
 
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
         # LxC: `long_exclusive.track_exclusive_aclus`
@@ -2908,9 +2936,6 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
             # Note that in general LxC and SxC might have differing numbers of cells.
             self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
         
-
-        # self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
-
 
     def get_summary_dataframe(self) -> pd.DataFrame:
         """ Returns a summary datatable for each neuron with one entry for each cell in (self.LxC_aclus + self.SxC_aclus)
