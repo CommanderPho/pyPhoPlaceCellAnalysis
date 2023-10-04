@@ -1099,7 +1099,8 @@ class AcrossSessionsVisualizations:
         # Perform interactive Matplotlib operations with 'Qt5Agg' backend
         _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, **kwargs)
         if save_figure:
-            _out_aggregate_fig_2.perform_save()
+            # _out_aggregate_fig_2.perform_save(_fig_2_theta_out)
+            print(f'save_figure()!')
 
         return global_multi_session_context, _out_aggregate_fig_2
 
