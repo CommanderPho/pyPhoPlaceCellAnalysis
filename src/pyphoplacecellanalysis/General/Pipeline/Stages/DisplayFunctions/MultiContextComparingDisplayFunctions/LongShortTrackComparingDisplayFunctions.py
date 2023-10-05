@@ -1803,7 +1803,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=True):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
 
@@ -1827,16 +1827,18 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # convert to pd.Series
         y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
                 
-    # Optionally swap the x and y axes so laps is on the x-axis:
+    # Optionally swap the x and y axes:
     if swap_xy_axis:
+        # Swapped x: Replays, y: Laps
         _y_frs_index = deepcopy(y_frs_index)
         y_frs_index = deepcopy(x_frs_index)
         x_frs_index = _y_frs_index
-        ylabel_str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
-        xlabel_str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$'
-    else:
         xlabel_str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
-        ylabel_str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$'
+        ylabel_str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$' 
+    else:
+        # Unswapped, x: Laps, y: Replays
+        xlabel_str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$' 
+        ylabel_str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
         
 
     if neurons_colors is not None:
@@ -1863,7 +1865,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors) # , s=10, alpha=0.5
     plt.xlabel(xlabel_str, fontsize=16, **xlabel_kwargs)
     plt.ylabel(ylabel_str, fontsize=16, **ylabel_kwargs)
-
 
     ## Non-flexitext version:
     # plt.title('long ($L$)|short($S$) firing rate indicies')
