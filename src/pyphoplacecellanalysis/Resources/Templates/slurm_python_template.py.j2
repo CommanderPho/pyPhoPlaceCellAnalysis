@@ -12,7 +12,9 @@ from neuropy.utils.result_context import IdentifyingContext
 from pyphoplacecellanalysis.General.Batch.runBatch import build_batch_task_logger
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
-from pyphoplacecellanalysis.General.Batch.runBatch import SavingOptions, run_specific_batch, BatchRun, BatchResultDataframeAccessor, run_diba_batch, BatchComputationProcessOptions, BatchSessionCompletionHandler
+from pyphoplacecellanalysis.General.Batch.runBatch import run_specific_batch, BatchRun, BatchResultDataframeAccessor, run_diba_batch
+from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import \
+    BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
 
 ## Begin Script Body
 
