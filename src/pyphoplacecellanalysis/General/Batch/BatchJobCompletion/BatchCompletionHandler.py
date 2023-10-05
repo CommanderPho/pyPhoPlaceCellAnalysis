@@ -322,7 +322,7 @@ class BatchSessionCompletionHandler:
                 if self.fail_on_exception:
                     raise e.exc
 
-            return newly_computed_values # return
+        return newly_computed_values # return
 
 
     def try_export_pipeline_hdf5_if_needed(self, curr_active_pipeline, curr_session_context) -> Tuple[Optional[Path], Optional[CapturedException]]:
