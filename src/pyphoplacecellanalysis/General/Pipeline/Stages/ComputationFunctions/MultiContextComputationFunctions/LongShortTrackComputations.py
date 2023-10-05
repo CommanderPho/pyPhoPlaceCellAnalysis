@@ -765,8 +765,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             old_default_parameters = DynamicParameters(sigma=0.02, thresh=(0, 3), min_dur=0.1, merge_dur=0.01, max_dur=1.0) # Default
             old_kamran_parameters = DynamicParameters(sigma=0.02, thresh=(0, 1.5), min_dur=0.06, merge_dur=0.06, max_dur=2.3) # Kamran's Parameters
             new_papers_parameters = DynamicParameters(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters
-            
-            new_pbe_epochs = sess.compute_pbe_epochs(sess, active_parameters=new_papers_parameters) # NewPaper's Parameters # , **({'thresh': (0, 1.5), 'min_dur': 0.03, 'merge_dur': 0.1, 'max_dur': 0.3} | kwargs)
+            kamrans_new_parameters = DynamicParameters(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=2.3) # 2023-10-05 Kamran's imposed Parameters, wants to remove the effect of the max_dur which was previously at 0.300
+
+            new_pbe_epochs = sess.compute_pbe_epochs(sess, active_parameters=kamrans_new_parameters) # NewPaper's Parameters # , **({'thresh': (0, 1.5), 'min_dur': 0.03, 'merge_dur': 0.1, 'max_dur': 0.3} | kwargs)
             return new_pbe_epochs
 
         # BEGIN MAIN FUNCTION:
