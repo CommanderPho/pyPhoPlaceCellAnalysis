@@ -199,15 +199,18 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         elif search_mode.name == FunctionsSearchMode.ANY.name:
             # build a merged function dictionary containing both global and non-global functions:
             active_registered_computation_function_dict = self.registered_merged_computation_function_dict
+
+
         else:
             raise NotImplementedError
 
         if names_list_is_excludelist:
             # excludelist-style operation: treat the registered_names_list as a excludelist and return all registered functions EXCEPT those that are in registered_names_list
-            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name not in registered_names_list}
+            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if ((a_computation_fn_name not in registered_names_list) and (a_computation_fn.short_name not in registered_names_list))}
         else:
             # default includelist-style operation:
-            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name in registered_names_list}
+            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if ((a_computation_fn_name in registered_names_list) or (a_computation_fn.short_name in registered_names_list))}
+
         return list(active_computation_function_dict.values())
         
 
