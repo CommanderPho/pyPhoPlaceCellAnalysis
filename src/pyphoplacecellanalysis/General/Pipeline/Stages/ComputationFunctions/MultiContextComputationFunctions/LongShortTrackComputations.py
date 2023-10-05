@@ -1630,7 +1630,6 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
         assert short_epochs.n_epochs > 0, f"No short epochs for '{key}'!\t long: ({key}: {long_epochs.n_epochs > 0}), \t short: ({key}: {short_epochs.n_epochs})"
         assert long_epochs.n_epochs > 0, f"No long epochs for '{key}'!\t long: ({key}: {long_epochs.n_epochs > 0}), \t short: ({key}: {short_epochs.n_epochs})"
 
-
         ## The non-instantaneous (niaeve) firing rate computations
         long_mean_epochs_all_frs, long_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, long_epochs)
         short_mean_epochs_all_frs, short_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, short_epochs)
