@@ -682,7 +682,6 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             # tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_peak_firing_rates # the peak firing rates of each tuning curve
             tuning_curve_peak_firing_rates = active_pf_2D.ratemap.tuning_curve_unsmoothed_peak_firing_rates
              
-
             #  Build the results:
             out_results = {}
             out_cell_peak_dfs_list = []
@@ -821,7 +820,9 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             filtered_summits_analysis_df['nearest_y_boundary_distance'] = y_distances # the distance in the minimal dimension towards the nearest y boundary
 
             ## Build function output:
-            computation_result.computed_data.setdefault('RatemapPeaksAnalysis', DynamicParameters()) # get the existing RatemapPeaksAnalysis output or create a new one if needed
+            if 'RatemapPeaksAnalysis' not in computation_result.computed_data:
+                computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters() # get the existing RatemapPeaksAnalysis output or create a new one if needed
+                            
             computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D'] = DynamicParameters(xx=active_pf_2D.xbin_centers, yy=active_pf_2D.ybin_centers, neuron_extended_ids=active_pf_2D.neuron_extended_ids, results=out_results,
                                                                                                              flat_peaks_df=cell_peaks_df, filtered_flat_peaks_df=filtered_summits_analysis_df, peak_counts=pf_peak_counts_results)
 
