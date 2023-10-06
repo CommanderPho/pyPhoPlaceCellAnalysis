@@ -1756,20 +1756,22 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         long_replays, short_replays, global_replays = [DataSession.filter_replay_epochs(curr_active_pipeline.filtered_sessions[an_epoch_name].replay, pos_df=curr_active_pipeline.filtered_sessions[an_epoch_name].position.to_dataframe(), spikes_df=curr_active_pipeline.filtered_sessions[an_epoch_name].spikes_df) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # NOTE: this includes a few overlapping   epochs since the function to remove overlapping ones seems to be broken
 
     except (AttributeError, KeyError) as e:
-        print(f'Replays missing, need to compute new ones... e: {e}')
+        print(f'!!WARN!!: pipeline_complete_compute_long_short_fr_indicies(...): Replays missing, need to compute new ones... e: {e}')
         # AttributeError: 'DataSession' object has no attribute 'replay'. Fallback to PBEs?
         # filter_epochs = a_session.pbe # Epoch object
         filter_epoch_replacement_type = KnownFilterEpochs.PBE
 
         # filter_epochs = a_session.ripple # Epoch object
         # filter_epoch_replacement_type = KnownFilterEpochs.RIPPLE
-        print(f'missing .replay epochs, using {filter_epoch_replacement_type} as surrogate replays...')
+        print(f'!!WARN!!: pipeline_complete_compute_long_short_fr_indicies(...): missing .replay epochs, using {filter_epoch_replacement_type} as surrogate replays...')
         active_context = active_context.adding_context(collision_prefix='replay_surrogate', replays=filter_epoch_replacement_type.name)
 
         ## Working:
         # long_replays, short_replays, global_replays = [KnownFilterEpochs.perform_get_filter_epochs_df(sess=a_computation_result.sess, filter_epochs=filter_epochs, min_epoch_included_duration=min_epoch_included_duration) for a_computation_result in [long_computation_results, short_computation_results, global_computation_results]] # returns Epoch objects
         # New sess.compute_estimated_replay_epochs(...) based method:
-        long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].estimate_replay_epochs() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # raise NotImplementedError(f'estimate_replay_epochs is invalid because it does not properly use the parameters!')
+        assert curr_active_pipeline.sess.config.preprocessing_parameters.replays is not None
+        long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].estimate_replay_epochs(*curr_active_pipeline.sess.config.preprocessing_parameters.replays) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
 
     
