@@ -997,6 +997,25 @@ class AcrossSessionTables:
                                     'aclu', 'neuron_type', 'cluster_index', 'qclu', 'shank_index']]
         return neuron_identities_table
 
+    @classmethod
+    def write_table_to_files(cls, df, global_data_root_parent_path:Path, output_basename:str='neuron_identities_table'):
+        """ 
+        
+        AcrossSessionTables.write_table_to_files(v, global_data_root_parent_path=global_data_root_parent_path, output_basename='a_table')
+        """
+        out_parent_path = global_data_root_parent_path.resolve() # = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
+        out_parent_path.mkdir(parents=True, exist_ok=True)
+        # print(f'global_batch_result_inst_fr_file_path: {out_parent_path}')
+        # print(f'a_name: {a_name}')
+        if not isinstance(output_basename, Path):
+            output_basename = Path(output_basename)
+        csv_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.csv'))
+        print(f'writing {csv_out_path}.')
+        df.to_csv(csv_out_path)
+        pkl_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.pkl'))
+        print(f'writing {pkl_out_path}.')
+        saveData(pkl_out_path, db=df, safe_save=False)
+        
 
     @classmethod
     def build_and_save_all_combined_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
@@ -1033,16 +1052,17 @@ class AcrossSessionTables:
         'long_short_fr_indicies_analysis_table': long_short_fr_indicies_analysis_table,
         'neuron_replay_stats_table': neuron_replay_stats_table}
 
-        for k, v in across_session_outputs.items():
-            k = Path(k)
-            a_name = k.name
+        for table_name, v in across_session_outputs.items():
+            table_name = Path(table_name)
+            a_name = table_name.name
             print(f'a_name: {a_name}')
-            csv_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.csv'))
-            print(f'writing {csv_out_path}.')
-            v.to_csv(csv_out_path)
-            pkl_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.pkl'))
-            print(f'writing {pkl_out_path}.')
-            saveData(pkl_out_path, db=v, safe_save=False)
+            cls.write_table_to_files(v, global_data_root_parent_path=out_parent_path, output_basename=table_name)
+            # csv_out_path = out_parent_path.joinpath(table_name.with_suffix(suffix='.csv'))
+            # print(f'writing {csv_out_path}.')
+            # v.to_csv(csv_out_path)
+            # pkl_out_path = out_parent_path.joinpath(table_name.with_suffix(suffix='.pkl'))
+            # print(f'writing {pkl_out_path}.')
+            # saveData(pkl_out_path, db=v, safe_save=False)
             # v.to_hdf(k, key=f'/{a_name}', format='table', data_columns=True)    # TypeError: objects of type ``StringArray`` are not supported in this context, sorry; supported objects are: NumPy array, record or scalar; homogeneous list or tuple, integer, float, complex or bytes
             
         return neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table
