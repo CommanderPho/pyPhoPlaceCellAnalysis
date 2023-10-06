@@ -227,7 +227,7 @@ class Render2DScrollWindowPlotMixin:
         """
         # from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
         if generate_debug_tuples:
-            debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'cell_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
+            debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'neuron_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
             active_datapoint_column_names = debug_datapoint_column_names # all values for the purpose of debugging
         else:
             default_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']

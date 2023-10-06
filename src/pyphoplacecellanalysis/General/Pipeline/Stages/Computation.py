@@ -983,7 +983,7 @@ class PipelineWithComputedPipelineStageMixin:
 
 
     def get_session_unique_aclu_information(self) -> pd.DataFrame:
-        """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'cell_type'] columns """
+        """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns """
         return self.sess.spikes_df.spikes.extract_unique_neuron_identities()
 
 

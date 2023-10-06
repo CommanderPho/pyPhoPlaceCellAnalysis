@@ -143,7 +143,7 @@ class InstantaneousFiringRatesDataframeAccessor():
                 row['neuron_identity/global_uid'] = f"{session_uid}|{row_data['aclu']}"
                 row['neuron_identity/session_uid'] = session_uid
                 row['neuron_identity/neuron_id'] = row_data['aclu']
-                row['neuron_identity/neuron_type'] = neuronTypesEnum[row_data['cell_type'].hdfcodingClassName]
+                row['neuron_identity/neuron_type'] = neuronTypesEnum[row_data['neuron_type'].hdfcodingClassName]
                 row['neuron_identity/shank_index'] = row_data['shank']
                 row['neuron_identity/cluster_index'] = row_data['cluster']
                 row['neuron_identity/qclu'] = row_data['qclu']
@@ -196,9 +196,9 @@ class InstantaneousFiringRatesDataframeAccessor():
                     'shank': row['neuron_identity/shank_index'],
                     'cluster': row['neuron_identity/cluster_index'],
                     'qclu': row['neuron_identity/qclu'],
-                    # 'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']).hdfcodingClassName, # Assuming reverse mapping is available
+                    # 'neuron_type': neuronTypesEnum(row['neuron_identity/neuron_type']).hdfcodingClassName, # Assuming reverse mapping is available
                     # 'active_set_membership': trackMembershipTypesEnum(row['active_set_membership']).name, # Assuming reverse mapping is available
-                    'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']),
+                    'neuron_type': neuronTypesEnum(row['neuron_identity/neuron_type']),
                     'active_set_membership': trackExclusiveToMembershipTypeReverseDict[trackMembershipTypesEnum(row['active_set_membership'])], # Assuming reverse mapping is available
                     'lap_delta_minus': row['lap_firing_rates_delta/delta_minus'],
                     'lap_delta_plus': row['lap_firing_rates_delta/delta_plus'],
@@ -234,7 +234,7 @@ class InstantaneousFiringRatesDataframeAccessor():
             ## Build the Output Dataframe:
             cell_firing_rate_summary_df: pd.DataFrame = _out_inst_fr_comps.get_summary_dataframe() # Returns the dataframe with columns ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
 
-            # Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'cell_type'] columns
+            # Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns
             # unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.sess.spikes_df.spikes.extract_unique_neuron_identities()
             unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.get_session_unique_aclu_information()
 
@@ -245,7 +245,7 @@ class InstantaneousFiringRatesDataframeAccessor():
             result_df[curr_session_context._get_session_context_keys()] = curr_session_context.as_tuple()
 
             # Reordering the columns to place the new columns on the left
-            result_df = result_df[['format_name', 'animal', 'exper_name', 'session_name', 'aclu', 'shank', 'cluster', 'qclu', 'cell_type', 'active_set_membership', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']]
+            result_df = result_df[['format_name', 'animal', 'exper_name', 'session_name', 'aclu', 'shank', 'cluster', 'qclu', 'neuron_type', 'active_set_membership', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']]
             
             cls.scatter_plot_results_table_to_hdf(file_path=common_file_path, result_df=result_df, file_mode=file_mode)
 
@@ -455,7 +455,7 @@ class AcrossSessionsResults:
         shank_array = unique_rows_df['shank'].values
         cluster_array = unique_rows_df['cluster'].values
         qclu_array = unique_rows_df['qclu'].values
-        neuron_type_array = unique_rows_df['cell_type'].values
+        neuron_type_array = unique_rows_df['neuron_type'].values
         neuron_types_enum_array = np.array([neuronTypesEnum[a_type.hdfcodingClassName] for a_type in neuron_type_array]) # convert NeuronTypes to neuronTypesEnum
         n_neurons = len(aclu_array)
         
