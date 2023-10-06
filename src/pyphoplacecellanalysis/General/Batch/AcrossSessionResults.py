@@ -1085,6 +1085,8 @@ class AcrossSessionTables:
             pkl_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.pkl'))
             print(f'loading {pkl_out_path}.')
             v = loadData(pkl_out_path)
+            # try to rename the columns if needed
+            v.rename(columns=cls.aliases_columns_dict, inplace=True)
             _loaded_tables.append(v)
 
 
