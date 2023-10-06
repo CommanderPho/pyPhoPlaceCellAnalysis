@@ -309,7 +309,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     
 
     @function_attributes(short_name='firing_rate_trends', tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-31 00:00', related_items=[],
-                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
+                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends']['pf_included_spikes_only']), is_global=False)
     def _perform_firing_rate_trends_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes trends and time-courses of each neuron's firing rate. 
         
