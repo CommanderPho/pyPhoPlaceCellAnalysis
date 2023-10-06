@@ -2923,4 +2923,10 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     # joined_df = join_on_index(long_short_fr_indicies_df_with_prefix, neuron_replay_stats_df_with_prefix, rate_remapping_df_with_prefix)
 
     # joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df)
+
+    ## Add the extended neuron identifiers (like the global neuron_uid, session_uid) columns
+    joined_df = joined_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=False, add_extended_aclu_identity_columns=False)
+    joined_df.drop(columns=['jfra_aclu'], inplace=True)
+
+
     return joined_df
