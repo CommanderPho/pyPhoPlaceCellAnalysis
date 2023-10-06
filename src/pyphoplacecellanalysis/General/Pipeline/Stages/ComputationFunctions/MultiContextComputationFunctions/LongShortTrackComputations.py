@@ -13,6 +13,7 @@ from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMix
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphocorehelpers.indexing_helpers import join_on_index
 
 from neuropy.analyses.placefields import PfND # used in `constrain_to_laps` to construct new objects
 from neuropy.core.epoch import Epoch
@@ -2849,9 +2850,12 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         return df_combined
 
 
-@function_attributes(short_name=None, tags=['merged', 'firing_rate_indicies', 'multi_result', 'neuron_indexed'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 18:10', related_items=[])
+@function_attributes(short_name=None, tags=['merged', 'firing_rate_indicies', 'multi_result', 'neuron_indexed'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.indexing_helpers.join_on_index'], used_by=[], creation_date='2023-09-12 18:10', related_items=[])
 def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_display_intermediate_results=False) -> pd.DataFrame:
     """ 2023-09-12 - TODO - merges firing rate indicies computed in several different computations into a single dataframe for comparison.
+    
+    Combines [long_short_fr_indicies_df, neuron_replay_stats_df, rate_remapping_df] into a single table
+    
     
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import build_merged_neuron_firing_rate_indicies
@@ -2859,19 +2863,7 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
         joined_neruon_fri_df
         
     """
-    should_add_prefix=False
-
-    def join_on_index(*dfs, suffixes_list=None) -> pd.DataFrame:
-        if suffixes_list is not None:
-            assert len(suffixes_list) == (len(dfs[1:])), f"{len(suffixes_list)} == {(len(dfs[1:]))}"
-        else:
-            suffixes_list = ('_x', '_y') * len(dfs[1:])
-        joined_df: pd.DataFrame = dfs[0]
-        for df, a_suffix_pair in zip(dfs[1:], suffixes_list):
-            # joined_df = joined_df.join(df, how='inner')
-            joined_df = joined_df.merge(df, on='aclu', how='inner', suffixes=a_suffix_pair)
-        return joined_df
-    
+    should_add_prefix=False    
     # Requires (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
     
     # 'long_short_fr_indicies_analysis'
@@ -2927,7 +2919,7 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     # suffixes_list = ((None, '_lsfria'), ('_lsfria', '_jfra'), ('_jfra', '_lspd'))
     suffixes_list = (('_lsfria', '_jfra'), ('_jfra', '_lspd'))
 
-    joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df, rate_remapping_df, suffixes_list=suffixes_list)
+    joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df, rate_remapping_df, join_index='aclu', suffixes_list=suffixes_list)
     # joined_df = join_on_index(long_short_fr_indicies_df_with_prefix, neuron_replay_stats_df_with_prefix, rate_remapping_df_with_prefix)
 
     # joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df)
