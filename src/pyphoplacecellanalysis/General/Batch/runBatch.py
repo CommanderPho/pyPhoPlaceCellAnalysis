@@ -24,8 +24,7 @@ from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDib
 
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
-from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, \
-    PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
+from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
 
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
@@ -37,6 +36,10 @@ from attrs import Factory
 from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults
 from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import generate_batch_single_session_scripts
+
+from pyphocorehelpers.Filesystem.path_helpers import discover_data_files, generate_copydict, copy_movedict, copy_file
+
+
 
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
@@ -104,6 +107,10 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
     batch_task_logger.info(f'==========================================================================================\n========== Module Logger INIT "{batch_task_logger.name}" ==============================')
     return batch_task_logger
 
+@unique
+class BackupMethods(Enum):
+    CommonTargetDirectory = "COMMON_TARGET_DIR" # copies all files to the same output folder, meaning they need a prefix or suffix to identify their session added to their name
+    RenameInSourceDirectory = "RENAME_IN_SOURCE_DIR" # copies to the same parent directory as the source file, but the copy has a prefix/suffix appended to the name
 
 
 @custom_define(slots=False)
@@ -112,12 +119,6 @@ class ConcreteSessionFolder:
     context: IdentifyingContext = serialized_attribute_field()
     path: Path = serialized_attribute_field()
     
-
-    @unique
-    class BackupMethods(Enum):
-        CommonTargetDirectory = "COMMON_TARGET_DIR" # copies all files to the same output folder, meaning they need a prefix or suffix to identify their session added to their name
-        RenameInSourceDirectory = "RENAME_IN_SOURCE_DIR" # copies to the same parent directory as the source file, but the copy has a prefix/suffix appended to the name
-
     @property 
     def session_pickle(self) -> Path:
         return self.path.joinpath('loadedSessPickle.pkl').resolve()
@@ -135,23 +136,41 @@ class ConcreteSessionFolder:
         return self.output_folder.joinpath('global_computation_results.pkl').resolve()
 
     @classmethod
-    def backup_output_files(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: ConcreteSessionFolder.BackupMethods=ConcreteSessionFolder.BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, debug_print=False):
+    def backup_output_files(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, debug_print=False):
+        """ builds the copydict and actually performs the copy
+
+        """
+        copy_dict = cls.backup_output_files(good_session_concrete_folders, backup_mode=backup_mode, target_dir=target_dir, rename_backup_suffix=rename_backup_suffix, debug_print=debug_print)
+        moved_files_dict_files = copy_movedict(copy_dict)
+        return moved_files_dict_files
+
+    @classmethod
+    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, debug_print=False):
         """ backs up the list of backup files to a specified target_dir. 
         
-        
-        copy_dict = ConcreteSessionFolder.backup_output_files(good_session_concrete_folders, target_dir=target_dir)
-        
-        target_dir: only used if 
-        rename_backup_suffix: Optional[str] only used
+        ## Usage 1:
+            target_dir = Path('/home/halechr/cloud/turbo/Pho/Output/across_session_results/2023-10-03').resolve()
+            copy_dict = ConcreteSessionFolder.build_backup_copydict(good_session_concrete_folders, target_dir=target_dir)
+            copy_dict
+
+        ## Usage 2:
+            copy_dict = ConcreteSessionFolder.build_backup_copydict(good_session_concrete_folders, backup_mode=BackupMethods.RenameInSourceDirectory, rename_backup_suffix='2023-10-05')
+            copy_dict
+
+
+        Parameters:
+            target_dir: only used if (backup_mode.name == BackupMethods.CommonTargetDirectory.name)
+            rename_backup_suffix: Optional[str] only used if (backup_mode.name == BackupMethods.RenameInSourceDirectory.name)
+
         """        
         if rename_backup_suffix is not None:
-            assert (backup_mode.name == ConcreteSessionFolder.BackupMethods.RenameInSourceDirectory.name), f"rename_backup_suffix: {rename_backup_suffix} is only used if (backup_mode.name == ConcreteSessionFolder.BackupMethods.RenameInSourceDirectory.name), but backup_mode: {backup_mode} and rename_backup_suffix is not None!"
-        if backup_mode.name == ConcreteSessionFolder.BackupMethods.RenameInSourceDirectory.name:
-            assert rename_backup_suffix is not None, f"rename_backup_suffix is required if backup_mode == ConcreteSessionFolder.BackupMethods.RenameInSourceDirectory"
+            assert (backup_mode.name == BackupMethods.RenameInSourceDirectory.name), f"rename_backup_suffix: {rename_backup_suffix} is only used if (backup_mode.name == BackupMethods.RenameInSourceDirectory.name), but backup_mode: {backup_mode} and rename_backup_suffix is not None!"
+        if backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
+            assert rename_backup_suffix is not None, f"rename_backup_suffix is required if backup_mode == BackupMethods.RenameInSourceDirectory"
 
         if target_dir is not None:
-            assert (backup_mode.name == ConcreteSessionFolder.BackupMethods.CommonTargetDirectory.name)
-        if backup_mode.name == ConcreteSessionFolder.BackupMethods.CommonTargetDirectory.name:
+            assert (backup_mode.name == BackupMethods.CommonTargetDirectory.name)
+        if backup_mode.name == BackupMethods.CommonTargetDirectory.name:
             assert target_dir is not None
             target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -167,13 +186,13 @@ class ConcreteSessionFolder:
                     print(f'a_session_folder.src_file: {src_file}')
                 # src_file: Path = a_session_folder.pipeline_results_h5
                 basename: str = src_file.stem
-                if backup_mode.name == ConcreteSessionFolder.BackupMethods.CommonTargetDirectory.name:
+                if backup_mode.name == BackupMethods.CommonTargetDirectory.name:
                     final_dest_basename:str = '_'.join([session_descr, basename])
                     final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
                     if debug_print:
                         print(f'\tfinal_dest_name: {final_dest_name}')
                     dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
-                elif backup_mode.name == ConcreteSessionFolder.BackupMethods.RenameInSourceDirectory.name:
+                elif backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
                     assert rename_backup_suffix is not None
                     target_dir = src_file.parent
                     final_dest_basename:str = '_'.join([basename, rename_backup_suffix])
