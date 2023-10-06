@@ -998,7 +998,7 @@ class AcrossSessionTables:
         return neuron_identities_table
 
     @classmethod
-    def write_table_to_files(cls, df, global_data_root_parent_path:Path, output_basename:str='neuron_identities_table'):
+    def write_table_to_files(cls, df, global_data_root_parent_path:Path, output_basename:str='neuron_identities_table', include_csv:bool=False, include_pkl:bool=True):
         """ 
         
         AcrossSessionTables.write_table_to_files(v, global_data_root_parent_path=global_data_root_parent_path, output_basename='a_table')
@@ -1009,32 +1009,34 @@ class AcrossSessionTables:
         # print(f'a_name: {a_name}')
         if not isinstance(output_basename, Path):
             output_basename = Path(output_basename)
-        csv_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.csv'))
-        print(f'writing {csv_out_path}.')
-        df.to_csv(csv_out_path)
-        pkl_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.pkl'))
-        print(f'writing {pkl_out_path}.')
-        saveData(pkl_out_path, db=df, safe_save=False)
+        if include_csv:
+            csv_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.csv'))
+            print(f'writing {csv_out_path}.')
+            df.to_csv(csv_out_path)
+        if include_pkl:
+            pkl_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.pkl'))
+            print(f'writing {pkl_out_path}.')
+            saveData(pkl_out_path, db=df, safe_save=False)
 
 
     @classmethod
-    def load_table_from_file(cls, global_data_root_parent_path:Path, output_basename:str='neuron_identities_table') -> pd.DataFrame:
+    def load_table_from_file(cls, global_data_root_parent_path:Path, output_filename:str='neuron_identities_table', skip_on_error=False) -> pd.DataFrame:
         """ Reciprocal of  write_table_to_files
         
-        v = AcrossSessionTables.load_table_from_file(global_data_root_parent_path=global_data_root_parent_path, output_basename='a_table')
+        v = AcrossSessionTables.load_table_from_file(global_data_root_parent_path=global_data_root_parent_path, output_filename='a_table.pkl')
 
         Usage:
 
-            joined_neruon_fri_df = AcrossSessionTables.load_table_from_file(global_data_root_parent_path=global_data_root_parent_path, output_basename=f'{BATCH_DATE_TO_USE}_{output_file_prefix}_joined_neruon_fri_df')
+            joined_neruon_fri_df = AcrossSessionTables.load_table_from_file(global_data_root_parent_path=global_data_root_parent_path, output_filename=f'{BATCH_DATE_TO_USE}_{output_file_prefix}_joined_neruon_fri_df')
             joined_neruon_fri_df
 
         """
         out_parent_path = global_data_root_parent_path.resolve() # = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
         assert out_parent_path.exists(), f"out_parent_path: '{out_parent_path}' must exist to load the tables!"
         # print(f'a_name: {a_name}')
-        if not isinstance(output_basename, Path):
-            output_basename = Path(output_basename)
-        pkl_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.pkl'))
+        if not isinstance(output_filename, Path):
+            output_filename = Path(output_filename)#.with_suffix(suffix='.pkl')
+        pkl_out_path = out_parent_path.joinpath(output_filename)
         assert pkl_out_path.exists(), f"pkl_out_path: '{pkl_out_path}' does not exist!"
         print(f'reading {pkl_out_path}.')
         v = loadData(pkl_out_path)
