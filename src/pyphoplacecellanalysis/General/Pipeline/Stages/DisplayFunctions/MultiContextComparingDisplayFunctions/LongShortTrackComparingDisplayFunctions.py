@@ -1828,18 +1828,29 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # convert to pd.Series
         y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
                 
+    # \\theta_{\\Delta +}
+
+    # ## Old L/R style strings
+    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$'
+    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
+    
+
+    ## 2023-10-06 - Consistent "\\Delta +"/"\\Delta -" notation
+    laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta +}-\\theta_{\\Delta -}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
+    replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta +}-R_{\\Delta -}}{R_{\\Delta +} + R_{\\Delta -}}$'
+
     # Optionally swap the x and y axes:
     if swap_xy_axis:
         # Swapped x: Replays, y: Laps
         _y_frs_index = deepcopy(y_frs_index)
         y_frs_index = deepcopy(x_frs_index)
         x_frs_index = _y_frs_index
-        xlabel_str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
-        ylabel_str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$' 
+        xlabel_str = replays_fri_label_str
+        ylabel_str =  laps_fri_label_str
     else:
         # Unswapped, x: Laps, y: Replays
-        xlabel_str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$' 
-        ylabel_str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
+        xlabel_str = laps_fri_label_str
+        ylabel_str = replays_fri_label_str
         
 
     if neurons_colors is not None:
