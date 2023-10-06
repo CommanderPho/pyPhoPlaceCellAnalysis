@@ -461,7 +461,7 @@ class BatchSessionCompletionHandler:
 
         newly_computed_values = self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
         ## Try to ensure the 2023-09-29 LxC and SxCs are "refined" by the rate remapping firing rate:
-        newly_computed_values = newly_computed_values + self.try_require_pipeline_has_refined_pfs(curr_active_pipeline)
+        # newly_computed_values = newly_computed_values + self.try_require_pipeline_has_refined_pfs(curr_active_pipeline)
         self._try_save_global_computations_if_needed(curr_active_pipeline, curr_session_context, newly_computed_values) # Save if needed
 
 
@@ -512,9 +512,9 @@ class BatchSessionCompletionHandler:
         except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-            if self.fail_on_exception:
-                raise e.exc
+            print(f"WARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            # if self.fail_on_exception:
+            #     raise e.exc
             _out_inst_fr_comps = None
             _out_recomputed_inst_fr_comps = None
 
