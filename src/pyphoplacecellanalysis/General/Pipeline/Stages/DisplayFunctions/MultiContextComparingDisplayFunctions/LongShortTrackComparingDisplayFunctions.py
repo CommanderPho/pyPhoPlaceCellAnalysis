@@ -1314,7 +1314,8 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
         formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
     
     if optional_cell_info_labels is not None:
-        print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
+        if debug_print:
+            print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
         optional_cell_info_labels_string: str = optional_cell_info_labels # already should be a string
         # formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{optional_cell_info_labels_string}</>' # single label mode
         optional_formatted_cell_label_string = f'<size:9>{optional_cell_info_labels_string}</>' # separate single mode
