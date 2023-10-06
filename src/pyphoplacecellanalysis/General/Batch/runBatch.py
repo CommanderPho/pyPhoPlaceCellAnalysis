@@ -136,16 +136,16 @@ class ConcreteSessionFolder:
         return self.output_folder.joinpath('global_computation_results.pkl').resolve()
 
     @classmethod
-    def backup_output_files(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, debug_print=False):
+    def backup_output_files(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, skip_non_extant_src_files:bool=True, only_include_file_types=None, debug_print=False):
         """ builds the copydict and actually performs the copy
 
         """
-        copy_dict = cls.backup_output_files(good_session_concrete_folders, backup_mode=backup_mode, target_dir=target_dir, rename_backup_suffix=rename_backup_suffix, debug_print=debug_print)
+        copy_dict = cls.backup_output_files(good_session_concrete_folders, backup_mode=backup_mode, target_dir=target_dir, rename_backup_suffix=rename_backup_suffix, skip_non_extant_src_files=skip_non_extant_src_files, only_include_file_types=only_include_file_types, debug_print=debug_print)
         moved_files_dict_files = copy_movedict(copy_dict)
         return moved_files_dict_files
 
     @classmethod
-    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, debug_print=False):
+    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, skip_non_extant_src_files:bool=True, only_include_file_types=['local_pkl', 'global_pkl','h5'], debug_print=False):
         """ backs up the list of backup files to a specified target_dir. 
         
         ## Usage 1:
@@ -161,6 +161,8 @@ class ConcreteSessionFolder:
         Parameters:
             target_dir: only used if (backup_mode.name == BackupMethods.CommonTargetDirectory.name)
             rename_backup_suffix: Optional[str] only used if (backup_mode.name == BackupMethods.RenameInSourceDirectory.name)
+            only_include_file_types: subet of file types to include: ['local_pkl', 'global_pkl','h5']
+
 
         """        
         if rename_backup_suffix is not None:
@@ -182,28 +184,33 @@ class ConcreteSessionFolder:
                 print(f'a_session_folder: {session_descr}')
             src_files_dict = {'h5':a_session_folder.pipeline_results_h5, 'local_pkl':a_session_folder.session_pickle, 'global_pkl':a_session_folder.global_computation_result_pickle}
             for src_file_kind, src_file in src_files_dict.items():
-                if debug_print:
-                    print(f'a_session_folder.src_file: {src_file}')
-                # src_file: Path = a_session_folder.pipeline_results_h5
-                basename: str = src_file.stem
-                if backup_mode.name == BackupMethods.CommonTargetDirectory.name:
-                    final_dest_basename:str = '_'.join([session_descr, basename])
-                    final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
+                if src_file_kind in (only_include_file_types or ['local_pkl', 'global_pkl','h5']):
                     if debug_print:
-                        print(f'\tfinal_dest_name: {final_dest_name}')
-                    dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
-                elif backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
-                    assert rename_backup_suffix is not None
-                    target_dir = src_file.parent
-                    final_dest_basename:str = '_'.join([basename, rename_backup_suffix])
-                    final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
-                    if debug_print:
-                        print(f'\tfinal_dest_name: {final_dest_name}')
-                    dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
-                else:
-                    raise ValueError
+                        print(f'a_session_folder.src_file: {src_file}')
+                    if skip_non_extant_src_files and (not src_file.exists()):
+                        if debug_print:
+                            print(f'src_file: "{src_file}" does not exist and skip_non_extant_src_files==True, so omitting from output copy_dict')
+                    else:
+                        # src_file: Path = a_session_folder.pipeline_results_h5
+                        basename: str = src_file.stem
+                        if backup_mode.name == BackupMethods.CommonTargetDirectory.name:
+                            final_dest_basename:str = '_'.join([session_descr, basename])
+                            final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
+                            if debug_print:
+                                print(f'\tfinal_dest_name: {final_dest_name}')
+                            dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
+                        elif backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
+                            assert rename_backup_suffix is not None
+                            target_dir = src_file.parent
+                            final_dest_basename:str = '_'.join([basename, rename_backup_suffix])
+                            final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
+                            if debug_print:
+                                print(f'\tfinal_dest_name: {final_dest_name}')
+                            dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
+                        else:
+                            raise ValueError
 
-                copy_dict[src_file] = dest_path
+                        copy_dict[src_file] = dest_path
         return copy_dict
 
 
