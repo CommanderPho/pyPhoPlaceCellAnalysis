@@ -140,7 +140,7 @@ class InstantaneousFiringRatesDataframeAccessor():
                 session_uid: str = f"|".join([row_data['format_name'], row_data['animal'], row_data['exper_name'], row_data['session_name']])
                 
                 # NeuronIdentityTable
-                row['neuron_identity/global_uid'] = f"{session_uid}|{row_data['aclu']}"
+                row['neuron_identity/neuron_uid'] = f"{session_uid}|{row_data['aclu']}"
                 row['neuron_identity/session_uid'] = session_uid
                 row['neuron_identity/neuron_id'] = row_data['aclu']
                 row['neuron_identity/neuron_type'] = neuronTypesEnum[row_data['neuron_type'].hdfcodingClassName]
@@ -178,16 +178,16 @@ class InstantaneousFiringRatesDataframeAccessor():
 
             data = []
             for row in table.iterrows():
-                global_uid = row['neuron_identity/global_uid'].decode()
+                neuron_uid = row['neuron_identity/neuron_uid'].decode()
                 session_uid = row['neuron_identity/session_uid'].decode()
                 session_uid_parts = session_uid.split("|")
-                # global_uid_parts = global_uid.split("|")
-                # print(f'global_uid: {global_uid}, global_uid_parts: {global_uid_parts}')
+                # global_uid_parts = neuron_uid.split("|")
+                # print(f'neuron_uid: {neuron_uid}, global_uid_parts: {global_uid_parts}')
             
-                # global_uid, session_uid, neuron_id, neuron_type, shank_index, cluster_index, qclu = neuron_identity
+                # neuron_uid, session_uid, neuron_id, neuron_type, shank_index, cluster_index, qclu = neuron_identity
                 
                 row_data = {
-                    'global_uid': global_uid,
+                    'neuron_uid': neuron_uid,
                     'format_name': session_uid_parts[0],
                     'animal': session_uid_parts[1],
                     'exper_name': session_uid_parts[2],
@@ -317,7 +317,7 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
         # For `loaded_result_df`, to recover the plottable FigureTwo points:
-        table_columns = ['global_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+        table_columns = ['neuron_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
         # 1. Group by 'active_set_membership' (to get LxC and SxC groups which are processed separately)
 
         # loaded_result_df.groupby('active_set_membership')
@@ -332,8 +332,8 @@ class InstantaneousFiringRatesDataframeAccessor():
         #TODO 2023-08-11 02:09: - [ ] These LxC/SxC_aclus need to be globally unique probably.
         # LxC_aclus = LxC_df.aclu.values
         # SxC_aclus = SxC_df.aclu.values
-        LxC_aclus = LxC_df.global_uid.values
-        SxC_aclus = SxC_df.global_uid.values
+        LxC_aclus = LxC_df.neuron_uid.values
+        SxC_aclus = SxC_df.neuron_uid.values
         # The arguments should be determined by the neuron information or the session, etc. Let's color based on session here.
 
         # LxC_scatter_props = [{'edgecolor': a_color, 'marker': a_marker} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
@@ -398,7 +398,7 @@ class AcrossSessionsResults:
  
     class ProcessedSessionResultsTable(tb.IsDescription):
         """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
-        global_uid = StringCol(68)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
+        neuron_uid = StringCol(68)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
         session_uid = StringCol(64)
         neuron_identities = NeuronIdentityTable()
 
@@ -473,7 +473,7 @@ class AcrossSessionsResults:
             row = table.row
             for i in np.arange(n_neurons):
                 ## Build the row here from aclu_array, etc
-                row['global_uid'] = f"{session_uid}|{aclu_array[i]}"
+                row['neuron_uid'] = f"{session_uid}|{aclu_array[i]}"
                 row['session_uid'] = session_uid  # Provide an appropriate session identifier here
                 row['neuron_id'] = aclu_array[i]
                 row['neuron_type'] = neuron_types_enum_array[i]
@@ -917,6 +917,8 @@ def copy_files_in_filelist_to_dest(filelist_text_file='fileList_GreatLakes_HDF5_
 
 class AcrossSessionTables:
 
+    aliases_columns_dict = {'global_uid':'neuron_uid', 'neuron_id':'aclu'}
+
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
     def build_custom_table(included_session_contexts, included_h5_paths, df_table_keys, drop_columns_list:Optional[List]=None, should_restore_native_column_types:bool=True):
         """
@@ -937,6 +939,9 @@ class AcrossSessionTables:
         if drop_columns_list is not None:
             # Drop columns: 'neuron_IDX', 'has_short_pf' and 3 other columns
             _out_table = _out_table.drop(columns=drop_columns_list)
+            
+        # try to rename the columns if needed
+        _out_table.rename(columns=AcrossSessionTables.aliases_columns_dict, inplace=True)
         return _out_table
     
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
@@ -983,11 +988,13 @@ class AcrossSessionTables:
         neuron_identities_table = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_identities_table_keys, drop_columns_list=drop_columns_list, should_restore_native_column_types=should_restore_native_column_types)
         if should_restore_native_column_types:
             neuron_identities_table['session_uid'] = neuron_identities_table['session_uid'].astype(object)
-        
+
+        # aliases_columns_dict = {'global_uid':'neuron_uid', 'neuron_id':'aclu'}
+        neuron_identities_table.rename(columns=AcrossSessionTables.aliases_columns_dict, inplace=True)
         # neuron_identities_table = HDF_Converter.general_post_load_restore_table_as_needed(neuron_identities_table)
-        neuron_identities_table = neuron_identities_table[['global_uid', 'session_uid', 'session_datetime', 
+        neuron_identities_table = neuron_identities_table[['neuron_uid', 'session_uid', 'session_datetime', 
                                     'format_name', 'animal', 'exper_name', 'session_name',
-                                    'neuron_id', 'neuron_type', 'cluster_index', 'qclu', 'shank_index']]
+                                    'aclu', 'neuron_type', 'cluster_index', 'qclu', 'shank_index']]
         return neuron_identities_table
 
 
