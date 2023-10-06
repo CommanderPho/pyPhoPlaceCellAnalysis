@@ -1304,7 +1304,7 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
         # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
         # subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
         try:
-            subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>\ntype <size:10><weight:bold>{cell_neuron_extended_ids.cell_type}</></>'
+            subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>\ntype <size:10><weight:bold>{cell_neuron_extended_ids.neuron_type}</></>'
         except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'quality'
             # Older definition that is missing the quality and neuron type:
             subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>'
