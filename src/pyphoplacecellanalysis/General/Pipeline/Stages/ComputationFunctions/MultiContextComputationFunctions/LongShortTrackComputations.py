@@ -2859,11 +2859,17 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
         joined_neruon_fri_df
         
     """
-    def join_on_index(*dfs) -> pd.DataFrame:
+    should_add_prefix=False
+
+    def join_on_index(*dfs, suffixes_list=None) -> pd.DataFrame:
+        if suffixes_list is not None:
+            assert len(suffixes_list) == (len(dfs[1:])), f"{len(suffixes_list)} == {(len(dfs[1:]))}"
+        else:
+            suffixes_list = ('_x', '_y') * len(dfs[1:])
         joined_df: pd.DataFrame = dfs[0]
-        for df in dfs[1:]:
+        for df, a_suffix_pair in zip(dfs[1:], suffixes_list):
             # joined_df = joined_df.join(df, how='inner')
-            joined_df = joined_df.merge(df, on='aclu', how='inner')
+            joined_df = joined_df.merge(df, on='aclu', how='inner', suffixes=a_suffix_pair)
         return joined_df
     
     # Requires (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
@@ -2874,7 +2880,8 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
     _curr_frs_indicies_dict = {k:v.values() for k,v in curr_long_short_fr_indicies_analysis.items() if k in ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']} # extract the values
 
     long_short_fr_indicies_df = pd.DataFrame(_curr_frs_indicies_dict, index=_curr_aclus)
-    long_short_fr_indicies_df = long_short_fr_indicies_df.add_prefix('lsfria_')
+    if should_add_prefix:
+        long_short_fr_indicies_df = long_short_fr_indicies_df.add_prefix('lsfria_')
 
     # columns_to_prefix = ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']
     # rename_dict = {col:f'lsfria_{col}' for col in columns_to_prefix}
@@ -2892,24 +2899,35 @@ def build_merged_neuron_firing_rate_indicies(curr_active_pipeline, enable_displa
 
     jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis # 'jfra'
     neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
-    neuron_replay_stats_df = neuron_replay_stats_df.add_prefix('jfra_')
+    if should_add_prefix:
+        neuron_replay_stats_df = neuron_replay_stats_df.add_prefix('jfra_')
+        neuron_replay_stats_df.rename(columns={'jfra_neuron_type':'neuron_type'}, inplace=True)
+    else:
+        neuron_replay_stats_df.rename(columns={'aclu':'jfra_aclu'}, inplace=True) # neuron_replay_stats_df already has an explicit 'aclu' column which we need to rename to avoid collisions.
+
     neuron_replay_stats_df.index.name = 'aclu'
     neuron_replay_stats_df = neuron_replay_stats_df.reset_index()
+    
+
     if enable_display_intermediate_results: 
         display(neuron_replay_stats_df)
 
     ## Get global 'long_short_post_decoding' results:
     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'] # 'lspd'
     rate_remapping_df = deepcopy(curr_long_short_post_decoding.rate_remapping.rr_df[['laps', 'replays',	'skew',	'max_axis_distance_from_center', 'distance_from_center', 'has_considerable_remapping']]) # drops ['neuron_type', 'render_color']
-    rate_remapping_df = rate_remapping_df.add_prefix('lspd_')
+    if should_add_prefix:
+        rate_remapping_df = rate_remapping_df.add_prefix('lspd_')
     rate_remapping_df.index.name = 'aclu'
     rate_remapping_df = rate_remapping_df.reset_index() 
     if enable_display_intermediate_results:
         display(rate_remapping_df)
 
 
+    # suffixes_list = ({'suffixes':('_lsfria', '_jfra')}, )
+    # suffixes_list = ((None, '_lsfria'), ('_lsfria', '_jfra'), ('_jfra', '_lspd'))
+    suffixes_list = (('_lsfria', '_jfra'), ('_jfra', '_lspd'))
 
-    joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df, rate_remapping_df)
+    joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df, rate_remapping_df, suffixes_list=suffixes_list)
     # joined_df = join_on_index(long_short_fr_indicies_df_with_prefix, neuron_replay_stats_df_with_prefix, rate_remapping_df_with_prefix)
 
     # joined_df = join_on_index(long_short_fr_indicies_df, neuron_replay_stats_df)
