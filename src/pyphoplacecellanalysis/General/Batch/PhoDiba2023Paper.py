@@ -3,6 +3,7 @@ from typing import Dict, Callable
 from attrs import define, field
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 
 import matplotlib as mpl
 import matplotlib.patches as mpatches # used for plot_epoch_track_assignments
@@ -957,6 +958,81 @@ def PAPER_FIGURE_figure_3(curr_active_pipeline, defer_render=False, save_figure=
     _out2 = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=defer_render, save_figure=save_figure)
 
     return (_out, _out2)
+
+
+
+# ==================================================================================================================== #
+# Statistical Tests                                                                                                    #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['stats', 'binomial', 'FRI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-10 16:55', related_items=[])
+def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table):
+    """ Performs a binomial test to see if the number of entries above/below the y=x diagnoal were greater than would be expected by chance.
+
+    Usage:
+        binom_test_chance_result = pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table)
+        binom_test_chance_result
+
+    """
+    # Drop column: 'index'
+    # long_short_fr_indicies_analysis_table = long_short_fr_indicies_analysis_table.drop(columns=['index'])
+    # Drop rows with missing data in columns: 'x_frs_index', 'y_frs_index', 'neuron_uid'
+    long_short_fr_indicies_analysis_table = long_short_fr_indicies_analysis_table.dropna(subset=['x_frs_index', 'y_frs_index', 'neuron_uid'])
+
+    ## Find the values above/below the main y=x diagonal:
+    x_minus_y_diff = (long_short_fr_indicies_analysis_table['x_frs_index'] - long_short_fr_indicies_analysis_table['y_frs_index'])
+    assert np.sum(np.logical_not(np.isfinite(x_minus_y_diff))) == 0, f"ERROR: contains {np.sum(np.logical_not(np.isfinite(x_minus_y_diff)))} non-finite values"
+    ## Find the counts for each:
+    n_total = len(x_minus_y_diff) # 856
+    n_below_diagonal = np.sum((0.0 > x_minus_y_diff)) # 365
+    n_above_diagonal = np.sum((0.0 < x_minus_y_diff)) # 487
+    n_exact_on_diagonal = np.sum((0.0 == x_minus_y_diff))
+    print(f'n_total: {n_total}, n_above_diagonal: {n_above_diagonal}, n_exact_on_diagonal: {n_exact_on_diagonal}, n_below_diagonal: {n_below_diagonal}')
+    assert (n_above_diagonal + n_below_diagonal + n_exact_on_diagonal) == n_total, f"they don't add up!" 
+    binom_test_chance_result = stats.binomtest(n_above_diagonal, n=n_total, p=0.5) # p=0.5 random assignment on each trial, n=n_total trials
+    return binom_test_chance_result
+
+
+
+def pho_stats_paired_t_test(values1, values2):
+    """ Paired (Dependent) T-Test of means
+
+    degrees of freedom (dof): n -1
+    """
+    assert len(values1) == len(values2), f"this is supposed to be a paired t-test so the number of samples in values1 should equal values2!! but {np.shape(values1)} and {np.shape(values2)}"
+    # # Manual Calculation:
+    # n_samples = len(values1) # sample_size (number of neurons)
+    # out_numerator = (np.mean(values1) - np.mean(values2))
+    # out_denom = np.std(values1 - values2) / np.sqrt(n_samples)
+    # T = out_numerator/out_denom
+    T_result = stats.ttest_rel(values1, values2)
+    # T_value = T_result.statistic
+    return T_result
+
+
+@function_attributes(short_name=None, tags=['stats', 'bar'], input_requires=[], output_provides=[], uses=['pho_stats_paired_t_test'], used_by=[], creation_date='2023-10-10 16:54', related_items=[])
+def pho_stats_bar_graph_t_tests(across_session_inst_fr_computation):
+    """ performs the statistical tests for the bar-graphs 
+
+    Usage:
+        LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(across_session_inst_fr_computation)
+
+    """
+    ## Laps Bar Graph Statistics:
+    LxC_Laps_T_result = pho_stats_paired_t_test(across_session_inst_fr_computation.Fig2_Laps_FR[0].values, across_session_inst_fr_computation.Fig2_Laps_FR[1].values)
+    SxC_Laps_T_result = pho_stats_paired_t_test(across_session_inst_fr_computation.Fig2_Laps_FR[2].values, across_session_inst_fr_computation.Fig2_Laps_FR[3].values)
+    print(f'LxC_Laps_T_result: {LxC_Laps_T_result}') # LxC_Laps_T_result: TtestResult(statistic=13.925882964152734, pvalue=2.3158087721181958e-10, df=16)
+    print(f'SxC_Laps_T_result: {SxC_Laps_T_result}') # SxC_Laps_T_result: TtestResult(statistic=-12.402705609994197, pvalue=8.279901167065766e-08, df=11)
+
+    ## Replay Bar Graph Statistics
+    LxC_Replay_T_result = pho_stats_paired_t_test(across_session_inst_fr_computation.Fig2_Replay_FR[0].values, across_session_inst_fr_computation.Fig2_Replay_FR[1].values)
+    SxC_Replay_T_result = pho_stats_paired_t_test(across_session_inst_fr_computation.Fig2_Replay_FR[2].values, across_session_inst_fr_computation.Fig2_Replay_FR[3].values)
+    print(f'LxC_Replay_T_result: {LxC_Replay_T_result}') # LxC_Replay_T_result: TtestResult(statistic=-0.44250837706672874, pvalue=0.6640450004297094, df=16) # LxC_Replay_T_result is NOT p<0.05 significant (pvalue=0.6640450004297094)
+    print(f'SxC_Replay_T_result: {SxC_Replay_T_result}') # SxC_Replay_T_result: TtestResult(statistic=-3.6555017036343607, pvalue=0.0037841961453242896, df=11) # SxC_Replay_T_result IS p<0.05 significant (pvalue=0.0037841961453242896)
+    
+    return LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result
+
+
 
 
 
