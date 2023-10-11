@@ -524,7 +524,7 @@ class BatchSessionCompletionHandler:
         
             
         # On large ram systems, we can return the whole pipeline? No, because the whole pipeline can't be pickled.
-            across_session_results_extended_dict = {}
+        across_session_results_extended_dict = {}
 
         ## run external completion functions:
         for a_fn in self.completion_functions:
