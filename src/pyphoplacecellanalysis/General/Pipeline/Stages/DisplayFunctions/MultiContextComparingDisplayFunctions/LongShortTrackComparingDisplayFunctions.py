@@ -1804,7 +1804,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
 
@@ -1874,7 +1874,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         xlabel_kwargs = dict(loc='left')
         ylabel_kwargs = dict(loc='bottom')
 
-    scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors) # , s=10, alpha=0.5
+    scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
     plt.xlabel(xlabel_str, fontsize=16, **xlabel_kwargs)
     plt.ylabel(ylabel_str, fontsize=16, **ylabel_kwargs)
 
