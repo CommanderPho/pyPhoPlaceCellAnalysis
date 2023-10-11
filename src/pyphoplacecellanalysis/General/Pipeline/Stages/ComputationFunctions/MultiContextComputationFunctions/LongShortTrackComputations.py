@@ -564,6 +564,11 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
                 # Backup and replace loaded replays with computed ones:
                 long_replays, short_replays, global_replays = [a_session.replace_session_replays_with_estimates(require_intersecting_epoch=None, debug_print=False) for a_session in [long_session, short_session, global_session]]
 
+            # Now we are certain that it's properly constrained. If changes were made, we'll need to save
+            #TODO 2023-10-11 12:12: - [ ] Save indicator that it IS properly constrained so long as: 'grid_bin_bounds', 'grid_bin', TODO_MORE don't change. Also store the current date.
+            # owning_pipeline_reference # will become invalidated when grid_bin_bounds, grid_bin, etc change.
+
+
             # 3m 40.3s
         else:
             print(f'`is_certain_properly_constrained`: True - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions')
@@ -610,7 +615,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
     
 
-    @function_attributes(tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=[], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57')
+    @function_attributes(short_name='long_short_rate_remapping', tags=['long_short', 'short_long','replay', 'rate_remapping', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=['global_computation_results.computed_data.long_short_rate_remapping'], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57')
     def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
         """ Computes rate remapping statistics
         
@@ -2736,7 +2741,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
 
 
         # jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=0.5) ## This has to be done first. No clue where to do it.
-        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.5)
+        # neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.5)
 
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]

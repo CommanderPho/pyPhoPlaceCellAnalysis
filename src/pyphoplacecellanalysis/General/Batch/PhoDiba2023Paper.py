@@ -9,9 +9,9 @@ import matplotlib as mpl
 import matplotlib.patches as mpatches # used for plot_epoch_track_assignments
 from flexitext import flexitext ## flexitext version
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import \
-    InstantaneousSpikeRateGroupsComputation
 from neuropy.utils.mixins.enum_helpers import ExtendedEnum # used in TrackAssignmentState
+from neuropy.core.epoch import Epoch
+from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
 
 from pyphocorehelpers.mixins.key_value_hashable import KeyValueHashableObject
 from pyphocorehelpers.indexing_helpers import partition # needed by `AssigningEpochs` to partition the dataframe by aclus
@@ -27,6 +27,9 @@ from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpe
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.result_context import providing_context
 from neuropy.core.user_annotations import UserAnnotationsManager
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import determine_long_short_pf1D_indicies_sort_by_peak
@@ -1034,6 +1037,84 @@ def pho_stats_bar_graph_t_tests(across_session_inst_fr_computation):
 
 
 
+
+@function_attributes(short_name=None, tags=['epoch', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-11 14:13', related_items=[])
+def build_derived_epochs_dicts(owning_pipeline_reference):
+	""" builds three dictionaries containing all of the Epoch objects for {global, long, short}. Contains epochs that don't normally exist on the session object
+	
+	Usage:
+    	from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import build_derived_epochs_dicts
+    	all_epochs, long_only_all_epochs, short_only_all_epochs = build_derived_epochs_dicts(curr_active_pipeline)
+	
+	"""	
+    
+	long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+	long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
+
+	## Do all epoch computations on the original session. When done, should have: ['pbe', 'replay', 'laps', 'non_running_periods', 'non_replay_periods'
+	# dictionary of all epoch objects across the session
+	all_epochs: Dict[str,Epoch] = dict(
+		laps = owning_pipeline_reference.sess.laps.as_epoch_obj(),
+		pbe = owning_pipeline_reference.sess.pbe,
+		replay = Epoch(owning_pipeline_reference.sess.replay),
+		non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement()),
+		non_replay_periods = Epoch(Epoch.from_PortionInterval(owning_pipeline_reference.sess.replay.epochs.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]),  #[:-1] # any period except the replay ones, drop the infinite last entry
+	)
+
+	# Split into long/short only periods:
+	long_only_all_epochs: Dict[str,Epoch] = {k:v.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) for k,v in all_epochs.items()}
+	short_only_all_epochs: Dict[str,Epoch] = {k:v.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) for k,v in all_epochs.items()}
+
+	return all_epochs, long_only_all_epochs, short_only_all_epochs
+
+
+@function_attributes(short_name=None, tags=['inst_fr', 'spike_rate_Trends'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-11 14:13', related_items=[])
+def add_extra_spike_rate_trends(curr_active_pipeline) -> InstantaneousSpikeRateGroupsComputation:
+	""" independent of all other FR computations. Builds inst spike rate groups for the PBEs. 
+	
+    from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import add_extra_spike_rate_trends
+
+
+	"""
+	temp = InstantaneousSpikeRateGroupsComputation()
+	temp.active_identifying_session_ctx=curr_active_pipeline.sess.get_context()
+
+	long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+	long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
+
+	## Add additional Epochs:
+	all_epochs, long_only_all_epochs, short_only_all_epochs = build_derived_epochs_dicts(curr_active_pipeline)
+
+	## Manual User-annotation mode:
+	annotation_man: UserAnnotationsManager = UserAnnotationsManager()
+	session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[temp.active_identifying_session_ctx].get('session_cell_exclusivity', None)
+	if session_cell_exclusivity is not None:
+		print(f'setting LxC_aclus/SxC_aclus from user annotation.')
+		temp.LxC_aclus = session_cell_exclusivity.LxC
+		temp.SxC_aclus = session_cell_exclusivity.SxC
+	else:
+		print(f'WARN: no user annotation for session_cell_exclusivity')
+
+	are_LxC_empty: bool = (len(temp.LxC_aclus) == 0)
+	are_SxC_empty: bool = (len(temp.SxC_aclus) == 0)
+
+	temp.LxC_PBEsDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_only_all_epochs['pbe'], included_neuron_ids=temp.LxC_aclus, instantaneous_time_bin_size_seconds=temp.instantaneous_time_bin_size_seconds)
+	temp.LxC_PBEsDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_only_all_epochs['pbe'], included_neuron_ids=temp.LxC_aclus, instantaneous_time_bin_size_seconds=temp.instantaneous_time_bin_size_seconds)
+	temp.SxC_PBEsDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_only_all_epochs['pbe'], included_neuron_ids=temp.SxC_aclus, instantaneous_time_bin_size_seconds=temp.instantaneous_time_bin_size_seconds)
+	temp.SxC_PBEsDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_only_all_epochs['pbe'], included_neuron_ids=temp.SxC_aclus, instantaneous_time_bin_size_seconds=temp.instantaneous_time_bin_size_seconds)
+
+	# Note that in general LxC and SxC might have differing numbers of cells.
+	if (are_LxC_empty or are_SxC_empty):
+		temp.Fig2_PBEs_FR: list[SingleBarResult] = []
+		for v in (temp.LxC_PBEsDeltaMinus, temp.LxC_PBEsDeltaPlus, temp.SxC_PBEsDeltaMinus, temp.SxC_PBEsDeltaPlus):
+			if v is not None:
+				temp.Fig2_PBEs_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, temp.LxC_aclus, temp.SxC_aclus, None, None))
+			else:
+				temp.Fig2_PBEs_FR.append(SingleBarResult(None, None, np.array([], dtype=float), temp.LxC_aclus, temp.SxC_aclus, None, None))
+	else:
+		temp.Fig2_PBEs_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, temp.LxC_aclus, temp.SxC_aclus, None, None) for v in (temp.LxC_PBEsDeltaMinus, temp.LxC_PBEsDeltaPlus, temp.SxC_PBEsDeltaMinus, temp.SxC_PBEsDeltaPlus)]
+
+	return temp
 
 
 

@@ -143,6 +143,8 @@ class BatchSessionCompletionHandler:
 
     override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
 
+
+    ## Computation Options:
     session_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
 
     global_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
@@ -521,11 +523,7 @@ class BatchSessionCompletionHandler:
 
         
             
-        # On large ram systems, we can return the whole pipeline?
-
-        if self.enable_full_pipeline_in_ram:
-            across_session_results_extended_dict = {'curr_active_pipeline': curr_active_pipeline}
-        else:
+        # On large ram systems, we can return the whole pipeline? No, because the whole pipeline can't be pickled.
             across_session_results_extended_dict = {}
 
         ## run external completion functions:
