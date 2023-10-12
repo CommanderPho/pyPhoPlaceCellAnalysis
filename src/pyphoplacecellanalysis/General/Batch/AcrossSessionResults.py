@@ -1252,7 +1252,7 @@ class AcrossSessionsVisualizations:
         scatter_plot_kwargs = dict()
         if 'has_pf_color' in long_short_fr_indicies_analysis_results:
             scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['has_pf_color'].to_numpy() #.to_list() # edgecolors=(r, g, b, 1)
-            
+        
 
         fig = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', **scatter_plot_kwargs) #  markeredgewidth=1.5,
         

@@ -23,6 +23,7 @@ ScaleFactors = namedtuple("ScaleFactors", ["major", "minor"])
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.axes
+from matplotlib.path import Path
 import matplotlib.patches as patches # for matplotlib version of the plot
 from matplotlib.collections import PatchCollection
 
@@ -828,3 +829,88 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
         short_rects_outputs = None
 
     return long_rects_outputs, short_rects_outputs
+
+
+
+
+def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float = 70.0, track_1D_height: float = 1.0, platform_1D_height: float = 1.1, track_center_midpoint_x = 135.0, track_center_midpoint_y = 0.0, debug_print=False) -> Path:
+    """ 2023-10-12 - a hyper-simplified 1D plot of the linear track using info from Kamran about the actual midpoint of the track (x=135.0).
+
+    COMPLETELY INDEPENDENT OF ALL OTHER VERSIONS ABOVE.
+    Confirmed to be valid for a simple 1D track with a simple x-coord offset
+        
+    track_center_midpoint_x: float, default: 135.0 # in cm coordinates, according to Kamran on 2023-10-12
+    track_center_midpoint_y: float, default: 0.0 # not relevant for 1D track plots
+
+
+    Usage:
+    
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
+        from matplotlib.path import Path
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _build_track_1D_verticies
+        
+        path = _build_track_1D_verticies(platform_length=22.0, track_length=70.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=135.0, track_center_midpoint_y=0.0, debug_print=True)
+
+
+        fig, ax = plt.subplots()
+        patch = patches.PathPatch(path, facecolor='orange', lw=2)
+        ax.add_patch(patch)
+        ax.autoscale()
+        plt.show()
+
+    
+    
+    
+    """
+    
+    
+    # track_width: float = 6.0
+    total_track_length: float = platform_length + track_length + platform_length
+
+    # display(total_track_length)
+
+    track_center_relative_point_x = total_track_length / 2.0
+    track_center_offset_x = track_center_midpoint_x - track_center_relative_point_x
+    # display(track_center_relative_point_x)
+
+
+    relative_points_array = np.array([[0.0, platform_length], [platform_length, (platform_length+track_length)], [(platform_length+track_length), (platform_length+track_length+platform_length)]]) # still grouped in [[start_x, end_x], ...] pairs
+    # relative_points_array.shape # (3, 2)
+
+    bottom_points_x = relative_points_array.flatten() + track_center_offset_x
+    bottom_points_y = np.zeros_like(bottom_points_x)
+    # For the top points, clone the bottom points to start
+    top_points_x = deepcopy(bottom_points_x)
+    top_points_y = deepcopy(bottom_points_y)
+
+    # Adjust the important top points
+    top_points_y[[True, True, False, False, True, True]] = platform_1D_height
+    top_points_y[[False, False, True, True, False, False]] = track_1D_height
+
+    # remove redundant bottom points:
+    bottom_points_x = bottom_points_x[[0,-1]]
+    bottom_points_y = bottom_points_y[[0,-1]]
+
+    num_verticies = len(bottom_points_x) + len(top_points_x) + 1
+    _bottom_point_tuples = [(x, y) for x,y in zip(bottom_points_x, bottom_points_y)]
+    _top_point_tuples = [(x, y) for x,y in zip(top_points_x, top_points_y)]
+    if debug_print:
+        print(_bottom_point_tuples)
+        print(_top_point_tuples)
+
+    _all_point_tuples = deepcopy(_top_point_tuples)
+    _all_point_tuples.insert(0, _bottom_point_tuples[0])
+    _all_point_tuples.append(_bottom_point_tuples[-1])
+    _all_point_tuples.append((0.0, 0.0)) # append the extra vertex used to close the polygon
+
+
+    ## Matplotlib-specific part here:	
+    verts = np.array(_all_point_tuples)
+    num_verticies = np.shape(verts)[0]
+    codes = np.full(num_verticies, Path.LINETO, dtype=int)
+    codes[0] = Path.MOVETO
+    codes[-1] = Path.CLOSEPOLY
+    path = Path(verts, codes)
+
+    return path
