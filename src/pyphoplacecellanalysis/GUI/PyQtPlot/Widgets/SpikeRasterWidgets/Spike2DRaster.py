@@ -459,7 +459,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
         self._setupUI_matplotlib_render_plots()
 
-    
+        ## Add the epochs separator lines:
+        _out_lines = self.add_raster_spikes_and_epochs_separator_line()
         
     def _run_delayed_gui_load_code(self):
         """ called when the self._delayed_gui_timer QTimer fires. """
