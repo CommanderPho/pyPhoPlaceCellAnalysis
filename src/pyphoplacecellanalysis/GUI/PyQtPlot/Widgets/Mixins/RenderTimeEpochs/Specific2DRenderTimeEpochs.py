@@ -6,7 +6,7 @@ from copy import deepcopy
 from neuropy.core.laps import Laps
 from neuropy.core.epoch import Epoch
 from neuropy.core.session.dataSession import DataSession
-from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # for advanced add_render_time_epochs
+
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
@@ -119,11 +119,11 @@ class General2DRenderTimeEpochs(object):
         # if curr_pipeline is not None:
         #     assert isinstance(curr_sess, NeuropyPipeline)
             
-        if isinstance(curr_sess, NeuropyPipeline):
-            curr_pipeline = curr_sess
-            sess = curr_pipeline.sess
-            active_Epochs = sess.epochs # <Epoch> object
-        elif isinstance(curr_sess, DataSession):
+        # if isinstance(curr_sess, NeuropyPipeline):
+        #     curr_pipeline = curr_sess
+        #     sess = curr_pipeline.sess
+        #     active_Epochs = sess.epochs # <Epoch> object
+        if isinstance(curr_sess, DataSession):
             active_Epochs = curr_sess.epochs # <Epoch> object
         elif isinstance(curr_sess, (Epoch, pd.DataFrame, tuple)):
             active_Epochs = curr_sess  # <Epoch> object passed directly
@@ -508,6 +508,8 @@ class SpikeBurstIntervals_2DRenderTimeEpochs(General2DRenderTimeEpochs):
         """ directly-called method 
         destination_plot should implement add_rendered_intervals
         """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # for advanced add_render_time_epochs
+
         if isinstance(curr_sess, NeuropyPipeline):
             curr_active_pipeline = curr_sess
             long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
