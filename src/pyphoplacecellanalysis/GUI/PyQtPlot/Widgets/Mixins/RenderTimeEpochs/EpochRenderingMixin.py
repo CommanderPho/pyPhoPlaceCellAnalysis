@@ -104,12 +104,17 @@ class EpochRenderingMixin:
         """The interval_datasource_updating_connections property. A ConnectionsContainer object """
         return self.ui.connections
     
-    
     @property
     def rendered_epochs(self):
         """The interval_datasources property."""
         return self.plots.rendered_epochs
     
+    @property
+    def rendered_epoch_series_names(self):
+        """The rendered_epoch_names property."""
+        return [a_name for a_name in self.rendered_epochs.keys() if ((a_name != 'name') and (a_name != 'context'))]
+
+
     #######################################################################################################################################
     
     @QtCore.Slot()
@@ -333,9 +338,11 @@ class EpochRenderingMixin:
 
     def clear_all_rendered_intervals(self, child_plots_removal_list=None, debug_print=False):
         """ removes all rendered rects - a batch version of removed_rendered_intervals(...) """
-        curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
+        # curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
+        curr_rendered_epoch_names = self.rendered_epoch_series_names
+        # the `self.rendered_epochs` is of type RenderPlots, and it has a 'name' and 'context' property that don't correspond to real outputs
         for a_name in curr_rendered_epoch_names:
-            if a_name != 'name':
+            if (a_name != 'name') and (a_name != 'context'):
                 if debug_print:
                     print(f'removing {a_name}...')
                 self.remove_rendered_intervals(a_name, child_plots_removal_list=child_plots_removal_list, debug_print=debug_print)

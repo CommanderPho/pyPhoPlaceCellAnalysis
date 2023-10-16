@@ -91,7 +91,6 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
         if self.rendered_epochs is None:
             return False
         # Find at least one plot:
-        # curr_rendered_epoch_names = [a_name for a_name in self.rendered_epochs.keys() if a_name != 'name'] # done to prevent problems with dict changing size during iteration
         curr_rendered_epoch_names = self.rendered_epoch_series_names
         child_plots = self.interval_rendering_plots
         # See if we have at least one set of non-empty rendered rects
