@@ -414,12 +414,9 @@ class EpochRenderingMixin:
         ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
         for interval_key, interval_update_kwargs in update_dict.items():
             if interval_key in self.interval_datasources:
+                if not isinstance(interval_update_kwargs, dict):
+                    interval_update_kwargs = interval_update_kwargs.to_dict() # deal with EpochDisplayConfig 
                 self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(interval_update_kwargs | kwargs))) ## Fully inline
-                # # Adjust bounds. I don't think this is needed tbh
-                # for a_plot, a_rect_item in active_2d_plot.rendered_epochs[interval_key].items():
-                #     if not isinstance(a_rect_item, str):
-                #         # Adjust the bounds to fit any children:
-                #         EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item)
             else:
                 print(f"WARNING: interval_key '{interval_key}' was not found in self.interval_datasources. Skipping update for unknown item.")
 
