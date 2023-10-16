@@ -197,7 +197,7 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 4
     _is_global = False
 
-    @function_attributes(short_name=None, tags=['spikes','burst'], input_requires=[], output_provides=[], uses=['safe_pandas_get_group','pybursts.kleinberg'], used_by=[], creation_date='2023-09-12 17:27', related_items=[],
+    @function_attributes(short_name='spike_burst_detection', tags=['spikes','burst'], input_requires=[], output_provides=[], uses=['safe_pandas_get_group','pybursts.kleinberg'], used_by=[], creation_date='2023-09-12 17:27', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['burst_detection'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['burst_detection']['burst_intervals']), is_global=False)
     def _perform_spike_burst_detection_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes periods when the cells are firing in bursts in a hierarchical manner
