@@ -8,6 +8,7 @@ import pyphoplacecellanalysis.External.pyqtgraph.graphicsItems as graphicsItems
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem import PlotItem #, PlotCurveItem
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.ScatterPlotItem import ScatterPlotItem #, PlotCurveItem
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout import GraphicsLayout
+from qtpy import QtGui
 
 # """ 
 
@@ -96,8 +97,12 @@ def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_p
 # ==================================================================================================================== #
 # RectangleRenderTupleHelpers                                                                                          #
 # ==================================================================================================================== #
-QPenTuple = namedtuple('QPenTuple', ['color', 'width'])
-QBrushTuple = namedtuple('QBrushTuple', ['color'])
+QColorTuple = namedtuple('QColorTuple', ['hexColor', 'alpha'])
+# QPenTuple = namedtuple('QPenTuple', ['color', 'width'])
+# QBrushTuple = namedtuple('QBrushTuple', ['color'])
+QPenTuple = namedtuple('QPenTuple', ['hexColor', 'alpha', 'width'])
+QBrushTuple = namedtuple('QBrushTuple', ['hexColor', 'alpha'])
+
 
 
 @metadata_attributes(short_name=None, tags=['class', 'helper', 'pyqtgraph', 'QPen', 'Qt', 'QBrush', 'Helpful', 'TO_REFACTOR'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 13:45', related_items=[])
@@ -125,22 +130,43 @@ class RectangleRenderTupleHelpers:
 
 
     """
+    @classmethod
+    def QColor_to_simple_columns_dict(cls, value):
+        """Resolves into basic datatypes:
+        color: a HexRgb string (without opacity)
+        alpha: a float value indicating the opacity
+        """
+        return {'hexColor': value.name(QtGui.QColor.HexRgb),'alpha':value.alphaF()}
+    
+
+    # _color_process_fn = lambda a_color: pg.colorStr(a_color) # a_pen.color()
+    _color_process_fn = lambda a_color: RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_color)
+
+
     @staticmethod
     def QPen_to_dict(a_pen):
-        return {'color': pg.colorStr(a_pen.color()),'width':a_pen.widthF()}
+        # return {'color': RectangleRenderTupleHelpers._color_process_fn(a_pen.color()),'width':a_pen.widthF()}
+        return {**RectangleRenderTupleHelpers._color_process_fn(a_pen.color()),'width':a_pen.widthF()}
 
     @staticmethod
     def QBrush_to_dict(a_brush):
-        return {'color': pg.colorStr(a_brush.color())} # ,'gradient':a_brush.gradient()
+        # return {'color': RectangleRenderTupleHelpers._color_process_fn(a_brush.color())} # ,'gradient':a_brush.gradient()
+        return {**RectangleRenderTupleHelpers._color_process_fn(a_brush.color())} # ,'gradient':a_brush.gradient()
 
+
+    @staticmethod
+    def QColor_to_tuple(value):
+        return QColorTuple(hexColor=value.name(QtGui.QColor.HexRgb), alpha=value.alphaF())
 
     @staticmethod
     def QPen_to_tuple(a_pen):
-        return QPenTuple(color=pg.colorStr(a_pen.color()), width=a_pen.widthF())
+        # return QPenTuple(color=RectangleRenderTupleHelpers._color_process_fn(a_pen.color()), width=a_pen.widthF())
+        return QPenTuple(**RectangleRenderTupleHelpers._color_process_fn(a_pen.color()), width=a_pen.widthF())
 
     @staticmethod
     def QBrush_to_tuple(a_brush):
-        return QBrushTuple(color=pg.colorStr(a_brush.color()))
+        # return QBrushTuple(color=RectangleRenderTupleHelpers._color_process_fn(a_brush.color()))
+        return QBrushTuple(**RectangleRenderTupleHelpers._color_process_fn(a_brush.color()))
 
     
     @classmethod
