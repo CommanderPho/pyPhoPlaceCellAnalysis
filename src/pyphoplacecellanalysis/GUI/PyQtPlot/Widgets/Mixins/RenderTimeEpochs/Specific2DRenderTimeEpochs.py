@@ -1,3 +1,4 @@
+from typing import List, Dict, Optional
 from attrs import define, field, Factory
 import numpy as np
 import pandas as pd
@@ -26,7 +27,11 @@ class General2DRenderTimeEpochs(object):
     
     @classmethod
     def _update_df_visualization_columns(cls, active_df, y_location=None, height=None, pen_color=None, brush_color=None, **kwargs):
-        """ updates the columns of the provided active_df given the values specified. If values aren't provided, they aren't changed. """        
+        """ updates the columns of the provided active_df given the values specified. If values aren't provided, they aren't changed. 
+        
+        active_df['series_vertical_offset', 'series_height', 'pen', 'brush']
+        
+        """        
         # Update only the provided columns while leaving the others intact
         if y_location is not None:
             ## y_location:
@@ -84,7 +89,8 @@ class General2DRenderTimeEpochs(object):
 
     @classmethod
     def build_render_time_epochs_datasource(cls, active_epochs_obj, **kwargs):
-        """ allows specifying a custom formatter function """
+        """ allows specifying a custom formatter function. Called from cls.add_render_time_epochs(...)
+        """
         custom_epochs_df_formatter = kwargs.pop('epochs_dataframe_formatter', None)
         
         if custom_epochs_df_formatter is None:

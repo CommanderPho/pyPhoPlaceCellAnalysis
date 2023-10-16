@@ -1,4 +1,6 @@
+from typing import List, Dict, Optional
 import param
+import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from qtpy import QtGui # for QColor
 from qtpy.QtGui import QColor, QBrush, QPen
@@ -15,6 +17,11 @@ class EpochDisplayConfig(BasePlotDataParams):
 
     This class uses the 'param' library to observe changes to its members and perform corresponding updates to the class that holds it when they happen:
     
+
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig
+
+
+
     From OccupancyPlottingMixin.setup_occupancy_plotting_mixin(self):
         # Setup watchers:    
         self.occupancy_plotting_config.param.watch(self.plot_occupancy_bars, OccupancyPlottingConfig._config_update_watch_labels(), queued=True)
