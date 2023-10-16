@@ -1,6 +1,8 @@
 import numpy as np
 
 from qtpy import QtCore, QtWidgets
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
@@ -450,8 +452,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ##################################
     
 
-    
-    @QtCore.Slot(float)
+    @pyqtExceptionPrintingSlot(float)
     def update_animation(self, next_start_timestamp: float):
         """ Actually updates the animation given the next_start_timestep
             extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...)
@@ -467,7 +468,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
         
 
-    @QtCore.Slot(int)
+    @pyqtExceptionPrintingSlot(int)
     def shift_animation_frame_val(self, shift_frames: int):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: {shift_frames})')
@@ -476,14 +477,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
 
     # Called from SliderRunner's thread when it emits the update_signal:        
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def increase_animation_frame_val(self):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.increase_animation_frame_val()')
         self.shift_animation_frame_val(1)
         
     ## Update Functions:
-    @QtCore.Slot(bool)
+    @pyqtExceptionPrintingSlot(bool)
     def play_pause(self, is_playing):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.play_pause(is_playing: {is_playing})')
@@ -493,14 +494,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.animationThread.terminate()
             
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def on_jump_left(self):
         # Skip back some frames
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_jump_left()')
         self.shift_animation_frame_val(-5)
         
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def on_jump_right(self):
         # Skip forward some frames
         if self.enable_debug_print:
@@ -508,7 +509,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.shift_animation_frame_val(5)
         
 
-    @QtCore.Slot(bool)
+    @pyqtExceptionPrintingSlot()
     def on_jump_window_left(self):
         """ jumps by the full width of the window, consistent with a PaegUp operation. """
         if self.enable_debug_print:
@@ -517,6 +518,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         window_duration_sec = time_window.window_duration
         proposed_next_window_start_time = time_window.active_window_start_time - window_duration_sec
         self.update_animation(proposed_next_window_start_time)
+        
+
+    @pyqtExceptionPrintingSlot()
     def on_jump_window_right(self):
         """ jumps by the full width of the window, consistent with a PaegDown operation. """
         if self.enable_debug_print:
@@ -526,6 +530,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         proposed_next_window_start_time = time_window.active_window_start_time + window_duration_sec
         self.update_animation(proposed_next_window_start_time)
         
+
+
+    @pyqtExceptionPrintingSlot(bool)
     def on_reverse_held(self, is_reversed):
         print(f'Spike3DRasterWindowWidget.on_reverse_held(is_reversed: {is_reversed})')
         pass
@@ -533,21 +540,21 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ########################################################
     ## For SpikeRasterLeftSidebarControlsMixin conformance:
     ########################################################
-    @QtCore.Slot(float)
+    @pyqtExceptionPrintingSlot(float)
     def on_animation_timestep_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_animation_timestep_valueChanged(updated_val: {updated_val})')
         old_value = self.animation_time_step
         self.animation_time_step = updated_val
         
-    @QtCore.Slot(float)
+    @pyqtExceptionPrintingSlot(float)
     def on_temporal_zoom_factor_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_temporal_zoom_factor_valueChanged(updated_val: {updated_val})')
         old_value = self.temporal_zoom_factor        
         self.temporal_zoom_factor = updated_val
                 
-    @QtCore.Slot(float)
+    @pyqtExceptionPrintingSlot(float)
     def on_render_window_duration_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_render_window_duration_valueChanged(updated_val: {updated_val})')
@@ -561,7 +568,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ## For SpikeRasterBottomFrameControlsMixin conformance:
     ########################################################
 
-    @QtCore.Slot(str)
+    @pyqtExceptionPrintingSlot(str)
     def perform_jump_next_series_item(self, curr_jump_series_name):
         """ seeks the current active_time_Window to the start of the next epoch event (for the epoch event series specified in the bottom bar) 
 
@@ -589,7 +596,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.update_animation(next_start_timestamp=next_target_jump_time)
 
 
-    @QtCore.Slot(str)
+    @pyqtExceptionPrintingSlot(str)
     def perform_jump_prev_series_item(self, curr_jump_series_name):
         """ seeks the current active_time_Window to the start of the previous epoch event (for the epoch event series specified in the bottom bar) 
 
@@ -612,7 +619,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.update_animation(next_start_timestamp=next_target_jump_time)
 
 
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def perform_jump_specific_timestamp(self, next_start_timestamp: float, window_duration: float=None):
         """ Jumps to a specific time window (needs window size too)
         """
@@ -631,7 +638,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
 
 
-    @QtCore.Slot(str)
+    @pyqtExceptionPrintingSlot(str)
     def perform_interval_series_remove_item(self, curr_series_name):
         """ Removes the interval series with the name specified by curr_series_name
         """
@@ -640,7 +647,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         assert curr_series_name in interval_datasources, f"curr_series_name: '{curr_series_name}' not in interval_datasources: {interval_datasources}"
         self.spike_raster_plt_2d.remove_rendered_intervals(name=curr_series_name)
 
-    @QtCore.Slot(str)
+    @pyqtExceptionPrintingSlot(str)
     def perform_interval_series_customize_item(self, curr_series_name):
         """ Launches a customization dialog for the interval series with the name specified by curr_series_name
         """
@@ -651,13 +658,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         print(f'perform_series_customize_item(curr_series_name: "{curr_series_name}"): NOT YET IMPLEMENTED')
 
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def perform_interval_series_clear_all(self):
         """ Removes all rendered interval series
         """
         self.spike_raster_plt_2d.clear_all_rendered_intervals()
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def perform_interval_series_request_add(self):
         """ Launches a dialog to add new rendered interval series
         """
@@ -698,7 +705,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ########################################################
     ## For Other conformances:
     ########################################################
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def on_spikes_df_changed(self):
         """ changes:
             self.fragile_linear_neuron_IDXs
@@ -707,7 +714,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_spikes_df_changed()')
         
-    @QtCore.Slot(float, float, float)
+    @pyqtExceptionPrintingSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
         if self.enable_debug_print:
@@ -715,7 +722,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # TODO 2023-03-29 19:03: - [ ] Shouldn't this at least update the plots like on_window_changed does? I know duration changing is more involved than just start_t changing.
 
 
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         if self.enable_debug_print:
@@ -726,13 +733,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
     
-    @QtCore.Slot(float, float, float, object)
+    @pyqtExceptionPrintingSlot(float, float, float, object)
     def on_windowed_data_window_duration_changed(self, start_t, end_t, duration, updated_data_value):
         """ changes self.half_render_window_duration """
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_windowed_data_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration}, updated_data_value: ...)')
 
-    @QtCore.Slot(float, float, object)
+    @pyqtExceptionPrintingSlot(float, float, object)
     def on_windowed_data_window_changed(self, start_t, end_t, updated_data_value):
         # called when the window is updated
         if self.enable_debug_print:
