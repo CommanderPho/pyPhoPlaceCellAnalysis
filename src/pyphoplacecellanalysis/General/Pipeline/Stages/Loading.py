@@ -404,8 +404,6 @@ class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipeli
         self.registered_load_function_dict[registered_name] = load_function
         
 
-
-
     def post_load(self, progress_logger=None, debug_print=False):
         """ Called after load is complete to post-process the data """
         if (len(self.post_load_functions) > 0):
@@ -422,6 +420,32 @@ class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipeli
                 print(f'No post_load_functions, skipping post_load.')
             if progress_logger is not None:
                 progress_logger.debug(f'No post_load_functions, skipping post_load.')
+                
+
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        del state['registered_load_function_dict']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(LoadedPipelineStage, self).__init__() # from 
+
+        self.registered_load_function_dict = {}
+        self.register_default_known_load_functions() # registers the default load functions
+
+
+    
+
+
+
+
+
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #

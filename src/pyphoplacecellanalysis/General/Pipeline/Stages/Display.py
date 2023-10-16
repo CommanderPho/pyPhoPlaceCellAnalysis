@@ -227,6 +227,41 @@ class DisplayPipelineStage(ComputedPipelineStage):
         display_function.is_global = getattr(display_function, 'is_global', False) # sets the 'is_global' property on the function with its current value if it has one, otherwise it assume that it's not global and sets False
         self.registered_display_function_dict[registered_name] = display_function
         
+
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        del state['registered_load_function_dict']
+        del state['registered_computation_function_dict']
+        del state['registered_global_computation_function_dict']
+        del state['display_output']
+        del state['render_actions']
+        del state['registered_display_function_dict']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(LoadedPipelineStage, self).__init__() # from 
+
+        self.registered_load_function_dict = {}
+        self.register_default_known_load_functions() # registers the default load functions
+        
+        self.registered_computation_function_dict = OrderedDict()
+        self.registered_global_computation_function_dict = OrderedDict()
+        self.reload_default_computation_functions() # registers the default
+
+        # Initialize custom fields:
+        self.display_output = DynamicParameters()
+        self.render_actions = DynamicParameters()
+        self.registered_display_function_dict = OrderedDict()
+        self.register_default_known_display_functions() # registers the default display functions
+
+
+
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #

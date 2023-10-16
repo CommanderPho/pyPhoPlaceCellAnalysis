@@ -66,7 +66,7 @@ class FunctionsSearchMode(Enum):
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, BaseNeuropyPipelineStage):
+class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     """Docstring for ComputedPipelineStage.
 
     global_comparison_results has keys of type IdentifyingContext
@@ -214,6 +214,31 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         return list(active_computation_function_dict.values())
         
 
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        del state['registered_load_function_dict']
+        del state['registered_computation_function_dict']
+        del state['registered_global_computation_function_dict']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(LoadedPipelineStage, self).__init__() # from 
+
+        self.registered_load_function_dict = {}
+        self.register_default_known_load_functions() # registers the default load functions
+        
+        self.registered_computation_function_dict = OrderedDict()
+        self.registered_global_computation_function_dict = OrderedDict()
+        self.reload_default_computation_functions() # registers the default
+
+
+        
 
     # ==================================================================================================================== #
     # Specific Context Computation Helpers                                                                                 #
