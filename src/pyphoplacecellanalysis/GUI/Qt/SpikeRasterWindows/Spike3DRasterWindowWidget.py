@@ -885,7 +885,39 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'\t wheelEvent(event: {event}')
     
 
-    
+    @classmethod
+    def find_or_create_if_needed(cls, curr_active_pipeline, **kwargs):
+        """ Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+        Usage:
+        
+        from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+        spike_raster_window = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline)
+
+        
+        """
+        # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+        from pyphocorehelpers.gui.Qt.TopLevelWindowHelper import TopLevelWindowHelper
+        import pyphoplacecellanalysis.External.pyqtgraph as pg # Used to get the app for TopLevelWindowHelper.top_level_windows
+        ## For searching with `TopLevelWindowHelper.all_widgets(...)`:
+
+        found_spike_raster_windows = TopLevelWindowHelper.all_widgets(pg.mkQApp(), searchType=cls)
+
+        if len(found_spike_raster_windows) < 1:
+            # no existing spike_raster_windows. Make a new one
+            print(f'no existing SpikeRasterWindow. Creating a new one.')
+            # Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
+            active_2d_plot, active_3d_plot, spike_raster_window = curr_active_pipeline.plot._display_spike_rasters_pyqtplot_2D(**kwargs).values()
+
+        else:
+            print(f'found {len(found_spike_raster_windows)} existing Spike3DRasterWindowWidget windows using TopLevelWindowHelper.all_widgets(...). Will use the most recent.')
+            # assert len(found_spike_raster_windows) == 1, f"found {len(found_spike_raster_windows)} Spike3DRasterWindowWidget windows using TopLevelWindowHelper.all_widgets(...) but require exactly one."
+            # Get the most recent existing one and reuse that:
+            spike_raster_window = found_spike_raster_windows[0]
+            # Extras:
+            active_2d_plot = spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+            active_3d_plot = spike_raster_window.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+
+        return spike_raster_window
     
     
     
