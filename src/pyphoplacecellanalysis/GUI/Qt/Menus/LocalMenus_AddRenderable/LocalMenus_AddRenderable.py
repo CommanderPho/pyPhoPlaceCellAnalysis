@@ -93,8 +93,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
         widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
         widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
-        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(True) # disable by default
-
+        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, destination_plot=destination_plot, active_config_name=active_config_name)) # disable by default
 
         ## Time Curves:
         submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_RelativeEntropySurprise, widget.ui.actionAddTimeCurves_Custom]
