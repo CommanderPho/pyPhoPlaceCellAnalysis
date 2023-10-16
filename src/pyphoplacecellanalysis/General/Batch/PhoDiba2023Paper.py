@@ -395,18 +395,20 @@ class AssigningEpochs:
         assigning_epochs_obj._debug_print_assignment_statuses()
         fig, axs = assigning_epochs_obj._subfn_plot_epoch_track_assignments(axis_idx=axis_idx, defer_render=True)
 
-        # Partition based on whether the user included the epoch in the long or short track in the user-included epochs:
-        is_user_exclusive_L = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']))
-        is_user_exclusive_S = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included']))
-        is_user_unassigned_in_both_epochs = np.logical_and(np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']), np.logical_not(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'])) # the user said it was bad in both epochs, so assign it to neither with high confidence
 
-        # NOTE: be sure to assign to the filter_epochs_df, not the unassigned_epochs_df, because the unassigned_epochs_df is a subset of the filter_epochs_df, and we want to assign to the filter_epochs_df so that the unassigned_epochs_df will be a subset of the filter_epochs_df:
-        # assign the user_exclusive_L to long_track:
-        assigning_epochs_obj.filter_epochs_df.loc[is_user_exclusive_L, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.LONG_TRACK, 1.0)
-        # assign the user_exclusive_S to short_track:
-        assigning_epochs_obj.filter_epochs_df.loc[is_user_exclusive_S, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.SHORT_TRACK, 1.0)
-        # assign the user_unassigned_in_both_epochs to neither:
-        assigning_epochs_obj.filter_epochs_df.loc[is_user_unassigned_in_both_epochs, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.NEITHER, 1.0)
+        ## User Assignment:
+        # # Partition based on whether the user included the epoch in the long or short track in the user-included epochs:
+        # is_user_exclusive_L = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']))
+        # is_user_exclusive_S = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included']))
+        # is_user_unassigned_in_both_epochs = np.logical_and(np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']), np.logical_not(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'])) # the user said it was bad in both epochs, so assign it to neither with high confidence
+
+        # # NOTE: be sure to assign to the filter_epochs_df, not the unassigned_epochs_df, because the unassigned_epochs_df is a subset of the filter_epochs_df, and we want to assign to the filter_epochs_df so that the unassigned_epochs_df will be a subset of the filter_epochs_df:
+        # # assign the user_exclusive_L to long_track:
+        # assigning_epochs_obj.filter_epochs_df.loc[is_user_exclusive_L, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.LONG_TRACK, 1.0)
+        # # assign the user_exclusive_S to short_track:
+        # assigning_epochs_obj.filter_epochs_df.loc[is_user_exclusive_S, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.SHORT_TRACK, 1.0)
+        # # assign the user_unassigned_in_both_epochs to neither:
+        # assigning_epochs_obj.filter_epochs_df.loc[is_user_unassigned_in_both_epochs, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.NEITHER, 1.0)
 
         # assigning_epochs_obj.filter_epochs_df[is_user_exclusive_S]
         # assigning_epochs_obj.filter_epochs_df[is_user_exclusive_L]
@@ -414,12 +416,16 @@ class AssigningEpochs:
         assigning_epochs_obj._debug_print_assignment_statuses()
         fig, axs = assigning_epochs_obj._subfn_plot_epoch_track_assignments(axis_idx=axis_idx, fig=fig, axs=axs, defer_render=True)
 
-
+        unassigned_epochs_df = assigning_epochs_obj.unassigned_epochs_df
         # Filter based on the active_set cells (LxC, SxC):
-        assigning_epochs_obj.unassigned_epochs_df.loc[np.logical_and(assigning_epochs_obj.unassigned_epochs_df['has_LONG_exclusive_aclu'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['has_SHORT_exclusive_aclu'])), 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.LONG_TRACK, 1.0)
+        unassigned_epochs_df.loc[np.logical_and(unassigned_epochs_df['has_LONG_exclusive_aclu'], np.logical_not(unassigned_epochs_df['has_SHORT_exclusive_aclu'])), 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.LONG_TRACK, 0.85)
         assigning_epochs_obj._debug_print_assignment_statuses()
         # assign the user_exclusive_S to short_track:
-        assigning_epochs_obj.unassigned_epochs_df.loc[np.logical_and(np.logical_not(assigning_epochs_obj.unassigned_epochs_df['has_LONG_exclusive_aclu']), assigning_epochs_obj.unassigned_epochs_df['has_SHORT_exclusive_aclu']), 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.SHORT_TRACK, 1.0)
+        unassigned_epochs_df.loc[np.logical_and(np.logical_not(unassigned_epochs_df['has_LONG_exclusive_aclu']), unassigned_epochs_df['has_SHORT_exclusive_aclu']), 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.SHORT_TRACK, 0.85)
+
+        # Re assign
+        assigning_epochs_obj.unassigned_epochs_df = unassigned_epochs_df
+
         axis_idx = axis_idx + 1
         assigning_epochs_obj._debug_print_assignment_statuses()
         fig, axs = assigning_epochs_obj._subfn_plot_epoch_track_assignments(axis_idx=axis_idx, fig=fig, axs=axs, defer_render=True)
@@ -427,7 +433,7 @@ class AssigningEpochs:
         if not defer_render:
             fig.show() 
             
-        return fig, axs
+        return fig, axs, assigning_epochs_obj
 
 
 # ==================================================================================================================== #
@@ -463,15 +469,23 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
     included_neuron_ids = EITHER_subset.track_exclusive_aclus
     spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df).spikes.sliced_by_neuron_type('pyr')
     # filter_epochs_df = deepcopy(long_results_obj.active_filter_epochs.to_dataframe())
+
+
+    ## TODO: need to usee the actual LxC/SxCs (hand-picked) instead of the ones based on placefields.
     filter_epoch_spikes_df, filter_epochs_df = assigning_epochs_obj.determine_if_contains_active_set_exclusive_cells(spikes_df, exclusive_aclus=EITHER_subset.track_exclusive_aclus, short_exclusive=short_exclusive, long_exclusive=long_exclusive, included_neuron_ids=included_neuron_ids) # adds 'active_unique_aclus'    
+
+
+    
+
+
+
     # filter_epoch_spikes_df, filter_epochs_df = assigning_epochs_obj._find_example_epochs(spikes_df, EITHER_subset.track_exclusive_aclus, included_neuron_ids=included_neuron_ids) # adds 'active_unique_aclus'
     # # epoch_contains_any_exclusive_aclus.append(np.isin(epoch_spikes_unique_aclus, exclusive_aclus).any())
     # filter_epochs_df['has_SHORT_exclusive_aclu'] = [np.isin(epoch_spikes_unique_aclus, short_exclusive.track_exclusive_aclus).any() for epoch_spikes_unique_aclus in filter_epochs_df['active_unique_aclus']]
     # filter_epochs_df['has_LONG_exclusive_aclu'] = [np.isin(epoch_spikes_unique_aclus, long_exclusive.track_exclusive_aclus).any() for epoch_spikes_unique_aclus in filter_epochs_df['active_unique_aclus']]
 
     # Get the manual user annotations to determine the good replays for both long/short decoding:
-    assigning_epochs_obj.filter_by_user_selections(curr_active_pipeline=curr_active_pipeline, allow_interactive_selection=allow_interactive_good_epochs_selection)
-    
+    # assigning_epochs_obj.filter_by_user_selections(curr_active_pipeline=curr_active_pipeline, allow_interactive_selection=allow_interactive_good_epochs_selection)
 
     #### Finally, get only the epochs that meet the criteria:
 
@@ -481,8 +495,17 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
     # considered_filter_epochs_df = considered_filter_epochs_df[np.logical_xor(filter_epochs_df['long_is_user_included'], filter_epochs_df['short_is_user_included'])]
 
     # Get separate long-side/short-side candidate replays:
-    epochs_df_L = filter_epochs_df[(filter_epochs_df['has_LONG_exclusive_aclu'] & filter_epochs_df['long_is_user_included'])].copy() # replay not considered good by user for short decoding, but it is for long decoding. Finally, has at least one LONG exclusive ACLU.
-    epochs_df_S = filter_epochs_df[(filter_epochs_df['has_SHORT_exclusive_aclu'] & filter_epochs_df['short_is_user_included'])].copy()  # replay not considered good by user for long decoding, but it is for short decoding. Finally, has at least one SHORT exclusive ACLU.
+    if 'long_is_user_included' not in filter_epochs_df:
+        print(f'WARNING: PAPER_FIGURE_figure_1_add_replay_epoch_rasters(...): no user-assigned manually labeled replay epochs. Reeturning all epochs.')
+        epochs_df_L = filter_epochs_df[(filter_epochs_df['has_LONG_exclusive_aclu'])].copy() # replay not considered good by user for short decoding, but it is for long decoding. Finally, has at least one LONG exclusive ACLU.
+        epochs_df_S = filter_epochs_df[(filter_epochs_df['has_SHORT_exclusive_aclu'])].copy()  # replay not considered good by user for long decoding, but it is for short decoding. Finally, has at least one SHORT exclusive ACLU.
+    else:
+        epochs_df_L = filter_epochs_df[(filter_epochs_df['has_LONG_exclusive_aclu'] & filter_epochs_df['long_is_user_included'])].copy() # replay not considered good by user for short decoding, but it is for long decoding. Finally, has at least one LONG exclusive ACLU.
+        epochs_df_S = filter_epochs_df[(filter_epochs_df['has_SHORT_exclusive_aclu'] & filter_epochs_df['short_is_user_included'])].copy()  # replay not considered good by user for long decoding, but it is for short decoding. Finally, has at least one SHORT exclusive ACLU.
+
+
+    # epochs_df_L = filter_epochs_df[(filter_epochs_df['has_LONG_exclusive_aclu'] & filter_epochs_df['long_is_user_included'])].copy() # replay not considered good by user for short decoding, but it is for long decoding. Finally, has at least one LONG exclusive ACLU.
+    # epochs_df_S = filter_epochs_df[(filter_epochs_df['has_SHORT_exclusive_aclu'] & filter_epochs_df['short_is_user_included'])].copy()  # replay not considered good by user for long decoding, but it is for short decoding. Finally, has at least one SHORT exclusive ACLU.
 
     # Common for all rasters:
     new_all_aclus_sort_indicies = determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline=curr_active_pipeline, curr_any_context_neurons=EITHER_subset.track_exclusive_aclus)
