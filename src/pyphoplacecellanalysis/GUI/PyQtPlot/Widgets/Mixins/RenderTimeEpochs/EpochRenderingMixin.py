@@ -580,6 +580,14 @@ class EpochRenderingMixin:
         return stacked_epoch_layout_dict
 
 
+    # Separator Lines ____________________________________________________________________________________________________ #
+
+    def add_raster_spikes_and_epochs_separator_line(self):
+        """ adds a thick separator line between the spikes and the epochs. """
+        _out_lines_dict = {}
+        for a_dest_plot in self.interval_rendering_plots:
+            _out_lines_dict[a_dest_plot.objectName()] = a_dest_plot.addLine(x=None, y=0.0, pen={'color':'w', 'width':3.0}, name='EpochDividerLine') # pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.InfiniteLine.InfiniteLine
+        return _out_lines_dict
 
     # ---------------------------------------------------------------------------- #
     #                          Private Implementor Methods                         #
