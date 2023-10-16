@@ -90,6 +90,30 @@ class EpochDisplayConfig(BasePlotDataParams):
                 out.brush_color = brush_qcolor # set raw
         return out
     
+    @classmethod
+    def init_configs_list_from_interval_datasource_df(cls, name: str, a_ds) -> List["EpochDisplayConfig"]:
+        """
+
+        Example Usage:
+
+            epochs_update_dict = {
+                'Replays':dict(y_location=-10.0, height=7.5, pen_color=inline_mkColor('orange', 0.8), brush_color=inline_mkColor('orange', 0.5)),
+                'PBEs':dict(y_location=-2.0, height=1.5, pen_color=inline_mkColor('pink', 0.8), brush_color=inline_mkColor('pink', 0.5)),
+                'Ripples':dict(y_location=-12.0, height=1.5, pen_color=inline_mkColor('cyan', 0.8), brush_color=inline_mkColor('cyan', 0.5)),
+                'SessionEpochs':dict(y_location=-12.0, height=1.5, pen_color=inline_mkColor('cyan', 0.8), brush_color=inline_mkColor('cyan', 0.5)),
+            }
+            epochs_update_dict = {k:EpochDisplayConfig.init_from_config_dict(name=k, config_dict=v) for k,v in epochs_update_dict.items()}
+            epochs_update_dict
+
+
+        """
+        a_serializable_df = a_ds.get_serialized_data(drop_duplicates=True)
+        assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns))
+        return [cls(name=f'{name}', isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity) for y_location, height, (pen_color, pen_opacity, pen_width), (brush_color, brush_opacity) in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+        
+
+
+
     @property
     def pen_QColor(self):
         return inline_mkColor(self.pen_color, self.pen_opacity)
@@ -108,6 +132,9 @@ class EpochDisplayConfig(BasePlotDataParams):
         self.brush_opacity = value.alphaF()
 
 
+    def to_dict(self) -> dict:
+        """ returns as a dictionary representation """
+        return dict(y_location=self.y_location, height=self.height, pen_color=self.pen_QColor, brush_color=self.brush_QColor)
 
     # def to_plot_config_dict(self):
     #     issue_labels = {'name': 'OccupancyLabels', 'name': 'Occupancy'}
@@ -119,3 +146,16 @@ class EpochDisplayConfig(BasePlotDataParams):
     # def to_labels_plot_config_dict(self):
     #     return {'name': 'OccupancyLabels', 'shape': 'rounded_rect', 'shape_opacity': self.labelsOpacity, 'show_points': self.labelsShowPoints}
     
+
+
+
+def _get_default_epoch_configs():
+    epochs_update_dict = {
+        # 'SessionEpochs': EpochDisplayConfig(brush_color='#00ffff', brush_opacity=0.5, name='SessionEpochs', pen_color='#00ffff', pen_opacity=0.8, height=2.469135802469136, y_location=-12.34567901234568),
+        'Laps': EpochDisplayConfig(brush_color='#ff0000', brush_opacity=0.5, name='Laps', pen_color='#ff0000', pen_opacity=0.8, height=4.938271604938272, y_location=-9.876543209876544),	
+        'PBEs': EpochDisplayConfig(brush_color='#ffc0cb', brush_opacity=0.5, name='PBEs', pen_color='#ffc0cb', pen_opacity=0.8, height=4.938271604938272, y_location=-4.938271604938272),
+        'Ripples': EpochDisplayConfig(brush_color='#6e00f5', brush_opacity=0.5, name='Ripples', pen_color='#6e00f5', pen_opacity=0.8, height=4.938271604938272, y_location=-12.0),
+        'Replays': EpochDisplayConfig(brush_color='#ffa500', brush_opacity=0.5, name='Replays', pen_color='#ffa500', pen_opacity=0.8, height=4.938271604938272, y_location=-10.0), 
+    }
+
+    return epochs_update_dict
