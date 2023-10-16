@@ -503,6 +503,28 @@ class SpikeBurstIntervals_2DRenderTimeEpochs(General2DRenderTimeEpochs):
             return active_df
         return _add_interval_dataframe_visualization_columns_general_epoch
     
+
+    @classmethod
+    def is_render_time_epochs_enabled(cls, curr_sess, destination_plot, **kwargs) -> bool:
+        """ takes the exact same arguments as `add_render_time_epochs(...) but returns True if the call would be valid and False otherwise. """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # for advanced add_render_time_epochs
+        if isinstance(curr_sess, NeuropyPipeline):
+            curr_active_pipeline = curr_sess
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            active_config_name = kwargs.pop('active_config_name', global_epoch_name)
+
+            try:
+                active_burst_intervals = curr_active_pipeline.computation_results[active_config_name].computed_data['burst_detection']['burst_intervals'] # this works
+                return (active_burst_intervals is not None)
+                    
+            except (KeyError, AttributeError, ValueError):
+                return False
+                    
+        else:
+            return False
+        
+
+
     @classmethod
     def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs):
         """ directly-called method 
