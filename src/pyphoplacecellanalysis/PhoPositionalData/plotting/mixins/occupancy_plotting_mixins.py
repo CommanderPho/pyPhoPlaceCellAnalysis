@@ -10,7 +10,7 @@ class OccupancyPlottingConfig(BasePlotDataParams):
 
     This class uses the 'param' library to observe changes to its members and perform corresponding updates to the class that holds it when they happen:
     
-    From  OccupancyPlottingMixin.setup_occupancy_plotting_mixin(self):
+    From OccupancyPlottingMixin.setup_occupancy_plotting_mixin(self):
         # Setup watchers:    
         self.occupancy_plotting_config.param.watch(self.plot_occupancy_bars, OccupancyPlottingConfig._config_update_watch_labels(), queued=True)
         self.occupancy_plotting_config.param.watch(self.on_occupancy_plot_update_visibility, OccupancyPlottingConfig._config_visibility_watch_labels(), queued=True)

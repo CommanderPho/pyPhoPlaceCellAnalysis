@@ -93,7 +93,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
         widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
         widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
-        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(False) # disable by default
+        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(True) # disable by default
 
 
         ## Time Curves:
