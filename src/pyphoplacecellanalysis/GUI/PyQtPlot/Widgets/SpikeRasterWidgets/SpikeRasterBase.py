@@ -574,12 +574,12 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         elif e.key() == QtCore.Qt.Key_PageDown:
             # PageDown Key
             print(f'Key_PageDown Pressed')
-            self.shift_animation_frame_val(1) # jump forward one frame
+            self.on_jump_window_right() # jump forward one full window
+
         elif e.key() == QtCore.Qt.Key_PageUp:
             # PageUp Key
             print(f'Key_PageUp Pressed')
-            self.shift_animation_frame_val(-1) # jump back one frame
-
+            self.on_jump_window_left() # jump back one window
 
         elif e.key() == QtCore.Qt.Key_Space:
             self.play_pause()
