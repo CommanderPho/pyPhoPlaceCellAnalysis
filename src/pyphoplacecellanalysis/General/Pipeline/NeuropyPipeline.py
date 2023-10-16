@@ -593,21 +593,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         #     del stage['display_output'] # self.stage.display_output
         #     del stage['display_output'] # self.stage.display_output
 
-        try:
-            del state['display_output'] # self.stage.display_output
-        except KeyError:
-            print(f'pipeline does not have "display_output"')
-            pass
-        except BaseException:
-            raise
-
-        try:
-            del state['render_actions'] # self.stage.display_output
-        except KeyError:
-            print(f'pipeline does not have "render_actions"')
-            pass
-        except BaseException:
-            raise
 
         del state['_registered_output_files']
         del state['_outputs_specifier']
