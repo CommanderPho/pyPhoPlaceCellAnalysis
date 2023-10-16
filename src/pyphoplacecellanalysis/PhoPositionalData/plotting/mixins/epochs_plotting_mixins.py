@@ -9,7 +9,18 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import inline_mkColor
 from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDataParams
 
 
+# class ColorWithOpacity(param.Parameter):
+#     """Integer Parameter that must be even"""
 
+#     def _validate_value(self, val, allow_None):
+#         super(ColorWithOpacity, self)._validate_value(val, allow_None)
+#         if not isinstance(val, numbers.Number):
+#             raise ValueError("ColorWithOpacity parameter %r must be a number, "
+#                              "not %r." % (self.name, val))
+        
+#         if not (val % 2 == 0):
+#             raise ValueError("ColorWithOpacity parameter %r must be even, "
+#                              "not %r." % (self.name, val))
 
 
 class EpochDisplayConfig(BasePlotDataParams):
@@ -57,6 +68,10 @@ class EpochDisplayConfig(BasePlotDataParams):
     # Location Properties:
     height = param.Number(default=7.5, bounds=(0.1, 50.0), step=0.1)
     y_location = param.Number(default=-12.0, bounds=(-200.0, 1000.0), step=2.0)
+
+
+    #transformer = param.Callable(identity)
+    #a = param.Action(print_time_of_day)
 
     @classmethod
     def init_from_config_dict(cls, name: str, config_dict: dict):
