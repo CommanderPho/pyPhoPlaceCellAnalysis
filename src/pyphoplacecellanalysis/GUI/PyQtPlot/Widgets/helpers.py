@@ -218,3 +218,8 @@ def _helper_make_scatterplot_clickable(main_scatter_plot, enable_hover:bool=Fals
 
 
 
+def inline_mkColor(color, alpha=1.0):
+    """ helps build a new QColor for a pen/brush in an inline (single-line) way. """
+    out_color = pg.mkColor(color)
+    out_color.setAlphaF(alpha)
+    return out_color
