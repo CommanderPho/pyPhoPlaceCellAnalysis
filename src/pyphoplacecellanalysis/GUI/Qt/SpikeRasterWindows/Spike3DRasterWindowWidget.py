@@ -509,6 +509,23 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
 
     @QtCore.Slot(bool)
+    def on_jump_window_left(self):
+        """ jumps by the full width of the window, consistent with a PaegUp operation. """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_jump_window_left()')
+        time_window = self.animation_active_time_window # SpikesDataframeWindow
+        window_duration_sec = time_window.window_duration
+        proposed_next_window_start_time = time_window.active_window_start_time - window_duration_sec
+        self.update_animation(proposed_next_window_start_time)
+    def on_jump_window_right(self):
+        """ jumps by the full width of the window, consistent with a PaegDown operation. """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_jump_window_right()')
+        time_window = self.animation_active_time_window # SpikesDataframeWindow
+        window_duration_sec = time_window.window_duration
+        proposed_next_window_start_time = time_window.active_window_start_time + window_duration_sec
+        self.update_animation(proposed_next_window_start_time)
+        
     def on_reverse_held(self, is_reversed):
         print(f'Spike3DRasterWindowWidget.on_reverse_held(is_reversed: {is_reversed})')
         pass

@@ -557,7 +557,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     # Input Handelers:        
     def keyPressEvent(self, e):
         """ called automatically when a keyboard key is pressed and this widget has focus. 
-        TODO: doesn't actually work right now.
+        
         """
         print(f'keyPressEvent(e.key(): {e.key()})')
         if e.key() == QtCore.Qt.Key_Escape:
@@ -565,11 +565,22 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         elif e.key() == QtCore.Qt.Key_Backspace:
             print('TODO')
         elif e.key() == QtCore.Qt.Key_Left:
-            self.shift_animation_frame_val(-1) # jump back one frame
-            
+            # Left Arrow
+            self.shift_animation_frame_val(-1) # jump back one frame            
         elif e.key() == QtCore.Qt.Key_Right:
+            # Right Arrow
+            self.shift_animation_frame_val(1) # jump forward one frame            
+
+        elif e.key() == QtCore.Qt.Key_PageDown:
+            # PageDown Key
+            print(f'Key_PageDown Pressed')
             self.shift_animation_frame_val(1) # jump forward one frame
-            
+        elif e.key() == QtCore.Qt.Key_PageUp:
+            # PageUp Key
+            print(f'Key_PageUp Pressed')
+            self.shift_animation_frame_val(-1) # jump back one frame
+
+
         elif e.key() == QtCore.Qt.Key_Space:
             self.play_pause()
         elif e.key() == QtCore.Qt.Key_P:
