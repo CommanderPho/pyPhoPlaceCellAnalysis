@@ -53,7 +53,7 @@ class EpochRenderConfigWidget(QWidget):
 
     def initUI(self):
         self.update_from_config(self.config)
-        ## Setup Bindings:
+        ## TODO: Setup Bindings:
         param_to_pyqt_binding_dict = ParamToPyQtBinding.param_to_pyqt_binding_dict()
         ui_element_list = self.get_ui_element_list()
         bound_config_value_list = self.get_bound_config_value_list()

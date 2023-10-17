@@ -7,7 +7,8 @@ from qtpy.QtGui import QColor, QBrush, QPen
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import inline_mkColor
 from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDataParams
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 """ 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig, _get_default_epoch_configs
@@ -28,6 +29,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mi
 #                              "not %r." % (self.name, val))
 
 
+@metadata_attributes(short_name=None, tags=['epoch', 'params', 'config'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 03:26', related_items=[])
 class EpochDisplayConfig(BasePlotDataParams):
     """ NOTE: Upon reviewing many different versions of my plotting implementations, this Param-based one is the most succinct and smooth.
 

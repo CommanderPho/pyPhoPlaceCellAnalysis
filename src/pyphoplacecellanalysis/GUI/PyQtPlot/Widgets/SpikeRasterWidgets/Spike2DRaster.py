@@ -559,6 +559,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
     @QtCore.pyqtSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
+        """ update the zoomed plot, the spikes_window, and update the dependent curves
+        
+        """
         # Update the main_plot_widget:
         if self.Includes2DActiveWindowScatter:
             self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
@@ -586,7 +589,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
     @QtCore.pyqtSlot(float, float)
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
-        """ called to update the interactive scrolling window control """
+        """ called to update the interactive scrolling window control
+        
+        PUBLIC: primary update function
+        
+        
+        """
         if block_signals:
             self.ui.scroll_window_region.blockSignals(True) # Block signals so it doesn't recursively update
         self.ui.scroll_window_region.setRegion([new_start, new_end]) # adjust scroll control
