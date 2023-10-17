@@ -233,7 +233,8 @@ class DisplayPipelineStage(ComputedPipelineStage):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
         # Remove the unpicklable entries.
-        del state['registered_load_function_dict']
+        if 'registered_load_function_dict' in state:
+            del state['registered_load_function_dict']
         del state['registered_computation_function_dict']
         del state['registered_global_computation_function_dict']
         del state['display_output']
