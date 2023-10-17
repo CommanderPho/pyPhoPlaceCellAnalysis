@@ -589,6 +589,33 @@ class EpochRenderingMixin:
             _out_lines_dict[a_dest_plot.objectName()] = a_dest_plot.addLine(x=None, y=0.0, pen={'color':'w', 'width':3.0}, name='EpochDividerLine') # pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.InfiniteLine.InfiniteLine
         return _out_lines_dict
 
+
+
+    # 2023-10-16 - Interval `EpochDisplayConfig` extraction from datasources: ____________________________________________ #
+    def extract_interval_display_config_lists(self):
+        """ Build the EpochDisplayConfig lists for each interval datasource
+
+        
+        Usage:
+        
+        import panel as pn
+        pn.extension()
+
+        out_configs_dict = active_2d_plot.extract_interval_display_config_lists()
+        pn.Row(*[pn.Column(*[pn.Param(a_sub_v) for a_sub_v in v]) for k,v in out_configs_dict.items()])
+
+        """
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig
+        out_configs_dict = {}
+        rendered_epoch_names = self.interval_datasource_names
+        for a_name in rendered_epoch_names:
+            a_ds = self.interval_datasources[a_name]
+            result = EpochDisplayConfig.init_configs_list_from_interval_datasource_df(a_name, a_ds)
+            out_configs_dict[a_name] = result
+
+        return out_configs_dict
+    
+
     # ---------------------------------------------------------------------------- #
     #                          Private Implementor Methods                         #
     # ---------------------------------------------------------------------------- #
