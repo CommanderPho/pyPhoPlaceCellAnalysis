@@ -1371,7 +1371,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     # Get the colormap applied to the decoded posteriors:
     colormap = cm.get_cmap("viridis")  # "nipy_spectral" cm.get_cmap("CMRmap")
     colormap._init()
-    lut = (colormap._lut * 255).view(np.ndarray)  # Convert matplotlib colormap from 0-1 to 0 -255 for Qt
+    lut = (colormap._lut * 255).view(np.ndarray)  # Convert matplotlib colormap from 0-1 to 0-255 for Qt
 
 
     ## 0. Precompute the active neurons in each timebin, and the epoch-timebin-flattened decoded posteriors makes it easier to compute for a given time bin:

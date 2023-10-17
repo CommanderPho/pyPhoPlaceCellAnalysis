@@ -12,6 +12,8 @@ from neuropy.core.session.dataSession import DataSession
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager # for getting colors of session epochs
+
 
 """ 
 A general epochs_dataframe_formatter takes a dataframe and adds the required columns
@@ -164,6 +166,10 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
     default_datasource_name = 'SessionEpochs'
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
+
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
             """ Adds the remaining _required_interval_visualization_columns specifically for PBEs
             """
@@ -175,9 +181,18 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             # brush_color = pg.mkColor('red')
 
             ## parameters:
-            pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
-            brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+            # pen_color = [pg.mkColor('red'), pg.mkColor('cyan')]
+            # brush_color = [pg.mkColor('red'), pg.mkColor('cyan')]
             
+            pen_color = [pg.mkColor(long_epoch_config.pen.color()), pg.mkColor(short_epoch_config.pen.color())]
+            brush_color = [pg.mkColor(long_epoch_config.brush.color()), pg.mkColor(short_epoch_config.brush.color())]
+            
+            for a_pen_color in pen_color:
+                a_pen_color.setAlphaF(0.8)
+
+            for a_brush_color in brush_color:
+                a_brush_color.setAlphaF(0.5)
+
             ## Add the missing parameters to the dataframe:
             active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             return active_df

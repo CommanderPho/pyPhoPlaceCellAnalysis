@@ -1577,6 +1577,10 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
     should_plot_vertical_track_bounds_lines: bool - if True, vertical lines representing the bounds of the linear track are rendered
     should_plot_linear_track_shapes: bool - if True, plots 2D linear tracks on the figure
     
+
+    Notes:
+
+        actual colors are built from cmap in `plot_ratemap_1D(...)`
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_short_v_long_pf1D_comparison
 
