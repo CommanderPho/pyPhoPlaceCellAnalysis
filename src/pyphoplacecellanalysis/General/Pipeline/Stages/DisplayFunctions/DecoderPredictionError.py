@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from copy import deepcopy
-from attrs import define
+from attrs import define, field, Factory
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.patches import FancyArrowPatch, FancyArrow
@@ -826,18 +826,28 @@ def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, axs=None
 # Menu Commands                                                                                                        #
 # ==================================================================================================================== #
 
+
+
+@define(slots=False)
 class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
     """ Creates a stacked decoded epoch slices view by calling _display_plot_decoded_epoch_slices
     
     """
-    def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, filter_epochs='laps', display_output={}) -> None:
-        super(CreateNewStackedDecodedEpochSlicesPlotCommand, self).__init__()
-        self._spike_raster_window = spike_raster_window
-        self._active_pipeline = active_pipeline
-        self._active_config_name = active_config_name
-        self._context = active_context
-        self._display_output = display_output
-        self._filter_epochs = filter_epochs
+    _spike_raster_window = field()
+    _active_pipeline = field()
+    _active_config_name = field(default=None)
+    _context = field(default=None, alias="active_context")
+    _filter_epochs = field(default='laps')
+    _display_output = field(default=Factory(dict))
+    
+    # def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, filter_epochs='laps', display_output={}) -> None:
+    #     super(CreateNewStackedDecodedEpochSlicesPlotCommand, self).__init__()
+    #     self._spike_raster_window = spike_raster_window
+    #     self._active_pipeline = active_pipeline
+    #     self._active_config_name = active_config_name
+    #     self._context = active_context
+    #     self._display_output = display_output
+    #     self._filter_epochs = filter_epochs
         
         
     def execute(self, *args, **kwargs) -> None:
@@ -851,15 +861,22 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
         self._display_output[_out_display_key] = _out_plot_tuple
         
 
+
+@define(slots=False)
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
-    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
-        super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
-        self._spike_raster_window = spike_raster_window
-        self._curr_active_pipeline = curr_active_pipeline
-        self._active_config_name = active_config_name
-        self._display_output = display_output
-        # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
+    _spike_raster_window = field()
+    _active_pipeline = field(alias='curr_active_pipeline')
+    _active_config_name = field(default=None)
+    _display_output = field(default=Factory(dict))
+
+    # def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
+    #     super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
+    #     self._spike_raster_window = spike_raster_window
+    #     self._curr_active_pipeline = curr_active_pipeline
+    #     self._active_config_name = active_config_name
+    #     self._display_output = display_output
+    #     # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
 
     def execute(self, *args, **kwargs) -> None:
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
@@ -875,6 +892,81 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
         # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
         
+
+
+@define(slots=False)
+class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
+    """ 2023-10-17. """
+    _spike_raster_window = field()
+    _active_pipeline = field(alias='curr_active_pipeline')
+    _active_config_name = field(default=None)
+    _context = field(default=None, alias="active_context")
+    _display_output = field(default=Factory(dict))
+
+    @classmethod
+    def add_long_short_decoder_decoded_replays(cls, curr_active_pipeline, active_2d_plot):
+        """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # Actual most general
+
+        ## long_short_decoding_analyses:
+        curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
+        ## Extract variables from results object:
+        long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+        # long_results_obj.active_filter_epochs
+        long_decoded_epochs_result = long_results_obj.all_included_filter_epochs_decoder_result # pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult  original_1D_decoder.deco
+        short_decoded_epochs_result = short_results_obj.all_included_filter_epochs_decoder_result # pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult  original_1D_decoder.deco
+
+        long_desired_total_n_timebins, long_updated_time_bin_containers, long_updated_timebins_p_x_given_n = long_decoded_epochs_result.flatten_to_masked_values()
+        short_desired_total_n_timebins, short_updated_time_bin_containers, short_updated_timebins_p_x_given_n = short_decoded_epochs_result.flatten_to_masked_values()
+
+
+        long_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=2, col=0, name='long_decoded_epoch_matplotlib_view_widget')
+        long_decoded_replay_matplotlib_view_widget, long_decoded_replay_fig, long_decoded_replay_ax = long_decoded_replay_tuple
+        _out_long = plot_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), time_window_centers=long_updated_time_bin_containers, xbin=long_results_obj.original_1D_decoder.xbin.copy(),
+                                                    posterior=long_updated_timebins_p_x_given_n,
+                                                    active_most_likely_positions_1D=None,
+                                                    enable_flat_line_drawing=False, debug_print=False, ax=long_decoded_replay_ax[0])
+        # long_decoded_replay_fig, long_decoded_replay_ax = _out_long
+        active_2d_plot.sync_matplotlib_render_plot_widget('long_decoded_epoch_matplotlib_view_widget')
+        
+        short_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=3, col=0, name='short_decoded_epoch_matplotlib_view_widget')
+        short_decoded_replay_matplotlib_view_widget, short_decoded_replay_fig, short_decoded_replay_ax = short_decoded_replay_tuple
+
+        # if len(short_decoded_replay_ax)
+        # short_decoded_replay_ax
+
+        _out_short = plot_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), time_window_centers=short_updated_time_bin_containers, xbin=long_results_obj.original_1D_decoder.xbin.copy(),
+                                                        posterior=short_updated_timebins_p_x_given_n,
+                                                        active_most_likely_positions_1D=None,
+                                                        enable_flat_line_drawing=False, debug_print=False, ax=short_decoded_replay_ax[0])
+        # short_decoded_replay_fig, short_decoded_replay_ax = _out_short
+        active_2d_plot.sync_matplotlib_render_plot_widget('short_decoded_epoch_matplotlib_view_widget')
+        return long_decoded_replay_tuple, short_decoded_replay_tuple
+
+
+    def execute(self, *args, **kwargs) -> None:
+        ## To begin, the destination plot must have a matplotlib widget plot to render to:
+        # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
+        active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+        # If no plot to render on, do this:
+        long_decoded_replay_tuple, short_decoded_replay_tuple = self.add_long_short_decoder_decoded_replays(self._active_pipeline, active_2d_plot)
+
+        # Update display output dict:
+        self._display_output['long_decoded_replay_tuple'] = long_decoded_replay_tuple
+        self._display_output['short_decoded_replay_tuple'] = short_decoded_replay_tuple
+
+        # widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget(name='MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons')
+        # # most_likely_positions_mode: 'standard'|'corrected'
+        # fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=matplotlib_fig_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
+        # # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
+        # # active_2d_plot.ui.matplotlib_view_widget.draw()
+        # widget.draw() # alternative to accessing through full path?
+        # active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
+        print(f'\t AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand.execute() is done.')
+
+
 # ==================================================================================================================== #
 # Potentially Unused                                                                                                   #
 # ==================================================================================================================== #

@@ -1017,7 +1017,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
             ## Add the plot:
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
-            ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
+            _single_ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
+            ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
         
         else:
             # Already had the widget

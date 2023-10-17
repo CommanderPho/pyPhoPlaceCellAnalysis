@@ -1,4 +1,5 @@
 from qtpy import QtCore, QtGui, QtWidgets
+from attrs import define, field, Factory
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
@@ -12,13 +13,14 @@ def initialize_global_menu_ui_variables_if_needed(a_main_window):
     """
     return PhoMenuHelper.initialize_global_menu_ui_variables_if_needed(a_main_window)
     
-         
+
+@define(slots=False)
 class BaseMenuCommand:
     """
     An abstract base command to be executed from a Menu item
     """
-    def __init__(self) -> None:
-        pass
+    # def __init__(self) -> None:
+    #     pass
 
     @property
     def is_visible(self):
@@ -34,6 +36,30 @@ class BaseMenuCommand:
     
     def __call__(self, *args, **kwds):
         return self.execute(*args, **kwds)
+    
+
+
+# class BaseMenuCommand:
+#     """
+#     An abstract base command to be executed from a Menu item
+#     """
+#     def __init__(self) -> None:
+#         pass
+
+#     @property
+#     def is_visible(self):
+#         return True
+    
+#     @property
+#     def is_enabled(self):
+#         return True
+        
+#     def execute(self, *args, **kwargs) -> None:
+#         """ Implicitly captures spike_raster_window """
+#         raise NotImplementedError # implementors must override        
+    
+#     def __call__(self, *args, **kwds):
+#         return self.execute(*args, **kwds)
 
 
 class BaseMenuProviderMixin(QtCore.QObject):

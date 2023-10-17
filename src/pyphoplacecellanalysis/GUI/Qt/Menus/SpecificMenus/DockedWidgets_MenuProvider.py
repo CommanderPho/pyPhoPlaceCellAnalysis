@@ -11,7 +11,7 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.LocalMenus_Add
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.helpers import build_combined_time_synchronized_plotters_window, build_connected_time_synchronized_occupancy_plotter, build_connected_time_synchronized_placefields_plotter, build_connected_time_synchronized_decoder_plotter
     
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand # for commands
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand # for add matplotlib plot action
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand, AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand # for add matplotlib plot action
 
     
 
@@ -102,6 +102,8 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Context Nested Docks", name="actionNewDockedContextNested", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
+        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Long Short Decoded Epochs in Matplotlib Views", name="actionLongShortDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+        addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Custom...", name="actionNewDockedCustom", tooltip="", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
         
@@ -111,6 +113,11 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         
         curr_actions_dict['actionNewDockedMatplotlibView'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
         curr_actions_dict['actionNewDockedContextNested'].triggered.connect(CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionLongShortDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+
+
+
+
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
 
