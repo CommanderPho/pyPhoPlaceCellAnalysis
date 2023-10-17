@@ -593,7 +593,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # jump_change_time = next_target_jump_time - curr_time_window[0]
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
-        self.update_animation(next_start_timestamp=next_target_jump_time)
+        self.update_animation(next_target_jump_time)
 
 
     @pyqtExceptionPrintingSlot(str)
@@ -616,7 +616,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # jump_change_time = next_target_jump_time - curr_time_window[0]
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
-        self.update_animation(next_start_timestamp=next_target_jump_time)
+        self.update_animation(next_target_jump_time)
 
 
     @pyqtExceptionPrintingSlot(float, float)
@@ -633,7 +633,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                     print(f'perform_jump_specific_timestamp(): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
                 self.animation_active_time_window.timeWindow.window_duration = window_duration
                 # TODO 2023-03-29 19:18: - [ ] See if anything needs to be updated manually when window duration changes.
-        self.update_animation(next_start_timestamp=next_start_timestamp)
+        self.update_animation(next_start_timestamp)
         
 
 
