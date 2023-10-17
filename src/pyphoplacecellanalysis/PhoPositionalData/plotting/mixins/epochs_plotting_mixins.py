@@ -32,15 +32,14 @@ class EpochDisplayConfig(BasePlotDataParams):
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig
 
 
+    ## Use with Panel:
 
-    From OccupancyPlottingMixin.setup_occupancy_plotting_mixin(self):
-        # Setup watchers:    
-        self.occupancy_plotting_config.param.watch(self.plot_occupancy_bars, OccupancyPlottingConfig._config_update_watch_labels(), queued=True)
-        self.occupancy_plotting_config.param.watch(self.on_occupancy_plot_update_visibility, OccupancyPlottingConfig._config_visibility_watch_labels(), queued=True)
-    
-    
-    Note that _config_update_watch_labels() provides the names/labels of the properties that when updated trigger plot_occupancy_bars(...)
-        and _config_visibility_watch_labels() provides those for on_occupancy_plot_update_visibility(...)
+    import panel as pn
+
+    pn.extension()
+   
+
+
     """
     # debug_logging = False
 
@@ -69,9 +68,6 @@ class EpochDisplayConfig(BasePlotDataParams):
     height = param.Number(default=7.5, bounds=(0.1, 50.0), step=0.1)
     y_location = param.Number(default=-12.0, bounds=(-200.0, 1000.0), step=2.0)
 
-
-    #transformer = param.Callable(identity)
-    #a = param.Action(print_time_of_day)
 
     @classmethod
     def init_from_config_dict(cls, name: str, config_dict: dict):
@@ -150,6 +146,13 @@ class EpochDisplayConfig(BasePlotDataParams):
     def to_dict(self) -> dict:
         """ returns as a dictionary representation """
         return dict(y_location=self.y_location, height=self.height, pen_color=self.pen_QColor, brush_color=self.brush_QColor)
+
+
+    # @param.depends('height','y_location','pen_color','pen_opacity','brush_color','brush_opacity', watch=True)
+    # def on_update(self):
+    #     """ unused example callback. Just prints the values when any of them change. """
+    #     print(f"on_update(name: {self.name}, {self.to_dict()})")
+
 
     # def to_plot_config_dict(self):
     #     issue_labels = {'name': 'OccupancyLabels', 'name': 'Occupancy'}
