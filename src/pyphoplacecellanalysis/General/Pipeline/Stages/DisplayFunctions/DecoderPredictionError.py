@@ -329,7 +329,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
 
 # A version of `plot_1D_most_likely_position_comparsions` that plots several images on the same axis: ____________________________________________________ #
 @function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
-def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices_time_window_centers, xbin, ax=None, slices_posteriors=None, slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
+def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices_time_window_centers, xbin, ax=None, slices_posteriors=None, slices_active_most_likely_positions_1D=None, slices_additional_plots_data=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -345,12 +345,7 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
     
         ## Test Plotting just a single dimension of the 2D posterior:
-        pho_custom_decoder = new_decoder
-        active_posterior = pho_custom_decoder.p_x_given_n
-        # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
-        marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
-        marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-        # np.shape(marginal_posterior_x) # (41, 3464)
+        
         fig, ax, out_img_list = plot_slices_1D_most_likely_position_comparsions(sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in long_results_obj.time_bin_containers], xbin=pho_custom_decoder.xbin,
                                                         slices_posteriors=long_results_obj.p_x_given_n_list,
                                                         slices_active_most_likely_positions_1D=None,
@@ -387,27 +382,13 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
         if slices_posteriors is not None:
             extents_list = [(a_centers[0], a_centers[-1], ymin, ymax) for a_centers in slices_time_window_centers]
             out_img_list = [ax.imshow(a_posterior, extent=an_extent, animated=True, **main_plot_kwargs) for an_extent, a_posterior in zip(extents_list, slices_posteriors)]
-            # for epoch_idx in np.arange(long_results_obj.num_filter_epochs):
-            #     # a_curr_num_bins: int = long_results_obj.nbins[epoch_idx]
-            #     a_centers = long_results_obj.time_bin_containers[epoch_idx].centers
-            #     a_posterior = long_results_obj.p_x_given_n_list[epoch_idx]
-            #     # n_pos_bins = np.shape(a_posterior)[0]
-            #     # Compute extents for imshow:
-            #     # xmin, xmax, ymin, ymax = (a_centers[0], a_centers[-1], xbin[0], xbin[-1])
-            #     xmin, xmax = (a_centers[0], a_centers[-1])           
-            #     x_first_extent = (xmin, xmax, ymin, ymax)
-            #     active_extent = x_first_extent
-            #     # Posterior distribution heatmaps at each point.
-            #     im_posterior_x = ax.imshow(a_posterior, extent=active_extent, animated=True, **main_plot_kwargs)
-            #     out_img_list.append(im_posterior_x)
-
-            # ax.set_xlim((xmin, xmax))
-            # ax.set_ylim((ymin, ymax))
-
-
-            # ax.set_xlim((xmin, xmax))
             ax.set_ylim((ymin, ymax))
     
+
+        if slices_additional_plots_data is not None:
+            raise NotImplementedError('slices_additional_plots_data functionality is not yet implemented as of 2023-10-17')
+            # slices_additional_plots_data.radon_transform_data
+
         # Most-likely Estimated Position Plots (grey line):
         if slices_active_most_likely_positions_1D is not None:
             # Most likely position plots:
@@ -849,7 +830,7 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs), epochs_linear_fit_df['velocity'].values, epochs_linear_fit_df['intercept'].values, epochs_linear_fit_df['score'].values, epochs_linear_fit_df['speed'].values):
             # build the discrete line over the centered time bins:
             epoch_time_bins = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx].centers
-            epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch:
+            epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
             epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
             with np.printoptions(precision=3, suppress=True, threshold=5):
                 score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
