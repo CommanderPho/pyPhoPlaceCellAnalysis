@@ -89,11 +89,18 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
 
         # Set enabled state
-        widget.ui.actionAddTimeIntervals_PBEs.setEnabled(sess.pbe is not None)
-        widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
-        widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
-        widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
-        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, destination_plot=destination_plot, active_config_name=active_config_name)) # disable by default
+        # widget.ui.actionAddTimeIntervals_PBEs.setEnabled(sess.pbe is not None)
+        # widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
+        # widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
+        # widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
+
+        
+        widget.ui.actionAddTimeIntervals_Laps.setEnabled(Laps2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.laps))
+        widget.ui.actionAddTimeIntervals_Ripples.setEnabled(Ripples_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.ripple))
+        widget.ui.actionAddTimeIntervals_PBEs.setEnabled(PBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.pbe))
+        widget.ui.actionAddTimeIntervals_Replays.setEnabled(Replays_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.replay))
+        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, active_config_name=active_config_name)) # disable by default
+
 
         ## Time Curves:
         submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_RelativeEntropySurprise, widget.ui.actionAddTimeCurves_Custom]

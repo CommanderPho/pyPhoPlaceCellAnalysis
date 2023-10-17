@@ -934,7 +934,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return plt
     
     def create_separate_render_plot_item(self, row=None, col=None, rowspan=1, colspan=1, name='new_curves_separate_plot'):
-        """ Adds a separate independent plot for epoch time rects to the 2D plot above the others:
+        """ Adds a separate pyqtgraph independent plot for epoch time rects to the 2D plot above the others:
         
         Requires:
             active_2d_plot.ui.main_graphics_layout_widget <GraphicsLayoutWidget>

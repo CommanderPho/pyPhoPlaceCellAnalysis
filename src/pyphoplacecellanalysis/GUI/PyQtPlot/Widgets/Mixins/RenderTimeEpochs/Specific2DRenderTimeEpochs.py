@@ -118,6 +118,23 @@ class General2DRenderTimeEpochs(object):
         return general_epochs_interval_datasource
 
     @classmethod
+    def is_render_time_epochs_enabled(cls, curr_sess, **kwargs) -> bool:
+        """ takes the exact same arguments as `add_render_time_epochs(...) but returns True if the call would be valid and False otherwise. """
+        try:
+            if isinstance(curr_sess, DataSession):
+                active_Epochs = curr_sess.epochs # <Epoch> object
+            elif isinstance(curr_sess, (Epoch, pd.DataFrame, tuple)):
+                active_Epochs = curr_sess  # <Epoch> object passed directly
+            else:
+                return False
+            return (active_Epochs is not None)
+        except BaseException:
+            return False
+        
+        
+        
+
+    @classmethod
     def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs): # , curr_pipeline=None
         """ directly-called method 
         destination_plot should implement add_rendered_intervals
@@ -193,6 +210,22 @@ class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
 
         return _add_interval_dataframe_visualization_columns_general_epoch
     
+    @classmethod
+    def is_render_time_epochs_enabled(cls, curr_sess, **kwargs) -> bool:
+        """ takes the exact same arguments as `add_render_time_epochs(...) but returns True if the call would be valid and False otherwise. """
+        try:
+            if isinstance(curr_sess, DataSession):
+                active_Epochs = curr_sess.laps.as_epoch_obj() # <Epoch> object
+            elif isinstance(curr_sess, Laps):
+                active_Epochs = curr_sess.as_epoch_obj()
+            elif isinstance(curr_sess, Epoch):
+                active_Epochs = curr_sess
+            else:
+                return False
+            return (active_Epochs is not None)
+        except BaseException:
+            return False
+        
     @classmethod
     def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs):
         """ directly-called method 
@@ -511,7 +544,7 @@ class SpikeBurstIntervals_2DRenderTimeEpochs(General2DRenderTimeEpochs):
     
 
     @classmethod
-    def is_render_time_epochs_enabled(cls, curr_sess, destination_plot, **kwargs) -> bool:
+    def is_render_time_epochs_enabled(cls, curr_sess, **kwargs) -> bool:
         """ takes the exact same arguments as `add_render_time_epochs(...) but returns True if the call would be valid and False otherwise. """
         from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # for advanced add_render_time_epochs
         if isinstance(curr_sess, NeuropyPipeline):
