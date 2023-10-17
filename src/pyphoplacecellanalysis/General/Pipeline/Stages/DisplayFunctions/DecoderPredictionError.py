@@ -63,7 +63,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # print(f'animate({i})')
             return renderer.display(i)
         
-    @function_attributes(short_name='marginal_1D_most_likely_pos_compare', tags=['display','marginal','1D','most_likely','position'], input_requires=[], output_provides=[], creation_date='2023-03-23 15:49')
+    @function_attributes(short_name='marginal_1D_most_likely_pos_compare', tags=['display','marginal','1D','most_likely','position'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'overriding_dict_with'], creation_date='2023-03-23 15:49')
     def _display_plot_marginal_1D_most_likely_position_comparisons(computation_result, active_config, variable_name='x', posterior_name='p_x_given_n', most_likely_positions_mode='corrected', **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
         
@@ -110,7 +110,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         return fig, curr_ax
 
 
-    @function_attributes(short_name='plot_most_likely_position_compare', tags=['display','most_likely','position'], input_requires=[], output_provides=[], creation_date='2023-03-23 15:49')
+    @function_attributes(short_name='plot_most_likely_position_compare', tags=['display','most_likely','position'], input_requires=[], output_provides=[], uses=['plot_most_likely_position_comparsions'], creation_date='2023-03-23 15:49')
     def _display_plot_most_likely_position_comparisons(computation_result, active_config, **kwargs):
         """ renders a 2D plot with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. """
         
@@ -136,6 +136,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             axs[0].plot(active_time_window_variable, active_most_likely_positions_x, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions x') # (Num windows x 2)
             axs[1].plot(active_time_window_variable, active_most_likely_positions_y, lw=1.0, color='#00ff7f99', alpha=0.6, label='2-step: most likely positions y') # (Num windows x 2)
             
+
     @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch','slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
     def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', included_epoch_indicies=None, **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
@@ -227,6 +228,7 @@ def _cached_epoch_computation_if_needed(computation_result, active_config, activ
 # ==================================================================================================================== #
 # Private Implementations                                                                                              #
 # ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions'], creation_date='2023-05-01 00:00', related_items=[])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
@@ -325,6 +327,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         return fig, ax
     
 
+
+@function_attributes(short_name=None, tags=['decoder', 'plot', 'position'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 12:29', related_items=[])
 def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     Usage:
@@ -504,6 +508,7 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
 # Functions for rendering a stack of decoded epochs in a stacked_epoch_slices-style manner                             #
 # ==================================================================================================================== #
 
+@function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=['_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-08 00:00', related_items=[])
 def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=False):
     """ 2023-05-08 - Factored out of plot_decoded_epoch_slices to enable paged 
 
@@ -523,6 +528,7 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
     return params, plots_data, plots, ui
 
+@function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['_helper_update_decoded_single_epoch_slice_plot'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-09 00:00', related_items=[])
 def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=False):
     """ attempts to update existing plots created by:
     
@@ -548,7 +554,7 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
                 pass            
 
 
-@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view'], used_by=['_display_plot_decoded_epoch_slices', 'DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data'], creation_date='2023-05-08 16:31', related_items=[])
+@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view', '_subfn_update_decoded_epoch_slices'], used_by=['_display_plot_decoded_epoch_slices', 'DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data'], creation_date='2023-05-08 16:31', related_items=[])
 def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, included_epoch_indicies=None, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
