@@ -984,7 +984,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # performs required setup to enable dynamically added matplotlib render subplots.
         self.ui.matplotlib_view_widgets = {} # empty dictionary
 
-
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget'):
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
@@ -1003,7 +1003,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
             ## Add to dynamic_docked_widget_container:
             min_width = 500
-            min_height = 100
+            min_height = 50
             # if _last_dock_outer_nested_item is not None:
             #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
             #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
@@ -1030,7 +1030,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # self.sync_matplotlib_render_plot_widget()
         return self.ui.matplotlib_view_widgets[name], fig, ax
 
-
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:23', related_items=[])
     def find_matplotlib_render_plot_widget(self, identifier):
         """ finds the existing dynamically added matplotlib_render_plot_widget. 
         returns (widget, fig, ax)
@@ -1042,7 +1042,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
             return None, None, None
 
-        
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def remove_matplotlib_render_plot_widget(self, identifier):
         """ removes the subplot - does not work yet """
         ## TODO: need to remove the display item from self.ui.dynamic_docked_widget_container?
@@ -1060,7 +1060,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
 
-
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'sync'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def sync_matplotlib_render_plot_widget(self, identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW):
         """ syncs a matplotlib render plot widget with a specified identifier with either the global window, the active time window, or disables sync with the Spike2DRaster. """
         # Requires specifying the identifier
