@@ -98,10 +98,12 @@ def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_p
 # RectangleRenderTupleHelpers                                                                                          #
 # ==================================================================================================================== #
 QColorTuple = namedtuple('QColorTuple', ['hexColor', 'alpha'])
-# QPenTuple = namedtuple('QPenTuple', ['color', 'width'])
-# QBrushTuple = namedtuple('QBrushTuple', ['color'])
-QPenTuple = namedtuple('QPenTuple', ['hexColor', 'alpha', 'width'])
-QBrushTuple = namedtuple('QBrushTuple', ['hexColor', 'alpha'])
+QPenTuple = namedtuple('QPenTuple', ['color', 'width'])
+QBrushTuple = namedtuple('QBrushTuple', ['color'])
+
+
+# QPenTuple = namedtuple('QPenTuple', ['hexColor', 'alpha', 'width'])
+# QBrushTuple = namedtuple('QBrushTuple', ['hexColor', 'alpha'])
 
 
 
@@ -139,19 +141,19 @@ class RectangleRenderTupleHelpers:
         return {'hexColor': value.name(QtGui.QColor.HexRgb),'alpha':value.alphaF()}
     
 
-    # _color_process_fn = lambda a_color: pg.colorStr(a_color) # a_pen.color()
-    _color_process_fn = lambda a_color: RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_color)
+    _color_process_fn = lambda a_color: pg.colorStr(a_color) # a_pen.color()
+    # _color_process_fn = lambda a_color: RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_color)
 
 
     @staticmethod
     def QPen_to_dict(a_pen):
-        # return {'color': RectangleRenderTupleHelpers._color_process_fn(a_pen.color()),'width':a_pen.widthF()}
-        return {**RectangleRenderTupleHelpers._color_process_fn(a_pen.color()),'width':a_pen.widthF()}
+        return {'color': RectangleRenderTupleHelpers._color_process_fn(a_pen.color()),'width':a_pen.widthF()}
+        # return {**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_pen.color()),'width':a_pen.widthF()}
 
     @staticmethod
     def QBrush_to_dict(a_brush):
-        # return {'color': RectangleRenderTupleHelpers._color_process_fn(a_brush.color())} # ,'gradient':a_brush.gradient()
-        return {**RectangleRenderTupleHelpers._color_process_fn(a_brush.color())} # ,'gradient':a_brush.gradient()
+        return {'color': RectangleRenderTupleHelpers._color_process_fn(a_brush.color())} # ,'gradient':a_brush.gradient()
+        # return {**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_brush.color())} # ,'gradient':a_brush.gradient()
 
 
     @staticmethod
@@ -160,13 +162,13 @@ class RectangleRenderTupleHelpers:
 
     @staticmethod
     def QPen_to_tuple(a_pen):
-        # return QPenTuple(color=RectangleRenderTupleHelpers._color_process_fn(a_pen.color()), width=a_pen.widthF())
-        return QPenTuple(**RectangleRenderTupleHelpers._color_process_fn(a_pen.color()), width=a_pen.widthF())
+        return QPenTuple(color=RectangleRenderTupleHelpers._color_process_fn(a_pen.color()), width=a_pen.widthF())
+        # return QPenTuple(**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_pen.color()), width=a_pen.widthF())
 
     @staticmethod
     def QBrush_to_tuple(a_brush):
-        # return QBrushTuple(color=RectangleRenderTupleHelpers._color_process_fn(a_brush.color()))
-        return QBrushTuple(**RectangleRenderTupleHelpers._color_process_fn(a_brush.color()))
+        return QBrushTuple(color=RectangleRenderTupleHelpers._color_process_fn(a_brush.color()))
+        # return QBrushTuple(**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_brush.color()))
 
     
     @classmethod
@@ -184,8 +186,12 @@ class RectangleRenderTupleHelpers:
         Usage:
             seralized_tuples_data = RectangleRenderTupleHelpers.get_serialized_data(tuples_data)
             tuples_data = RectangleRenderTupleHelpers.get_deserialized_data(seralized_tuples_data)
-        """ 
+        """        
         return [(start_t, series_vertical_offset, duration_t, series_height, pg.mkPen(pen_color_hex), pg.mkBrush(**brush_color_hex)) for (start_t, series_vertical_offset, duration_t, series_height, pen_color_hex, brush_color_hex) in seralized_tuples_data]
+        # return [(start_t, series_vertical_offset, duration_t, series_height, pg.mkPen(inline_mkColor(pen_color_hex)), pg.mkBrush(**brush_color_hex)) for (start_t, series_vertical_offset, duration_t, series_height, pen_color_hex, brush_color_hex) in seralized_tuples_data]
+
+
+
 
     @classmethod
     def copy_data(cls, tuples_data):
