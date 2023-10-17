@@ -419,6 +419,7 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
 
         """
         # returns a flattened version of self over all epochs
+        updated_is_masked_bin = []
         updated_time_bin_containers = []
         updated_timebins_p_x_given_n = []
 
@@ -438,19 +439,26 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
             
             updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
             updated_posterior[:,1:-1] = a_posterior
-            
+
+            curr_is_masked_bin = np.full((updated_curr_num_bins,), True)
+            curr_is_masked_bin[1:-1] = False
+
             ## Add the start/end bin
             # a_centers.
             updated_time_bin_containers.append([(a_centers[0]-decoding_time_bin_size), list(a_centers), (a_centers[-1]+decoding_time_bin_size)])
             updated_timebins_p_x_given_n.append(updated_posterior)
+            updated_is_masked_bin.append(curr_is_masked_bin)
+
     
         updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
         updated_time_bin_containers = np.hstack(np.hstack(updated_time_bin_containers))
-        
+        updated_is_masked_bin = np.hstack(updated_is_masked_bin)
+
         assert np.shape(updated_time_bin_containers)[0] == desired_total_n_timebins
         assert np.shape(updated_timebins_p_x_given_n)[1] == desired_total_n_timebins
+        assert np.shape(updated_is_masked_bin)[0] == desired_total_n_timebins
 
-        return desired_total_n_timebins, updated_time_bin_containers, updated_timebins_p_x_given_n
+        return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
 
 
 
