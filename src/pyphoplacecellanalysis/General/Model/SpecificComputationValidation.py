@@ -71,25 +71,32 @@ class SpecificComputationValidator:
             comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
             if on_already_computed_fn is not None:
                 on_already_computed_fn(comp_short_name, computation_filter_name)
-                
-        except (AttributeError, KeyError) as e:
-
+        except (AttributeError, KeyError, TypeError) as initial_validation_err:
+            ## validate_computation_test(...) failed, so we need to recompute.
             if progress_print or debug_print:
                 print(f'{comp_short_name} missing.')
             if debug_print:
                 import traceback # for stack trace formatting
-                print(f'\t encountered error: {e}\n{traceback.format_exc()}\n.')
+                print(f'\t encountered error while initially validating: initial_validation_err: {initial_validation_err}\n{traceback.format_exc()}\n.')
             if progress_print or debug_print:
                 print(f'\t Recomputing {comp_short_name}...')
             # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[comp_specifier.computation_fn_name], computation_kwargs_list=[comp_specifier.computation_fn_kwargs], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
-            if progress_print or debug_print:
-                print(f'\t done.')
-            # try the validation again.
-            comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
-            newly_computed_values.append((comp_short_name, computation_filter_name))
-        except Exception as e:
-            raise e
+            try:
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[comp_specifier.computation_fn_name], computation_kwargs_list=[comp_specifier.computation_fn_kwargs], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
+                if progress_print or debug_print:
+                    print(f'\t done.')
+                # try the validation again.
+                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
+                newly_computed_values.append((comp_short_name, computation_filter_name))
+            except (AttributeError, KeyError, TypeError, ValueError) as inner_e:
+                # Handle the inner exception
+                print(f'Exception occured while computing (`perform_specific_computation(...)`) or validating (`validate_computation_test(...)`) after recomputation:\n Inner exception: {inner_e}')
+                if fail_on_exception:
+                    raise inner_e
+
+        except BaseException:
+            raise
+
         return newly_computed_values
 
 
