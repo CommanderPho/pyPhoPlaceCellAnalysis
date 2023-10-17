@@ -9,6 +9,11 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import inline_mkColor
 from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDataParams
 
 
+""" 
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig, _get_default_epoch_configs
+
+"""
+
 # class ColorWithOpacity(param.Parameter):
 #     """Integer Parameter that must be even"""
 
@@ -51,7 +56,7 @@ class EpochDisplayConfig(BasePlotDataParams):
     #     return ['labelsAreVisible', 'isVisible']
     
     # Overriding defaults from parent
-    name = param.String(default='SessionEpochs')
+    name = param.String(default='SessionEpochs', doc='Name of the epochs')
     isVisible = param.Boolean(default=False, doc="Whether the epochs are visible") # default to False
 
     # Bar properties:

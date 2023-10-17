@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, 
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
 
+from pyphocorehelpers.gui.Qt.TopLevelWindowHelper import print_widget_hierarchy
 ## IMPORTS:
 # 
 
@@ -20,14 +21,6 @@ path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'NeuronVisualSelectionControlsWidgetBase.ui')
 
 # from PyQt5.QtWidgets import QWidget
-
-def print_widget_hierarchy(widget: QWidget, indent: str = ""):
-    print(f"{indent}{widget.objectName()} ({widget.__class__.__name__})")
-    for child in widget.children():
-        if isinstance(child, QWidget):
-            print_widget_hierarchy(child, indent=indent + "  ")
-
-
 
 class NeuronVisualSelectionControlsWidgetBase(QWidget):
     def __init__(self, parent=None):
