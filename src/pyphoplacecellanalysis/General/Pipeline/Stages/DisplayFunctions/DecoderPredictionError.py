@@ -327,6 +327,154 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         return fig, ax
     
 
+# A version of `plot_1D_most_likely_position_comparsions` that plots several images on the same axis: ____________________________________________________ #
+@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
+def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices_time_window_centers, xbin, ax=None, slices_posteriors=None, slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
+    """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
+    
+    Animal's actual position is rendered as a red line with no markers 
+
+    active_most_likely_positions_1D: Animal's most likely position is rendered as a grey line with '+' markers at each datapoint
+
+    Input:
+    
+        enable_flat_line_drawing
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+    
+        ## Test Plotting just a single dimension of the 2D posterior:
+        pho_custom_decoder = new_decoder
+        active_posterior = pho_custom_decoder.p_x_given_n
+        # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+        marginal_posterior_x = np.squeeze(np.sum(active_posterior, 1)) # sum over all y. Result should be [x_bins x time_bins]
+        marginal_posterior_x = marginal_posterior_x / np.sum(marginal_posterior_x, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+        # np.shape(marginal_posterior_x) # (41, 3464)
+        fig, ax, out_img_list = plot_slices_1D_most_likely_position_comparsions(sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in long_results_obj.time_bin_containers], xbin=pho_custom_decoder.xbin,
+                                                        slices_posteriors=long_results_obj.p_x_given_n_list,
+                                                        slices_active_most_likely_positions_1D=None,
+                                                        enable_flat_line_drawing=False, debug_print=False)
+                                                        
+        num_filter_epochs = long_results_obj.num_filter_epochs
+        time_window_centers = [v.centers for v in long_results_obj.time_bin_containers]
+        
+        fig.show()
+            
+        
+    NOTES: `, animated=True` allows blitting to speed up updates in the future with only minor overhead if blitting isn't fully implemented.
+            
+    """
+    # Get the colormap to use and set the bad color
+    cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
+    cmap.set_bad(color='black')
+    main_plot_kwargs = {'origin': 'lower', 'vmin': 0, 'vmax': 1, 'cmap': cmap, 'interpolation':'nearest', 'aspect':'auto'}
+    assert ax is not None
+    ymin, ymax = xbin[0], xbin[-1]
+    out_img_list = []
+    with plt.ion():
+        if ax is None:
+            fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
+        else:
+            fig = None # Calling plt.gcf() creates an empty figure and returns the wrong value 
+        
+        # Actual Position Plots (red line):
+        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        ax.set_title(variable_name)
+    
+        # Posterior distribution heatmap:
+        # if long_results_obj is not None:
+        if slices_posteriors is not None:
+            extents_list = [(a_centers[0], a_centers[-1], ymin, ymax) for a_centers in slices_time_window_centers]
+            out_img_list = [ax.imshow(a_posterior, extent=an_extent, animated=True, **main_plot_kwargs) for an_extent, a_posterior in zip(extents_list, slices_posteriors)]
+            # for epoch_idx in np.arange(long_results_obj.num_filter_epochs):
+            #     # a_curr_num_bins: int = long_results_obj.nbins[epoch_idx]
+            #     a_centers = long_results_obj.time_bin_containers[epoch_idx].centers
+            #     a_posterior = long_results_obj.p_x_given_n_list[epoch_idx]
+            #     # n_pos_bins = np.shape(a_posterior)[0]
+            #     # Compute extents for imshow:
+            #     # xmin, xmax, ymin, ymax = (a_centers[0], a_centers[-1], xbin[0], xbin[-1])
+            #     xmin, xmax = (a_centers[0], a_centers[-1])           
+            #     x_first_extent = (xmin, xmax, ymin, ymax)
+            #     active_extent = x_first_extent
+            #     # Posterior distribution heatmaps at each point.
+            #     im_posterior_x = ax.imshow(a_posterior, extent=active_extent, animated=True, **main_plot_kwargs)
+            #     out_img_list.append(im_posterior_x)
+
+            # ax.set_xlim((xmin, xmax))
+            # ax.set_ylim((ymin, ymax))
+
+
+            # ax.set_xlim((xmin, xmax))
+            ax.set_ylim((ymin, ymax))
+    
+        # Most-likely Estimated Position Plots (grey line):
+        if slices_active_most_likely_positions_1D is not None:
+            # Most likely position plots:
+
+            if enable_flat_line_drawing:
+                # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
+                #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
+                time_bin_size = (slices_time_window_centers[1]-slices_time_window_centers[0])
+                active_half_time_bin_seconds = time_bin_size / 2.0
+                active_time_window_start_points = np.expand_dims(slices_time_window_centers - active_half_time_bin_seconds, axis=1)
+                active_time_window_end_points = np.expand_dims(slices_time_window_centers + active_half_time_bin_seconds, axis=1)
+                active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
+                
+                if debug_print:
+                    print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
+                    # np.shape(active_time_window_end_points): (5783, 1)
+                    # np.shape(active_time_window_start_end_points): (11566, 1)
+
+                active_time_window_variable = active_time_window_start_end_points
+                slices_active_most_likely_positions_1D = np.repeat(slices_active_most_likely_positions_1D, 2, axis=0) # repeat each element twice
+            else:
+                active_time_window_variable = slices_time_window_centers
+            
+            ax.plot(active_time_window_variable, slices_active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True) # (Num windows x 2)
+            # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
+        
+        return fig, ax, out_img_list
+    
+
+def _batch_update_posterior_image(long_results_obj, xbin, ax): # time_window_centers, posterior
+	# Get the colormap to use and set the bad color
+	cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
+	cmap.set_bad(color='black')
+	main_plot_kwargs = {'origin': 'lower', 'vmin': 0, 'vmax': 1, 'cmap': cmap, 'interpolation':'nearest', 'aspect':'auto'}
+	assert ax is not None
+	ymin, ymax = xbin[0], xbin[-1]
+
+	out_img_list = []
+	with plt.ion():
+		# Posterior distribution heatmap:
+		if long_results_obj is not None:
+			for epoch_idx in np.arange(long_results_obj.num_filter_epochs):
+				# a_curr_num_bins: int = long_results_obj.nbins[epoch_idx]
+				a_centers = long_results_obj.time_bin_containers[epoch_idx].centers
+				a_posterior = long_results_obj.p_x_given_n_list[epoch_idx]
+				# n_pos_bins = np.shape(a_posterior)[0]
+				# Compute extents for imshow:
+				# xmin, xmax, ymin, ymax = (a_centers[0], a_centers[-1], xbin[0], xbin[-1])
+				xmin, xmax = (a_centers[0], a_centers[-1])           
+				x_first_extent = (xmin, xmax, ymin, ymax)
+				active_extent = x_first_extent
+				# Posterior distribution heatmaps at each point.
+				im_posterior_x = ax.imshow(a_posterior, extent=active_extent, animated=True, **main_plot_kwargs)
+				out_img_list.append(im_posterior_x)
+			
+			# ax.set_xlim((xmin, xmax))
+			# ax.set_ylim((ymin, ymax))
+
+
+		# ax.set_xlim((xmin, xmax))
+		ax.set_ylim((ymin, ymax))
+		
+	return out_img_list
+
+
+
+## END
 
 @function_attributes(short_name=None, tags=['decoder', 'plot', 'position'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 12:29', related_items=[])
 def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False):
@@ -916,9 +1064,11 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
     _display_output = field(default=Factory(dict))
 
     @classmethod
-    def add_long_short_decoder_decoded_replays(cls, curr_active_pipeline, active_2d_plot):
+    def add_long_short_decoder_decoded_replays(cls, curr_active_pipeline, active_2d_plot, debug_print=False):
         """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # Actual most general
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # Actual most general
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
+        
 
         ## long_short_decoding_analyses:
         curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
@@ -930,31 +1080,42 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         long_decoded_epochs_result = long_results_obj.all_included_filter_epochs_decoder_result # pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult  original_1D_decoder.deco
         short_decoded_epochs_result = short_results_obj.all_included_filter_epochs_decoder_result # pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult  original_1D_decoder.deco
 
-        long_desired_total_n_timebins, long_updated_is_masked_bin, long_updated_time_bin_containers, long_updated_timebins_p_x_given_n = long_decoded_epochs_result.flatten_to_masked_values()
-        short_desired_total_n_timebins, short_updated_is_masked_bin, short_updated_time_bin_containers, short_updated_timebins_p_x_given_n = short_decoded_epochs_result.flatten_to_masked_values()
+        # long_desired_total_n_timebins, long_updated_is_masked_bin, long_updated_time_bin_containers, long_updated_timebins_p_x_given_n = long_decoded_epochs_result.flatten_to_masked_values()
+        # short_desired_total_n_timebins, short_updated_is_masked_bin, short_updated_time_bin_containers, short_updated_timebins_p_x_given_n = short_decoded_epochs_result.flatten_to_masked_values()
 
 
         long_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=2, col=0, name='long_decoded_epoch_matplotlib_view_widget')
         long_decoded_replay_matplotlib_view_widget, long_decoded_replay_fig, long_decoded_replay_ax = long_decoded_replay_tuple
-        _out_long = plot_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), time_window_centers=long_updated_time_bin_containers, xbin=long_results_obj.original_1D_decoder.xbin.copy(),
-                                                    posterior=long_updated_timebins_p_x_given_n,
-                                                    active_most_likely_positions_1D=None,
-                                                    enable_flat_line_drawing=False, debug_print=False, ax=long_decoded_replay_ax[0])
+        # _out_long = plot_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), time_window_centers=long_updated_time_bin_containers, xbin=long_results_obj.original_1D_decoder.xbin.copy(),
+        #                                             posterior=long_updated_timebins_p_x_given_n,
+        #                                             active_most_likely_positions_1D=None,
+        #                                             enable_flat_line_drawing=False, debug_print=False, ax=long_decoded_replay_ax[0])
+        
+        _out_long = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in long_decoded_epochs_result.time_bin_containers], xbin=long_results_obj.original_1D_decoder.xbin.copy(),
+                                                                slices_posteriors=long_decoded_epochs_result.p_x_given_n_list,
+                                                                slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=long_decoded_replay_ax[0], debug_print=debug_print)
+        # fig, ax, out_img_list = _out_long
+
         # long_decoded_replay_fig, long_decoded_replay_ax = _out_long
         active_2d_plot.sync_matplotlib_render_plot_widget('long_decoded_epoch_matplotlib_view_widget')
+        long_decoded_replay_matplotlib_view_widget.draw()
         
         short_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=3, col=0, name='short_decoded_epoch_matplotlib_view_widget')
         short_decoded_replay_matplotlib_view_widget, short_decoded_replay_fig, short_decoded_replay_ax = short_decoded_replay_tuple
+        # _out_short = plot_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), time_window_centers=short_updated_time_bin_containers, xbin=long_results_obj.original_1D_decoder.xbin.copy(),
+        #                                                 posterior=short_updated_timebins_p_x_given_n,
+        #                                                 active_most_likely_positions_1D=None,
+        #                                                 enable_flat_line_drawing=False, debug_print=False, ax=short_decoded_replay_ax[0])
 
-        # if len(short_decoded_replay_ax)
-        # short_decoded_replay_ax
+        _out_short = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in short_decoded_epochs_result.time_bin_containers], xbin=short_results_obj.original_1D_decoder.xbin.copy(),
+                                                                slices_posteriors=short_decoded_epochs_result.p_x_given_n_list,
+                                                                slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=short_decoded_replay_ax[0], debug_print=debug_print)
+        # fig, ax, out_img_list = _out_short
 
-        _out_short = plot_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), time_window_centers=short_updated_time_bin_containers, xbin=long_results_obj.original_1D_decoder.xbin.copy(),
-                                                        posterior=short_updated_timebins_p_x_given_n,
-                                                        active_most_likely_positions_1D=None,
-                                                        enable_flat_line_drawing=False, debug_print=False, ax=short_decoded_replay_ax[0])
         # short_decoded_replay_fig, short_decoded_replay_ax = _out_short
         active_2d_plot.sync_matplotlib_render_plot_widget('short_decoded_epoch_matplotlib_view_widget')
+        short_decoded_replay_matplotlib_view_widget.draw()
+
         return long_decoded_replay_tuple, short_decoded_replay_tuple
 
 
