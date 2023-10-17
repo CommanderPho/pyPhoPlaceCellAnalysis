@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from attrs import define, field, Factory
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.patches import FancyArrowPatch, FancyArrow
@@ -271,12 +272,17 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
        
         # Posterior distribution heatmap:
         if posterior is not None:
+            # Get the colormap to use and set the bad color
+            cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
+            cmap.set_bad(color='black')
+            # cmap = 'turbo'
+
             # Compute extents for imshow:
             main_plot_kwargs = {
                 'origin': 'lower',
                 'vmin': 0,
                 'vmax': 1,
-                'cmap': 'turbo',
+                'cmap': cmap,
                 'interpolation':'nearest',
                 'aspect':'auto',
             }
