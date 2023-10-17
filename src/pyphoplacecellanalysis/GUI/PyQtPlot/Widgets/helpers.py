@@ -43,6 +43,12 @@ win.setYRange
 
 # """
 
+def inline_mkColor(color, alpha=1.0):
+    """ helps build a new QColor for a pen/brush in an inline (single-line) way. """
+    out_color = pg.mkColor(color)
+    out_color.setAlphaF(alpha)
+    return out_color
+
 
 
 @function_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 13:44', related_items=[])
@@ -102,8 +108,8 @@ QPenTuple = namedtuple('QPenTuple', ['color', 'width'])
 QBrushTuple = namedtuple('QBrushTuple', ['color'])
 
 
-# QPenTuple = namedtuple('QPenTuple', ['hexColor', 'alpha', 'width'])
-# QBrushTuple = namedtuple('QBrushTuple', ['hexColor', 'alpha'])
+QPenFlatTuple = namedtuple('QPenFlatTuple', ['hexColor', 'alpha', 'width'])
+QBrushFlatTuple = namedtuple('QBrushFlatTuple', ['hexColor', 'alpha'])
 
 
 
@@ -140,6 +146,10 @@ class RectangleRenderTupleHelpers:
         """
         return {'hexColor': value.name(QtGui.QColor.HexRgb),'alpha':value.alphaF()}
     
+    @staticmethod
+    def QColor_to_tuple(value):
+        return QColorTuple(hexColor=value.name(QtGui.QColor.HexRgb), alpha=value.alphaF())
+
 
     _color_process_fn = lambda a_color: pg.colorStr(a_color) # a_pen.color()
     # _color_process_fn = lambda a_color: RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_color)
@@ -154,11 +164,6 @@ class RectangleRenderTupleHelpers:
     def QBrush_to_dict(a_brush):
         return {'color': RectangleRenderTupleHelpers._color_process_fn(a_brush.color())} # ,'gradient':a_brush.gradient()
         # return {**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_brush.color())} # ,'gradient':a_brush.gradient()
-
-
-    @staticmethod
-    def QColor_to_tuple(value):
-        return QColorTuple(hexColor=value.name(QtGui.QColor.HexRgb), alpha=value.alphaF())
 
     @staticmethod
     def QPen_to_tuple(a_pen):
@@ -250,8 +255,3 @@ def _helper_make_scatterplot_clickable(main_scatter_plot, enable_hover:bool=Fals
 
 
 
-def inline_mkColor(color, alpha=1.0):
-    """ helps build a new QColor for a pen/brush in an inline (single-line) way. """
-    out_color = pg.mkColor(color)
-    out_color.setAlphaF(alpha)
-    return out_color

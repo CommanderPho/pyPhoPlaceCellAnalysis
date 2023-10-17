@@ -100,7 +100,53 @@ class EpochDisplayConfig(BasePlotDataParams):
             else:
                 out.brush_color = brush_qcolor # set raw
         return out
-    
+
+
+    @classmethod
+    def init_from_visualization_dataframe_row(cls, name: str, y_location, height, pen_tuple, brush_tuple):
+        """
+
+        Example Usage:
+
+            epochs_update_dict = {
+                'Replays':dict(y_location=-10.0, height=7.5, pen_color=inline_mkColor('orange', 0.8), brush_color=inline_mkColor('orange', 0.5)),
+                'PBEs':dict(y_location=-2.0, height=1.5, pen_color=inline_mkColor('pink', 0.8), brush_color=inline_mkColor('pink', 0.5)),
+                'Ripples':dict(y_location=-12.0, height=1.5, pen_color=inline_mkColor('cyan', 0.8), brush_color=inline_mkColor('cyan', 0.5)),
+                'SessionEpochs':dict(y_location=-12.0, height=1.5, pen_color=inline_mkColor('cyan', 0.8), brush_color=inline_mkColor('cyan', 0.5)),
+            }
+            epochs_update_dict = {k:EpochDisplayConfig.init_from_config_dict(name=k, config_dict=v) for k,v in epochs_update_dict.items()}
+            epochs_update_dict
+
+
+        """
+        # print(f'pen_tuple: {pen_tuple}, brush_tuple: {brush_tuple}')
+
+        ## Try 3-tuple unwrap
+        if len(pen_tuple) == 3:
+            (pen_color, pen_opacity, pen_width) = pen_tuple
+        elif len(pen_tuple) == 2:
+            (_temp_pen_color_hex_argb, pen_width) = pen_tuple.color, pen_tuple.width # QPenTuple(color='ff0000ff', width=1.0)
+            _temp_pen_qcolor = inline_mkColor(_temp_pen_color_hex_argb)
+            pen_color = _temp_pen_qcolor.name(QtGui.QColor.HexRgb)
+            pen_opacity = _temp_pen_qcolor.alphaF()
+        else:
+            raise NotImplementedError
+
+        if len(brush_tuple) == 2:
+            (brush_color, brush_opacity) = brush_tuple
+        elif len(brush_tuple) == 1:
+            # brush_tuple: QBrushTuple(color='ff000080')
+            _temp_brush_color_hex_argb = brush_tuple.color
+            _temp_brush_qcolor = inline_mkColor(_temp_brush_color_hex_argb)
+            brush_color = _temp_brush_qcolor.name(QtGui.QColor.HexRgb)
+            brush_opacity = _temp_brush_qcolor.alphaF()
+        else:
+            raise NotImplementedError
+
+        return cls(name=name, isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity)
+
+
+
     @classmethod
     def init_configs_list_from_interval_datasource_df(cls, name: str, a_ds) -> List["EpochDisplayConfig"]:
         """
@@ -120,8 +166,8 @@ class EpochDisplayConfig(BasePlotDataParams):
         """
         a_serializable_df = a_ds.get_serialized_data(drop_duplicates=True)
         assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns))
-        return [cls(name=f'{name}', isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity) for y_location, height, (pen_color, pen_opacity, pen_width), (brush_color, brush_opacity) in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
-        
+        # return [cls(name=f'{name}', isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity) for y_location, height, (pen_color, pen_opacity, pen_width), (brush_color, brush_opacity) in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+        return [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
 
 
 
