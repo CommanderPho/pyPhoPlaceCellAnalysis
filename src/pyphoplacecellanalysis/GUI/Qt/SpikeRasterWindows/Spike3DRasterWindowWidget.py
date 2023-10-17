@@ -20,12 +20,13 @@ from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWi
 
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import SpikeRasterBottomFrameControlsMixin
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget import Spike3DRasterLeftSidebarControlBar, SpikeRasterLeftSidebarControlsMixin
+from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget import Spike3DRasterRightSidebarWidget, SpikeRasterRightSidebarOwningMixin
 
 from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
 
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
-class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
+class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRasterRightSidebarOwningMixin, SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
     Manages the main raster views in addition to the shared window-related functions such as menu management, connections, etc.
@@ -225,10 +226,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         self.SpikeRasterBottomFrameControlsMixin_on_init()
         self.SpikeRasterLeftSidebarControlsMixin_on_init()
-        
+        self.SpikeRasterRightSidebarOwningMixin_on_init()
+
         # Helper Mixins: SETUP:
         self.SpikeRasterBottomFrameControlsMixin_on_setup()
         self.SpikeRasterLeftSidebarControlsMixin_on_setup()
+        self.SpikeRasterRightSidebarOwningMixin_on_setup()
         
         self.initUI(curr_spikes_df, core_app_name=application_name, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, type_of_3d_plotter=self.params.type_of_3d_plotter)
         
@@ -293,6 +296,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         ## Connect the UI Controls:
         # Helper Mixins: buildUI:
         self.SpikeRasterLeftSidebarControlsMixin_on_buildUI() # Call this to set the initial values for the UI before signals are connected.
+        self.SpikeRasterRightSidebarOwningMixin_on_buildUI()
+
+
         # self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.SpikeRasterBottomFrameControlsMixin_on_buildUI() # NOTE: do not call for the window as it already has a valid bottom bar widget
         # Connect the signals:
         self.ui.bottom_bar_connections = None 
@@ -300,8 +306,17 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         self.ui.left_side_bar_connections = None
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
+
+        self.ui.right_side_bar_connections = None
+        self.ui.right_side_bar_connections = self.SpikeRasterRightSidebarOwningMixin_connectSignals(self.ui.leftSideToolbarWidget)
+
         
-        
+        ## Setup the right side bar:
+        rightSideContainerWidget = self.ui.rightSideContainerWidget
+        self.ui.rightSideContainerWidget.setVisible(False) # collapses and hides the sidebar
+        # self.ui.rightSideContainerWidget.setVisible(True) # shows the sidebar
+
+
         ## Install the event filter in the 2D View to enable scroll wheel events:
         if self.ui.spike_raster_plt_2d is not None:
             # self.ui.spike_raster_plt_2d.installEventFilter(self) # Kinda works, but doesn't show when scrolling over plots
