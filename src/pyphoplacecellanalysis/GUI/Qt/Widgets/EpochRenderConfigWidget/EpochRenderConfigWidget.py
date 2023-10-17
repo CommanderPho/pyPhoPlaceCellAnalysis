@@ -58,20 +58,20 @@ class EpochRenderConfigWidget(QWidget):
         ui_element_list = self.get_ui_element_list()
         bound_config_value_list = self.get_bound_config_value_list()
         
-        for a_config_property, a_widget in zip(bound_config_value_list, ui_element_list):
-            a_widget_type = type(a_widget)
-            # print(f'a_widget_type: {a_widget_type.__name__}')
-            # found_binding = param_to_pyqt_binding_dict.get(type(a_widget), None)
-            found_binding = param_to_pyqt_binding_dict.get(type(a_widget).__name__, None)
-            if found_binding is not None:
-                # print(f'found_binding: {found_binding}')
-                desired_value = a_config_property(config)
-                # print(f'\t{desired_value}')
-                # curr_value = found_binding.get_value(a_widget)
-                # print(f'\t{curr_value}')
-                found_binding.set_value(a_widget, desired_value)
-            else:
-                print(f'no binding for {a_widget} of type: {type(a_widget)}')
+        # for a_config_property, a_widget in zip(bound_config_value_list, ui_element_list):
+        #     a_widget_type = type(a_widget)
+        #     # print(f'a_widget_type: {a_widget_type.__name__}')
+        #     # found_binding = param_to_pyqt_binding_dict.get(type(a_widget), None)
+        #     found_binding = param_to_pyqt_binding_dict.get(type(a_widget).__name__, None)
+        #     if found_binding is not None:
+        #         # print(f'found_binding: {found_binding}')
+        #         desired_value = a_config_property(self.config)
+        #         # print(f'\t{desired_value}')
+        #         # curr_value = found_binding.get_value(a_widget)
+        #         # print(f'\t{curr_value}')
+        #         found_binding.set_value(a_widget, desired_value)
+        #     else:
+        #         print(f'no binding for {a_widget} of type: {type(a_widget)}')
                 
 
     def get_ui_element_list(self):
