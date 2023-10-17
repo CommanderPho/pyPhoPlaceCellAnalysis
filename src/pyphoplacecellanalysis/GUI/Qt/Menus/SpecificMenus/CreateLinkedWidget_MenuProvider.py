@@ -1,6 +1,7 @@
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuProviderMixin
@@ -55,7 +56,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         self.CreateLinkedWidget_MenuProvider_on_setup()
         
         
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def CreateLinkedWidget_MenuProvider_on_init(self):
         """ perform any parameters setting/checking during init """
         BaseMenuProviderMixin.BaseMenuProviderMixin_on_init(self)
@@ -64,7 +65,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # Define the core object
         self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}, 'menu_provider_obj': None})
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def CreateLinkedWidget_MenuProvider_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
@@ -118,7 +119,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         self.activeMenuReference.actions_dict['actionMenuCreateLinkedWidget'] = curr_window.ui.actionMenuCreateLinkedWidget 
         return self.activeMenuReference.top_level_menu, self.activeMenuReference.actions_dict
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def CreateLinkedWidget_MenuProvider_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         ## Remove Debug Menu:
@@ -132,7 +133,7 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # curr_window.ui.menus.global_window_menus.debug.actions_dict = {} # Empty the dict of actions
         self.CreateLinkedWidget_MenuProvider_actionsDict = {}
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def CreateLinkedWidget_MenuProvider_on_menus_update(self):
         """ called to update menus dynamically. Only needed if the menu items themselves change dynamically.
         """

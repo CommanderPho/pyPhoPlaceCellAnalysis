@@ -1,6 +1,7 @@
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuProviderMixin
@@ -62,14 +63,14 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         self.DebugMenuProviderMixin_on_buildUI()
         
         
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def DebugMenuProviderMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         BaseMenuProviderMixin.BaseMenuProviderMixin_on_init(self)
         # Define the core object
         self.activeMenuReference = PhoUIContainer.init_from_dict({'top_level_menu': None, 'actions_dict': {}, 'menu_provider_obj': None})        
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def DebugMenuProviderMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
@@ -111,7 +112,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         an_action_key, self.activeMenuReference.active_connections_menu = PhoMenuHelper.add_menu(a_main_window=self.root_window, text="Active Connections", name='actionMenuDebugMenuActiveConnections', parent_menu=self.activeMenuReference.top_level_menu, menu_actions_dict=self.DebugMenuProviderMixin_actionsDict)
         # active_connections_menu = self.root_window.ui['actionMenuDebugMenuActiveConnections']
         
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def DebugMenuProviderMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self._DebugMenuProviderMixin_build_menus()
@@ -136,7 +137,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
             self.activeMenuReference.active_connections_menu.removeAction(an_old_action)
             
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def DebugMenuProviderMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         ## Remove Debug Menu:
@@ -155,7 +156,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         self.DebugMenuProviderMixin_actionsDict = {}
 
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def DebugMenuProviderMixin_on_menus_update(self):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc.
         TODO: finish implementation
