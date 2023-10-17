@@ -388,8 +388,8 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
     """
-    decoding_time_bin_size: float
-    num_filter_epochs: int # depends on the number of epochs
+    decoding_time_bin_size: float # the time bin_size in seconds
+    num_filter_epochs: int # depends on the number of epochs (`n_epochs`)
     most_likely_positions_list: list = field(metadata={'shape': ('n_epochs',)})
     p_x_given_n_list: list = field(metadata={'shape': ('n_epochs',)})
     marginal_x_list: list = field(metadata={'shape': ('n_epochs',)})
