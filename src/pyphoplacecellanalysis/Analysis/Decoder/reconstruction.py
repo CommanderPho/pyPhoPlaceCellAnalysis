@@ -413,6 +413,47 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         return n_timebins, flat_time_bin_containers, timebins_p_x_given_n
 
 
+    def flatten_to_masked_values(self):
+        """ appends np.nan values to the beginning and end of each posterior (adding a start and end timebin as well) to allow flat plotting via matplotlib.
+
+
+        """
+        # returns a flattened version of self over all epochs
+        updated_time_bin_containers = []
+        updated_timebins_p_x_given_n = []
+
+        decoding_time_bin_size: float = self.decoding_time_bin_size
+        desired_n_timebins = self.nbins + 2 # add two to each element for the start/end bin
+
+        total_n_timebins = np.sum(self.nbins)
+        desired_total_n_timebins = np.sum(desired_n_timebins)
+
+
+        for epoch_idx in np.arange(self.num_filter_epochs):
+            a_curr_num_bins: int = self.nbins[epoch_idx]
+            updated_curr_num_bins = a_curr_num_bins + 2 # add two (start/end) bins
+            a_centers = self.time_bin_containers[epoch_idx].centers
+            a_posterior = self.p_x_given_n_list[epoch_idx]
+            n_pos_bins = np.shape(a_posterior)[0]
+            
+            updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
+            updated_posterior[:,1:-1] = a_posterior
+            
+            ## Add the start/end bin
+            # a_centers.
+            updated_time_bin_containers.append([(a_centers[0]-decoding_time_bin_size), list(a_centers), (a_centers[-1]+decoding_time_bin_size)])
+            updated_timebins_p_x_given_n.append(updated_posterior)
+    
+        updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        updated_time_bin_containers = np.hstack(np.hstack(updated_time_bin_containers))
+        
+        assert np.shape(updated_time_bin_containers)[0] == desired_total_n_timebins
+        assert np.shape(updated_timebins_p_x_given_n)[1] == desired_total_n_timebins
+
+        return desired_total_n_timebins, updated_time_bin_containers, updated_timebins_p_x_given_n
+
+
+
     def filtered_by_epochs(self, included_epoch_indicies):
         """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
         subset = deepcopy(self)
