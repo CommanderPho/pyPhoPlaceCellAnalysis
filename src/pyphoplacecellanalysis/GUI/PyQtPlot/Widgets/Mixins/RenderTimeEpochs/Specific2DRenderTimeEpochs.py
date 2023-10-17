@@ -279,10 +279,11 @@ class Replays_2DRenderTimeEpochs(General2DRenderTimeEpochs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
             ## parameters:
             y_location = -4.0
-            height = 0.9
+            height = 1.9
             pen_color = pg.mkColor('orange')
+            pen_color.setAlphaF(0.8)
             brush_color = pg.mkColor('orange')
-            
+            brush_color.setAlphaF(0.5)
             ## Add the missing parameters to the dataframe:
             active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             return active_df
@@ -299,7 +300,12 @@ class Replays_2DRenderTimeEpochs(General2DRenderTimeEpochs):
         elif isinstance(curr_sess, Epoch):
             active_Epochs = curr_sess  # <Epoch> object passed directly
         elif isinstance(curr_sess, pd.DataFrame):
-            active_Epochs = (curr_sess['start'].to_numpy(), curr_sess['duration'].to_numpy(), curr_sess['flat_replay_idx'].to_numpy()) 
+            # tries 'flat_replay_idx' column if it exists, otherwise tries 'label' column
+            replay_idx_column_name = 'flat_replay_idx'
+            if replay_idx_column_name not in curr_sess.columns:
+                replay_idx_column_name = 'label' # try "label" instead
+                assert replay_idx_column_name in curr_sess.columns                
+            active_Epochs = (curr_sess['start'].to_numpy(), curr_sess['duration'].to_numpy(), curr_sess[replay_idx_column_name].to_numpy()) 
         else:
             raise NotImplementedError
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
