@@ -1026,6 +1026,14 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
             
+        ## Apply the default formatting:
+        fig.patch.set_facecolor('black')
+        fig.patch.set_alpha(0.1)
+
+        for an_ax in ax:
+            an_ax.patch.set_facecolor('black')
+            an_ax.patch.set_alpha(0.1)
+    
 
         # self.sync_matplotlib_render_plot_widget()
         return self.ui.matplotlib_view_widgets[name], fig, ax
