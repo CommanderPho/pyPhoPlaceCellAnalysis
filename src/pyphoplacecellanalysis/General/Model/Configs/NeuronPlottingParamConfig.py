@@ -175,6 +175,7 @@ class NeuronConfigOwningMixin:
 
 
 class SingleNeuronPlottingExtended(ExtendedPlotDataParams):
+    """ represents the visual config for a single neuron. """
     spikesVisible = param.Boolean(default=False, doc="Whether the spikes are visible")
 
     @property
