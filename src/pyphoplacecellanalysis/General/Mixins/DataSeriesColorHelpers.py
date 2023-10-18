@@ -1,4 +1,4 @@
-from typing import OrderedDict, Union
+from typing import OrderedDict, Union, Optional, Dict, List
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -8,7 +8,26 @@ from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended # for build_cell_display_configs
 
+from qtpy import QtGui # for QColor
+from qtpy.QtGui import QColor, QBrush, QPen
+
+@define(repr=False)
+class ColorData:
+    """ represents a set of color variables as are used in SpikeNDRaster to store properties for neurons.
+
+    """
+	neuron_qcolors: List[QColor] = field(default=Factory(list))
+	neuron_qcolors_map: dict = field(default=Factory(dict))
+	neuron_colors: np.ndarray = field(default=Factory(np.ndarray))
+	neuron_colors_hex: List[str] = field(default=Factory(list))
+
+    @classmethod
+    def backup_raster_colors(cls, active_2d_plot) -> "ColorData":
+    """ extracts the color data from the .params of the SpikeNDRaster plot to back them up and returns them as a ColorData object. """
+        return ColorData(*[deepcopy(arr) for arr in (active_2d_plot.params.neuron_qcolors, active_2d_plot.params.neuron_qcolors_map, active_2d_plot.params.neuron_colors, active_2d_plot.params.neuron_colors_hex)])
+        
 
 @metadata_attributes(short_name=None, tags=['enum'], creation_date='2023-06-21 13:50', related_items=['DataSeriesColorHelpers'])
 class UnitColoringMode(StringLiteralComparableEnum):
@@ -97,7 +116,43 @@ class DataSeriesColorHelpers:
     
 
 
-    
+    @function_attributes(short_name=None, tags=['colors', 'neuron_identity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-18 11:33', related_items=[])
+    @classmethod
+    def build_cell_colors(cls, n_neurons:int, colormap_name='hsv', colormap_source='matplotlib'):
+        """Cell Colors from just n_neurons using pyqtgraph colormaps.
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
+
+            n_neurons = len(active_2d_plot.neuron_ids)
+            neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
+
+            ## Preview the new colors
+            render_colors([ColorFormatConverter.qColor_to_hexstring(a_qcolor, include_alpha=False) for a_qcolor in neuron_qcolors_list])
+
+        """
+        cm = pg.colormap.get(colormap_name, source=colormap_source) # prepare a linear color map
+
+        # unit_colors_list = None # default rainbow of colors for the raster plots
+        neuron_qcolors_list = cm.mapToQColor(np.arange(n_neurons)/float(n_neurons-1)) # returns a list of QColors
+        neuron_colors_ndarray = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
+        # neuron_colors_ndarray = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=False)
+
+        return neuron_qcolors_list, neuron_colors_ndarray
 
 
+    @classmethod
+    def build_cell_display_configs(cls, neuron_ids, neuron_qcolors_list: Optional[List[QColor]], **kwargs) -> Dict[int, SingleNeuronPlottingExtended]:
+        """
 
+        Usage:
+            neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_2d_plot.neuron_ids, neuron_qcolors_list)
+            spike_raster_window.update_neurons_color_data(neuron_plotting_configs_dict)
+
+        """
+        if neuron_qcolors_list is None:
+            neuron_qcolors_list = cls.build_cell_colors(len(neuron_ids), **kwargs) # if no colors provided, builds some
+
+        assert len(neuron_ids) == len(neuron_qcolors_list)
+        return {aclu:SingleNeuronPlottingExtended(name=str(aclu), isVisible=False, color=color.name(QtGui.QColor.HexRgb), spikesVisible=False) for aclu, color in zip(neuron_ids, neuron_qcolors_list)}
+        
