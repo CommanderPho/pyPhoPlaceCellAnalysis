@@ -1,4 +1,5 @@
 from copy import deepcopy
+from enum import Enum
 from typing import Dict, List, Optional # for PlacefieldOverlapMetricMode
 from attrs import define, field, Factory
 from pathlib import Path
@@ -55,6 +56,20 @@ Usage:
 
 
 """
+
+
+class DisplayColorsEnum(Enum):
+    """ Hardcoded Theme Colors for visual consistancy - 2023-10-18
+    
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+    
+    """
+    class Laps(Enum):
+        even = '#5522de' # a yellowish-green
+        odd = '#aadd21'# a purplish-royal-blue
+
+
+
 @define(slots=False, repr=False)
 class DisplayConfig:
     """ Holds display properties for a given configuration """
@@ -71,7 +86,6 @@ class DisplayConfig:
 
     def as_matplotlib_kwargs(self) -> dict:
         return convert_pen_brush_to_matplot_kwargs(pen=self.pen, brush=self.brush)
-
 
 @define(slots=False, repr=False)
 class LongShortDisplayConfigManager:

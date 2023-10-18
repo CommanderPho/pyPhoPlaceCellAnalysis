@@ -192,6 +192,7 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
         # ax.scatter(pos_t_rel_seconds[curr_included_mask], pos_value[curr_included_mask], s=0.5, c=color)
 
 
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
 
 # ==================================================================================================================== #
 # MAIN FUNCTIONS                                                                                                       #
@@ -208,8 +209,8 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
         estimation_session_laps
     """
     # Passed 'even_lap_kwargs', 'odd_lap_kwargs' are to `_plot_helper_render_laps` when rendering the laps
-    default_even_lap_kwargs = dict(color='#5522de', include_highlight=True) # a yellowish-green
-    default_odd_lap_kwargs = dict(color='#aadd21', include_highlight=True) # a purplish-royal-blue
+    default_even_lap_kwargs = dict(color=DisplayColorsEnum.Laps.even.value, include_highlight=True) # a yellowish-green
+    default_odd_lap_kwargs = dict(color=DisplayColorsEnum.Laps.odd.value, include_highlight=True) # a purplish-royal-blue
 
     pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
     position_obj = sess.position

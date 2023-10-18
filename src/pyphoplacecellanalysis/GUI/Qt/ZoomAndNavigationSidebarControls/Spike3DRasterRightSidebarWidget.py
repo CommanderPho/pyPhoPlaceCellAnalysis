@@ -3,11 +3,8 @@
 import sys
 import os
 
-from PyQt5 import QtGui, QtWidgets, uic
-from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
-from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
-from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
-from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 
 ## IMPORTS:
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
@@ -20,7 +17,7 @@ uiFile = os.path.join(path, 'Spike3DRasterRightSidebarWidget.ui')
 
 # LayoutWidget
 
-class Spike3DRasterRightSidebarWidget(QWidget):
+class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
@@ -40,23 +37,24 @@ class Spike3DRasterRightSidebarWidget(QWidget):
 
 
 class SpikeRasterRightSidebarOwningMixin:
-    """ renders the UI controls for the Spike3DRaster_Vedo class 
-        Follows Conventions outlined in ModelViewMixin Conventions.md
-        
-        Implementors must have:
-    
-            @pyqtExceptionPrintingSlot(float)
-            def on_animation_timestep_valueChanged(self, updated_val)
-            
-            @pyqtExceptionPrintingSlot(float)
-            def on_temporal_zoom_factor_valueChanged(self, updated_val)
-        
-            @pyqtExceptionPrintingSlot(float)
-            def on_render_window_duration_valueChanged(self, updated_val)
-        
-        Currently used in Spike3DRasterWindowWidget to implement the left sidebar
+    """ renders the UI 
+
+        Currently used in Spike3DRasterWindowWidget to implement the right sidebar
     """
     
+    def right_sidebar_widget(self) -> Spike3DRasterRightSidebarWidget:
+        return self.ui.rightSideContainerWidget
+    
+
+    def right_sidebar_contents_container(self) -> LayoutWidget:
+        return self.right_sidebar_widget.ui.layout_widget
+
+    def toggle_right_sidebar(self):
+        is_visible = self.right_sidebar_widget.isVisible()
+        self.right_sidebar_widget.setVisible(not is_visible) # collapses and hides the sidebar
+        # self.right_sidebar_widget.setVisible(True) # shows the sidebar
+
+
     @pyqtExceptionPrintingSlot()
     def SpikeRasterRightSidebarOwningMixin_on_init(self):
         """ perform any parameters setting/checking during init """
@@ -76,7 +74,9 @@ class SpikeRasterRightSidebarOwningMixin:
         # right_side_bar_connections.append(right_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))
         return right_side_bar_connections
         
-            
+
+
+
     @pyqtExceptionPrintingSlot()
     def SpikeRasterRightSidebarOwningMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
@@ -116,7 +116,7 @@ class SpikeRasterRightSidebarOwningMixin:
 
 ## Start Qt event loop
 if __name__ == '__main__':
-    app = QApplication([])
+    app = pg.mkQApp()
     widget = Spike3DRasterRightSidebarWidget()
     widget.show()
     sys.exit(app.exec_())
