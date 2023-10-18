@@ -71,6 +71,24 @@ class DataSeriesColorHelpers:
         else:
             raise NotImplementedError
 
+    @classmethod
+    def Colors_NDArray_Convert_to_255_array(cls, colors_ndarray: np.ndarray) -> np.ndarray:
+        """ takes an [4, nCell] np.array of (0.0 - 255.0) values for the color and converts it to a 0.0-1.0 array of the same shape.
+        Reciprocal: Colors_NDArray_Convert_to_zero_to_one_array
+        """
+        converted_colors_ndarray = deepcopy(colors_ndarray)
+        converted_colors_ndarray[0:2, :] *= 255 # [1.0, 0.0, 0.0, 1.0]
+        return converted_colors_ndarray
+    
+    @classmethod
+    def Colors_NDArray_Convert_to_zero_to_one_array(cls, colors_ndarray: np.ndarray) -> np.ndarray:
+        """ takes an [4, nCell] np.array of 0.0-1.0 values for the color and converts it to a (0.0 - 255.0) array of the same shape.
+        Reciprocal: Colors_NDArray_Convert_to_255_array
+        """
+        converted_colors_ndarray = deepcopy(colors_ndarray)
+        converted_colors_ndarray[0:2, :] /= 255
+        return converted_colors_ndarray
+    
 
     @classmethod
     def qColorsList_to_NDarray(cls, neuron_qcolors_list, is_255_array:bool) -> np.ndarray:
@@ -78,6 +96,9 @@ class DataSeriesColorHelpers:
         
         is_255_array: bool - if False, all RGB color values are (0.0 - 1.0), else they are (0.0 - 255.0)
         I was having issues with this list being in the range 0.0-1.0 instead of 0-255.
+        
+        Note: Matplotlib requires zero_to_one_array format
+        
         """
         # allocate new neuron_colors array:
         n_cells = len(neuron_qcolors_list)
@@ -86,5 +107,8 @@ class DataSeriesColorHelpers:
             curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
             neuron_colors[:, i] = curr_color[:]
         if is_255_array:
-            neuron_colors[0:2, :] *= 255 # [1.0, 0.0, 0.0, 1.0]
+            neuron_colors = cls.Colors_NDArray_Convert_to_255_array(neuron_colors) 
         return neuron_colors
+
+
+
