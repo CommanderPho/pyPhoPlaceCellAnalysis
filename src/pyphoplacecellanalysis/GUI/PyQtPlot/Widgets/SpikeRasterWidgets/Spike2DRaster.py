@@ -601,34 +601,35 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         if block_signals:
             self.ui.scroll_window_region.blockSignals(False)
         
+
+
+    def update(self, sort_changed=True, colors_changed=True):
+        """ refreshes the raster when the colors or sort change. 
+        
+        """
+        if sort_changed:
+            # rebuild the position range for each unit along the y-axis:
+            self.update_series_identity_y_values()
+            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
+            self.spikes_df['visualization_raster_y_location'] = all_y
+            colors_changed = True # colors always changed when sort changes
+            
+        if colors_changed:
+            ## Rebuild Raster Plot Points:
+            self._build_cell_configs()
+            # ALL Spikes in the preview window:
+            self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            # Update preview_overview_scatter_plot
+            self.update_rasters()
+        
+
         
     # unit_sort_order_changed_signal
     @QtCore.pyqtSlot(object)
     def on_unit_sort_order_changed(self, new_sort_order):
         ## TODO: copied from Spike3DRaster but untested
-        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')
-        # rebuild the position range for each unit along the y-axis:
-        self.update_series_identity_y_values()
-        # self._update_neuron_id_graphics() # rebuild the text labels
-        # self._update_plots()
-        
-        # Update the 'visualization_raster_y_location' locations:
-        ## TODO: performance: can this just be sorted in place instead of rebuilt entirely?
-
-        all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # old
-        # all_y = [self.fragile_linear_neuron_IDX_to_spatial(self.cell_id_to_fragile_linear_neuron_IDX_map[a_cell_id]) for a_cell_id in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # copied from Spike3DRaster_Vedo. Note self.spikes_df's 'neuron_IDX' is identical to 'fragile_linear_neuron_IDX'
-        self.spikes_df['visualization_raster_y_location'] = all_y
-
-        ## Rebuild Raster Plot Points:
-        self._build_cell_configs()
-
-        # ALL Spikes in the preview window:
-        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()
-        # pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        # self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots        
-        self.plots_data.all_spots = self._build_all_spikes_all_spots()
-        # Update preview_overview_scatter_plot
-        self.update_rasters()
+        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')        
+        self.update(sort_changed=True, colors_changed=True)
         print('\t done.')
 
 
@@ -643,16 +644,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
         """
         print(f'Spike2DRaster.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
-        ## Rebuild Raster Plot Points:
-        self._build_cell_configs()
-
-        # ALL Spikes in the preview window:
-        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()
-        # pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        # self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots        
-        self.plots_data.all_spots = self._build_all_spikes_all_spots()
-        # Update preview_overview_scatter_plot
-        self.update_rasters()
+        self.update(sort_changed=False, colors_changed=True)
         
         
 
