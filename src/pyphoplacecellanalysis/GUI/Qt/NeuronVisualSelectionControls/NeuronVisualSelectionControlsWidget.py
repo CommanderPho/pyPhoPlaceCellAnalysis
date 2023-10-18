@@ -3,6 +3,9 @@
 import sys
 import os
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
@@ -19,6 +22,8 @@ from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig impo
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'NeuronVisualSelectionControlsWidget.ui')
 
+
+@metadata_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-18 15:04', related_items=[])
 class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
     """ Copied from PlacefieldVisualSelectionWidget on 2023-10-18 
     
@@ -410,38 +415,146 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
 # ==================================================================================================================== #
 # Container Class                                                                                                      #
 # ==================================================================================================================== #
+
+@metadata_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-18 15:03', related_items=[])
 class NeuronWidgetContainer(QtWidgets.QWidget):
+    """ Renders a vertical list that displays the color and properties of each neuron
+    
+    Usage:
+        from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+        from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
+        from pyphoplacecellanalysis.GUI.Qt.NeuronVisualSelectionControls.NeuronVisualSelectionControlsWidget import NeuronVisualSelectionControlsWidget, NeuronWidgetContainer
+
+        neuron_ids = active_2d_plot.neuron_ids
+        neuron_plotting_configs_list: List[SingleNeuronPlottingExtended] = [SingleNeuronPlottingExtended(name=str(aclu), isVisible=False, color=ColorFormatConverter.qColor_to_hexstring(color, include_alpha=False), spikesVisible=False) for aclu, color in zip(neuron_ids, neuron_qcolors_list)]
+        # Standalone:
+        # neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_list)
+        # neuron_widget_container.show()
+
+        ## Render in right sidebar:
+        neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_list, parent=spike_raster_window.right_sidebar_contents_container)
+        spike_raster_window.right_sidebar_contents_container.addWidget(neuron_widget_container)
+        
+        
+    Feature: Adding Buttons Dynamically:
+    chkbtnNewButtonTest = a_widget.add_ui_toggle_button(name='chkbtnNewButtonTest', text='test1')
+    
+    """
+    sigRefresh = QtCore.pyqtSignal(object)
+    
 
     def __init__(self, neuron_plotting_configs_list, parent=None):
+        self.ui = PhoUIContainer()
         super(NeuronWidgetContainer, self).__init__(parent)
         
         # Create a QWidget for the scroll area content
-        scroll_content = QtWidgets.QWidget()
+        self.ui.scroll_content = QtWidgets.QWidget()
         
-        layout = QtWidgets.QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        self.ui.main_widgets_list_layout = QtWidgets.QVBoxLayout()
+        self.ui.main_widgets_list_layout.setContentsMargins(0, 0, 0, 0)
+        self.ui.main_widgets_list_layout.setSpacing(2)
 
-        self.widgets_list = []
+        self.ui.widgets_list = []
         for neuron_config in neuron_plotting_configs_list:
             widget = NeuronVisualSelectionControlsWidget(config=neuron_config)
-            self.widgets_list.append(widget)
-            layout.addWidget(widget)
+            self.ui.widgets_list.append(widget)
+            self.ui.main_widgets_list_layout.addWidget(widget)
         
         # Set the layout to the scroll area content widget
-        scroll_content.setLayout(layout)
+        self.ui.scroll_content.setLayout(self.ui.main_widgets_list_layout)
 
         # Create scroll area and set its content
-        scroll_area = QtWidgets.QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setWidget(scroll_content)
+        self.ui.scroll_area = QtWidgets.QScrollArea()
+        self.ui.scroll_area.setWidgetResizable(True)
+        self.ui.scroll_area.setWidget(self.ui.scroll_content)
 
         # Create a main layout for self and add the scroll area
-        main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        main_layout.addWidget(scroll_area)
-        self.setLayout(main_layout)
+        self.ui.main_layout = QtWidgets.QVBoxLayout(self)
+        self.ui.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.ui.main_layout.setSpacing(0)
+        self.ui.main_layout.addWidget(self.ui.scroll_area)
+        self.setLayout(self.ui.main_layout)
+
+
+    # ==================================================================================================================== #
+    # Container Properties to access child widgets:                                                                        #
+    # ==================================================================================================================== #
+    @property
+    def config_widgets(self):
+        """The pf_widgets property."""
+        return self.ui.widgets_list
+    @config_widgets.setter
+    def config_widgets(self, value):
+        self.ui.widgets_list = value
+        self.rebuild_neuron_id_to_widget_map()
+        
+    @property
+    def neuron_id_config_widgets_map(self):
+        """The neuron_id_pf_widgets_map property."""
+        return self._neuron_id_config_widgets_map
+    @neuron_id_config_widgets_map.setter
+    def neuron_id_config_widgets_map(self, value):
+        self._neuron_id_config_widgets_map = value
+    
+    def rebuild_neuron_id_to_widget_map(self):
+        """ must be called after changing self.widgets_list """
+        self._neuron_id_config_widgets_map = dict()
+        for a_widget in self.ui.widgets_list:
+            curr_widget_config = a_widget.config_from_state()
+            self._neuron_id_config_widgets_map[curr_widget_config.neuron_id] = a_widget 
+        
+
+    # @QtCore.pyqtSlot()
+    # def onRefreshAction(self):
+    #     print(f'PlacefieldVisualSelectionControlsBarWidget.onRefreshAction()')
+    #     self.sigRefresh.emit(self)
+    #     # self.done(QtCore.Qt.WA_DeleteOnClose)
+
+    @QtCore.pyqtSlot(object)
+    def applyUpdatedConfigs(self, active_configs_map):
+        """ Updates the placefield Qt widgets provided in the neuron_id_pf_widgets_map from the active_configs_map
+        
+        Inputs:
+            Both maps should have keys of neuron_id <int>
+        
+        Usage:
+            ipcDataExplorer.neuron_id_pf_widgets_map = _build_id_index_configs_dict(pf_widgets)
+            apply_updated_configs_to_pf_widgets(ipcDataExplorer.neuron_id_pf_widgets_map, active_configs_map)
+        """
+        print(f'PlacefieldVisualSelectionControlsBarWidget.applyUpdatedConfigs(active_configs_map: {active_configs_map})')
+        ## Update placefield selection GUI widgets from updated configs:
+        for neuron_id, updated_config in active_configs_map.items():
+            """ Update the placefield selection GUI widgets from the updated configs using the .update_from_config(render_config) fcn """
+            # update the widget:
+            self.neuron_id_config_widgets_map[neuron_id].update_from_config(updated_config)
+
+
+    def configsFromStates(self):
+        """ gets the current config from the state of each child pf_widget (a list of SingleNeuronPlottingExtended) """
+        return [a_widget.config_from_state() for a_widget in self.ui.widgets_list]
+        
+    def configMapFromChildrenWidgets(self):
+        """ returns a map with keys of neuron_id and values of type SingleNeuronPlottingExtended """
+        return {a_config.neuron_id:a_config for a_config in self.configsFromStates()}
+
+    
+
+    @classmethod
+    def apply_updated_configs_to_neuron_widgets(cls, neuron_id_config_widgets_map, active_configs_map):
+        """ Updates the placefield Qt widgets provided in the neuron_id_pf_widgets_map from the active_configs_map
+            
+        Inputs:
+            Both maps should have keys of neuron_id <int>
+        
+        Usage:
+            ipcDataExplorer.neuron_id_pf_widgets_map = _build_id_index_configs_dict(pf_widgets)
+            apply_updated_configs_to_pf_widgets(ipcDataExplorer.neuron_id_pf_widgets_map, active_configs_map)
+        """
+        ## Update placefield selection GUI widgets from updated configs:
+        for neuron_id, updated_config in active_configs_map.items():
+            """ Update the placefield selection GUI widgets from the updated configs using the .update_from_config(render_config) fcn """
+            # update the widget:
+            neuron_id_config_widgets_map[neuron_id].update_from_config(updated_config)
 
 
 

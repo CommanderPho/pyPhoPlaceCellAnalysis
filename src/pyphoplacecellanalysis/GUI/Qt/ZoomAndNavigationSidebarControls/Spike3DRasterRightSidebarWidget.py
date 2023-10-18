@@ -42,13 +42,15 @@ class SpikeRasterRightSidebarOwningMixin:
         Currently used in Spike3DRasterWindowWidget to implement the right sidebar
     """
     
+    @property
     def right_sidebar_widget(self) -> Spike3DRasterRightSidebarWidget:
         return self.ui.rightSideContainerWidget
     
-
+    @property
     def right_sidebar_contents_container(self) -> LayoutWidget:
         return self.right_sidebar_widget.ui.layout_widget
 
+    
     def toggle_right_sidebar(self):
         is_visible = self.right_sidebar_widget.isVisible()
         self.right_sidebar_widget.setVisible(not is_visible) # collapses and hides the sidebar
