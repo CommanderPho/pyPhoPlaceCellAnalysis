@@ -5,15 +5,15 @@ import sys
 import os
 from typing import Optional, List, Dict, Callable
 
-from PyQt5 import QtGui, QtWidgets, uic
-from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
-from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
-from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
-from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
+from pyphoplacecellanalysis.External.pyqtgraph.widgets.LayoutWidget import LayoutWidget
 
 
 ## IMPORTS:
 from attrs import define, field, Factory
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.Param_to_PyQt_Binding import ParamToPyQtBinding
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig, _get_default_epoch_configs
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
@@ -26,10 +26,11 @@ path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'EpochRenderConfigWidget.ui')
 
 
-     
+
 
 # @define(slots=False, auto_detect=True) # , init=False
-class EpochRenderConfigWidget(QWidget):
+@metadata_attributes(short_name=None, tags=['epoch', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 00:00', related_items=[])
+class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
     """ a widget that allows graphically configuring the rendering Epochs 
         EpochDisplayConfig
     """
@@ -146,11 +147,70 @@ class EpochRenderConfigWidget(QWidget):
         return a_config
         
 
+def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) -> EpochRenderConfigWidget:
+    """ builds a simple EpochRenderConfigWidget widget from a simple EpochDisplayConfig
+    
+    Called in build_containing_epoch_display_configs_root_widget(...) down below.
+    
+    """
+    curr_epoch_config_string = f'{render_config.name}'
+    curr_widget = EpochRenderConfigWidget(config=render_config) # new widget type
+    curr_widget.setObjectName(curr_epoch_config_string)
+    
+    # curr_widget.update_from_config(render_config) # is this the right type of config? I think it is.
+
+    return curr_widget
+
+
+def build_containing_epoch_display_configs_root_widget(epoch_display_configs, parent=None):
+    """ Renders a list cf config widgets for each epoch into the right sidebar of the Spike3DRasterWindow
+
+        Usage:
+            from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig, _get_default_epoch_configs
+            from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigWidget, build_containing_epoch_display_configs_root_widget
+
+
+            rightSideContainerWidget = spike_raster_window.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
+            a_layout_widget = rightSideContainerWidget.ui.layout_widget
+            rightSideContainerWidget.setVisible(True) # shows the sidebar
+
+            epoch_display_configs = _get_default_epoch_configs()
+            rootWidget, out_render_config_widgets_dict = build_containing_epoch_display_configs_root_widget(epoch_display_configs, parent=a_layout_widget)
+            rootWidget.show()
+
+    """
+    if parent is None:
+        rootWidget = pg.Qt.QtWidgets.QWidget()
+    else:
+        rootWidget = pg.Qt.QtWidgets.QWidget()
+        parent.addWidget(rootWidget)
+
+
+    # config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
+    config_widget_layout = pg.Qt.QtWidgets.QVBoxLayout()
+    config_widget_layout.setSpacing(0)
+    config_widget_layout.setContentsMargins(0, 0, 0, 0)
+    # config_widget_layout.setObjectName("horizontalLayout")
+    config_widget_layout.setObjectName("verticalLayout")
+
+    out_render_config_widgets_dict = {}
+    for a_config_name, a_config in epoch_display_configs.items():
+        curr_widget = build_single_epoch_display_config_widget(a_config)
+        config_widget_layout.addWidget(curr_widget)
+        out_render_config_widgets_dict[a_config_name] = curr_widget
+
+    out_render_config_widgets_dict
+
+
+    rootWidget.setLayout(config_widget_layout)
+    return rootWidget, out_render_config_widgets_dict
+
+
 
 
 ## Start Qt event loop
 if __name__ == '__main__':
-    app = QApplication([])
+    app = pg.mkQApp('test EpochRenderConfigWidget')
     test_config = EpochDisplayConfig()
     widget = EpochRenderConfigWidget(config=test_config)
     # widget = EpochRenderConfigWidget()
