@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>255</width>
-    <height>55</height>
+    <width>239</width>
+    <height>42</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -56,7 +56,7 @@ border-color: rgb(0, 0, 0);</string>
     <number>0</number>
    </property>
    <item row="0" column="0">
-    <widget class="QGroupBox" name="groupBox">
+    <widget class="QFrame" name="mainFrame">
      <property name="minimumSize">
       <size>
        <width>20</width>
@@ -100,9 +100,6 @@ QToolButton:!checked{
     /*border-style: dashed;*/
 }</string>
      </property>
-     <property name="flat">
-      <bool>false</bool>
-     </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <property name="spacing">
        <number>0</number>
@@ -135,6 +132,9 @@ QToolButton:!checked{
           <property name="text">
            <string>pf[i]</string>
           </property>
+          <property name="flat">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
@@ -150,61 +150,6 @@ QToolButton:!checked{
           </property>
           <property name="text">
            <string/>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_BottomRow">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <item>
-         <widget class="QToolButton" name="chkbtnPlacefield">
-          <property name="styleSheet">
-           <string notr="true">QToolButton {
-    /*background-color: green;*/
-    color: rgb(244, 244, 244);
-    /*border: 2px green;*/
-    /*border-radius: 22px;*/
-    /*border-style: outset;*/
-	/*border-style: inset;*/
-}
-QToolButton:disabled {
-    color: gray;
-    background-color: gray;
-    border: 1px black;
-    border-style: outset;                
-}
-QToolButton:checked{
-    color: rgb(255, 170, 0); 
-    /*font:  12px; */  
-    font: bold;
-    /*background-color: red;*/
-    border: 1px white;
-    border-style: outset;
-}
-QToolButton:!checked{
-    /*color: black; */
-    /*background-color: green;*/
-    /*border: 1px black;*/
-    /*border-style: outset;*/
-	/*border: 1px black;*/
-    /*border-style: dashed;*/
-}</string>
-          </property>
-          <property name="text">
-           <string>pf</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-          <property name="popupMode">
-           <enum>QToolButton::DelayedPopup</enum>
-          </property>
-          <property name="toolButtonStyle">
-           <enum>Qt::ToolButtonTextBesideIcon</enum>
           </property>
          </widget>
         </item>
@@ -255,6 +200,54 @@ QToolButton:!checked{
           </property>
           <property name="toolButtonStyle">
            <enum>Qt::ToolButtonTextOnly</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="chkbtnPlacefield">
+          <property name="styleSheet">
+           <string notr="true">QToolButton {
+    /*background-color: green;*/
+    color: rgb(244, 244, 244);
+    /*border: 2px green;*/
+    /*border-radius: 22px;*/
+    /*border-style: outset;*/
+	/*border-style: inset;*/
+}
+QToolButton:disabled {
+    color: gray;
+    background-color: gray;
+    border: 1px black;
+    border-style: outset;                
+}
+QToolButton:checked{
+    color: rgb(255, 170, 0); 
+    /*font:  12px; */  
+    font: bold;
+    /*background-color: red;*/
+    border: 1px white;
+    border-style: outset;
+}
+QToolButton:!checked{
+    /*color: black; */
+    /*background-color: green;*/
+    /*border: 1px black;*/
+    /*border-style: outset;*/
+	/*border: 1px black;*/
+    /*border-style: dashed;*/
+}</string>
+          </property>
+          <property name="text">
+           <string>pf</string>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="popupMode">
+           <enum>QToolButton::DelayedPopup</enum>
+          </property>
+          <property name="toolButtonStyle">
+           <enum>Qt::ToolButtonTextBesideIcon</enum>
           </property>
          </widget>
         </item>
