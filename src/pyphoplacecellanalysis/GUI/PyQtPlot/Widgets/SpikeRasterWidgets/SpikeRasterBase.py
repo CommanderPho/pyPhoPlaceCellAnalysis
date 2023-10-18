@@ -111,7 +111,7 @@ class UnitSortableMixin:
         self._unit_sort_order
         self.n_cells
     """
-    unit_sort_order_changed_signal = QtCore.pyqtSignal(object) # Called when the window is closing. 
+    unit_sort_order_changed_signal = QtCore.pyqtSignal(object) # Called when the sort order is changed. 
     
     @property
     def unit_sort_order(self):
