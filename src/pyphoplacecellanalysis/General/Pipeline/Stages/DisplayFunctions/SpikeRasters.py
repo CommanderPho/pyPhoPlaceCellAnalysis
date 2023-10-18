@@ -193,7 +193,7 @@ class RasterPlotParams:
 
         Inputs:
             neuron_colors_list: a list of neuron colors
-                if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
+                if None provided will call DataSeriesColorHelpers._build_cell_qcolor_list(...) to build them.
             
             mode:
                 'preserve_fragile_linear_neuron_IDXs': color is assigned based off of fragile_linear_neuron_IDX value, meaning after re-sorting the fragile_linear_neuron_IDXs the colors will appear visually different along y but will correspond to the same units as before the sort.
@@ -223,11 +223,11 @@ class RasterPlotParams:
         n_cells = len(unsorted_fragile_linear_neuron_IDXs)
 
         if neuron_colors_list is None:
-            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
             for a_color in neuron_qcolors_list:
                 a_color.setAlphaF(0.5)
         else:
-            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
                                 
         neuron_qcolors_map = dict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
 

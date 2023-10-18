@@ -14,6 +14,7 @@ import qtawesome as qta
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
+from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots, RenderPlotsData
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
@@ -357,7 +358,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def _setup_neurons_color_data(self, neuron_colors_list=None, coloring_mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER):
         """ 
         neuron_colors_list: a list of neuron colors
-            if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
+            if None provided will call DataSeriesColorHelpers._build_cell_qcolor_list(...) to build them.
         
         Requires:
             self.fragile_linear_neuron_IDXs
@@ -377,12 +378,12 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         unsorted_fragile_linear_neuron_IDXs = self.fragile_linear_neuron_IDXs
         
         if neuron_colors_list is None:
-            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
             for a_color in neuron_qcolors_list:
                 a_color.setAlphaF(0.5)
         else:
             ## TODO: otherwise we have some provided colors that we should convert into the correct format
-            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
                                 
         # neuron_fragile_linear_neuron_IDX_to_colors_index_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_colors_list))
         neuron_qcolors_map = OrderedDict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
@@ -402,7 +403,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         # get hex colors:
         #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
         #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
-        self.params.neuron_colors_hex = [self.params.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs)] 
+        self.params.neuron_colors_hex = [ColorFormatConverter.qColor_to_hexstring(self.params.neuron_qcolors[i], include_alpha=False) for i, cell_id in enumerate(self.fragile_linear_neuron_IDXs)] 
         
        
        
