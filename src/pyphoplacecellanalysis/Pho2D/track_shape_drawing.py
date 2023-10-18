@@ -10,7 +10,7 @@ from neuropy.utils.dynamic_container import overriding_dict_with # required for 
 from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect, is_point_in_rect
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.gui.Qt.color_helpers import convert_pen_brush_to_matplot_kwargs
+from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -438,7 +438,7 @@ class LinearTrackDimensions:
                 if matplotlib_rect_kwargs_override is not None:
                     matplotlib_rect_kwargs = matplotlib_rect_kwargs_override
                 else:
-                    matplotlib_rect_kwargs = convert_pen_brush_to_matplot_kwargs(pen, brush) # linewidth=2, edgecolor='red', facecolor='red'                
+                    matplotlib_rect_kwargs = ColorFormatConverter.convert_pen_brush_to_matplot_kwargs(pen, brush) # linewidth=2, edgecolor='red', facecolor='red'                
                 rect = patches.Rectangle((x, y), w, h, **matplotlib_rect_kwargs)
                 plot_item.add_patch(rect)                
                 rect_items.append(rect)

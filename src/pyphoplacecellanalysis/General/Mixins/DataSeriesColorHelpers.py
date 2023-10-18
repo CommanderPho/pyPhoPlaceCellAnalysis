@@ -7,6 +7,8 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+
 
 @metadata_attributes(short_name=None, tags=['enum'], creation_date='2023-06-21 13:50', related_items=['DataSeriesColorHelpers'])
 class UnitColoringMode(StringLiteralComparableEnum):
@@ -24,8 +26,8 @@ class DataSeriesColorHelpers:
     debug_logging = False
     
     @classmethod
-    def _build_cell_color_map(cls, fragile_linear_neuron_IDXs, mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER, provided_cell_colors=None, debug_print=False):
-        """ builds a list of pg.mkColors from the cell index id:
+    def _build_cell_qcolor_list(cls, fragile_linear_neuron_IDXs, mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER, provided_cell_colors=None, debug_print=False):
+        """ builds a list of QColors from the cell index id:
 
         mode:
             'preserve_fragile_linear_neuron_IDXs': color is assigned based off of fragile_linear_neuron_IDX value, meaning after re-sorting the fragile_linear_neuron_IDXs the colors will appear visually different along y but will correspond to the same units as before the sort.
@@ -34,8 +36,8 @@ class DataSeriesColorHelpers:
         provided_cell_colors: usually None, in which case a rainbow of colors is built. If not None it better be an np.array of shape (4, n_cells)
         
         Usage:
-            # _build_cell_color_map(spike_raster_plt_3d.fragile_linear_neuron_IDXs, mode=UnitColoringMode.COLOR_BY_INDEX_ORDER)
-            _build_cell_color_map(spike_raster_plt_3d.fragile_linear_neuron_IDXs, mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS)
+            # _build_cell_qcolor_list(spike_raster_plt_3d.fragile_linear_neuron_IDXs, mode=UnitColoringMode.COLOR_BY_INDEX_ORDER)
+            _build_cell_qcolor_list(spike_raster_plt_3d.fragile_linear_neuron_IDXs, mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS)
 
         
 
@@ -59,35 +61,18 @@ class DataSeriesColorHelpers:
             if provided_cell_colors is not None:
                 return [pg.mkColor(provided_cell_colors[:, fragile_linear_neuron_IDX]) for i, fragile_linear_neuron_IDX in enumerate(sorted_fragile_linear_neuron_IDXs)]
             else:
-                return [pg.mkColor((fragile_linear_neuron_IDX, n_cells*1.3)) for i, fragile_linear_neuron_IDX in enumerate(sorted_fragile_linear_neuron_IDXs)]
+                return [pg.mkColor((fragile_linear_neuron_IDX, n_cells*1.3)) for i, fragile_linear_neuron_IDX in enumerate(sorted_fragile_linear_neuron_IDXs)] # builds varied hues (hue_index, n_hues). see https://pyqtgraph.readthedocs.io/en/latest/api_reference/functions.html#pyqtgraph.intColor
             
         elif mode.name == UnitColoringMode.COLOR_BY_INDEX_ORDER.name:
             # color is assigned based of the raw index order of the passed-in unit ids. This means after re-sorting the units the colors will appear visually the same along y, but will not correspond to the same units.
             if provided_cell_colors is not None:
                 return [pg.mkColor(provided_cell_colors[:, i]) for i, fragile_linear_neuron_IDX in enumerate(fragile_linear_neuron_IDXs)]
             else:
-                return [pg.mkColor((i, n_cells*1.3)) for i, fragile_linear_neuron_IDX in enumerate(fragile_linear_neuron_IDXs)]
+                return [pg.mkColor((i, n_cells*1.3)) for i, fragile_linear_neuron_IDX in enumerate(fragile_linear_neuron_IDXs)] # builds varied hues (hue_index, n_hues). see https://pyqtgraph.readthedocs.io/en/latest/api_reference/functions.html#pyqtgraph.intColor
             
         else:
             raise NotImplementedError
 
-    @classmethod
-    def Colors_NDArray_Convert_to_255_array(cls, colors_ndarray: np.ndarray) -> np.ndarray:
-        """ takes an [4, nCell] np.array of (0.0 - 255.0) values for the color and converts it to a 0.0-1.0 array of the same shape.
-        Reciprocal: Colors_NDArray_Convert_to_zero_to_one_array
-        """
-        converted_colors_ndarray = deepcopy(colors_ndarray)
-        converted_colors_ndarray[0:2, :] *= 255 # [1.0, 0.0, 0.0, 1.0]
-        return converted_colors_ndarray
-    
-    @classmethod
-    def Colors_NDArray_Convert_to_zero_to_one_array(cls, colors_ndarray: np.ndarray) -> np.ndarray:
-        """ takes an [4, nCell] np.array of 0.0-1.0 values for the color and converts it to a (0.0 - 255.0) array of the same shape.
-        Reciprocal: Colors_NDArray_Convert_to_255_array
-        """
-        converted_colors_ndarray = deepcopy(colors_ndarray)
-        converted_colors_ndarray[0:2, :] /= 255
-        return converted_colors_ndarray
     
 
     @classmethod
@@ -107,8 +92,12 @@ class DataSeriesColorHelpers:
             curr_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
             neuron_colors[:, i] = curr_color[:]
         if is_255_array:
-            neuron_colors = cls.Colors_NDArray_Convert_to_255_array(neuron_colors) 
+            neuron_colors = ColorFormatConverter.Colors_NDArray_Convert_to_255_array(neuron_colors) 
         return neuron_colors
+    
+
+
+    
 
 
 

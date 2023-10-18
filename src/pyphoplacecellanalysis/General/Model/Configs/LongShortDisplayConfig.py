@@ -25,7 +25,7 @@ from pyphocorehelpers.print_helpers import generate_html_string # used for `plot
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphocorehelpers.gui.Qt.color_helpers import convert_pen_brush_to_matplot_kwargs
+from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
 from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used by RateRemappingPaginatedFigureController
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
@@ -40,8 +40,8 @@ History:
         long_epoch_config = dict(epoch_label='long', pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00'))
         short_epoch_config = dict(epoch_label='short', pen=pg.mkPen('#490000'), brush=pg.mkBrush('#f5161659'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00'))
 
-        long_epoch_matplotlib_config = convert_pen_brush_to_matplot_kwargs(pen=long_epoch_config['pen'], brush=long_epoch_config['brush'])
-        short_epoch_matplotlib_config = convert_pen_brush_to_matplot_kwargs(pen=short_epoch_config['pen'], brush=short_epoch_config['brush'])
+        long_epoch_matplotlib_config = ColorFormatConverter.convert_pen_brush_to_matplot_kwargs(pen=long_epoch_config['pen'], brush=long_epoch_config['brush'])
+        short_epoch_matplotlib_config = ColorFormatConverter.convert_pen_brush_to_matplot_kwargs(pen=short_epoch_config['pen'], brush=short_epoch_config['brush'])
     ```
 
 Usage:
@@ -85,7 +85,7 @@ class DisplayConfig:
         return {'epoch_label': self.epoch_label, 'pen': self.pen, 'brush': self.brush, 'hoverBrush': self.hoverBrush, 'hoverPen': self.hoverPen}
 
     def as_matplotlib_kwargs(self) -> dict:
-        return convert_pen_brush_to_matplot_kwargs(pen=self.pen, brush=self.brush)
+        return ColorFormatConverter.convert_pen_brush_to_matplot_kwargs(pen=self.pen, brush=self.brush)
 
 @define(slots=False, repr=False)
 class LongShortDisplayConfigManager:
