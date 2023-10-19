@@ -581,13 +581,14 @@ class NeuronWidgetContainer(QtWidgets.QWidget):
             self.neuron_id_config_widgets_map[neuron_id].update_from_config(updated_config)
 
 
-    def configsFromStates(self):
+    def get_configs_from_states(self) -> List[SingleNeuronPlottingExtended]:
         """ gets the current config from the state of each child pf_widget (a list of SingleNeuronPlottingExtended) """
         return [a_widget.config_from_state() for a_widget in self.ui.widgets_list]
         
-    def configMapFromChildrenWidgets(self):
+    
+    def get_config_map_from_child_widgets(self) -> Dict[int, SingleNeuronPlottingExtended]:
         """ returns a map with keys of neuron_id and values of type SingleNeuronPlottingExtended """
-        return {a_config.neuron_id:a_config for a_config in self.configsFromStates()}
+        return {a_config.neuron_id:a_config for a_config in self.get_configs_from_states()}
 
     
 
@@ -698,8 +699,9 @@ def add_neuron_display_config_widget(spike_raster_window):
 
     ## Render in right sidebar:
     neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict, parent=spike_raster_window.right_sidebar_contents_container)
+    ## add reference to sidebar.ui.neuron_widget_container
     spike_raster_window.right_sidebar_contents_container.addWidget(neuron_widget_container)
-    ## TODO: add to sidebar
+    # Display the sidebar:
     spike_raster_window.toggle_right_sidebar()
 
     ## Connect	
