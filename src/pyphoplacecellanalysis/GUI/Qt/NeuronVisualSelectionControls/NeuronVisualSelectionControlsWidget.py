@@ -630,6 +630,12 @@ def add_neuron_display_config_widget(spike_raster_window):
 
 
     """
+    ## Get 2D or 3D Raster from spike_raster_window
+    active_raster_plot = spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+    if active_raster_plot is None:
+        active_raster_plot = spike_raster_window.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+        assert active_raster_plot is not None
+
     ### Callbacks for NeuronWidgetContainer and `spike_raster_window`
     def _update_configs_from_raster():
         """ The function called when the neuron color is changed.
@@ -646,12 +652,6 @@ def add_neuron_display_config_widget(spike_raster_window):
         print(f'_update_configs_from_raster()')
         # # Set colors from the raster:
         # neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_2d_plot.neuron_ids, colormap_name='PAL-relaxed_bright', colormap_source=None)
-
-        ## Get 2D or 3D Raster from spike_raster_window
-        active_raster_plot = spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
-        if active_raster_plot is None:
-            active_raster_plot = spike_raster_window.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
-            assert active_raster_plot is not None
 
         ## Backup Existing Colors:
         _plot_backup_colors = ColorData.backup_raster_colors(active_raster_plot) # note that they are all 0.0-1.0 format. RGBA
