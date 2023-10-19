@@ -1,3 +1,5 @@
+from copy import deepcopy
+from typing import Dict
 import numpy as np
 
 from qtpy import QtCore, QtWidgets
@@ -23,6 +25,12 @@ from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRaste
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget import Spike3DRasterRightSidebarWidget, SpikeRasterRightSidebarOwningMixin
 
 from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
+
+from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers, UnitColoringMode, ColorData
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
+from pyphoplacecellanalysis.GUI.Qt.NeuronVisualSelectionControls.NeuronVisualSelectionControlsWidget import NeuronVisualSelectionControlsWidget, NeuronWidgetContainer, add_neuron_display_config_widget
+
+
 
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
@@ -946,7 +954,138 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         return spike_raster_window
     
     
+
+    # ==================================================================================================================== #
+    # Neuron Visual Configs Widget                                                                                         #
+    # ==================================================================================================================== #
+
+
+    def on_neuron_color_display_config_changed(self, new_config):
+        """ The function called when the neuron color is changed in the widget
+        Implicitly captures spike_raster_window
+
+        Recieves a SingleNeuronPlottingExtended config
+
+        Usage:
+            for a_widget in pf_widgets:
+                # Connect the signals to the debugging slots:
+                a_widget.spike_config_changed.connect(_on_spike_config_changed)
+                a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+        """
+        print(f'_on_neuron_color_display_config_changed(new_config: {new_config})')
+
+        if isinstance(new_config, SingleNeuronPlottingExtended):
+            # wrap it in a single-element dict before passing:
+            new_config = {int(new_config.name):new_config}
+
+        # extracted_neuron_id_updated_colors_map = {int(a_config.name):a_config.color for a_config in new_config}
+
+        # Update the raster when the configs change:
+        self.update_neurons_color_data(new_config)
+
+
+
+    ### Callbacks for NeuronWidgetContainer and `spike_raster_window`
+    def update_neuron_config_widgets_from_raster(self, *arg, block_signals: bool=True, **kwargs):
+        """ The function called when the neuron color is changed.
+        Implicitly captures spike_raster_window, active_raster_plot, neuron_widget_container
+
+        Recieves a SingleNeuronPlottingExtended config
+
+        Raster -> Configs
+
+        Usage:
+            for a_widget in pf_widgets:
+                # Connect the signals to the debugging slots:
+                a_widget.spike_config_changed.connect(_on_spike_config_changed)
+                a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+        """
+        print(f'update_neuron_config_widgets_from_raster()')
+        # # Set colors from the raster:
+        # neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_2d_plot.neuron_ids, colormap_name='PAL-relaxed_bright', colormap_source=None)
+
+        ## Get 2D or 3D Raster from spike_raster_window
+        active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+        if active_raster_plot is None:
+            active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+            assert active_raster_plot is not None
+
+
+        neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_raster_plot.neuron_ids, deepcopy(active_raster_plot.params.neuron_qcolors))
+
+        neuron_widget_container = self.ui.rightSideContainerWidget.ui.neuron_widget_container
+        
+        # TODO apply to neuron_widget_container
+        if block_signals:
+            neuron_widget_container.blockSignals(True) # Block signals so it doesn't recursively update
+        neuron_widget_container.applyUpdatedConfigs(neuron_plotting_configs_dict)
+        if block_signals:
+            neuron_widget_container.blockSignals(False)
+
+
+
+
+    def _perform_build_attached_neuron_visual_configs_widget(self, neuron_plotting_configs_dict: Dict):
+        # Standalone:
+        # neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict)
+        # neuron_widget_container.show()
+
+        assert not hasattr(self.ui.rightSideContainerWidget.ui, 'neuron_widget_container')
+        
+        ## Render in right sidebar:
+        self.ui.rightSideContainerWidget.ui.neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict, parent=self.right_sidebar_contents_container)
+        ## add reference to sidebar.ui.neuron_widget_container
+        self.right_sidebar_contents_container.addWidget(self.ui.rightSideContainerWidget.ui.neuron_widget_container)
+
+        ## Connect	
+        ## TODO: use `self.connection_man`?
+
+        _connections_list = []
+        for curr_widget in self.ui.rightSideContainerWidget.ui.neuron_widget_container.config_widgets:        
+            # Connect the signals to the widgets:
+            # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=neuron_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
+            # # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
+            # curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+            _connections_list.append(curr_widget.sig_neuron_color_changed.connect(self.on_neuron_color_display_config_changed))
+
+        self.ui.rightSideContainerWidget.ui.neuron_widget_container.rebuild_neuron_id_to_widget_map()
+        
+        _connections_list.append(self.ui.rightSideContainerWidget.ui.neuron_widget_container.sigRevert.connect(self.update_neuron_config_widgets_from_raster))
+        
+
+        return self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list
     
+        
+    def build_neuron_visual_configs_widget(self, build_new_neuron_colormap:bool=False):
+        """ addds to the right sidebar and connects controls """
+        ## Get 2D or 3D Raster from spike_raster_window
+        active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+        if active_raster_plot is None:
+            active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+            assert active_raster_plot is not None
+
+
+        ## Backup Existing Colors:
+        # _plot_backup_colors = ColorData.backup_raster_colors(active_raster_plot) # note that they are all 0.0-1.0 format. RGBA
+        # deepcopy(active_raster_plot.params.neuron_qcolors) #, active_raster_plot.params.neuron_qcolors_map
+
+        # Build updated configs from the raster_plot's colors:
+        if build_new_neuron_colormap:
+            # builds a new colormap
+            print(f'building new colormap')
+            neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_raster_plot.neuron_ids, colormap_name='PAL-relaxed_bright', colormap_source=None)
+        else:
+            # Uses the existing neuron colors from self:
+            neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_raster_plot.neuron_ids, deepcopy(active_raster_plot.params.neuron_qcolors))
+        
+        # neuron_widget_container, _connections_list = add_neuron_display_config_widget(self)
+         
+        self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
+
+        # Display the sidebar:
+        self.set_right_sidebar_visibility()
+    
+
 
 if __name__ == "__main__":
     import sys

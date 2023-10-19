@@ -687,28 +687,28 @@ def add_neuron_display_config_widget(spike_raster_window, use_current_spike_rast
 
 
 
-    def _on_neuron_color_display_config_changed(new_config):
-        """ The function called when the neuron color is changed.
-        Implicitly captures spike_raster_window
+    # def _on_neuron_color_display_config_changed(new_config):
+    #     """ The function called when the neuron color is changed.
+    #     Implicitly captures spike_raster_window
 
-        Recieves a SingleNeuronPlottingExtended config
+    #     Recieves a SingleNeuronPlottingExtended config
 
-        Usage:
-            for a_widget in pf_widgets:
-                # Connect the signals to the debugging slots:
-                a_widget.spike_config_changed.connect(_on_spike_config_changed)
-                a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
-        """
-        print(f'_on_neuron_color_display_config_changed(new_config: {new_config})')
+    #     Usage:
+    #         for a_widget in pf_widgets:
+    #             # Connect the signals to the debugging slots:
+    #             a_widget.spike_config_changed.connect(_on_spike_config_changed)
+    #             a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+    #     """
+    #     print(f'_on_neuron_color_display_config_changed(new_config: {new_config})')
 
-        if isinstance(new_config, SingleNeuronPlottingExtended):
-            # wrap it in a single-element dict before passing:
-            new_config = {int(new_config.name):new_config}
+    #     if isinstance(new_config, SingleNeuronPlottingExtended):
+    #         # wrap it in a single-element dict before passing:
+    #         new_config = {int(new_config.name):new_config}
 
-        # extracted_neuron_id_updated_colors_map = {int(a_config.name):a_config.color for a_config in new_config}
+    #     # extracted_neuron_id_updated_colors_map = {int(a_config.name):a_config.color for a_config in new_config}
 
-        # Update the raster when the configs change:
-        spike_raster_window.update_neurons_color_data(new_config)
+    #     # Update the raster when the configs change:
+    #     spike_raster_window.update_neurons_color_data(new_config)
 
 
     # BEGIN FUNCTION MAIN ________________________________________________________________________________________________ #

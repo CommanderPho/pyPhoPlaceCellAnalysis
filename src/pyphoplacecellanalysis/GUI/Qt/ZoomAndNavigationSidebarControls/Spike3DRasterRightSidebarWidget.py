@@ -18,6 +18,10 @@ uiFile = os.path.join(path, 'Spike3DRasterRightSidebarWidget.ui')
 # LayoutWidget
 
 class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
+    """ A simple container to hold interactive widgets
+    
+    
+    """
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
@@ -55,6 +59,9 @@ class SpikeRasterRightSidebarOwningMixin:
         is_visible = self.right_sidebar_widget.isVisible()
         self.right_sidebar_widget.setVisible(not is_visible) # collapses and hides the sidebar
         # self.right_sidebar_widget.setVisible(True) # shows the sidebar
+
+    def set_right_sidebar_visibility(self, is_visible:bool):
+        self.right_sidebar_widget.setVisible(is_visible) 
 
 
     @pyqtExceptionPrintingSlot()
