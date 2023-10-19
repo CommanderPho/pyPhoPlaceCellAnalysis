@@ -6,6 +6,8 @@ import os
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
@@ -209,7 +211,11 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
         # get hex colors:
         #  getting the name of a QColor with .name(QtGui.QColor.HexRgb) results in a string like '#ff0000'
         #  getting the name of a QColor with .name(QtGui.QColor.HexArgb) results in a string like '#80ff0000'
-        color_hex_str = self.color.name(QtGui.QColor.HexRgb) 
+        if isinstance(self.color, str):
+            print(f'self.color: {self.color}')
+            color_hex_str = self.color
+        else:
+            color_hex_str = self.color.name(QtGui.QColor.HexRgb)
         if self.enable_debug_print:
             print(f'\thex: {color_hex_str}')
         
@@ -426,13 +432,13 @@ class NeuronWidgetContainer(QtWidgets.QWidget):
         from pyphoplacecellanalysis.GUI.Qt.NeuronVisualSelectionControls.NeuronVisualSelectionControlsWidget import NeuronVisualSelectionControlsWidget, NeuronWidgetContainer
 
         neuron_ids = active_2d_plot.neuron_ids
-        neuron_plotting_configs_list: List[SingleNeuronPlottingExtended] = [SingleNeuronPlottingExtended(name=str(aclu), isVisible=False, color=ColorFormatConverter.qColor_to_hexstring(color, include_alpha=False), spikesVisible=False) for aclu, color in zip(neuron_ids, neuron_qcolors_list)]
+        neuron_plotting_configs: List[SingleNeuronPlottingExtended] = [SingleNeuronPlottingExtended(name=str(aclu), isVisible=False, color=ColorFormatConverter.qColor_to_hexstring(color, include_alpha=False), spikesVisible=False) for aclu, color in zip(neuron_ids, neuron_qcolors_list)]
         # Standalone:
-        # neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_list)
+        # neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs)
         # neuron_widget_container.show()
 
         ## Render in right sidebar:
-        neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_list, parent=spike_raster_window.right_sidebar_contents_container)
+        neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs, parent=spike_raster_window.right_sidebar_contents_container)
         spike_raster_window.right_sidebar_contents_container.addWidget(neuron_widget_container)
         
         
@@ -440,13 +446,16 @@ class NeuronWidgetContainer(QtWidgets.QWidget):
     chkbtnNewButtonTest = a_widget.add_ui_toggle_button(name='chkbtnNewButtonTest', text='test1')
     
     """
-    sigRefresh = QtCore.pyqtSignal(object)
-    
+    sigRefresh = QtCore.pyqtSignal()
+    sigApply = QtCore.pyqtSignal(object)
+    sigRevert = QtCore.pyqtSignal()
 
-    def __init__(self, neuron_plotting_configs_list, parent=None):
+    def __init__(self, neuron_plotting_configs, parent=None):
         self.ui = PhoUIContainer()
         super(NeuronWidgetContainer, self).__init__(parent)
         
+        self.ui.connections = ConnectionsContainer()
+
         # Create a QWidget for the scroll area content
         self.ui.scroll_content = QtWidgets.QWidget()
         
@@ -455,7 +464,11 @@ class NeuronWidgetContainer(QtWidgets.QWidget):
         self.ui.main_widgets_list_layout.setSpacing(2)
 
         self.ui.widgets_list = []
-        for neuron_config in neuron_plotting_configs_list:
+
+        if isinstance(neuron_plotting_configs, list):
+            neuron_plotting_configs = {int(neuron_config.name):neuron_config for neuron_config in neuron_plotting_configs} # convert to dict
+
+        for aclu, neuron_config in neuron_plotting_configs.items():
             widget = NeuronVisualSelectionControlsWidget(config=neuron_config)
             self.ui.widgets_list.append(widget)
             self.ui.main_widgets_list_layout.addWidget(widget)
@@ -468,12 +481,34 @@ class NeuronWidgetContainer(QtWidgets.QWidget):
         self.ui.scroll_area.setWidgetResizable(True)
         self.ui.scroll_area.setWidget(self.ui.scroll_content)
 
+
+        ## Footer Button Row
+        self.ui.button_layout = QtWidgets.QHBoxLayout()
+        self.ui.button_layout.setContentsMargins(0, 0, 0, 0)
+        self.ui.button_layout.setSpacing(0)
+        
+        button_actions = {
+            "Apply": self.onApplyAction,
+            "Revert": self.onRevertAction,
+            "Refresh": self.onRefreshAction
+        }
+        button_identifiers = {}
+        for btn_name, action in button_actions.items():
+            # button_identifiers[btn_name] = f'btn_{btn_name}'
+            button = QtWidgets.QPushButton(btn_name)
+            button.clicked.connect(action)
+            self.ui.button_layout.addWidget(button)
+            # setattr(self.ui, button_identifiers[btn_name], button)
         # Create a main layout for self and add the scroll area
         self.ui.main_layout = QtWidgets.QVBoxLayout(self)
         self.ui.main_layout.setContentsMargins(0, 0, 0, 0)
         self.ui.main_layout.setSpacing(0)
         self.ui.main_layout.addWidget(self.ui.scroll_area)
+        self.ui.main_layout.addLayout(self.ui.button_layout)
         self.setLayout(self.ui.main_layout)
+
+        self.rebuild_neuron_id_to_widget_map()
+
 
 
     # ==================================================================================================================== #
@@ -504,11 +539,26 @@ class NeuronWidgetContainer(QtWidgets.QWidget):
             self._neuron_id_config_widgets_map[curr_widget_config.neuron_id] = a_widget 
         
 
-    # @QtCore.pyqtSlot()
-    # def onRefreshAction(self):
-    #     print(f'PlacefieldVisualSelectionControlsBarWidget.onRefreshAction()')
-    #     self.sigRefresh.emit(self)
-    #     # self.done(QtCore.Qt.WA_DeleteOnClose)
+
+    # ==================================================================================================================== #
+    # Button Actions                                                                                                       #
+    # ==================================================================================================================== #
+    @pyqtExceptionPrintingSlot()
+    def onRefreshAction(self):
+        print('NeuronWidgetContainer.onRefreshAction()')
+        self.sigRefresh.emit(self)
+
+    @pyqtExceptionPrintingSlot()
+    def onApplyAction(self):
+        print('NeuronWidgetContainer.onApplyAction()')
+        self.sigApply.emit(self)
+
+    @pyqtExceptionPrintingSlot()
+    def onRevertAction(self):
+        print('NeuronWidgetContainer.onRevertAction()')
+        self.sigRevert.emit(self)
+
+
 
     @QtCore.pyqtSlot(object)
     def applyUpdatedConfigs(self, active_configs_map):
@@ -557,6 +607,16 @@ class NeuronWidgetContainer(QtWidgets.QWidget):
             neuron_id_config_widgets_map[neuron_id].update_from_config(updated_config)
 
 
+    def bind_to_raster_plotter(self, active_2d_plot):
+        """ called to attach the widget to the raster plotter """
+        # # Set colors from the raster:
+        # neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_2d_plot.neuron_ids, colormap_name='PAL-relaxed_bright', colormap_source=None)
+
+
+        # # Update the raster when the configs change:
+        # spike_raster_window.update_neurons_color_data(neuron_plotting_configs_dict)
+
+        raise NotImplementedError
 
 
 ## Start Qt event loop
