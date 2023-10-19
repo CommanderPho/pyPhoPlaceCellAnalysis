@@ -94,7 +94,13 @@ class DataSeriesColorHelpers:
         else:
             raise NotImplementedError
 
-    
+    @classmethod
+    def auto_detect_color_NDArray_is_255_array_format(cls, neuron_colors: np.ndarray) -> bool:
+        """ tries to auto-detect the format of the color NDArray in terms of whether it contains 0.0-1.0 or 0.0-255.0 values. 
+        returns True if it is 255_array_format, and False otherwise
+        """
+        return (not np.all(neuron_colors <= 1.0)) # all are less than 1.0 implies that it NOT a 255_format_array
+
 
     @classmethod
     def qColorsList_to_NDarray(cls, neuron_qcolors_list, is_255_array:bool) -> np.ndarray:
@@ -106,6 +112,7 @@ class DataSeriesColorHelpers:
         Note: Matplotlib requires zero_to_one_array format
         
         """
+
         # allocate new neuron_colors array:
         n_cells = len(neuron_qcolors_list)
         neuron_colors = np.zeros((4, n_cells))
@@ -116,6 +123,28 @@ class DataSeriesColorHelpers:
             neuron_colors = ColorFormatConverter.Colors_NDArray_Convert_to_255_array(neuron_colors) 
         return neuron_colors
     
+
+    @classmethod
+    def colors_NDarray_to_qColorsList(cls, neuron_colors: np.ndarray, is_255_array:Optional[bool]=None) -> list:
+        """ Takes a [4, nCell] np.array and returns a list[QColor] with the color for each cell in the array
+        
+        is_255_array: bool - if False, all RGB color values are in range (0.0 - 1.0), else they are in range (0.0 - 255.0)
+        
+        Note: Matplotlib requires zero_to_one_array format
+        """
+        if is_255_array is None:
+            is_255_array = cls.auto_detect_color_NDArray_is_255_array_format(neuron_colors)
+
+        if is_255_array:
+            neuron_colors = ColorFormatConverter.Colors_NDArray_Convert_to_zero_to_one_array(neuron_colors)
+
+        n_cells = neuron_colors.shape[1]
+        neuron_qcolors_list = []
+        for i in range(n_cells):
+            curr_color = QColor.fromRgbF(*neuron_colors[:, i])
+            neuron_qcolors_list.append(curr_color)
+            
+        return neuron_qcolors_list
 
 
     @function_attributes(short_name=None, tags=['colors', 'neuron_identity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-18 11:33', related_items=[])
