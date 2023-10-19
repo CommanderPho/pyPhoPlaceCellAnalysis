@@ -2,6 +2,7 @@ from typing import OrderedDict, Union, Optional, Dict, List
 from copy import deepcopy
 import numpy as np
 import pandas as pd
+from attrs import define, field, Factory
 from neuropy.utils.mixins.enum_helpers import StringLiteralComparableEnum
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -13,19 +14,20 @@ from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig impo
 from qtpy import QtGui # for QColor
 from qtpy.QtGui import QColor, QBrush, QPen
 
+
 @define(repr=False)
 class ColorData:
     """ represents a set of color variables as are used in SpikeNDRaster to store properties for neurons.
 
     """
-	neuron_qcolors: List[QColor] = field(default=Factory(list))
-	neuron_qcolors_map: dict = field(default=Factory(dict))
-	neuron_colors: np.ndarray = field(default=Factory(np.ndarray))
-	neuron_colors_hex: List[str] = field(default=Factory(list))
+    neuron_qcolors: List[QColor] = field(default=Factory(list))
+    neuron_qcolors_map: dict = field(default=Factory(dict))
+    neuron_colors: np.ndarray = field(default=Factory(np.ndarray))
+    neuron_colors_hex: List[str] = field(default=Factory(list))
 
     @classmethod
     def backup_raster_colors(cls, active_2d_plot) -> "ColorData":
-    """ extracts the color data from the .params of the SpikeNDRaster plot to back them up and returns them as a ColorData object. """
+        """ extracts the color data from the .params of the SpikeNDRaster plot to back them up and returns them as a ColorData object. """
         return ColorData(*[deepcopy(arr) for arr in (active_2d_plot.params.neuron_qcolors, active_2d_plot.params.neuron_qcolors_map, active_2d_plot.params.neuron_colors, active_2d_plot.params.neuron_colors_hex)])
         
 
@@ -142,7 +144,7 @@ class DataSeriesColorHelpers:
 
 
     @classmethod
-    def build_cell_display_configs(cls, neuron_ids, neuron_qcolors_list: Optional[List[QColor]], **kwargs) -> Dict[int, SingleNeuronPlottingExtended]:
+    def build_cell_display_configs(cls, neuron_ids, neuron_qcolors_list: Optional[List[QColor]]=None, **kwargs) -> Dict[int, SingleNeuronPlottingExtended]:
         """
 
         Usage:
@@ -151,8 +153,8 @@ class DataSeriesColorHelpers:
 
         """
         if neuron_qcolors_list is None:
-            neuron_qcolors_list = cls.build_cell_colors(len(neuron_ids), **kwargs) # if no colors provided, builds some
+            neuron_qcolors_list, _ = cls.build_cell_colors(len(neuron_ids), **kwargs) # if no colors provided, builds some
 
-        assert len(neuron_ids) == len(neuron_qcolors_list)
+        assert len(neuron_ids) == len(neuron_qcolors_list), f"len(neuron_ids): {len(neuron_ids)} must equal len(neuron_qcolors_list): {len(neuron_qcolors_list)}"
         return {aclu:SingleNeuronPlottingExtended(name=str(aclu), isVisible=False, color=color.name(QtGui.QColor.HexRgb), spikesVisible=False) for aclu, color in zip(neuron_ids, neuron_qcolors_list)}
         
