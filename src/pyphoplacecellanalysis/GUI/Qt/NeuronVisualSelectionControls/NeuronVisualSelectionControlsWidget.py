@@ -659,7 +659,11 @@ def add_neuron_display_config_widget(spike_raster_window):
         neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_raster_plot.neuron_ids, _plot_backup_colors.neuron_qcolors)
         
         # TODO apply to neuron_widget_container
+        if block_signals:
+            neuron_widget_container.blockSignals(True) # Block signals so it doesn't recursively update
         neuron_widget_container.applyUpdatedConfigs(neuron_plotting_configs_dict) # applyUpdatedConfigs TODO: block programmatic signals
+        if block_signals:
+            neuron_widget_container.blockSignals(False)
 
 
     def _on_neuron_color_display_config_changed(new_config):
