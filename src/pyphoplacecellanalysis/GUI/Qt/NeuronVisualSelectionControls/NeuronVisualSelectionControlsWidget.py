@@ -2,6 +2,7 @@
 # Generated from NeuronVisualSelectionControlsWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
 import sys
 import os
+from typing import Dict, List
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -142,7 +143,7 @@ class NeuronVisualSelectionControlsWidget(QtWidgets.QWidget):
         self.ui.btnColorButton.sigColorChanging.connect(self.on_color_button_changing)
         self.ui.btnColorButton.sigColorChanged.connect(self.on_color_button_changed)  
 
-        self.show() # Show the GUI
+        # self.show() # Show the GUI
 
 
 
