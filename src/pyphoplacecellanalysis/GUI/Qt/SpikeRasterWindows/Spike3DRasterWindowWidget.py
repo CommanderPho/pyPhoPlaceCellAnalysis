@@ -959,10 +959,20 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     # Neuron Visual Configs Widget                                                                                         #
     # ==================================================================================================================== #
 
+    @property
+    def neuron_visual_config_widget_container(self) -> NeuronWidgetContainer:
+        try:
+            return self.ui.rightSideContainerWidget.ui.neuron_widget_container
+        except (AttributeError, KeyError):
+            print(f'missing self.ui.rightSideContainerWidget.ui.neuron_widget_container. returning None.')
+            return None
+        except Exception:
+            """ unhandled exception """
+            raise
+
 
     def on_neuron_color_display_config_changed(self, new_config):
         """ The function called when the neuron color is changed in the widget
-        Implicitly captures spike_raster_window
 
         Recieves a SingleNeuronPlottingExtended config
 
@@ -1011,8 +1021,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             assert active_raster_plot is not None
 
 
+        ## Get the configs from the `active_raster_plot` widget's colors:
         neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_raster_plot.neuron_ids, deepcopy(active_raster_plot.params.neuron_qcolors))
-
         neuron_widget_container = self.ui.rightSideContainerWidget.ui.neuron_widget_container
         
         # TODO apply to neuron_widget_container
@@ -1083,7 +1093,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
 
         # Display the sidebar:
-        self.set_right_sidebar_visibility()
+        self.set_right_sidebar_visibility(is_visible=True)
     
 
 
