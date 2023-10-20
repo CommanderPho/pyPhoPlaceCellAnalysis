@@ -180,7 +180,7 @@ class BatchSessionCompletionHandler:
         if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
             print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
             return False
-
+        
         # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
         was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
         print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
