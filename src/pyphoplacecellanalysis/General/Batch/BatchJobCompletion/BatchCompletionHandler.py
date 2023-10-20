@@ -177,7 +177,10 @@ class BatchSessionCompletionHandler:
     @classmethod
     def post_compute_validate(cls, curr_active_pipeline) -> bool:
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
-        LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate()
+        if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
+            print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
+            return False
+
         # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
         was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
         print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
