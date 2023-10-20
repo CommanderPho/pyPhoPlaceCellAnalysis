@@ -186,4 +186,4 @@ class DataSeriesColorHelpers:
 
         assert len(neuron_ids) == len(neuron_qcolors_list), f"len(neuron_ids): {len(neuron_ids)} must equal len(neuron_qcolors_list): {len(neuron_qcolors_list)}"
         return {aclu:SingleNeuronPlottingExtended(name=str(aclu), isVisible=False, color=color.name(QtGui.QColor.HexRgb), spikesVisible=False) for aclu, color in zip(neuron_ids, neuron_qcolors_list)}
-        
+            
