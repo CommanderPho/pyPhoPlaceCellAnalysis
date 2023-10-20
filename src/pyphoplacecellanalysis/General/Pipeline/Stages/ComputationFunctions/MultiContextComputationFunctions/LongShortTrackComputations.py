@@ -498,12 +498,20 @@ class LongShortPipelineTests:
         assert np.all(long_results.pf2D_Decoder.xbin == short_results.pf2D_Decoder.xbin), f"long_results.pf2D_Decoder.xbin: {len(long_results.pf2D_Decoder.xbin)}, short_results.pf2D_Decoder.xbin: {len(short_results.pf2D_Decoder.xbin)}"
         assert np.all(long_results.pf2D_Decoder.ybin == short_results.pf2D_Decoder.ybin), f"long_results.pf2D_Decoder.ybin: {len(long_results.pf2D_Decoder.ybin)}, short_results.pf2D_Decoder.ybin: {len(short_results.pf2D_Decoder.ybin)}"
 
-    def validate(self):
-        self.validate_placefields()
-        self.validate_decoders()
+    def validate(self) -> bool:
+        try:
+            self.validate_placefields()
+            self.validate_decoders()
+            return True
+        
+        except AssertionError:
+            return False
+            
+        except Exception:
+            raise # unhandled exception
 
-    def __call__(self):
-        self.validate()
+    def __call__(self) -> bool:
+        return self.validate()
 
 
 
@@ -535,7 +543,10 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
         # global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
 
-        is_certain_properly_constrained = False
+
+        is_certain_properly_constrained = LongShortPipelineTests(owning_pipeline_reference).validate()
+        # is_certain_properly_constrained = False
+
         """ a properly constrained pipeline has the computation_epochs for its placefields equal to its laps, 
             - equal n_bins between short and long.
             
@@ -545,6 +556,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # is_certain_properly_constrained = True
 
         if not is_certain_properly_constrained:
+            print(f'WARN: _perform_long_short_decoding_analyses: Not certain if pipeline results are properly constrained. Need to recompute and update.')
             owning_pipeline_reference = constrain_to_laps(owning_pipeline_reference) # Constrains placefields to laps
             
             (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_long_short_constrained_decoders(owning_pipeline_reference, recalculate_anyway=True)
