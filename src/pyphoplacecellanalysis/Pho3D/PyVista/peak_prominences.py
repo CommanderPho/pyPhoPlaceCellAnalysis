@@ -269,6 +269,8 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
         
     Usage:
     
+        from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences import render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter
+
         active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
         pActiveTuningCurvesPlotter = None
         display_output = display_output | curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', active_config_name, extant_plotter=display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt', should_nan_non_visited_elements=False, zScalingFactor=2000.0) # Works now!
@@ -277,7 +279,8 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
         pActiveTuningCurvesPlotter = display_output['pActiveTuningCurvesPlotter']
         root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets = display_output['pane'] # for Qt mode
         
-        
+        active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+        render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results)
         
     """
     active_peak_prominence_2d_results_aclus = np.array(list(active_peak_prominence_2d_results.results.keys()))
