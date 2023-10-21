@@ -1024,6 +1024,10 @@ def pho_stats_paired_t_test(values1, values2):
     """ Paired (Dependent) T-Test of means
 
     degrees of freedom (dof): n -1
+
+    from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import pho_stats_paired_t_test
+
+
     """
     assert len(values1) == len(values2), f"this is supposed to be a paired t-test so the number of samples in values1 should equal values2!! but {np.shape(values1)} and {np.shape(values2)}"
     # # Manual Calculation:
