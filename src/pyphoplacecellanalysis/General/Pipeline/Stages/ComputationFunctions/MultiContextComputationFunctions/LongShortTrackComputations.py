@@ -1323,6 +1323,7 @@ def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_
 # ==================================================================================================================== #
 ## 2023-04-07 - Builds the laps using estimation_session_laps(...) if needed for each epoch, and then sets the decoder's .epochs property to the laps object so the occupancy is correct.
 
+
 def constrain_to_laps(curr_active_pipeline):
     """ 2023-04-07 - Constrains the placefields to just the laps, computing the laps if needed.
     Other laps-related things?
@@ -1340,6 +1341,13 @@ def constrain_to_laps(curr_active_pipeline):
         curr_active_pipeline.computation_results[*].computed_data.pf2D,
         Maybe others?
     """
+
+    lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
+    assert lap_estimation_parameters is not None
+
+    use_direction_dependent_laps: bool = lap_estimation_parameters.get('use_direction_dependent_laps', True)
+    print(f'constrain_to_laps(...): use_direction_dependent_laps: {use_direction_dependent_laps}')
+
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
     long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -1375,6 +1383,7 @@ def constrain_to_laps(curr_active_pipeline):
             a_result.pf2D = lap_filtered_curr_pf2D
 
         return curr_active_pipeline
+
 
 def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
     """ 2023-04-14 - Computes both 1D & 2D Decoders constrained to each other's position bins 
