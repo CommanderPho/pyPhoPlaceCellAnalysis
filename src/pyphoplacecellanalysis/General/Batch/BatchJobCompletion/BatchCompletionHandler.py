@@ -151,7 +151,6 @@ class BatchSessionCompletionHandler:
 
     # a list of functions to be called upon completion, will be called sequentially. 
     completion_functions: List[Callable] = field(default=Factory(list))
-
     # override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
 
 
@@ -168,23 +167,22 @@ class BatchSessionCompletionHandler:
                                         'long_short_endcap_analysis']) # do only specified
 
     force_global_recompute: bool = field(default=False)
-    # override_global_computation_results_pickle_path: Optional[Path] = field(default=None)
 
 
-    @property
-    def override_session_computation_results_pickle_filename(self) -> Optional[str]:
-        return self.session_computations_options.override_file
-    @override_session_computation_results_pickle_filename.setter
-    def override_session_computation_results_pickle_filename(self, value):
-        self.session_computations_options.override_file = value
+    # @property
+    # def override_session_computation_results_pickle_filename(self) -> Optional[str]:
+    #     return self.session_computations_options.override_file
+    # @override_session_computation_results_pickle_filename.setter
+    # def override_session_computation_results_pickle_filename(self, value):
+    #     self.session_computations_options.override_file = value
 
 
-    @property
-    def override_global_computation_results_pickle_path(self) -> Optional[Path]:
-        return self.global_computations_options.override_file
-    @override_global_computation_results_pickle_path.setter
-    def override_global_computation_results_pickle_path(self, value):
-        self.global_computations_options.override_file = value
+    # @property
+    # def override_global_computation_results_pickle_path(self) -> Optional[Path]:
+    #     return self.global_computations_options.override_file
+    # @override_global_computation_results_pickle_path.setter
+    # def override_global_computation_results_pickle_path(self, value):
+    #     self.global_computations_options.override_file = value
 
 
 
@@ -365,8 +363,9 @@ class BatchSessionCompletionHandler:
                     # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
                     # Try to write out the global computation function results:
                     # curr_active_pipeline.save_global_computation_results()
-                    if self.global_computations_options.override_file is not None:
-                        curr_active_pipeline.save_global_computation_results(override_global_pickle_path=self.global_computations_options.override_file)
+                    an_override_save_path = (self.global_computations_options.override_output_file or self.global_computations_options.override_file)
+                    if an_override_save_path is not None:
+                        curr_active_pipeline.save_global_computation_results(override_global_pickle_path=an_override_save_path)
                     else:
                         curr_active_pipeline.save_global_computation_results()
                 except Exception as e:
@@ -383,8 +382,9 @@ class BatchSessionCompletionHandler:
                 try:
                     # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
                     # Try to write out the global computation function results:
-                    if self.global_computations_options.override_file is not None:
-                        curr_active_pipeline.save_global_computation_results(override_global_pickle_path=self.global_computations_options.override_file)
+                    an_override_save_path = (self.global_computations_options.override_output_file or self.global_computations_options.override_file)
+                    if an_override_save_path is not None:
+                        curr_active_pipeline.save_global_computation_results(override_global_pickle_path=an_override_save_path)
                     else:
                         curr_active_pipeline.save_global_computation_results()
                 except Exception as e:
@@ -405,11 +405,14 @@ class BatchSessionCompletionHandler:
         If `.global_computations_options.should_compute` then computations will be tried and saved out as needed. If an error occurs, those will not be saved.
 
         """
+        # self.session_computations_options.override_output_file
+        # self.global_computations_options.override_file
+
         newly_computed_values = []
         if self.global_computations_options.should_load:
             if not self.force_global_recompute: # not just force_reload, needs to recompute whenever the computation fails.
                 try:
-                    curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=self.override_global_computation_results_pickle_path)
+                    curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=self.global_computations_options.override_file)
                 except Exception as e:
                     exception_info = sys.exc_info()
                     e = CapturedException(e, exception_info)
@@ -567,7 +570,9 @@ class BatchSessionCompletionHandler:
             self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
 
         try:
-            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.override_session_computation_results_pickle_filename) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
+            self.session_computations_options.override_file
+            
+            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.session_computations_options.override_output_file) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
         except Exception as e:
             ## TODO: catch/log saving error and indicate that it isn't saved.
             exception_info = sys.exc_info()
