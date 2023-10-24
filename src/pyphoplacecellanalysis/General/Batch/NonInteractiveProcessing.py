@@ -200,7 +200,10 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs):
         # We need to filter and then compute with the appropriate config iteratively.
         for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
-            updated_active_session_pseudo_filter_configs[f'{a_filter_config_name}{a_computation_suffix_name}'] = deepcopy(a_filter_config_fn) # this copy is just so that the values are recomputed with the appropriate config. This is a HACK
+            # TODO: Build a context:
+            a_combined_name: str = f'{a_filter_config_name}{a_computation_suffix_name}'
+            # if a_computation_suffix_name != '':
+            updated_active_session_pseudo_filter_configs[a_combined_name] = deepcopy(a_filter_config_fn) # this copy is just so that the values are recomputed with the appropriate config. This is a HACK
 
         ## Actually do the filtering now. We have 
         curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
