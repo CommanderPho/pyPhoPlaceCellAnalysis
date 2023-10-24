@@ -400,6 +400,12 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             global_epoch_name: str = 'maze'
             known_epoch_names = [*non_global_epoch_names, global_epoch_name] # a list of names
             assert len(known_epoch_names) == 3, f"Must have exactly 3: {known_epoch_names}"
+            # If defaults are all missing, a renaming has probably been done.
+            if np.all(np.logical_not(np.isin(known_epoch_names, include_includelist))):
+                # if defaults are all missing, a filtering has probably been done.
+                known_epoch_names = [f'{a_name}_any' for a_name in known_epoch_names]
+
+            assert np.all(np.isin(known_epoch_names, include_includelist)), f"all long/short/global epochs must exist in include_includelist! known_epoch_names: {known_epoch_names}, include_includelist: {include_includelist}, np.isin(known_epoch_names, include_includelist): {np.isin(known_epoch_names, include_includelist)}"
             long_epoch_name, short_epoch_name, global_epoch_name = known_epoch_names # unwrap
         else:
             # Old method of unwrapping based on hard-coded values:
