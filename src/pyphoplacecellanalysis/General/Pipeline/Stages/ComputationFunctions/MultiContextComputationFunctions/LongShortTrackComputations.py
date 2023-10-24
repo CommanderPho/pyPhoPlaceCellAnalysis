@@ -1323,6 +1323,65 @@ def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_
 # ==================================================================================================================== #
 ## 2023-04-07 - Builds the laps using estimation_session_laps(...) if needed for each epoch, and then sets the decoder's .epochs property to the laps object so the occupancy is correct.
 
+from neuropy.analyses.laps import build_lap_computation_epochs # used in `split_to_directional_laps`
+
+
+def split_to_directional_laps(curr_active_pipeline, add_created_configs_to_pipeline:bool=True):
+    """ 2023-10-23 - Splits to directional laps 
+
+    if add_created_configs_to_pipeline is False, just returns the built configs and doesn't add them to the pipeline.
+
+    """
+    lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
+    assert lap_estimation_parameters is not None
+    use_direction_dependent_laps: bool = lap_estimation_parameters.get('use_direction_dependent_laps', True)
+    print(f'split_to_directional_laps(...): use_direction_dependent_laps: {use_direction_dependent_laps}')
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+    ## After all top-level computations are done, compute the subsets for direction laps
+    directional_lap_specific_configs = {}
+    if use_direction_dependent_laps:
+        print(f'split_to_directional_laps(...) processing for directional laps...')
+        split_directional_laps_name_parts = ['odd_laps', 'even_laps', 'any_laps']
+        
+        for a_name, a_sess, a_result in zip((long_epoch_name, short_epoch_name, global_epoch_name), (long_session, short_session, global_session), (long_results, short_results, global_results)):
+            split_directional_laps_config_names = [f'{a_name}_{a_lap_dir_description}' for a_lap_dir_description in split_directional_laps_name_parts]
+            print(f'\tsplit_directional_laps_config_names: {split_directional_laps_config_names}')
+
+            # 'build_lap_computation_epochs(...)' based mode:
+            desired_computation_epochs = build_lap_computation_epochs(a_sess, use_direction_dependent_laps=use_direction_dependent_laps)
+            even_lap_specific_epochs, odd_lap_specific_epochs, any_lap_specific_epochs = desired_computation_epochs
+
+            # # manual mode:
+            # lap_specific_epochs = a_sess.laps.as_epoch_obj().get_non_overlapping().filtered_by_duration(1.0, 30.0) # set this to the laps object
+            # any_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(len(a_sess.laps.lap_id))])
+            # even_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(0, len(a_sess.laps.lap_id), 2)])
+            # odd_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(1, len(a_sess.laps.lap_id), 2)])
+
+            split_directional_laps_dict = {'even_laps': even_lap_specific_epochs, 'odd_laps': odd_lap_specific_epochs, 'any_laps': any_lap_specific_epochs}
+
+            print(f'any_lap_specific_epochs: {any_lap_specific_epochs}\n\teven_lap_specific_epochs: {even_lap_specific_epochs}\n\todd_lap_specific_epochs: {odd_lap_specific_epochs}\n') # lap_specific_epochs: {lap_specific_epochs}\n\t
+            for a_lap_dir_description, lap_dir_epochs in split_directional_laps_dict.items():
+                new_name = f'{a_name}_{a_lap_dir_description}'
+                print(f'\tnew_name: {new_name}')
+                active_config_copy = deepcopy(curr_active_pipeline.active_configs[a_name])
+                # active_config_copy.computation_config.pf_params.computation_epochs = active_config_copy.computation_config.pf_params.computation_epochs.label_slice(odd_lap_specific_epochs.labels)
+                ## Just overwrite directly:
+                active_config_copy.computation_config.pf_params.computation_epochs = lap_dir_epochs
+                directional_lap_specific_configs[new_name] = active_config_copy
+                if add_created_configs_to_pipeline:
+                    curr_active_pipeline.active_configs[new_name] = active_config_copy
+
+            # end loop over split_directional_lap types:
+        # end loop over filter epochs:
+
+        print(f'directional_lap_specific_configs: {directional_lap_specific_configs}')
+
+
+    return curr_active_pipeline, directional_lap_specific_configs
+
+
 
 def constrain_to_laps(curr_active_pipeline):
     """ 2023-04-07 - Constrains the placefields to just the laps, computing the laps if needed.
@@ -1332,8 +1391,9 @@ def constrain_to_laps(curr_active_pipeline):
         # DataSession.compute_laps_position_df(position_df, laps_df)
 
     Usage:
-        from PendingNotebookCode import constrain_to_laps
-        curr_active_pipeline = constrain_to_laps(curr_active_pipeline)
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import constrain_to_laps
+
+        curr_active_pipeline, directional_lap_specific_configs = constrain_to_laps(curr_active_pipeline)
         
         
     MUTATES:
@@ -1384,22 +1444,20 @@ def constrain_to_laps(curr_active_pipeline):
 
 
     ## After all top-level computations are done, compute the subsets for direction laps
+    directional_lap_specific_configs = {}
     if use_direction_dependent_laps:
         print(f'constrain_to_laps(...) processing for directional laps...')
-
+        split_directional_laps_name_parts = ['odd_laps', 'even_laps', 'any_laps']
+        split_directional_laps_config_names = [f'{a_name}_{a_lap_dir_description}' for a_lap_dir_description in split_directional_laps_name_parts]
+        print(f'\tsplit_directional_laps_config_names: {split_directional_laps_config_names}')
         for a_name, a_sess, a_result in zip((long_epoch_name, short_epoch_name, global_epoch_name), (long_session, short_session, global_session), (long_results, short_results, global_results)):
-            
-
-            lap_specific_epochs = a_sess.laps.as_epoch_obj() # set this to the laps object
-            lap_specific_epochs = lap_specific_epochs.get_non_overlapping()
-            lap_specific_epochs = lap_specific_epochs.filtered_by_duration(1.0, 30.0) # the lap must be at least 1 second long and at most 10 seconds long
-            
+            lap_specific_epochs = a_sess.laps.as_epoch_obj().get_non_overlapping().filtered_by_duration(1.0, 30.0) # set this to the laps object
             any_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(len(a_sess.laps.lap_id))])
             even_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(0, len(a_sess.laps.lap_id), 2)])
             odd_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(1, len(a_sess.laps.lap_id), 2)])
             split_directional_laps_dict = {'odd_laps': odd_lap_specific_epochs, 'even_laps': even_lap_specific_epochs, 'any_laps': lap_specific_epochs}
 
-            print(f'any_lap_specific_epochs: {any_lap_specific_epochs}, even_lap_specific_epochs: {even_lap_specific_epochs}, odd_lap_specific_epochs: {odd_lap_specific_epochs}')
+            print(f'lap_specific_epochs: {lap_specific_epochs}\n\tany_lap_specific_epochs: {any_lap_specific_epochs}\n\teven_lap_specific_epochs: {even_lap_specific_epochs}\n\todd_lap_specific_epochs: {odd_lap_specific_epochs}\n')
             for a_lap_dir_description, lap_dir_epochs in split_directional_laps_dict.items():
                 new_name = f'{a_name}_{a_lap_dir_description}'
                 print(f'\tnew_name: {new_name}')
@@ -1408,14 +1466,14 @@ def constrain_to_laps(curr_active_pipeline):
                 ## Just overwrite directly:
                 active_config_copy.computation_config.pf_params.computation_epochs = lap_dir_epochs
                 directional_lap_specific_configs[new_name] = active_config_copy
+                # curr_active_pipeline.active_configs[new_name] = active_config_copy
+            # end loop over split_directional_lap types:
+        # end loop over filter epochs:
+
+        print('directional_lap_specific_configs: {directional_lap_specific_configs}')
 
 
-            curr_active_pipeline.active_configs[a_name]
-
-
-
-
-    return curr_active_pipeline
+    return curr_active_pipeline, directional_lap_specific_configs
 
 
 def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):

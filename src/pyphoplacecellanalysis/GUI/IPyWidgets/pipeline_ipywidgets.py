@@ -107,8 +107,8 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 		button_defns.append(("Figure Export Folder", lambda _: reveal_in_system_file_manager(figure_output_path)))
 
 	# Create and display the button
-	button_executor = JupyterButtonRowWidget(button_defns=button_defns, defer_display=True)
-	# updating_button_executor = JupyterButtonRowWidget(button_defns=updating_button_defns, defer_display=True)
+	button_executor = JupyterButtonRowWidget.init_from_button_defns(button_defns=button_defns, defer_display=True)
+	# updating_button_executor = JupyterButtonRowWidget.init_from_button_defns(button_defns=updating_button_defns, defer_display=True)
 
 	# combined_button_executor = widgets.VBox((widgets.HBox(button_executor.button_list), widgets.HBox(updating_button_executor.button_list)))
 	# combined_button_executor = widgets.VBox((button_executor.button_list, updating_button_executor.button_list))
@@ -178,7 +178,7 @@ def interactive_pipeline_widget(curr_active_pipeline):
 			# ("TEST - Dialog", lambda _: try_save_pickle_as(curr_active_pipeline.global_computation_results_pickle_path)),
 			# ("ViTables .h5 export", lambda _: reveal_in_system_file_manager(curr_active_pipeline.h5_export_path))
 		]
-	updating_button_executor = JupyterButtonRowWidget(button_defns=updating_button_defns, defer_display=True)
+	updating_button_executor = JupyterButtonRowWidget.init_from_button_defns(button_defns=updating_button_defns, defer_display=True)
 	# combined_button_executor = widgets.VBox((widgets.HBox(button_executor.button_list), widgets.HBox(updating_button_executor.button_list)))
 
 	
@@ -205,8 +205,6 @@ def interactive_pipeline_widget(curr_active_pipeline):
 	figure_display_toggle_button = widgets.ToggleButton(description="Figures Displaying", value=True)
 	figure_display_toggle_button.observe(toggle_figure_displaying_function, names='value')
 	
-
-
 
 	# _out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget])
 	_out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget, updating_button_executor.root_widget, figure_display_toggle_button])
