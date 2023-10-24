@@ -74,7 +74,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
     global_comparison_results has keys of type IdentifyingContext
     """
-    identity: PipelineStage = field(default=PipelineStage.Computed)
+    # identity: PipelineStage = field(default=PipelineStage.Computed)
+    identity: PipelineStage = PipelineStage.Computed
 
     filtered_sessions: Optional[DynamicParameters] = field(default=None)
     filtered_epochs: Optional[DynamicParameters] = field(default=None)

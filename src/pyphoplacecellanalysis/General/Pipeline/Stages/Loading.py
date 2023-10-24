@@ -372,7 +372,8 @@ class PipelineWithInputStage:
 @define(slots=False, repr=False) # , init=False
 class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage):
     """Docstring for LoadedPipelineStage."""
-    identity: PipelineStage = field(default=PipelineStage.Loaded)
+    # identity: PipelineStage = field(default=PipelineStage.Loaded)
+    identity: PipelineStage = PipelineStage.Loaded
     loaded_data: dict = field(default=None)
 
     # Custom Fields:
