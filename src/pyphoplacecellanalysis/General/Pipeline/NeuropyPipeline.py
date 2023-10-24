@@ -568,7 +568,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     
         else:
             # Not previously filtered. Perform the filtering:
-            self.stage = ComputedPipelineStage(self.stage)
+            # self.stage = ComputedPipelineStage(self.stage)
+            self.stage = ComputedPipelineStage.init_from_previous_stage(self.stage)
             self.stage.select_filters(active_session_filter_configurations, progress_logger=self.logger) # select filters when done
        
     

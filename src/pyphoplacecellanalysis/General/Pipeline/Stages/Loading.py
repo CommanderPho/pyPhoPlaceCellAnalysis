@@ -2,6 +2,7 @@ from typing import Callable, List, Dict, Optional
 from types import ModuleType
 import dataclasses
 from dataclasses import dataclass
+from attrs import define, field, Factory
 from datetime import datetime
 import pathlib
 from pathlib import Path
@@ -312,16 +313,16 @@ class RegisteredOutputsMixin:
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-@dataclass
+@define(slots=False)
 class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
     """ The first stage of the NeuropyPipeline. Allows specifying the inputs that will be used.
     
         post_load_functions: List[Callable] a list of Callables that accept the loaded session as input and return the potentially modified session as output.
     """
-    identity: PipelineStage = PipelineStage.Input
-    basedir: Path = Path("")
-    load_function: Callable = None
-    post_load_functions: List[Callable] = dataclasses.field(default_factory=list)
+    identity: PipelineStage = field(default=PipelineStage.Input)
+    basedir: Path = field(default=Path(""))
+    load_function: Callable = field(default=None)
+    post_load_functions: List[Callable] = field(default=Factory(list))
 
 
 # ==================================================================================================================== #
@@ -368,20 +369,37 @@ class PipelineWithInputStage:
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
+@define(slots=False) # , init=False
 class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage):
     """Docstring for LoadedPipelineStage."""
-    identity: PipelineStage = PipelineStage.Loaded
-    loaded_data: dict = None
+    identity: PipelineStage = field(default=PipelineStage.Loaded)
+    loaded_data: dict = field(default=None)
 
-    def __init__(self, input_stage: InputPipelineStage):
-        self.stage_name = input_stage.stage_name
-        self.basedir = input_stage.basedir
-        self.loaded_data = input_stage.loaded_data
-        self.post_load_functions = input_stage.post_load_functions # the functions to be called post load
+    # Custom Fields:
+    registered_load_function_dict: dict = field(default=Factory(dict))
+
+    # def __init__(self, input_stage: InputPipelineStage):
+    #     self.stage_name = input_stage.stage_name
+    #     self.basedir = input_stage.basedir
+    #     self.loaded_data = input_stage.loaded_data
+    #     self.post_load_functions = input_stage.post_load_functions # the functions to be called post load
+    #     # Initialize custom fields:
+    #     self.registered_load_function_dict = {}
+    #     self.register_default_known_load_functions() # registers the default load functions
+
+
+    @classmethod
+    def init_from_previous_stage(cls, input_stage: InputPipelineStage):
+        _obj = cls()
+        _obj.stage_name = input_stage.stage_name
+        _obj.basedir = input_stage.basedir
+        _obj.loaded_data = input_stage.loaded_data
+        _obj.post_load_functions = input_stage.post_load_functions # the functions to be called post load
         # Initialize custom fields:
-        self.registered_load_function_dict = {}
-        self.register_default_known_load_functions() # registers the default load functions
-            
+        _obj.registered_load_function_dict = {}
+        _obj.register_default_known_load_functions() # registers the default load functions
+        return _obj
+
     
     @property
     def registered_load_functions(self):
@@ -490,11 +508,13 @@ class PipelineWithLoadableStage(RegisteredOutputsMixin):
     @classmethod
     def perform_load(cls, input_stage) -> LoadedPipelineStage:
         input_stage.load()  # perform the load operation
-        return LoadedPipelineStage(input_stage)  # build the loaded stage
+        # return LoadedPipelineStage(input_stage)  # build the loaded stage
+        return LoadedPipelineStage.init_from_previous_stage(input_stage)  # build the loaded stage
+
 
     def load(self):
         self.stage.load()  # perform the load operation:
-        self.stage = LoadedPipelineStage(self.stage)  # build the loaded stage
+        self.stage = LoadedPipelineStage.init_from_previous_stage(self.stage)  # build the loaded stage
         self.stage.post_load(progress_logger=self.logger)
 
         
