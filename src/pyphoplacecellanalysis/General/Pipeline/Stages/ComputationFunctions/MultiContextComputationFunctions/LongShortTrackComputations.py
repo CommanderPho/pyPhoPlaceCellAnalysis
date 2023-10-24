@@ -1372,6 +1372,7 @@ def split_to_directional_laps(curr_active_pipeline, add_created_configs_to_pipel
                 directional_lap_specific_configs[new_name] = active_config_copy
                 if add_created_configs_to_pipeline:
                     curr_active_pipeline.active_configs[new_name] = active_config_copy
+                    # When a new config is added, new results and stuff should be added too.
 
             # end loop over split_directional_lap types:
         # end loop over filter epochs:

@@ -158,7 +158,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         # grid_bin_bounds = PlacefieldComputationParameters.compute_grid_bin_bounds(grid_bin_bounding_session.position.x, grid_bin_bounding_session.position.y)
 
         ## OR use no grid_bin_bounds meaning they will be determined dynamically for each epoch:
-        grid_bin_bounds = None
+        # grid_bin_bounds = None
         # time_bin_size = 0.03333 #1.0/30.0 # decode at 30fps to match the position sampling frequency
         # time_bin_size = 0.1 # 10 fps
         time_bin_size = kwargs.get('time_bin_size', 0.03333) # 0.03333 = 1.0/30.0 # decode at 30fps to match the position sampling frequency
@@ -186,7 +186,11 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         computation_functions_name_excludelist=None
 
     ## For every computation config we build a fake (duplicate) filter config).
-    if len(active_session_computation_configs) > 3:
+    lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
+    assert lap_estimation_parameters is not None
+    use_direction_dependent_laps: bool = lap_estimation_parameters['use_direction_dependent_laps'] # whether to split the laps into left and right directions
+
+    if (use_direction_dependent_laps or (len(active_session_computation_configs) > 3)):
         lap_direction_suffix_list = ['_odd', '_even', '_any'] # ['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']
     else:
         lap_direction_suffix_list = ['']
@@ -196,7 +200,10 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs):
         # We need to filter and then compute with the appropriate config iteratively.
         for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
-            updated_active_session_pseudo_filter_configs[f'{a_filter_config_name}{a_computation_suffix_name}'] = deepcopy(a_filter_config_fn) # this copy is just so that the values are recomputed with the appropriate config. This is a HACK
+            # TODO: Build a context:
+            a_combined_name: str = f'{a_filter_config_name}{a_computation_suffix_name}'
+            # if a_computation_suffix_name != '':
+            updated_active_session_pseudo_filter_configs[a_combined_name] = deepcopy(a_filter_config_fn) # this copy is just so that the values are recomputed with the appropriate config. This is a HACK
 
         ## Actually do the filtering now. We have 
         curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
@@ -209,7 +216,15 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
     # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation'], debug_print=False, fail_on_exception=False) # includelist: ['_perform_baseline_placefield_computation']
 
-    curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
+
+    try:
+        curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
+    except Exception as e:
+        exception_info = sys.exc_info()
+        an_error = CapturedException(e, exception_info, curr_active_pipeline)
+        print(f'WARNING: Failed to do `curr_active_pipeline.prepare_for_display(...)` with error: {an_error}')
+        if fail_on_exception:
+            raise
 
     try:
         curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
