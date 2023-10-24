@@ -44,7 +44,16 @@ class BatchComputationProcessOptions(HDF_SerializationMixin):
         # if changed
         # always
     override_file: Optional[Union[str,Path]] = serialized_attribute_field(default=None) # 'output/loadedSessPickle.pkl'
+    override_output_file: Optional[Union[str,Path]] = serialized_attribute_field(default=None)
 
+    # override_output_file
+    def __attrs_post_init__(self):
+        """ called after initializer built by `attrs` library. """
+        if self.override_file is not None:
+            if self.override_output_file is None:
+                # Want the output to default to the input
+                self.override_output_file = self.override_file
+             
 
 
 @custom_define(slots=False)
@@ -233,7 +242,7 @@ class BatchSessionCompletionHandler:
         return was_updated
 
     @classmethod
-    def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debug_print=False):
+    def _update_pipeline_missing_preprocessing_parameters(cls, curr_active_pipeline, debug_print=False):
         """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
 
         Usage:
