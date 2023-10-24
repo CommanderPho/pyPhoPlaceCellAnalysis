@@ -132,12 +132,12 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     
     was_loaded_from_file: bool =  curr_active_pipeline.has_associated_pickle # True if pipeline was loaded from an existing file, False if it was created fresh
     
-
     # Get the previous configs:
     # curr_active_pipeline.filtered_sessions
     # ['filtered_session_names', 'filtered_contexts', 'filtered_epochs', 'filtered_sessions']
-    loaded_session_filter_configurations = {k:v.filter_config['filter_function'] for k,v in curr_active_pipeline.active_configs.items()}
-    loaded_pipeline_computation_configs = {k:v.computation_config for k,v in curr_active_pipeline.active_configs.items()}
+    # loaded_session_filter_configurations = {k:v.filter_config['filter_function'] for k,v in curr_active_pipeline.active_configs.items()}
+    # loaded_pipeline_computation_configs = {k:v.computation_config for k,v in curr_active_pipeline.active_configs.items()}
+
 
     ## Build updated ones from the current configs:
     active_session_filter_configurations = active_data_mode_registered_class.build_default_filter_functions(sess=curr_active_pipeline.sess, epoch_name_includelist=epoch_name_includelist) # build_filters_pyramidal_epochs(sess=curr_kdiba_pipeline.sess)
