@@ -632,7 +632,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         # Restore unpickable properties:
         self._logger = pipeline_module_logger
-        self._logger.info(f'NeuropyPipeline.__setstate__(state="{state}")')
+        self._logger.info(f'NeuropyPipeline.__setstate__(state="{state}")') # AttributeError: 'DisplayPipelineStage' object has no attribute 'identity'
 
         self._persistance_state = None # the pickle_path has to be set manually after loading
         self._plot_object = None
