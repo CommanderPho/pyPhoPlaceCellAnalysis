@@ -216,7 +216,15 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         batch_extended_computations(curr_active_pipeline, include_global_functions=False, fail_on_exception=fail_on_exception, progress_print=True, debug_print=False)
     # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation'], debug_print=False, fail_on_exception=False) # includelist: ['_perform_baseline_placefield_computation']
 
-    curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
+
+    try:
+        curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
+    except Exception as e:
+        exception_info = sys.exc_info()
+        an_error = CapturedException(e, exception_info, curr_active_pipeline)
+        print(f'WARNING: Failed to do `curr_active_pipeline.prepare_for_display(...)` with error: {an_error}')
+        if fail_on_exception:
+            raise
 
     try:
         curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
