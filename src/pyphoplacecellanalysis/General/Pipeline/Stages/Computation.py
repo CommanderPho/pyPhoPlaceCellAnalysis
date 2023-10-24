@@ -68,7 +68,7 @@ class FunctionsSearchMode(Enum):
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-@define(slots=False)
+@define(slots=False, repr=False)
 class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     """Docstring for ComputedPipelineStage.
 

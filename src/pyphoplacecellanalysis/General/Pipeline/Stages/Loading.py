@@ -369,7 +369,7 @@ class PipelineWithInputStage:
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-@define(slots=False) # , init=False
+@define(slots=False, repr=False) # , init=False
 class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage):
     """Docstring for LoadedPipelineStage."""
     identity: PipelineStage = field(default=PipelineStage.Loaded)

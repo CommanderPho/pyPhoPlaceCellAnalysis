@@ -173,7 +173,7 @@ def update_figure_files_output_path(computation_result, active_config, root_outp
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-@define(slots=False)
+@define(slots=False, repr=False)
 class DisplayPipelineStage(ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
     identity: PipelineStage = field(default=PipelineStage.Displayed)
