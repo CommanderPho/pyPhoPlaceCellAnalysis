@@ -1,4 +1,5 @@
 # from pyphoplacecellanalysis.PhoPositionalData.analysis.interactive_placeCell_config import InteractivePlaceCellConfig, PlottingConfig
+from typing import Optional, List, Dict, Tuple, Union
 from attr import define, field, Factory, asdict, astuple
 import numpy as np
 import pandas as pd
@@ -57,11 +58,6 @@ class VideoOutputModeConfig(BaseConfig):
 
     def __attrs_post_init__(self):
         # Computed variables:
-        if self.video_output_parent_dir is None:
-            self.active_video_output_parent_dir = Path('output')
-        else:
-            self.active_video_output_parent_dir = self.video_output_parent_dir
-    
         self.active_video_output_filename = f'complete_plotting_full_curve_F{self.active_frame_range[0]}_F{self.active_frame_range[-1]}.mp4'
         self.active_video_output_fullpath = self.active_video_output_parent_dir.joinpath(self.active_video_output_filename)
 
@@ -90,18 +86,19 @@ class PlottingConfig(BaseConfig):
 
     # output_subplots_shape: tuple = field(default=(1,1))
     # output_parent_dir: Path = field(default=Path('output'))
-    subplots_shape: tuple = field(default=(1,1), alias='output_subplots_shape')
-    active_output_parent_dir: Path = field(default=Path('output'), alias='output_parent_dir')
+    subplots_shape: tuple = field(default=(1,1)) # , alias='output_subplots_shape'
+    active_output_parent_dir: Path = field(default=Path('output')) # , alias='output_parent_dir'
     use_age_proportional_spike_scale: bool = field(default=False)
     plotter_type: str = field(default='BackgroundPlotter')
     
     ## Typically "derived" properties:
-    pf_neuron_identities: list = field(default=Factory(list))
-    pf_sort_ind: np.ndarray = field(default=Factory(np.array))
-    pf_colors: np.ndarray = field(default=Factory(np.array))
-    pf_colormap: np.ndarray = field(default=Factory(np.array))
-    pf_listed_colormap: ListedColormap = field(default=Factory(ListedColormap))
-    use_smoothed_maze_rendering: bool = field(default=False)
+    pf_neuron_identities: Optional[list] = field(default=None)
+    pf_sort_ind: Optional[np.ndarray] = field(default=None)
+    pf_colors: Optional[np.ndarray] = field(default=None)
+    pf_colormap: np.ndarray = field(default=None)
+    pf_listed_colormap: Optional[ListedColormap] = field(default=None)
+    use_smoothed_maze_rendering: Optional[bool] = field(default=None)
+
 
     @property
     def figure_output_directory(self) -> Path:
@@ -148,13 +145,13 @@ class PlottingConfig(BaseConfig):
     def init_from_params(cls, output_subplots_shape=(1,1), output_parent_dir=None, use_age_proportional_spike_scale=False, plotter_type='BackgroundPlotter') -> "PlottingConfig": 
         if output_subplots_shape is None:
             output_subplots_shape = (1,1) # By default, only a single plot is needed
-        _obj = cls(output_subplots_shape, active_output_parent_dir, use_age_proportional_spike_scale, plotter_type)
-        _obj.subplots_shape = output_subplots_shape
         if output_parent_dir is None:
             active_output_parent_dir = Path('output')
         else:
             active_output_parent_dir = output_parent_dir
 
+        _obj = cls(subplots_shape=output_subplots_shape, active_output_parent_dir=active_output_parent_dir, use_age_proportional_spike_scale=use_age_proportional_spike_scale, plotter_type=plotter_type)
+        _obj.subplots_shape = output_subplots_shape
         _obj.use_age_proportional_spike_scale = use_age_proportional_spike_scale
         _obj.plotter_type = plotter_type
         return _obj
@@ -162,7 +159,12 @@ class PlottingConfig(BaseConfig):
 
 @define(slots=False)
 class InteractivePlaceCellConfig(BaseConfig):
-    # Docstring for InteractivePlaceCellConfig. 
+    """ 
+        Initially represented a single computation_config
+
+
+
+    """ 
 
     active_session_config: SessionConfig = field()
     active_epochs: NamedTimerange = field()
