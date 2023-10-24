@@ -1,0 +1,10 @@
+{% extends "slurm_python_template_base.py" %}
+{% block result_handler %}
+{{ super() }}
+## Templating mode:
+result_handler = BatchSessionCompletionHandler(force_reload_all=True,
+        session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
+        global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
+        should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_generate_all_plots=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_global_recompute=True)
+
+{% endblock %}
