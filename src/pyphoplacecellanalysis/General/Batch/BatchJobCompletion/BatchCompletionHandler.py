@@ -183,6 +183,7 @@ class BatchSessionCompletionHandler:
             Updates: `curr_active_pipeline.filtered_contexts`
 
         """
+        was_updated = False
         for a_name, a_named_timerange in curr_active_pipeline.filtered_epochs.items():
             filter_name:str = a_named_timerange.name
             if debug_print:
@@ -194,12 +195,16 @@ class BatchSessionCompletionHandler:
                 a_split_name, lap_dir = a_name.split('_')
                 if (a_filtered_ctxt.filter_name != filter_name) or (a_filtered_ctxt.lap_dir != lap_dir):
                     was_updated = True
+                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
                     a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name, lap_dir=lap_dir)
 
             else:
                 if a_filtered_ctxt.filter_name != filter_name:
                     was_updated = True
+                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
                     a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name)
+                    
+
             if debug_print:
                 print(f'\t{a_filtered_ctxt.to_dict()}')
             curr_active_pipeline.filtered_contexts[a_name] = a_filtered_ctxt # correct the context
