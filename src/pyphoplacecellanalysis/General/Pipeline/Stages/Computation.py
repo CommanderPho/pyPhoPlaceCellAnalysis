@@ -399,14 +399,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             non_global_epoch_names = list(self.sess.paradigm.get_unique_labels()) # ['maze1', 'maze2']
             global_epoch_name: str = 'maze'
             known_epoch_names = [*non_global_epoch_names, global_epoch_name] # a list of names
-            assert len(known_epoch_names) == 3, f"Must have exactly 3: {known_epoch_names}"
-            # If defaults are all missing, a renaming has probably been done.
-            if np.all(np.logical_not(np.isin(known_epoch_names, include_includelist))):
-                # if defaults are all missing, a filtering has probably been done.
-                known_epoch_names = [f'{a_name}_any' for a_name in known_epoch_names]
-
-            assert np.all(np.isin(known_epoch_names, include_includelist)), f"all long/short/global epochs must exist in include_includelist! known_epoch_names: {known_epoch_names}, include_includelist: {include_includelist}, np.isin(known_epoch_names, include_includelist): {np.isin(known_epoch_names, include_includelist)}"
-            long_epoch_name, short_epoch_name, global_epoch_name = known_epoch_names # unwrap
+            
         else:
             # Old method of unwrapping based on hard-coded values:
             assert len(include_includelist) == 3, f"Must have exactly 3: {include_includelist}"
@@ -416,6 +409,17 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             long_epoch_name = include_includelist[-3] # 'maze1_PYR'
             short_epoch_name = include_includelist[-2] # 'maze2_PYR'
             global_epoch_name = include_includelist[-1] # 'maze_PYR'
+            known_epoch_names = [long_epoch_name, short_epoch_name, global_epoch_name]
+
+
+        assert len(known_epoch_names) == 3, f"Must have exactly 3: {known_epoch_names}"
+        # If defaults are all missing, a renaming has probably been done.
+        if np.all(np.logical_not(np.isin(known_epoch_names, include_includelist))):
+            # if defaults are all missing, a filtering has probably been done.
+            known_epoch_names = [f'{a_name}_any' for a_name in known_epoch_names]
+
+        assert np.all(np.isin(known_epoch_names, include_includelist)), f"all long/short/global epochs must exist in include_includelist! known_epoch_names: {known_epoch_names}, include_includelist: {include_includelist}, np.isin(known_epoch_names, include_includelist): {np.isin(known_epoch_names, include_includelist)}"
+        long_epoch_name, short_epoch_name, global_epoch_name = known_epoch_names # unwrap
 
         return long_epoch_name, short_epoch_name, global_epoch_name
 
