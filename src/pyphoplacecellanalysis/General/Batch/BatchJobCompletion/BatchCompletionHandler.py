@@ -173,6 +173,40 @@ class BatchSessionCompletionHandler:
     frs_index_inclusion_magnitude: float = field(default=0.35)
     override_existing_frs_index_values:bool = field(default=False)
 
+    @classmethod
+    def _post_fix_filtered_contexts(cls, curr_active_pipeline, debug_print=False) -> bool:
+        """ 2023-10-24 - tries to update 
+
+            curr_active_pipeline.filtered_contexts with correct filter_names
+
+            Uses: `curr_active_pipeline.filtered_epoch`
+            Updates: `curr_active_pipeline.filtered_contexts`
+
+        """
+        for a_name, a_named_timerange in curr_active_pipeline.filtered_epochs.items():
+            filter_name:str = a_named_timerange.name
+            if debug_print:
+                print(f'{a_name} - {filter_name}')
+            a_filtered_ctxt = curr_active_pipeline.filtered_contexts[a_name]
+            _split_parts = a_name.split('_')
+            if (len(_split_parts) >= 2):
+                # also have lap_dir:
+                a_split_name, lap_dir = a_name.split('_')
+                if (a_filtered_ctxt.filter_name != filter_name) or (a_filtered_ctxt.lap_dir != lap_dir):
+                    was_updated = True
+                    a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name, lap_dir=lap_dir)
+
+            else:
+                if a_filtered_ctxt.filter_name != filter_name:
+                    was_updated = True
+                    a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name)
+            if debug_print:
+                print(f'\t{a_filtered_ctxt.to_dict()}')
+            curr_active_pipeline.filtered_contexts[a_name] = a_filtered_ctxt # correct the context
+
+        # end for
+        return was_updated
+
 
     @classmethod
     def post_compute_validate(cls, curr_active_pipeline) -> bool:
@@ -186,6 +220,8 @@ class BatchSessionCompletionHandler:
         print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
 
         ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
+        was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline)
+
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         # assert long_epoch_context.filter_name == long_epoch_name, f"long_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}"
