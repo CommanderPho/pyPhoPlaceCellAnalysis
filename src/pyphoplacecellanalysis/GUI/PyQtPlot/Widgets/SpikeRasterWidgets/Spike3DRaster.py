@@ -589,35 +589,47 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
         
         # Adds the widget with addItem:
         self.ui.main_gl_widget.addItem(widget)
+
+
+    def update(self, sort_changed=True, colors_changed=True):
+        """ refreshes the raster when the colors or sort change. 
+        
+        NOTE: Unlike Spike2DRaster, sorts seem to be able to be updated independent of colors.
+        
+        """
+        if sort_changed:
+            # rebuild the position range for each unit along the y-axis:
+            self.update_series_identity_y_values()
+            self._update_neuron_id_graphics() # rebuild the text labels
+            self._update_plots()
+                        
+        if colors_changed:
+            ## Spike3DRaster:
+            # ._update_neuron_id_graphics()
+            # .rebuild_main_gl_line_plots_if_needed()
+            self._update_neuron_id_graphics() # rebuild the text labels
+            self.rebuild_main_gl_line_plots_if_needed()
+            for i, a_fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
+                # color= (N,4) array of floats (0.0-1.0) or tuple of floats specifying a single color for the entire item.
+                curr_color = self.params.neuron_qcolors[a_fragile_linear_neuron_IDX] # get the pre-build color
+                self.ui.gl_line_plots[i].setData(color=curr_color) # update the current data
+            self._update_plots()
             
+
         
     # unit_sort_order_changed_signal
     @QtCore.pyqtSlot(object)
     def on_unit_sort_order_changed(self, new_sort_order):
         print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')        
-        # rebuild the position range for each unit along the y-axis:
-        self.update_series_identity_y_values()
-        self._update_neuron_id_graphics() # rebuild the text labels
-        self._update_plots()
-        print('\t done.')
-        
+        self.update(sort_changed=True, colors_changed=False)
+
+
     @QtCore.pyqtSlot(object)
     def on_neuron_colors_changed(self, neuron_id_color_update_dict):
         """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
         """
         print(f'Spike3DRaster.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
-        ## Spike3DRaster:
-        # ._update_neuron_id_graphics()
-        # .rebuild_main_gl_line_plots_if_needed()
-        self._update_neuron_id_graphics() # rebuild the text labels
-        self.rebuild_main_gl_line_plots_if_needed()
-        for i, a_fragile_linear_neuron_IDX in enumerate(self.fragile_linear_neuron_IDXs):
-            # color= (N,4) array of floats (0.0-1.0) or tuple of floats specifying a single color for the entire item.
-            curr_color = self.params.neuron_qcolors[a_fragile_linear_neuron_IDX] # get the pre-build color
-            self.ui.gl_line_plots[i].setData(color=curr_color) # update the current data
-            
-        
-        self._update_plots()
+        self.update(sort_changed=False, colors_changed=True)
         
         
         

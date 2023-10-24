@@ -85,7 +85,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     ## Scrollable Window Signals
     # window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
-
+    sigRenderedIntervalsListChanged = QtCore.Signal(object) # EpochRenderingMixin conformance: signal emitted whenever the list of rendered intervals changed (add/remove). Added 2023-10-16 to prevent `AttributeError: 'Spike2DRaster' does not have a signal with the signature PyQt_PyObject)`
+    
     @property
     def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""    
@@ -459,7 +460,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
         self._setupUI_matplotlib_render_plots()
 
-    
+        ## Add the epochs separator lines:
+        _out_lines = self.add_raster_spikes_and_epochs_separator_line()
         
     def _run_delayed_gui_load_code(self):
         """ called when the self._delayed_gui_timer QTimer fires. """
@@ -557,6 +559,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
     @QtCore.pyqtSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
+        """ update the zoomed plot, the spikes_window, and update the dependent curves
+        
+        """
         # Update the main_plot_widget:
         if self.Includes2DActiveWindowScatter:
             self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
@@ -584,41 +589,47 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
     @QtCore.pyqtSlot(float, float)
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
-        """ called to update the interactive scrolling window control """
+        """ called to update the interactive scrolling window control
+        
+        PUBLIC: primary update function
+        
+        
+        """
         if block_signals:
             self.ui.scroll_window_region.blockSignals(True) # Block signals so it doesn't recursively update
         self.ui.scroll_window_region.setRegion([new_start, new_end]) # adjust scroll control
         if block_signals:
             self.ui.scroll_window_region.blockSignals(False)
         
+
+
+    def update(self, sort_changed=True, colors_changed=True):
+        """ refreshes the raster when the colors or sort change. 
+        
+        """
+        if sort_changed:
+            # rebuild the position range for each unit along the y-axis:
+            self.update_series_identity_y_values()
+            all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
+            self.spikes_df['visualization_raster_y_location'] = all_y
+            colors_changed = True # colors always changed when sort changes
+            
+        if colors_changed:
+            ## Rebuild Raster Plot Points:
+            self._build_cell_configs()
+            # ALL Spikes in the preview window:
+            self.plots_data.all_spots = self._build_all_spikes_all_spots()
+            # Update preview_overview_scatter_plot
+            self.update_rasters()
+        
+
         
     # unit_sort_order_changed_signal
     @QtCore.pyqtSlot(object)
     def on_unit_sort_order_changed(self, new_sort_order):
         ## TODO: copied from Spike3DRaster but untested
-        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')
-        # rebuild the position range for each unit along the y-axis:
-        self.update_series_identity_y_values()
-        # self._update_neuron_id_graphics() # rebuild the text labels
-        # self._update_plots()
-        
-        # Update the 'visualization_raster_y_location' locations:
-        ## TODO: performance: can this just be sorted in place instead of rebuilt entirely?
-
-        all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # old
-        # all_y = [self.fragile_linear_neuron_IDX_to_spatial(self.cell_id_to_fragile_linear_neuron_IDX_map[a_cell_id]) for a_cell_id in self.spikes_df['fragile_linear_neuron_IDX'].to_numpy()] # copied from Spike3DRaster_Vedo. Note self.spikes_df's 'neuron_IDX' is identical to 'fragile_linear_neuron_IDX'
-        self.spikes_df['visualization_raster_y_location'] = all_y
-
-        ## Rebuild Raster Plot Points:
-        self._build_cell_configs()
-
-        # ALL Spikes in the preview window:
-        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()
-        # pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        # self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots        
-        self.plots_data.all_spots = self._build_all_spikes_all_spots()
-        # Update preview_overview_scatter_plot
-        self.update_rasters()
+        print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')        
+        self.update(sort_changed=True, colors_changed=True)
         print('\t done.')
 
 
@@ -633,16 +644,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
         """
         print(f'Spike2DRaster.neuron_id_color_update_dict: {neuron_id_color_update_dict}')
-        ## Rebuild Raster Plot Points:
-        self._build_cell_configs()
-
-        # ALL Spikes in the preview window:
-        # curr_spike_x, curr_spike_y, curr_spike_pens, curr_n = self._build_all_spikes_data_values()
-        # pos = np.vstack((curr_spike_x, curr_spike_y)) # np.shape(curr_spike_t): (11,), np.shape(curr_spike_x): (11,), np.shape(curr_spike_y): (11,), curr_n: 11
-        # self.plots_data.all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # update self.plots_data.all_spots        
-        self.plots_data.all_spots = self._build_all_spikes_all_spots()
-        # Update preview_overview_scatter_plot
-        self.update_rasters()
+        self.update(sort_changed=False, colors_changed=True)
         
         
 
@@ -932,7 +934,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return plt
     
     def create_separate_render_plot_item(self, row=None, col=None, rowspan=1, colspan=1, name='new_curves_separate_plot'):
-        """ Adds a separate independent plot for epoch time rects to the 2D plot above the others:
+        """ Adds a separate pyqtgraph independent plot for epoch time rects to the 2D plot above the others:
         
         Requires:
             active_2d_plot.ui.main_graphics_layout_widget <GraphicsLayoutWidget>
@@ -974,7 +976,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # performs required setup to enable dynamically added matplotlib render subplots.
         self.ui.matplotlib_view_widgets = {} # empty dictionary
 
-
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget'):
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
@@ -993,7 +995,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
             ## Add to dynamic_docked_widget_container:
             min_width = 500
-            min_height = 100
+            min_height = 50
             # if _last_dock_outer_nested_item is not None:
             #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
             #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
@@ -1007,7 +1009,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
             ## Add the plot:
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
-            ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
+            _single_ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
+            ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
         
         else:
             # Already had the widget
@@ -1015,11 +1018,19 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
             
+        ## Apply the default formatting:
+        fig.patch.set_facecolor('black')
+        fig.patch.set_alpha(0.1)
+
+        for an_ax in ax:
+            an_ax.patch.set_facecolor('black')
+            an_ax.patch.set_alpha(0.1)
+    
 
         # self.sync_matplotlib_render_plot_widget()
         return self.ui.matplotlib_view_widgets[name], fig, ax
 
-
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:23', related_items=[])
     def find_matplotlib_render_plot_widget(self, identifier):
         """ finds the existing dynamically added matplotlib_render_plot_widget. 
         returns (widget, fig, ax)
@@ -1031,7 +1042,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
             return None, None, None
 
-        
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def remove_matplotlib_render_plot_widget(self, identifier):
         """ removes the subplot - does not work yet """
         ## TODO: need to remove the display item from self.ui.dynamic_docked_widget_container?
@@ -1049,7 +1060,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
 
-
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'sync'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def sync_matplotlib_render_plot_widget(self, identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW):
         """ syncs a matplotlib render plot widget with a specified identifier with either the global window, the active time window, or disables sync with the Spike2DRaster. """
         # Requires specifying the identifier

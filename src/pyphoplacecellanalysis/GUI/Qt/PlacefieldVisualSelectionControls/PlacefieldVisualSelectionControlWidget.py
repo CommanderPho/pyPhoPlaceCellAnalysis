@@ -14,8 +14,7 @@ from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldV
 
 # For compatibility with the panel ui version:
 # from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
-
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
 
 
 class PlacefieldVisualSelectionWidget(QtWidgets.QWidget):

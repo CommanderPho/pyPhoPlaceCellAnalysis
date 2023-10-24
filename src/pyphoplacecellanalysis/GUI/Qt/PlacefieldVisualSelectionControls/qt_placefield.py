@@ -10,8 +10,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
 
 from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.PlacefieldVisualSelectionControlsBarWidget import PlacefieldVisualSelectionControlsBarWidget
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import SingleNeuronPlottingExtended
-
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
 
 """ 
 
@@ -24,7 +23,7 @@ Primary Function: build_qt_interactive_placefield_visibility_controls(...)
 """
 
 
-def build_single_placefield_output_widget(render_config):
+def build_single_placefield_output_widget(render_config) -> PlacefieldVisualSelectionWidget:
     """ An alternative to the whole SingleEditablePlacefieldDisplayConfiguration implementation 
     
     Called in build_all_placefield_output_panels(...) down below.

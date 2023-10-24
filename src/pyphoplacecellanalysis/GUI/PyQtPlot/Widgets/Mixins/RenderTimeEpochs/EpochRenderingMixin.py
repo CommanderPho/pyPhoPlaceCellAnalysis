@@ -104,12 +104,17 @@ class EpochRenderingMixin:
         """The interval_datasource_updating_connections property. A ConnectionsContainer object """
         return self.ui.connections
     
-    
     @property
     def rendered_epochs(self):
         """The interval_datasources property."""
         return self.plots.rendered_epochs
     
+    @property
+    def rendered_epoch_series_names(self):
+        """The rendered_epoch_names property."""
+        return [a_name for a_name in self.rendered_epochs.keys() if ((a_name != 'name') and (a_name != 'context'))]
+
+
     #######################################################################################################################################
     
     @QtCore.Slot()
@@ -333,9 +338,11 @@ class EpochRenderingMixin:
 
     def clear_all_rendered_intervals(self, child_plots_removal_list=None, debug_print=False):
         """ removes all rendered rects - a batch version of removed_rendered_intervals(...) """
-        curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
+        # curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
+        curr_rendered_epoch_names = self.rendered_epoch_series_names
+        # the `self.rendered_epochs` is of type RenderPlots, and it has a 'name' and 'context' property that don't correspond to real outputs
         for a_name in curr_rendered_epoch_names:
-            if a_name != 'name':
+            if (a_name != 'name') and (a_name != 'context'):
                 if debug_print:
                     print(f'removing {a_name}...')
                 self.remove_rendered_intervals(a_name, child_plots_removal_list=child_plots_removal_list, debug_print=debug_print)
@@ -414,12 +421,9 @@ class EpochRenderingMixin:
         ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
         for interval_key, interval_update_kwargs in update_dict.items():
             if interval_key in self.interval_datasources:
+                if not isinstance(interval_update_kwargs, dict):
+                    interval_update_kwargs = interval_update_kwargs.to_dict() # deal with EpochDisplayConfig 
                 self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(interval_update_kwargs | kwargs))) ## Fully inline
-                # # Adjust bounds. I don't think this is needed tbh
-                # for a_plot, a_rect_item in active_2d_plot.rendered_epochs[interval_key].items():
-                #     if not isinstance(a_rect_item, str):
-                #         # Adjust the bounds to fit any children:
-                #         EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, a_rect_item)
             else:
                 print(f"WARNING: interval_key '{interval_key}' was not found in self.interval_datasources. Skipping update for unknown item.")
 
@@ -576,6 +580,41 @@ class EpochRenderingMixin:
         return stacked_epoch_layout_dict
 
 
+    # Separator Lines ____________________________________________________________________________________________________ #
+
+    def add_raster_spikes_and_epochs_separator_line(self):
+        """ adds a thick separator line between the spikes and the epochs. """
+        _out_lines_dict = {}
+        for a_dest_plot in self.interval_rendering_plots:
+            _out_lines_dict[a_dest_plot.objectName()] = a_dest_plot.addLine(x=None, y=0.0, pen={'color':'w', 'width':3.0}, name='EpochDividerLine') # pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.InfiniteLine.InfiniteLine
+        return _out_lines_dict
+
+
+
+    # 2023-10-16 - Interval `EpochDisplayConfig` extraction from datasources: ____________________________________________ #
+    def extract_interval_display_config_lists(self):
+        """ Build the EpochDisplayConfig lists for each interval datasource
+
+        
+        Usage:
+        
+        import panel as pn
+        pn.extension()
+
+        out_configs_dict = active_2d_plot.extract_interval_display_config_lists()
+        pn.Row(*[pn.Column(*[pn.Param(a_sub_v) for a_sub_v in v]) for k,v in out_configs_dict.items()])
+
+        """
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig
+        out_configs_dict = {}
+        rendered_epoch_names = self.interval_datasource_names
+        for a_name in rendered_epoch_names:
+            a_ds = self.interval_datasources[a_name]
+            result = EpochDisplayConfig.init_configs_list_from_interval_datasource_df(a_name, a_ds)
+            out_configs_dict[a_name] = result
+
+        return out_configs_dict
+    
 
     # ---------------------------------------------------------------------------- #
     #                          Private Implementor Methods                         #

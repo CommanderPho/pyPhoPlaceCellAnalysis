@@ -26,6 +26,8 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import programmatic_dis
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metadata_from_display_context # newer version of build_pdf_export_metadata
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
 
+from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
+
 """ 
 
 filters should be checkable to express whether we want to build that one or not
@@ -233,13 +235,18 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_extended_computations(curr_active_pipeline, include_includelist=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool = False):
-    """ performs the remaining required global computations """
-    def _subfn_on_already_computed(_comp_name):
+def batch_extended_computations(curr_active_pipeline, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False, dry_run:bool=False):
+    """ performs the remaining required global computations
+
+    """
+    #TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
+    #TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
+
+    def _subfn_on_already_computed(_comp_name, computation_filter_name):
         """ captures: `progress_print`, `force_recompute`
         raises AttributeError if force_recompute is true to trigger recomputation """
         if progress_print:
-            print(f'{_comp_name} already computed.')
+            print(f'{_comp_name}, {computation_filter_name} already computed.')
         if force_recompute:
             if progress_print:
                 print(f'\tforce_recompute is true so recomputing anyway')
@@ -247,10 +254,10 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
     newly_computed_values = []
 
-    non_global_comp_names = ['firing_rate_trends', 'relative_entropy_analyses']
-    global_comp_names = ['jonathan_firing_rate_analysis', 'short_long_pf_overlap_analyses', 'long_short_fr_indicies_analyses', 'long_short_decoding_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups'] # , 'long_short_rate_remapping'
+    non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
+    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis'] # , 'long_short_rate_remapping'
 
-    # 'firing_rate_trends', 'relative_entropy_analyses'
+    # 'firing_rate_trends', 'pf_dt_sequential_surprise'
     # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
     
     if include_includelist is None:
@@ -260,31 +267,57 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
     ## Get computed relative entropy measures:
     global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
-    global_results = curr_active_pipeline.computation_results[global_epoch_name].computed_data #['computed_data']
+
+    if included_computation_filter_names is None:
+        included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
+        if progress_print:
+            print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
+
+    else:
+        if progress_print:
+            print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
+
 
     # ## Get existing `pf1D_dt`:
     # active_pf_1D = global_results.pf1D
     # active_pf_1D_dt = global_results.pf1D_dt
-    if progress_print:
-        print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
-
+    
     ## Specify the computations and the requirements to validate them.
-    _comp_specifiers = [
-        SpecificComputationValidator(short_name='firing_rate_trends', computation_fn_name='_perform_firing_rate_trends_computation', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.computation_results[global_epoch_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False),
-        SpecificComputationValidator(short_name='relative_entropy_analyses', computation_fn_name='_perform_time_dependent_pf_sequential_surprise_computation', validate_computation_test=lambda curr_active_pipeline: (np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['relative_entropy_analyses']['flat_jensen_shannon_distance_results'], axis=1)), is_global=False),  # flat_surprise_across_all_positions
-        SpecificComputationValidator(short_name='jonathan_firing_rate_analysis', computation_fn_name='_perform_jonathan_replay_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df, is_global=True),  # active_context
-        SpecificComputationValidator(short_name='short_long_pf_overlap_analyses', computation_fn_name='_perform_long_short_pf_overlap_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), is_global=True),  # relative_entropy_overlap_scalars_df
-        SpecificComputationValidator(short_name='long_short_fr_indicies_analyses', computation_fn_name='_perform_long_short_firing_rate_analyses', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['x_frs_index'], is_global=True),  # active_context
-        SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', validate_computation_test=lambda curr_active_pipeline: (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True),
-        SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True),
-        SpecificComputationValidator(short_name='long_short_inst_spike_rate_groups', computation_fn_name='_perform_long_short_instantaneous_spike_rate_groups_analysis', validate_computation_test=lambda curr_active_pipeline: curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], is_global=True)
-    ]
+
+    ## Hardcoded comp_specifiers
+    _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
+    ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
+    _comp_specifiers = reversed(_comp_specifiers)
+
+    remaining_include_function_names = {k:False for k in include_includelist.copy()}
 
     for _comp_specifier in _comp_specifiers:
         if (not _comp_specifier.is_global) or include_global_functions:
-            if _comp_specifier.short_name in include_includelist:
-                newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+            if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
+                if (not _comp_specifier.is_global):
+                    # Not Global-only, need to compute for all `included_computation_filter_names`:
+                    for a_computation_filter_name in included_computation_filter_names:
+                        if not dry_run:
+                            newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name=a_computation_filter_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                        else:
+                            print(f'dry-run: {_comp_specifier.short_name}, computation_filter_name={a_computation_filter_name}')
 
+                else:
+                    # Global-Only:
+                    if not dry_run:
+                        newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                    else:
+                        print(f'dry-run: {_comp_specifier.short_name}')
+
+                if (_comp_specifier.short_name in include_includelist):
+                    del remaining_include_function_names[_comp_specifier.short_name]
+                elif (_comp_specifier.computation_fn_name in include_includelist):
+                    del remaining_include_function_names[_comp_specifier.computation_fn_name]
+                else:
+                    raise NotImplementedError
+
+    if len(remaining_include_function_names) > 0:
+        print(f'WARNING: after execution of all _comp_specifiers found the functions: {remaining_include_function_names} still remain! Are they correct and do they have proper validator decorators?')
     if progress_print:
         print('done with all batch_extended_computations(...).')
 
@@ -312,7 +345,7 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
 
     ## Get global 'jonathan_firing_rate_analysis' results:
     curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-    neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
+    neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis.neuron_replay_stats_df, curr_jonathan_firing_rate_analysis.rdf.rdf, curr_jonathan_firing_rate_analysis.rdf.aclu_to_idx, curr_jonathan_firing_rate_analysis.irdf.irdf
 
     # ==================================================================================================================== #
     # Batch Output of Figures                                                                                              #
@@ -411,6 +444,42 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
         
+    ## Exports the video of the surprise:
+    try:
+        # Relative Entropy/Surprise Results:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        active_relative_entropy_results = global_results['extended_stats']['pf_dt_sequential_surprise'] # DynamicParameters
+        historical_snapshots = active_relative_entropy_results['historical_snapshots']
+        ## Get the placefield dt matrix:
+        if 'snapshot_occupancy_weighted_tuning_maps' not in active_relative_entropy_results:
+            ## Compute it if missing:
+            occupancy_weighted_tuning_maps_over_time = np.stack([placefield_snapshot.occupancy_weighted_tuning_maps_matrix for placefield_snapshot in historical_snapshots.values()])
+            active_relative_entropy_results['snapshot_occupancy_weighted_tuning_maps'] = occupancy_weighted_tuning_maps_over_time
+        else:
+            occupancy_weighted_tuning_maps_over_time = active_relative_entropy_results['snapshot_occupancy_weighted_tuning_maps'] # (n_post_update_times, n_neurons, n_xbins)
+
+        video_output_parent_path = export_active_relative_entropy_results_videos(active_relative_entropy_results, active_context=curr_active_pipeline.get_session_context())
+
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): export_active_relative_entropy_results_videos failed with error: {e}\n skipping.')
+
+
+    ## Exports all cells to the `BatchPhoJonathanFiguresHelper` but without the top part:
+    try:
+        # Relative Entropy/Surprise Results:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+        neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.2)
+        ## all cells:
+        fig_1c_figures_all_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=20, write_vector_format=False, write_png=True, show_only_refined_cells=False, disable_top_row=True)
+    
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): BatchPhoJonathanFiguresHelper.run(...) failed for all cells. failed with error: {e}\n skipping.')
+        
+
+    
 
 
 
@@ -432,20 +501,50 @@ class BatchPhoJonathanFiguresHelper:
 
 
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False):
-        """ The only public function. Performs the batch plotting. """
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True):
+        """ The only public function. Performs the batch plotting.
+        
+        # split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
+        
+        """
         if included_unit_neuron_IDs is not None:
             ## pre-filter the `neuron_replay_stats_df` by the included_unit_neuron_IDs only:
             neuron_replay_stats_df = neuron_replay_stats_df[np.isin(neuron_replay_stats_df.index, included_unit_neuron_IDs)]
             
         ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
         # %matplotlib qt
-        short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
-        short_only_aclus = short_only_df.index.values.tolist()
-        long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
-        long_only_aclus = long_only_df.index.values.tolist()
-        shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
-        shared_aclus = shared_df.index.values.tolist()
+
+         
+        if split_by_short_long_shared:
+            ## 2023-09-28 - Refined Outputs
+            if show_only_refined_cells:
+                short_only_df = neuron_replay_stats_df[neuron_replay_stats_df['is_refined_SxC']]
+                short_only_aclus = short_only_df.index.values.tolist()
+                long_only_df = neuron_replay_stats_df[neuron_replay_stats_df['is_refined_LxC']]
+                long_only_aclus = long_only_df.index.values.tolist()
+
+                ## Note that the above ("refined" LxC and SxC) omit long_only and short_only place cells that don't meant the "exclusive" criteria. That means these cells will be omitted entirely (and not even included in the shared)
+                # shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+                # shared_aclus = shared_df.index.values.tolist()
+                shared_aclus = [] # skip shared aclus for this mode
+                print(f"WARNING: 2023-09-28 - Note that the above ('refined' LxC and SxC) omit long_only and short_only place cells that don't meant the 'exclusive' criteria. That means these cells will be omitted entirely (and not even included in the shared)")
+
+            else:
+                # original (non-refined) mode
+                short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
+                short_only_aclus = short_only_df.index.values.tolist()
+                long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
+                long_only_aclus = long_only_df.index.values.tolist()
+                shared_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.SHARED]
+                shared_aclus = shared_df.index.values.tolist()
+        else:
+            # don't split the short/long/shared, treat all as shared.
+            short_only_aclus = []
+            long_only_aclus = []
+            shared_df = neuron_replay_stats_df.copy()
+            shared_aclus = shared_df.index.values.tolist()
+
+
         if debug_print:
             print(f'shared_aclus: {shared_aclus}')
             print(f'long_only_aclus: {long_only_aclus}')
@@ -453,13 +552,13 @@ class BatchPhoJonathanFiguresHelper:
 
         active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
         
-        _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows)
+        _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows, _extra_kwargs=dict(disable_top_row=disable_top_row))
         active_out_figures_dict = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
         
         return active_out_figures_dict
 
     @classmethod
-    def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10):
+    def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10, disable_top_row=False):
         """ the a programmatic wrapper for automated output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`. The specific plot function called. 
         Called ONLY by `_perform_batch_plot(...)`
 
@@ -474,17 +573,19 @@ class BatchPhoJonathanFiguresHelper:
         desired_figure_size_inches[1] = desired_figure_size_inches[1] * num_cells
         graphics_output_dict = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
                                                             n_max_plot_rows=n_max_page_rows, included_unit_neuron_IDs=included_unit_neuron_IDs,
-                                                            show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=False, defer_render=True) # save_figure will be false because we're saving afterwards
+                                                            show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=False, defer_render=True, disable_top_row=disable_top_row) # save_figure will be false because we're saving afterwards
         # fig, subfigs, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['subfigs'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
         fig, subfigs, axs, plot_data = graphics_output_dict.figures[0], graphics_output_dict.subfigs, graphics_output_dict.axes, graphics_output_dict.plot_data
         fig.suptitle(active_identifying_ctx.get_description()) # 'kdiba_2006-6-08_14-26-15_[4, 13, 36, 58, 60]'
         return fig
 
     @classmethod
-    def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10):
+    def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10, _extra_kwargs=None):
         """ builds the list of kwargs for all aclus. """
         _batch_plot_kwargs_list = [] # empty list to start
 
+        _extra_kwargs = _extra_kwargs or {}
+        
         # _aclu_indicies_list_str_formatter = lambda a_list: ('[' + ','.join(map(str, a_list)) + ']') # Prints an array of integer aclu indicies without spaces and comma separated, surrounded by hard brackets. e.g. '[5,6,7,8,11,12,15,17,18,19,20,21,24,25,26,27,28,31,34,35,39,40,41,43,44,45,48,49,50,51,52,53,55,56,60,62,63,64,65]'
         _aclu_indicies_list_str_formatter = lambda a_list: ('(' + ','.join(map(str, a_list)) + ')')
 
@@ -494,7 +595,7 @@ class BatchPhoJonathanFiguresHelper:
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
                 display_fn_name=cls._display_fn_context_display_name, plot_result_set='long_only', aclus=f"{_aclu_indicies_list_str_formatter(long_only_aclus)}"
             ),
-            fignum='long_only', n_max_page_rows=len(long_only_aclus)))
+            fignum='long_only', n_max_page_rows=len(long_only_aclus), **_extra_kwargs))
         else:
             print(f'WARNING: long_only_aclus is empty, so not adding kwargs for these.')
         
@@ -503,7 +604,7 @@ class BatchPhoJonathanFiguresHelper:
             active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
                 display_fn_name=cls._display_fn_context_display_name, plot_result_set='short_only', aclus=f"{_aclu_indicies_list_str_formatter(short_only_aclus)}"
             ),
-            fignum='short_only', n_max_page_rows=len(short_only_aclus)))
+            fignum='short_only', n_max_page_rows=len(short_only_aclus), **_extra_kwargs))
         else:
             print(f'WARNING: short_only_aclus is empty, so not adding kwargs for these.')
 
@@ -517,7 +618,7 @@ class BatchPhoJonathanFiguresHelper:
             included_unit_indicies_pages = [[curr_included_unit_index for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in v] for page_idx, v in enumerate(included_combined_indicies_pages)] # a list of length `num_pages` containing up to 10 items
             paginated_shared_cells_kwarg_list = [dict(included_unit_neuron_IDs=curr_included_unit_indicies,
                 active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{_aclu_indicies_list_str_formatter(curr_included_unit_indicies)}"),
-                fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
+                fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows, **_extra_kwargs) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
             _batch_plot_kwargs_list.extend(paginated_shared_cells_kwarg_list) # add paginated_shared_cells_kwarg_list to the list
         else:
             print(f'WARNING: shared_aclus is empty, so not adding kwargs for these.')

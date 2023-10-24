@@ -13,7 +13,7 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.Uic_AUTOGEN_LocalMenus_AddRenderable import Ui_LocalMenus_AddRenderable
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Replays_2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs # Time Intervals/Epochs
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Replays_2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, SessionEpochs2DRenderTimeEpochs, PBE_2DRenderTimeEpochs, Laps2DRenderTimeEpochs, SpikeBurstIntervals_2DRenderTimeEpochs # Time Intervals/Epochs
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.SpecificTimeCurves import GeneralRenderTimeCurves, PositionRenderTimeCurves, VelocityRenderTimeCurves, ConfigurableRenderTimeCurves, MUA_RenderTimeCurves, RelativeEntropySurpriseRenderTimeCurves ## Time Curves
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand ## MatplotlibSubplots
@@ -78,7 +78,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                                             lambda evt=None: SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
                                             lambda evt=None: Ripples_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.ripple, destination_plot=destination_plot),
                                             lambda evt=None: Replays_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.replay, destination_plot=destination_plot),
-                                            lambda evt=None: print(f'actionAddTimeIntervals_Bursts not yet supported'),
+                                            lambda evt=None: SpikeBurstIntervals_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=curr_active_pipeline, destination_plot=destination_plot, active_config_name=active_config_name),
                                             lambda evt=None: print(f'actionAddTimeIntervals_Custom not yet supported')]
         
         submenu_addTimeIntervals_Connections = []
@@ -89,11 +89,17 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
 
         # Set enabled state
-        widget.ui.actionAddTimeIntervals_PBEs.setEnabled(sess.pbe is not None)
-        widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
-        widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
-        widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
-        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(False) # disable by default
+        # widget.ui.actionAddTimeIntervals_PBEs.setEnabled(sess.pbe is not None)
+        # widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
+        # widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
+        # widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
+
+        
+        widget.ui.actionAddTimeIntervals_Laps.setEnabled(Laps2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.laps))
+        widget.ui.actionAddTimeIntervals_Ripples.setEnabled(Ripples_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.ripple))
+        widget.ui.actionAddTimeIntervals_PBEs.setEnabled(PBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.pbe))
+        widget.ui.actionAddTimeIntervals_Replays.setEnabled(Replays_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.replay))
+        widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, active_config_name=active_config_name)) # disable by default
 
 
         ## Time Curves:

@@ -8,6 +8,7 @@ import pyphoplacecellanalysis.External.pyqtgraph.graphicsItems as graphicsItems
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotItem import PlotItem #, PlotCurveItem
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.ScatterPlotItem import ScatterPlotItem #, PlotCurveItem
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsLayout import GraphicsLayout
+from qtpy import QtGui
 
 # """ 
 
@@ -41,6 +42,12 @@ win.setYRange
 
 
 # """
+
+def inline_mkColor(color, alpha=1.0):
+    """ helps build a new QColor for a pen/brush in an inline (single-line) way. """
+    out_color = pg.mkColor(color)
+    out_color.setAlphaF(alpha)
+    return out_color
 
 
 
@@ -96,8 +103,14 @@ def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_p
 # ==================================================================================================================== #
 # RectangleRenderTupleHelpers                                                                                          #
 # ==================================================================================================================== #
+QColorTuple = namedtuple('QColorTuple', ['hexColor', 'alpha'])
 QPenTuple = namedtuple('QPenTuple', ['color', 'width'])
 QBrushTuple = namedtuple('QBrushTuple', ['color'])
+
+
+QPenFlatTuple = namedtuple('QPenFlatTuple', ['hexColor', 'alpha', 'width'])
+QBrushFlatTuple = namedtuple('QBrushFlatTuple', ['hexColor', 'alpha'])
+
 
 
 @metadata_attributes(short_name=None, tags=['class', 'helper', 'pyqtgraph', 'QPen', 'Qt', 'QBrush', 'Helpful', 'TO_REFACTOR'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 13:45', related_items=[])
@@ -125,22 +138,42 @@ class RectangleRenderTupleHelpers:
 
 
     """
+    @classmethod
+    def QColor_to_simple_columns_dict(cls, value):
+        """Resolves into basic datatypes:
+        color: a HexRgb string (without opacity)
+        alpha: a float value indicating the opacity
+        """
+        return {'hexColor': value.name(QtGui.QColor.HexRgb),'alpha':value.alphaF()}
+    
+    @staticmethod
+    def QColor_to_tuple(value):
+        return QColorTuple(hexColor=value.name(QtGui.QColor.HexRgb), alpha=value.alphaF())
+
+
+    _color_process_fn = lambda a_color: pg.colorStr(a_color) # a_pen.color()
+    # _color_process_fn = lambda a_color: RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_color)
+
+
     @staticmethod
     def QPen_to_dict(a_pen):
-        return {'color': pg.colorStr(a_pen.color()),'width':a_pen.widthF()}
+        return {'color': RectangleRenderTupleHelpers._color_process_fn(a_pen.color()),'width':a_pen.widthF()}
+        # return {**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_pen.color()),'width':a_pen.widthF()}
 
     @staticmethod
     def QBrush_to_dict(a_brush):
-        return {'color': pg.colorStr(a_brush.color())} # ,'gradient':a_brush.gradient()
-
+        return {'color': RectangleRenderTupleHelpers._color_process_fn(a_brush.color())} # ,'gradient':a_brush.gradient()
+        # return {**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_brush.color())} # ,'gradient':a_brush.gradient()
 
     @staticmethod
     def QPen_to_tuple(a_pen):
-        return QPenTuple(color=pg.colorStr(a_pen.color()), width=a_pen.widthF())
+        return QPenTuple(color=RectangleRenderTupleHelpers._color_process_fn(a_pen.color()), width=a_pen.widthF())
+        # return QPenTuple(**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_pen.color()), width=a_pen.widthF())
 
     @staticmethod
     def QBrush_to_tuple(a_brush):
-        return QBrushTuple(color=pg.colorStr(a_brush.color()))
+        return QBrushTuple(color=RectangleRenderTupleHelpers._color_process_fn(a_brush.color()))
+        # return QBrushTuple(**RectangleRenderTupleHelpers.QColor_to_simple_columns_dict(a_brush.color()))
 
     
     @classmethod
@@ -158,8 +191,12 @@ class RectangleRenderTupleHelpers:
         Usage:
             seralized_tuples_data = RectangleRenderTupleHelpers.get_serialized_data(tuples_data)
             tuples_data = RectangleRenderTupleHelpers.get_deserialized_data(seralized_tuples_data)
-        """ 
+        """        
         return [(start_t, series_vertical_offset, duration_t, series_height, pg.mkPen(pen_color_hex), pg.mkBrush(**brush_color_hex)) for (start_t, series_vertical_offset, duration_t, series_height, pen_color_hex, brush_color_hex) in seralized_tuples_data]
+        # return [(start_t, series_vertical_offset, duration_t, series_height, pg.mkPen(inline_mkColor(pen_color_hex)), pg.mkBrush(**brush_color_hex)) for (start_t, series_vertical_offset, duration_t, series_height, pen_color_hex, brush_color_hex) in seralized_tuples_data]
+
+
+
 
     @classmethod
     def copy_data(cls, tuples_data):

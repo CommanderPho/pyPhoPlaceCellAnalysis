@@ -247,20 +247,6 @@ class DecoderResultDisplayingPlot2D(DecoderResultDisplayingBaseClass):
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 
-
-
-# def _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs, neuron_IDs):
-#     """ UNUSED: Reshape to -for-each-epoch instead of -for-each-cell
-#         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import _subfn_reshape_for_each_epoch_to_for_each_cell
-#         flat_all_epochs_cell_data, all_epochs_cell_data = _subfn_reshape_for_each_epoch_to_for_each_cell(data, epoch_IDXs=np.arange(active_filter_epochs.n_epochs), neuron_IDs=original_1D_decoder.neuron_IDs)
-#     """
-#     all_epochs_cell_data = []
-#     for decoded_epoch_idx in epoch_IDXs:
-#         all_epochs_cell_data.append(np.array([data[aclu][decoded_epoch_idx] for aclu in neuron_IDs]))
-#     flat_all_epochs_cell_data = np.hstack(all_epochs_cell_data) # .shape (65, 4584) -- (n_neurons, n_epochs * n_timebins_for_epoch_i), combines across all time_bins within all epochs
-#     return flat_all_epochs_cell_data, all_epochs_cell_data
-
-
 def _convert_dict_to_hdf_attrs_fn(f, key: str, value):
     """ value: dict-like """
     # if isinstance(f, h5py.File):
@@ -280,8 +266,6 @@ def _convert_optional_ndarray_to_hdf_attrs_fn(f, key: str, value):
             f[f'{key}'] = value
         else:
             f[f'{key}'] = np.ndarray([])
-
-
 
 
 @custom_define(slots=False, repr=False)
@@ -313,9 +297,6 @@ class LeaveOneOutDecodingResult(HDFMixin):
     decoded_timebins_p_x_given_n: Dict[int, np.ndarray] = serialized_field(default=Factory(dict), serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v)))
 
     
-    
-
-
 @custom_define(slots=False, repr=False)
 class TimebinnedNeuronActivity(HDFMixin):
     """ 2023-04-18 - keeps track of which neurons are active and inactive in each decoded timebin
@@ -884,7 +865,8 @@ def _analyze_leave_one_out_decoding_results(active_pos_df, active_filter_epochs,
 
 
 
-@function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo'], input_requires=[], output_provides=[], uses=['perform_leave_one_aclu_out_decoding_analysis', '_analyze_leave_one_out_decoding_results', 'LeaveOneOutDecodingAnalysisResult'], creation_date='2023-03-17 00:00')
+@function_attributes(short_name='session_loo_decoding_analysis', tags=['decoding', 'loo', 'surprise'], input_requires=[], output_provides=[],
+                      uses=['perform_leave_one_aclu_out_decoding_analysis', '_analyze_leave_one_out_decoding_results', 'LeaveOneOutDecodingAnalysisResult'], used_by=['_long_short_decoding_analysis_from_decoders'], creation_date='2023-03-17 00:00')
 def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decoder=None, decoding_time_bin_size = 0.02, cache_suffix = '', skip_cache_save:bool = True, perform_cache_load:bool = False) -> LeaveOneOutDecodingAnalysisResult:
     """ 2023-03-17 - Performs a leave one out decoding analysis for a full session
 
@@ -1389,7 +1371,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
     # Get the colormap applied to the decoded posteriors:
     colormap = cm.get_cmap("viridis")  # "nipy_spectral" cm.get_cmap("CMRmap")
     colormap._init()
-    lut = (colormap._lut * 255).view(np.ndarray)  # Convert matplotlib colormap from 0-1 to 0 -255 for Qt
+    lut = (colormap._lut * 255).view(np.ndarray)  # Convert matplotlib colormap from 0-1 to 0-255 for Qt
 
 
     ## 0. Precompute the active neurons in each timebin, and the epoch-timebin-flattened decoded posteriors makes it easier to compute for a given time bin:
@@ -1426,7 +1408,7 @@ def plot_kourosh_activity_style_figure(results_obj: LeaveOneOutDecodingAnalysisR
         print(f'{len(shared_aclus) = }')
 
     ## Create the raster plot:
-    app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list, scatter_app_name=f"Raster Epoch[{epoch_idx}]")
+    app, win, plots, plots_data = plot_raster_plot(_active_epoch_spikes_df, shared_aclus, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list, scatter_app_name=f"kourosh_activity_style_figure - Raster Epoch[{epoch_idx}]")
     
     ## Setup the aclu labels
     # Set the y range and ticks

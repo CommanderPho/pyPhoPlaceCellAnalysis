@@ -17,12 +17,12 @@ from neuropy.core.position import build_position_df_resampled_to_time_windows
 
 # from neuropy.analyses.laps import _build_new_lap_and_intra_lap_intervals # for _perform_time_dependent_pf_sequential_surprise_computation
 
-# For _perform_relative_entropy_analyses
+# For _perform_pf_dt_sequential_surprise
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 
 class TimeDependentPlacefieldSurpriseMode(ExtendedEnum):
-    """for _perform_relative_entropy_analyses """
+    """for _perform_pf_dt_sequential_surprise """
     STATIC_METHOD_ONLY = "static_method_only"
     USING_EXTANT = "using_extant"
     BUILD_NEW = "build_new"
@@ -56,7 +56,8 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
     @function_attributes(short_name='extended_stats', tags=['statistics'], 
         input_requires=["computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
-        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
+        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
     def _perform_extended_statistics_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         
@@ -91,9 +92,14 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         return computation_result
     
 
+
     @function_attributes(short_name='pf_dt_sequential_surprise', tags=['surprise', 'time_dependent_pf'], 
+        uses=['compute_snapshot_relative_entropy_surprise_differences'], used_by=[], related_items=[], conforms_to=[],
         input_requires=["computed_data['firing_rate_trends']", "computed_data['pf1D_dt']", "computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
-        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"])
+        output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['pf_dt_sequential_surprise'], np.sum(curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['pf_dt_sequential_surprise']['flat_relative_entropy_results'], axis=1),  np.sum(curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['pf_dt_sequential_surprise']['flat_jensen_shannon_distance_results'], axis=1)),
+        # validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (np.sum(curr_active_pipeline.global_computation_results.computed_data['pf_dt_sequential_surprise']['flat_relative_entropy_results'], axis=1), np.sum(curr_active_pipeline.global_computation_results.computed_data['pf_dt_sequential_surprise']['flat_jensen_shannon_distance_results'], axis=1)),
+        is_global=False)
     def _perform_time_dependent_pf_sequential_surprise_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes extended statistics regarding firing rates and such from the various dataframes.
         NOTE: 2022-12-14 - previously this version only did laps, but now it does the binned times for the entire epoch from ['firing_rate_trends']
@@ -192,8 +198,8 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         if 'extended_stats' not in computation_result.computed_data:
             computation_result.computed_data['extended_stats'] = DynamicParameters() # new 'extended_stats' dict
  
-
-        computation_result.computed_data['extended_stats']['relative_entropy_analyses'] = DynamicParameters.init_from_dict({
+        # Here is where we use `DynamicParameters`
+        computation_result.computed_data['extended_stats']['pf_dt_sequential_surprise'] = DynamicParameters.init_from_dict({
             'time_bin_size_seconds': time_bin_size_seconds,
             'historical_snapshots': historical_snapshots,
             'post_update_times': post_update_times,
@@ -202,10 +208,10 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
             'flat_relative_entropy_results': flat_relative_entropy_results, 'flat_jensen_shannon_distance_results': flat_jensen_shannon_distance_results
         })
         """ 
-        Access via ['extended_stats']['relative_entropy_analyses']
+        Access via ['extended_stats']['pf_dt_sequential_surprise']
         Example:
             active_extended_stats = curr_active_pipeline.computation_results['maze'].computed_data['extended_stats']
-            active_relative_entropy_results = active_extended_stats['relative_entropy_analyses']
+            active_relative_entropy_results = active_extended_stats['pf_dt_sequential_surprise']
             post_update_times = active_relative_entropy_results['post_update_times']
             snapshot_differences_result_dict = active_relative_entropy_results['snapshot_differences_result_dict']
             time_intervals = active_relative_entropy_results['time_intervals']
@@ -238,29 +244,9 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
 
-def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
-    """ Pre 2023-03-10 Refactoring:
-    Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
-    Returns a dictionary containing the results in both directions
-
-    TODO 2023-03-08 02:41: - [ ] Convert naming convention from long_, short_ to lhs_, rhs_ to be general
-    TODO 2023-03-08 02:47: - [ ] Convert output dict to a dataclass
-
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_surprise_relative_entropy_divergence
-
-    """
-    long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
-    long_short_relative_entropy = sum(long_short_rel_entr_curve) 
-    short_long_rel_entr_curve = rel_entr(short_curve, long_curve)
-    short_long_relative_entropy = sum(short_long_rel_entr_curve)
-    # Jensen-Shannon distance is an average of KL divergence:
-    mixture_distribution = 0.5 * (long_curve + short_curve)
-    jensen_shannon_distance = 0.5 * (sum(rel_entr(mixture_distribution, long_curve)) + sum(rel_entr(mixture_distribution, short_curve)))
-
-    return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy,
-            jensen_shannon_distance=jensen_shannon_distance)
 
 
+@function_attributes(short_name=None, tags=['surprise', 'snapshot', 'pfdt', 'relative_entropy'], input_requires=[], output_provides=[], uses=['compute_surprise_relative_entropy_divergence'], used_by=[], creation_date='2023-09-22 07:18', related_items=[])
 def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_dict):
     """
     Computes the surprise between consecutive pairs of placefield snapshots extracted from a computed `active_pf_1D_dt`
@@ -271,6 +257,32 @@ def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_
 
 
     """
+
+    # Subfunctions _______________________________________________________________________________________________________ #
+    def compute_surprise_relative_entropy_divergence(long_curve, short_curve):
+        """ Pre 2023-03-10 Refactoring:
+        Given two tuning maps, computes the surprise (in terms of the KL-divergence a.k.a. relative entropy) between the two
+        Returns a dictionary containing the results in both directions
+
+        TODO 2023-03-08 02:41: - [ ] Convert naming convention from long_, short_ to lhs_, rhs_ to be general
+        TODO 2023-03-08 02:47: - [ ] Convert output dict to a dataclass
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ExtendedStats import compute_surprise_relative_entropy_divergence
+
+        """
+        long_short_rel_entr_curve = rel_entr(long_curve, short_curve)
+        long_short_relative_entropy = sum(long_short_rel_entr_curve) 
+        short_long_rel_entr_curve = rel_entr(short_curve, long_curve)
+        short_long_relative_entropy = sum(short_long_rel_entr_curve)
+        # Jensen-Shannon distance is an average of KL divergence:
+        mixture_distribution = 0.5 * (long_curve + short_curve)
+        jensen_shannon_distance = 0.5 * (sum(rel_entr(mixture_distribution, long_curve)) + sum(rel_entr(mixture_distribution, short_curve))) # is this right? I'm confused by sum(...)
+
+        return dict(long_short_rel_entr_curve=long_short_rel_entr_curve, long_short_relative_entropy=long_short_relative_entropy, short_long_rel_entr_curve=short_long_rel_entr_curve, short_long_relative_entropy=short_long_relative_entropy,
+                jensen_shannon_distance=jensen_shannon_distance)
+
+
+    # Begin Function Body ________________________________________________________________________________________________ #
     # Lists with one entry per snapshot in historical_snapshots_dict
     pf_overlap_results = []
     flat_relative_entropy_results = []
@@ -289,7 +301,7 @@ def compute_snapshot_relative_entropy_surprise_differences(historical_snapshots_
         earlier_snapshot, later_snapshot = snapshots[earlier_snapshot_idx], snapshots[later_snapshot_idx]
         earlier_snapshot_t, later_snapshot_t = snapshot_times[earlier_snapshot_idx], snapshot_times[later_snapshot_idx]
 
-        ## Proof of concept, comute surprise between the two snapshots:
+        ## Proof of concept, compute surprise between the two snapshots:
         # relative_entropy_overlap_dict, relative_entropy_overlap_scalars_df = compute_relative_entropy_divergence_overlap(earlier_snapshot, later_snapshot, debug_print=False)
         # print(earlier_snapshot['occupancy_weighted_tuning_maps_matrix'].shape) # (108, 63)
         # print(later_snapshot['occupancy_weighted_tuning_maps_matrix'].shape) # (108, 63)

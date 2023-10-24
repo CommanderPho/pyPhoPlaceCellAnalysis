@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from attrs import define, field, Factory
+import shutil # copy_files_in_filelist_to_dest
 from pyphocorehelpers.print_helpers import CapturedException
 import tables as tb
 from tables import (
@@ -31,6 +32,7 @@ from tables import (
 )
 import seaborn as sns
 # from pyphocorehelpers.indexing_helpers import partition, safe_pandas_get_group
+
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
@@ -43,9 +45,13 @@ from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
 from neuropy.core.neuron_identities import NeuronExtendedIdentityTuple, neuronTypesEnum, NeuronIdentityTable
+from neuropy.utils.mixins.HDF5_representable import HDF_Converter
 
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
 # from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+
+from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata, get_file_metadata
+
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
@@ -53,9 +59,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, PaperFigureTwo # for `BatchSessionCompletionHandler`
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation # for `BatchSessionCompletionHandler`, `AcrossSessionsAggregator`
 from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
 
 """
 from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -133,10 +140,10 @@ class InstantaneousFiringRatesDataframeAccessor():
                 session_uid: str = f"|".join([row_data['format_name'], row_data['animal'], row_data['exper_name'], row_data['session_name']])
                 
                 # NeuronIdentityTable
-                row['neuron_identity/global_uid'] = f"{session_uid}|{row_data['aclu']}"
+                row['neuron_identity/neuron_uid'] = f"{session_uid}|{row_data['aclu']}"
                 row['neuron_identity/session_uid'] = session_uid
                 row['neuron_identity/neuron_id'] = row_data['aclu']
-                row['neuron_identity/neuron_type'] = neuronTypesEnum[row_data['cell_type'].hdfcodingClassName]
+                row['neuron_identity/neuron_type'] = neuronTypesEnum[row_data['neuron_type'].hdfcodingClassName]
                 row['neuron_identity/shank_index'] = row_data['shank']
                 row['neuron_identity/cluster_index'] = row_data['cluster']
                 row['neuron_identity/qclu'] = row_data['qclu']
@@ -171,16 +178,16 @@ class InstantaneousFiringRatesDataframeAccessor():
 
             data = []
             for row in table.iterrows():
-                global_uid = row['neuron_identity/global_uid'].decode()
+                neuron_uid = row['neuron_identity/neuron_uid'].decode()
                 session_uid = row['neuron_identity/session_uid'].decode()
                 session_uid_parts = session_uid.split("|")
-                # global_uid_parts = global_uid.split("|")
-                # print(f'global_uid: {global_uid}, global_uid_parts: {global_uid_parts}')
+                # global_uid_parts = neuron_uid.split("|")
+                # print(f'neuron_uid: {neuron_uid}, global_uid_parts: {global_uid_parts}')
             
-                # global_uid, session_uid, neuron_id, neuron_type, shank_index, cluster_index, qclu = neuron_identity
+                # neuron_uid, session_uid, neuron_id, neuron_type, shank_index, cluster_index, qclu = neuron_identity
                 
                 row_data = {
-                    'global_uid': global_uid,
+                    'neuron_uid': neuron_uid,
                     'format_name': session_uid_parts[0],
                     'animal': session_uid_parts[1],
                     'exper_name': session_uid_parts[2],
@@ -189,9 +196,9 @@ class InstantaneousFiringRatesDataframeAccessor():
                     'shank': row['neuron_identity/shank_index'],
                     'cluster': row['neuron_identity/cluster_index'],
                     'qclu': row['neuron_identity/qclu'],
-                    # 'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']).hdfcodingClassName, # Assuming reverse mapping is available
+                    # 'neuron_type': neuronTypesEnum(row['neuron_identity/neuron_type']).hdfcodingClassName, # Assuming reverse mapping is available
                     # 'active_set_membership': trackMembershipTypesEnum(row['active_set_membership']).name, # Assuming reverse mapping is available
-                    'cell_type': neuronTypesEnum(row['neuron_identity/neuron_type']),
+                    'neuron_type': neuronTypesEnum(row['neuron_identity/neuron_type']),
                     'active_set_membership': trackExclusiveToMembershipTypeReverseDict[trackMembershipTypesEnum(row['active_set_membership'])], # Assuming reverse mapping is available
                     'lap_delta_minus': row['lap_firing_rates_delta/delta_minus'],
                     'lap_delta_plus': row['lap_firing_rates_delta/delta_plus'],
@@ -227,8 +234,9 @@ class InstantaneousFiringRatesDataframeAccessor():
             ## Build the Output Dataframe:
             cell_firing_rate_summary_df: pd.DataFrame = _out_inst_fr_comps.get_summary_dataframe() # Returns the dataframe with columns ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
 
-            # Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'cell_type'] columns
-            unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.sess.spikes_df.spikes.extract_unique_neuron_identities()
+            # Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns
+            # unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.sess.spikes_df.spikes.extract_unique_neuron_identities()
+            unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.get_session_unique_aclu_information()
 
             # Horizontally join (merge) the dataframes
             result_df: pd.DataFrame = pd.merge(unique_aclu_information_df, cell_firing_rate_summary_df, left_on='aclu', right_on='aclu', how='inner')
@@ -237,7 +245,7 @@ class InstantaneousFiringRatesDataframeAccessor():
             result_df[curr_session_context._get_session_context_keys()] = curr_session_context.as_tuple()
 
             # Reordering the columns to place the new columns on the left
-            result_df = result_df[['format_name', 'animal', 'exper_name', 'session_name', 'aclu', 'shank', 'cluster', 'qclu', 'cell_type', 'active_set_membership', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']]
+            result_df = result_df[['format_name', 'animal', 'exper_name', 'session_name', 'aclu', 'shank', 'cluster', 'qclu', 'neuron_type', 'active_set_membership', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']]
             
             cls.scatter_plot_results_table_to_hdf(file_path=common_file_path, result_df=result_df, file_mode=file_mode)
 
@@ -309,7 +317,7 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
         # For `loaded_result_df`, to recover the plottable FigureTwo points:
-        table_columns = ['global_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+        table_columns = ['neuron_uid', 'aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
         # 1. Group by 'active_set_membership' (to get LxC and SxC groups which are processed separately)
 
         # loaded_result_df.groupby('active_set_membership')
@@ -324,8 +332,8 @@ class InstantaneousFiringRatesDataframeAccessor():
         #TODO 2023-08-11 02:09: - [ ] These LxC/SxC_aclus need to be globally unique probably.
         # LxC_aclus = LxC_df.aclu.values
         # SxC_aclus = SxC_df.aclu.values
-        LxC_aclus = LxC_df.global_uid.values
-        SxC_aclus = SxC_df.global_uid.values
+        LxC_aclus = LxC_df.neuron_uid.values
+        SxC_aclus = SxC_df.neuron_uid.values
         # The arguments should be determined by the neuron information or the session, etc. Let's color based on session here.
 
         # LxC_scatter_props = [{'edgecolor': a_color, 'marker': a_marker} for a_color, a_marker in zip(LxC_df['color'], LxC_df['marker'])]
@@ -390,7 +398,7 @@ class AcrossSessionsResults:
  
     class ProcessedSessionResultsTable(tb.IsDescription):
         """ represents a single session's processing results in the scope of multiple sessions for use in a PyTables table or HDF5 output file """
-        global_uid = StringCol(68)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
+        neuron_uid = StringCol(68)   # 16-character String, globally unique neuron identifier (across all sessions) composed of a session_uid and the neuron's (session-specific) aclu
         session_uid = StringCol(64)
         neuron_identities = NeuronIdentityTable()
 
@@ -447,7 +455,7 @@ class AcrossSessionsResults:
         shank_array = unique_rows_df['shank'].values
         cluster_array = unique_rows_df['cluster'].values
         qclu_array = unique_rows_df['qclu'].values
-        neuron_type_array = unique_rows_df['cell_type'].values
+        neuron_type_array = unique_rows_df['neuron_type'].values
         neuron_types_enum_array = np.array([neuronTypesEnum[a_type.hdfcodingClassName] for a_type in neuron_type_array]) # convert NeuronTypes to neuronTypesEnum
         n_neurons = len(aclu_array)
         
@@ -465,7 +473,7 @@ class AcrossSessionsResults:
             row = table.row
             for i in np.arange(n_neurons):
                 ## Build the row here from aclu_array, etc
-                row['global_uid'] = f"{session_uid}|{aclu_array[i]}"
+                row['neuron_uid'] = f"{session_uid}|{aclu_array[i]}"
                 row['session_uid'] = session_uid  # Provide an appropriate session identifier here
                 row['neuron_id'] = aclu_array[i]
                 row['neuron_type'] = neuron_types_enum_array[i]
@@ -603,8 +611,13 @@ class AcrossSessionsResults:
         LxC_scatter_props = [_return_scatter_props_fn(k) for k, v in across_sessions_instantaneous_fr_dict.items()]
         SxC_scatter_props = [_return_scatter_props_fn(k) for k, v in across_sessions_instantaneous_fr_dict.items()]
         
-        across_session_inst_fr_computation.LxC_scatter_props = LxC_scatter_props
-        across_session_inst_fr_computation.SxC_scatter_props = SxC_scatter_props
+        # across_session_inst_fr_computation.LxC_scatter_props = LxC_scatter_props
+        # across_session_inst_fr_computation.SxC_scatter_props = SxC_scatter_props
+
+
+        # Broken as of 2023-10-03:
+        across_session_inst_fr_computation.LxC_scatter_props = None
+        across_session_inst_fr_computation.SxC_scatter_props = None
 
         # i = 0
         # across_sessions_instantaneous_frs_list[i].LxC_aclus
@@ -612,159 +625,28 @@ class AcrossSessionsResults:
         # SxC_aclus = across_sessions_instantaneous_frs_list[0].LxC_ThetaDeltaPlus.SxC_aclus
 
         # Note that in general LxC and SxC might have differing numbers of cells.
-        across_session_inst_fr_computation.Fig2_Laps_FR = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
-                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
-                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ThetaDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
-                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ThetaDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]))]
+        across_session_inst_fr_computation.Fig2_Laps_FR = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaMinus is not None]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].LxC_ThetaDeltaPlus is not None]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ThetaDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].SxC_ThetaDeltaMinus is not None]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ThetaDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].SxC_ThetaDeltaPlus is not None]))]
 
 
-        across_session_inst_fr_computation.Fig2_Replay_FR = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ReplayDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
-                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ReplayDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
-                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]),
-                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions)]))]
-
-        
-
+        across_session_inst_fr_computation.Fig2_Replay_FR = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ReplayDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].LxC_ReplayDeltaMinus is not None]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].LxC_ReplayDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].LxC_ReplayDeltaPlus is not None]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaMinus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaMinus is not None]),
+                                                        np.concatenate([across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaPlus.cell_agg_inst_fr_list for i in np.arange(num_sessions) if across_sessions_instantaneous_frs_list[i].SxC_ReplayDeltaPlus is not None]))]
 
         return across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list
 
 
-
-
-
-class AcrossSessionsVisualizations:
-    # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
-
-    @classmethod
-    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, **kwargs):
-        """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
-        Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions."""
-
-        # num_sessions = len(across_sessions_instantaneous_fr_dict)
-        print(f'num_sessions: {num_sessions}')
-
-        global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
-
-        # To correctly aggregate results across sessions, it only makes sense to combine entries at the `.cell_agg_inst_fr_list` variable and lower (as the number of cells can be added across sessions, treated as unique for each session).
-
-        ## Display the aggregate across sessions:
-        _out_aggregate_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # WARNING: we didn't save this info
-        _out_aggregate_fig_2.computation_result = across_session_inst_fr_computation
-        _out_aggregate_fig_2.active_identifying_session_ctx = across_session_inst_fr_computation.active_identifying_session_ctx
-        # Set callback, the only self-specific property
-        # _out_fig_2._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
-
-        registered_output_files = {}
-
-        def output_figure(final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
-            """ outputs the figure using the provided context. """
-            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
-            def register_output_file(output_path, output_metadata=None):
-                """ registers a new output file for the pipeline """
-                print(f'register_output_file(output_path: {output_path}, ...)')
-                registered_output_files[output_path] = output_metadata or {}
-
-            fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
-            active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file)
-            return active_out_figure_paths, final_context
-
-
-        # Set callback, the only self-specific property
-        _out_aggregate_fig_2._pipeline_file_callback_fn = output_figure
-
-        # Showing
-        matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-        # Perform interactive Matplotlib operations with 'Qt5Agg' backend
-        _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, **kwargs)
-        if save_figure:
-            _out_aggregate_fig_2.perform_save()
-
-        return global_multi_session_context, _out_aggregate_fig_2
-
-
-    @classmethod
-    def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results, num_sessions:int, save_figure=True, **kwargs):
-        """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3. """
-        # _out2 = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=defer_render, save_figure=save_figure)
-
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
-
-        # Plot long|short firing rate index:
-        x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
-        x_frs_index = x_frs_index.set_axis(long_short_fr_indicies_analysis_results['neuron_uid']) # use neuron unique ID as index
-        y_frs_index = y_frs_index.set_axis(long_short_fr_indicies_analysis_results['neuron_uid']) # use neuron unique ID as index
-
-        # active_context = long_short_fr_indicies_analysis_results['active_context']
-        global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
-        active_context = global_multi_session_context
-        final_context = active_context.adding_context('display_fn', display_fn_name='display_long_short_laps')
-        fig = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, enable_hover_labels=True, enable_tiny_point_labels=False)
-        
-        active_out_figure_paths = []
-        # if not defer_render:
-        fig.show()
-        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=(fig), axes=tuple(fig.axes), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
-        # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
-        return graphics_output_dict
-    
-
-
-
-
-# AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
-
-
-
-
-
-
-
-
-# @custom_define(slots=False, repr=False)
-# class AcrossSessionsAggregator(AttrsBasedClassHelperMixin):
-#     """ Responsible for aggregating many individual pipeline results into a final AcrossSession one! 
-
-#     """
-#     active_pipelines: Dict
-#     all_results_output_directory: Path
-    
-#     def process_completed_pipeline(self, curr_active_pipeline):
-#         hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('session_results.h5').resolve()
-#         print(f'hdf5_output_path: {hdf5_output_path}')
-#         curr_active_pipeline.to_hdf(file_path=hdf5_output_path, key="/")
-
-    
-#         # long_short_decoding_analyses _______________________________________________________________________________________ #
-#         curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
-#         ## Extract variables from results object:
-#         long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
-
-#         # Get global 'long_short_post_decoding' results: _____________________________________________________________________ #
-#         curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
-#         expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
-#         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
-#         Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins, is_short_track_epoch, is_long_track_epoch, short_short_diff, long_long_diff = expected_v_observed_result.Flat_epoch_time_bins_mean, expected_v_observed_result.Flat_decoder_time_bin_centers, expected_v_observed_result.num_neurons, expected_v_observed_result.num_timebins_in_epoch, expected_v_observed_result.num_total_flat_timebins, expected_v_observed_result.is_short_track_epoch, expected_v_observed_result.is_long_track_epoch, expected_v_observed_result.short_short_diff, expected_v_observed_result.long_long_diff
-#         # jonathan_firing_rate_analysis_result _______________________________________________________________________________ #
-#         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
-#         (epochs_df_L, epochs_df_S), (filter_epoch_spikes_df_L, filter_epoch_spikes_df_S), (good_example_epoch_indicies_L, good_example_epoch_indicies_S), (short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset), new_all_aclus_sort_indicies, assigning_epochs_obj = PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline)
-
-#         # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
-#         _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
-#         _out_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-#         _out_inst_fr_comps.to_hdf('output/automatic_test.h5', '/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
-#         # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
-#         # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
-
-#         # def to_hdf(self, file_path, key: str, **kwargs):
-
-
-# session_name
+# ==================================================================================================================== #
+# HDF5 Across File Aggregations                                                                                        #
+# ==================================================================================================================== #
 
 @define(slots=False)
 class H5FileReference:
     short_name: str
     path: Path
-
 
 
 @define(slots=False)
@@ -773,15 +655,15 @@ class ExternallyReferencedItem:
     local_key: str # the key that will be created in the new reference table
     
 
-
 @define(slots=False)
-class H5ExternalLinkBuilder:
-    """ H5Loader class for loading and consolidating .h5 files
+class H5FileAggregator:
+    """ a class for loading and either building external links to or consolidating multiple .h5 files
+    
     Usage:
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5ExternalLinkBuilder
+        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5FileAggregator
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
-        a_loader = H5ExternalLinkBuilder.init_from_file_lists(file_list=included_h5_paths, table_key_list=neuron_identities_table_keys)
+        a_loader = H5FileAggregator.init_from_file_lists(file_list=included_h5_paths, table_key_list=neuron_identities_table_keys)
         _out_table = a_loader.load_and_consolidate()
         _out_table
 
@@ -801,11 +683,18 @@ class H5ExternalLinkBuilder:
 
 
     @classmethod
-    def init_from_file_lists(cls, file_list, table_key_list, short_name_list=None):
+    def init_from_file_lists(cls, file_list, table_key_list=None, short_name_list=None):
+        """ 
+        
+        
+        table_key_list: only used for external linking mode, which was initially concieved of being a property of the class which was called H5ExternalLinker or something at the time.
+        
+        """
         if short_name_list is None:
             short_name_list = [a_file.filename for a_file in file_list]
         assert len(short_name_list) == len(file_list)
-        assert len(table_key_list) == len(file_list)
+        if table_key_list is not None:
+            assert len(table_key_list) == len(file_list)
         return cls(file_reference_list=[H5FileReference(short_name=a_short_name, path=a_file) for a_short_name, a_file in zip(short_name_list, file_list)], table_key_list=table_key_list)
     
     
@@ -895,3 +784,548 @@ class H5ExternalLinkBuilder:
 
         print(f'added {len(external_file_links)} links to file.')
         return destination_file_path, external_file_links
+
+
+
+
+def check_output_h5_files(included_file_paths, minimum_good_file_size_GB:float=0.01, include_too_small_files:bool=False):
+        """
+        Usage:
+
+        df = check_output_h5_files(included_file_paths=included_h5_paths)
+        df
+        """
+        metadata = []
+
+        for a_file in included_file_paths:
+            # if not a_file.exists():
+            if not isinstance(a_file, Path):
+                a_file = Path(a_file).resolve()
+            fetched_metadata = get_file_metadata(a_file)
+            if fetched_metadata is None:
+                print(f'file {a_file} does not exist. Skipping.')
+            else:
+                if fetched_metadata['file_size'] < minimum_good_file_size_GB:
+                    print(f'WARN: file_size < {minimum_good_file_size_GB} for {a_file}!')
+                    if include_too_small_files:
+                        print(f'\t Continuing hesitantly.')
+                        metadata.append(fetched_metadata)
+                else:
+                    # file size is reasonable:
+                    metadata.append(fetched_metadata)
+                
+
+        # pd.options.display.float_format = '{:.2f}'.format
+        df = pd.DataFrame(metadata)
+        # df.style.format("{:.1f}") # suppresses scientific notation display only for this dataframe. Alternatively: pd.options.display.float_format = '{:.2f}'.format
+        # df['file_size'] = df['file_size'].round(decimals=2)
+
+        # with pd.option_context('display.float_format', lambda x: f'{x:,.3f}'):
+            # print(df)
+        return df
+
+
+def save_filelist_to_text_file(output_paths, filelist_path: Path):
+    _out_string = '\n'.join([str(a_file) for a_file in output_paths])
+    print(f'{_out_string}')
+    print(f'saving out to "{filelist_path}"...')
+    with open(filelist_path, 'w') as f:
+        f.write(_out_string)
+    return _out_string, filelist_path
+
+
+def build_output_filelists(filelist_save_parent_path: Path, included_session_basedirs: List[Path], BATCH_DATE_TO_USE:str, source_computer_name:str='GreatLakes', dest_computer_name:str='LabWorkstation'):
+    """ 
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import build_output_filelists
+        
+        output_filelist_transfer_dict = build_output_filelists(filelist_save_parent_path=global_data_root_parent_path, included_session_basedirs=included_session_basedirs, BATCH_DATE_TO_USE=BATCH_DATE_TO_USE, dest_computer_name='LabWorkstation')
+        
+    """
+    _dest_computers_dict = {'Apogee':Path(r'/~/W/Data/'), 'LabWorkstation':Path(r'/media/MAX/cloud/turbo/Data'), 'GreatLakes':Path(r'/nfs/turbo/umms-kdiba/Data')}
+    # output_filelist_paths = []
+    output_filelist_transfer_dict = {}
+    
+    included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_basedirs]
+    included_pkl_output_paths = [a_dir.joinpath('loadedSessPickle.pkl').resolve() for a_dir in included_session_basedirs]
+    included_global_computation_pkl_paths = [a_dir.joinpath('output','global_computation_results.pkl').resolve() for a_dir in included_session_basedirs]
+    # included_global_computation_h5_paths = [a_dir.joinpath('output','global_computations.h5').resolve() for a_dir in included_session_basedirs] 
+
+    filelist_dict = dict(zip(['pkls', 'global_pkls', 'HDF5'], (included_pkl_output_paths, included_global_computation_pkl_paths, included_h5_paths)))
+
+    # Save output filelist:
+    # h5_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_HDF5_{BATCH_DATE_TO_USE}.txt').resolve()
+    # _out_string, src_filelist_HDF5_savepath = save_filelist_to_text_file(included_h5_paths, h5_filelist_path)
+    # output_filelist_paths.append(src_filelist_HDF5_savepath)
+    
+    # pkls_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_pkls_{BATCH_DATE_TO_USE}.txt').resolve()
+    # _out_string, src_filelist_pkls_savepath = save_filelist_to_text_file(included_pkl_output_paths, pkls_filelist_path)
+    # output_filelist_paths.append(src_filelist_pkls_savepath)
+    
+    # global_pkls_filelist_path = filelist_save_parent_path.joinpath(f'fileList_Greatlakes_global_pkls_{BATCH_DATE_TO_USE}.txt').resolve()
+    # _out_string, src_filelist_global_pkls_savepath = save_filelist_to_text_file(included_global_computation_pkl_paths, global_pkls_filelist_path)
+    # output_filelist_paths.append(src_filelist_global_pkls_savepath)
+    
+    # source_parent_path = Path(r'/media/MAX/cloud/turbo/Data')
+    # source_parent_path = Path(r'/nfs/turbo/umms-kdiba/Data')
+    source_parent_path: Path = _dest_computers_dict[source_computer_name]
+    # dest_parent_path = Path(r'/~/W/Data/')
+    dest_parent_path: Path = _dest_computers_dict[dest_computer_name]
+    # # Build the destination filelist from the source_filelist and the two paths:
+    for a_filelist_name, a_source_filelist in filelist_dict.items():
+        # Non-converted:
+        source_filelist_path = filelist_save_parent_path.joinpath(f'fileList_{source_computer_name}_{a_filelist_name}_{BATCH_DATE_TO_USE}.txt').resolve()
+        _out_string, a_src_filelist_savepath = save_filelist_to_text_file(a_source_filelist, source_filelist_path)
+        # output_filelist_paths.append(a_src_filelist_savepath)
+    
+        ## Converted
+        filelist_dest_paths = convert_filelist_to_new_parent(a_source_filelist, original_parent_path=source_parent_path, dest_parent_path=dest_parent_path)
+        dest_Computer_h5_filelist_path = filelist_save_parent_path.joinpath(f'dest_fileList_{dest_computer_name}_{a_filelist_name}_{BATCH_DATE_TO_USE}.txt').resolve()
+        _out_string, dest_filelist_savepath = save_filelist_to_text_file(filelist_dest_paths, dest_Computer_h5_filelist_path)
+        # output_filelist_paths.append(dest_filelist_savepath)
+        
+        output_filelist_transfer_dict[a_src_filelist_savepath] = dest_filelist_savepath
+    
+    return output_filelist_transfer_dict
+
+
+def copy_files_in_filelist_to_dest(filelist_text_file='fileList_GreatLakes_HDF5_2023-09-29-GL.txt', target_directory='/path/to/target/directory'):
+    """ 
+    from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import copy_files_in_filelist_to_dest
+    
+    copy_files_in_filelist_to_dest(filelist_text_file="/nfs/turbo/umms-kdiba/Data/fileList_GreatLakes_HDF5_2023-09-29-GL.txt", target_directory=Path('output/extracted_hdf5_files/').resolve())
+    
+    
+    """
+    # Read the file paths from the text file
+    with open(filelist_text_file, 'r') as f:
+        file_paths = f.readlines()
+
+    # Remove newline characters from each line
+    file_paths = [x.strip() for x in file_paths]
+
+    # Target directory where files will be copied
+
+    # Copy each file to the target directory
+    for file_path in file_paths:
+        print(f'copying {file_path} to {target_directory}...')
+        shutil.copy(file_path, target_directory)
+    print(f'done.')
+
+
+
+
+class AcrossSessionTables:
+
+    aliases_columns_dict = {'global_uid':'neuron_uid', 'neuron_id':'aclu'}
+
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
+    def build_custom_table(included_session_contexts, included_h5_paths, df_table_keys, drop_columns_list:Optional[List]=None, should_restore_native_column_types:bool=True):
+        """
+        like:
+        
+        df_table_keys: like [f"{session_group_key}/global_computations/jonathan_fr_analysis/neuron_replay_stats_df/table" for session_group_key in session_group_keys]
+        drop_columns_list: list of columns to drop after loading is complete. e.g. ['neuron_IDX', 'has_short_pf', 'has_na', 'has_long_pf', 'index']
+        
+        
+        """
+        session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
+        # session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'  
+        a_loader = H5FileAggregator.init_from_file_lists(file_list=included_h5_paths, short_name_list=session_short_names)
+        _out_table = a_loader.load_and_consolidate(table_key_list=df_table_keys, fail_on_exception=False)
+        if should_restore_native_column_types:
+            _out_table = HDF_Converter.general_post_load_restore_table_as_needed(_out_table)
+        
+        if drop_columns_list is not None:
+            # Drop columns: 'neuron_IDX', 'has_short_pf' and 3 other columns
+            _out_table = _out_table.drop(columns=drop_columns_list)
+            
+        # try to rename the columns if needed
+        _out_table.rename(columns=AcrossSessionTables.aliases_columns_dict, inplace=True)
+        return _out_table
+    
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
+    def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths, **kwargs):
+        """ 
+        Usage:
+            neuron_replay_stats_table = AcrossSessionTables.build_neuron_replay_stats_table(included_session_contexts, included_h5_paths)
+            neuron_replay_stats_table
+        """
+        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        neuron_replay_stats_df_table_keys = [f"{session_group_key}/global_computations/jonathan_fr_analysis/neuron_replay_stats_df/table" for session_group_key in session_group_keys]
+        drop_columns_list = ['neuron_IDX', 'has_short_pf', 'has_na', 'has_long_pf', 'index']
+        return AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_replay_stats_df_table_keys, drop_columns_list=drop_columns_list, **kwargs)
+
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
+    def build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths, **kwargs):
+        """ 
+        One row for each long/short neuron?
+
+        Usage:
+            long_short_fr_indicies_analysis_table = AcrossSessionTables.build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths)
+            long_short_fr_indicies_analysis_table
+
+        """
+        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        long_short_fr_indicies_analysis_table_keys = [f"{session_group_key}/global_computations/long_short_fr_indicies_analysis/table" for session_group_key in session_group_keys]
+        drop_columns_list = None # []
+        long_short_fr_indicies_analysis_table = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=long_short_fr_indicies_analysis_table_keys, drop_columns_list=drop_columns_list, **kwargs)
+        # long_short_fr_indicies_analysis_table = HDF_Converter.general_post_load_restore_table_as_needed(long_short_fr_indicies_analysis_table)
+        return long_short_fr_indicies_analysis_table    
+
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
+    def build_neuron_identities_table(included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
+        """ Extracts the neuron identities table from across the .h5 files.
+        One row for each neuron.
+
+        Usage:
+            neuron_identities_table = AcrossSessionTables.build_neuron_identities_table(included_session_contexts, included_h5_paths)
+            neuron_identities_table
+        """
+        session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
+        neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
+        drop_columns_list = None
+        neuron_identities_table = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_identities_table_keys, drop_columns_list=drop_columns_list, should_restore_native_column_types=should_restore_native_column_types)
+        if should_restore_native_column_types:
+            neuron_identities_table['session_uid'] = neuron_identities_table['session_uid'].astype(object)
+
+        # aliases_columns_dict = {'global_uid':'neuron_uid', 'neuron_id':'aclu'}
+        neuron_identities_table.rename(columns=AcrossSessionTables.aliases_columns_dict, inplace=True)
+        # neuron_identities_table = HDF_Converter.general_post_load_restore_table_as_needed(neuron_identities_table)
+        neuron_identities_table = neuron_identities_table[['neuron_uid', 'session_uid', 'session_datetime', 
+                                    'format_name', 'animal', 'exper_name', 'session_name',
+                                    'aclu', 'neuron_type', 'cluster_index', 'qclu', 'shank_index']]
+        return neuron_identities_table
+
+    @classmethod
+    def write_table_to_files(cls, df, global_data_root_parent_path:Path, output_basename:str='neuron_identities_table', include_csv:bool=False, include_pkl:bool=True):
+        """ 
+        
+        AcrossSessionTables.write_table_to_files(v, global_data_root_parent_path=global_data_root_parent_path, output_basename='a_table')
+        """
+        out_parent_path = global_data_root_parent_path.resolve() # = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
+        out_parent_path.mkdir(parents=True, exist_ok=True)
+        # print(f'global_batch_result_inst_fr_file_path: {out_parent_path}')
+        # print(f'a_name: {a_name}')
+        if not isinstance(output_basename, Path):
+            output_basename = Path(output_basename)
+        if include_csv:
+            csv_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.csv'))
+            print(f'writing {csv_out_path}.')
+            df.to_csv(csv_out_path)
+        if include_pkl:
+            pkl_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.pkl'))
+            print(f'writing {pkl_out_path}.')
+            saveData(pkl_out_path, db=df, safe_save=False)
+
+
+    @classmethod
+    def load_table_from_file(cls, global_data_root_parent_path:Path, output_filename:str='neuron_identities_table', skip_on_error=False) -> pd.DataFrame:
+        """ Reciprocal of  write_table_to_files
+        
+        v = AcrossSessionTables.load_table_from_file(global_data_root_parent_path=global_data_root_parent_path, output_filename='a_table.pkl')
+
+        Usage:
+
+            joined_neruon_fri_df = AcrossSessionTables.load_table_from_file(global_data_root_parent_path=global_data_root_parent_path, output_filename=f'{BATCH_DATE_TO_USE}_{output_file_prefix}_joined_neruon_fri_df')
+            joined_neruon_fri_df
+
+        """
+        out_parent_path = global_data_root_parent_path.resolve() # = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
+        assert out_parent_path.exists(), f"out_parent_path: '{out_parent_path}' must exist to load the tables!"
+        # print(f'a_name: {a_name}')
+        if not isinstance(output_filename, Path):
+            output_filename = Path(output_filename)#.with_suffix(suffix='.pkl')
+        pkl_out_path = out_parent_path.joinpath(output_filename)
+        assert pkl_out_path.exists(), f"pkl_out_path: '{pkl_out_path}' does not exist!"
+        print(f'reading {pkl_out_path}.')
+        v = loadData(pkl_out_path)
+        # try to rename the columns if needed
+        v.rename(columns=cls.aliases_columns_dict, inplace=True)
+        return v
+
+
+        
+
+    @classmethod
+    def build_and_save_all_combined_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
+        """Save converted back to .h5 file, .csv file, and several others
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+
+            AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths)
+            included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
+        
+            
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
+            
+
+        """
+
+        # Get the combined tables: 
+        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=should_restore_native_column_types)
+
+        ## Potentially:
+        # neuron_replay_stats_table = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(neuron_replay_stats_table, active_context=curr_active_pipeline.get_session_context(), aclu_column_name=None)
+
+        # Build the output paths:
+        out_parent_path: Path = override_output_parent_path or Path('output/across_session_results')
+        out_parent_path = out_parent_path.resolve()
+
+        if output_path_suffix is not None:
+            out_parent_path = out_parent_path.joinpath(output_path_suffix).resolve()
+
+        out_parent_path.mkdir(parents=True, exist_ok=True)
+        
+        across_session_outputs = {'neuron_identities_table': neuron_identities_table,
+        'long_short_fr_indicies_analysis_table': long_short_fr_indicies_analysis_table,
+        'neuron_replay_stats_table': neuron_replay_stats_table}
+
+        for table_name, v in across_session_outputs.items():
+            table_name = Path(table_name)
+            a_name = table_name.name
+            print(f'a_name: {a_name}')
+            cls.write_table_to_files(v, global_data_root_parent_path=out_parent_path, output_basename=table_name)
+            # csv_out_path = out_parent_path.joinpath(table_name.with_suffix(suffix='.csv'))
+            # print(f'writing {csv_out_path}.')
+            # v.to_csv(csv_out_path)
+            # pkl_out_path = out_parent_path.joinpath(table_name.with_suffix(suffix='.pkl'))
+            # print(f'writing {pkl_out_path}.')
+            # saveData(pkl_out_path, db=v, safe_save=False)
+            # v.to_hdf(k, key=f'/{a_name}', format='table', data_columns=True)    # TypeError: objects of type ``StringArray`` are not supported in this context, sorry; supported objects are: NumPy array, record or scalar; homogeneous list or tuple, integer, float, complex or bytes
+            
+        return neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table
+    
+
+    @classmethod
+    def load_all_combined_tables(cls, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
+        """Save converted back to .h5 file, .csv file, and several others
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+ 
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(override_output_parent_path=global_data_root_parent_path, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
+            
+
+        """
+        # Build the output paths:
+        out_parent_path: Path = override_output_parent_path or Path('output/across_session_results')
+        out_parent_path = out_parent_path.resolve()
+
+        if output_path_suffix is not None:
+            out_parent_path = out_parent_path.joinpath(output_path_suffix).resolve()
+
+        # out_parent_path.mkdir(parents=True, exist_ok=True)
+        assert out_parent_path.exists(), f"out_parent_path: '{out_parent_path}' must exist to load the tables!"
+        
+        across_session_outputs = {'neuron_identities_table': None,
+        'long_short_fr_indicies_analysis_table': None,
+        'neuron_replay_stats_table': None}
+
+        _loaded_tables = []
+        
+        for k, v in across_session_outputs.items():
+            k = Path(k)
+            a_name = k.name
+            print(f'a_name: {a_name}')
+            # csv_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.csv'))
+            # print(f'loading {csv_out_path}.')
+            # v.to_csv(csv_out_path)
+            pkl_out_path = out_parent_path.joinpath(k.with_suffix(suffix='.pkl'))
+            print(f'loading {pkl_out_path}.')
+            v = loadData(pkl_out_path)
+            # try to rename the columns if needed
+            v.rename(columns=cls.aliases_columns_dict, inplace=True)
+            _loaded_tables.append(v)
+
+
+        return _loaded_tables
+
+
+    
+
+
+    @classmethod
+    def build_all_known_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
+        """ Extracts the neuron identities table from across the .h5 files.
+        One row for each neuron.
+
+        Usage:
+            
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=Falsee)
+            
+        """
+        neuron_identities_table = AcrossSessionTables.build_neuron_identities_table(included_session_contexts, included_h5_paths, should_restore_native_column_types=should_restore_native_column_types)
+        long_short_fr_indicies_analysis_table = AcrossSessionTables.build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths, should_restore_native_column_types=should_restore_native_column_types)
+        neuron_replay_stats_table = AcrossSessionTables.build_neuron_replay_stats_table(included_session_contexts, included_h5_paths, should_restore_native_column_types=should_restore_native_column_types)
+        
+        return neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table
+
+# ==================================================================================================================== #
+# Visualizations                                                                                                       #
+# ==================================================================================================================== #
+
+class AcrossSessionsVisualizations:
+    # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
+
+    # _registered_output_files = {}
+
+    @classmethod
+    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
+        """ outputs the figure using the provided context, replacing the pipeline's curr_active_pipeline.output_figure(...) callback which isn't usually accessible for across session figures. """
+        
+        def register_output_file(output_path, output_metadata=None):
+            """ registers a new output file for the pipeline """
+            print(f'register_output_file(output_path: {output_path}, ...)')
+            # registered_output_files[output_path] = output_metadata or {}
+
+        fig_out_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.HIERARCHY_UNIQUE)
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file)
+        return active_out_figure_paths, final_context
+        
+
+    @classmethod
+    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, **kwargs):
+        """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
+        Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions."""
+
+        # num_sessions = len(across_sessions_instantaneous_fr_dict)
+        print(f'num_sessions: {num_sessions}')
+
+        global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
+
+        # To correctly aggregate results across sessions, it only makes sense to combine entries at the `.cell_agg_inst_fr_list` variable and lower (as the number of cells can be added across sessions, treated as unique for each session).
+
+        ## Display the aggregate across sessions:
+        _out_aggregate_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # WARNING: we didn't save this info
+        _out_aggregate_fig_2.computation_result = across_session_inst_fr_computation
+        _out_aggregate_fig_2.active_identifying_session_ctx = across_session_inst_fr_computation.active_identifying_session_ctx
+        # Set callback, the only self-specific property
+        # _out_fig_2._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
+
+        # registered_output_files = {}
+
+        # Set callback, the only self-specific property
+        _out_aggregate_fig_2._pipeline_file_callback_fn = cls.output_figure
+
+        # Showing
+        matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+        # Perform interactive Matplotlib operations with 'Qt5Agg' backend
+        _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, **kwargs)
+        if save_figure:
+            # _out_aggregate_fig_2.perform_save(_fig_2_theta_out)
+            print(f'save_figure()!')
+
+        return global_multi_session_context, _out_aggregate_fig_2
+
+
+    @classmethod
+    def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results, num_sessions:int, save_figure=True, **kwargs):
+        """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3. 
+
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsVisualizations
+
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=True)
+            matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            graphics_output_dict = AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions)
+
+        
+        """
+        # _out2 = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=defer_render, save_figure=save_figure)
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
+
+        # Plot long|short firing rate index:
+        x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
+        x_frs_index = x_frs_index.set_axis(long_short_fr_indicies_analysis_results['neuron_uid']) # use neuron unique ID as index
+        y_frs_index = y_frs_index.set_axis(long_short_fr_indicies_analysis_results['neuron_uid']) # use neuron unique ID as index
+
+        # active_context = long_short_fr_indicies_analysis_results['active_context']
+        global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
+        active_context = global_multi_session_context
+        final_context = active_context.adding_context('display_fn', display_fn_name='display_long_short_laps')
+        
+
+        scatter_plot_kwargs = dict()
+        if 'has_pf_color' in long_short_fr_indicies_analysis_results:
+            scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['has_pf_color'].to_numpy() #.to_list() # edgecolors=(r, g, b, 1)
+        
+
+        fig = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', **scatter_plot_kwargs) #  markeredgewidth=1.5,
+        
+        def _perform_write_to_file_callback():
+            active_out_figure_path, *args_L = cls.output_figure(final_context, fig)
+            return (active_out_figure_path,)
+
+        if save_figure:
+            active_out_figure_paths = _perform_write_to_file_callback()
+        else:
+            active_out_figure_paths = []
+
+        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=(fig), axes=tuple(fig.axes), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
+        # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
+        return graphics_output_dict
+    
+
+
+
+    @classmethod
+    def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table, num_sessions:int, save_figure=True, **kwargs):
+        """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
+        
+        Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions._plot_session_long_short_track_firing_rate_figures`
+        
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsVisualizations
+            
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=True)
+            matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            graphics_output_dict = AcrossSessionsVisualizations.across_sessions_long_and_short_firing_rate_replays_v_laps_figure(neuron_replay_stats_table=neuron_replay_stats_table, num_sessions=num_sessions)
+
+
+        """
+
+        from neuropy.utils.matplotlib_helpers import fit_both_axes
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_single_track_firing_rate_compare
+
+
+        global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
+        active_context = global_multi_session_context
+        final_context = active_context.adding_context('display_fn', display_fn_name='plot_single_track_firing_rate_compare')
+
+        # (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, defer_render=defer_render)
+
+        ## Long Track Replay|Laps FR Figure
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
+        x_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
+        y_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()}
+        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'))
+
+
+        ## Short Track Replay|Laps FR Figure
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
+        x_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
+        y_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()}
+        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'))
+
+        ## Fit both the axes:
+        fit_both_axes(ax_L, ax_S)
+
+        def _perform_write_to_file_callback():
+            active_out_figure_paths_L, *args_L = cls.output_figure(active_display_context_L, fig_L)
+            active_out_figure_paths_S, *args_S = cls.output_figure(active_display_context_S, fig_S)
+            return (active_out_figure_paths_L + active_out_figure_paths_S)
+
+        if save_figure:
+            active_out_figure_paths = _perform_write_to_file_callback()
+        else:
+            active_out_figure_paths = []
+
+        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_long_and_short_firing_rate_replays_v_laps', figures=(fig_L, fig_S), axes=(ax_L, ax_S), context=(active_display_context_L, active_display_context_S), plot_data={'context': (active_display_context_L, active_display_context_S)}, saved_figures=active_out_figure_paths)
+
+        return graphics_output_dict

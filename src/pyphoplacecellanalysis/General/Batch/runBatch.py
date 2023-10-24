@@ -1,51 +1,44 @@
 import sys
-import os
-import pkg_resources # for Slurm templating
-from jinja2 import Environment, FileSystemLoader # for Slurm templating
 import logging
-import socket # for getting hostname in `build_batch_processing_session_task_identifier`
-from datetime import datetime, timedelta
 import pathlib
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Union, Callable
+from typing import List, Dict, Optional, Union, Callable
 import numpy as np
 import pandas as pd
-from pyphocorehelpers.print_helpers import CapturedException
 import tables as tb
 from copy import deepcopy
 import multiprocessing
 # import concurrent.futures
 # from tqdm import tqdm
 
-from enum import Enum, unique # SessionBatchProgress
+from enum import Enum, unique  # SessionBatchProgress
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
-from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 from pyphocorehelpers.function_helpers import function_attributes
-
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
-from neuropy.core.epoch import Epoch
-from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.result_context import IdentifyingContext
-from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
-from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
+from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
 
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, batch_programmatic_figures, batch_extended_programmatic_figures
+from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field
+from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
+from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
+
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
-from attrs import define, field, Factory
+from attrs import Factory
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import LongShortPipelineTests
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
-from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations  # for `BatchSessionCompletionHandler`
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
 from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations, InstantaneousFiringRatesDataframeAccessor
+from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults
+from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import generate_batch_single_session_scripts
+
+from pyphocorehelpers.Filesystem.path_helpers import discover_data_files, generate_copydict, copy_movedict, copy_file
+
 
 
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
@@ -114,6 +107,111 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
     batch_task_logger.info(f'==========================================================================================\n========== Module Logger INIT "{batch_task_logger.name}" ==============================')
     return batch_task_logger
 
+@unique
+class BackupMethods(Enum):
+    CommonTargetDirectory = "COMMON_TARGET_DIR" # copies all files to the same output folder, meaning they need a prefix or suffix to identify their session added to their name
+    RenameInSourceDirectory = "RENAME_IN_SOURCE_DIR" # copies to the same parent directory as the source file, but the copy has a prefix/suffix appended to the name
+
+
+@custom_define(slots=False)
+class ConcreteSessionFolder:
+    """ a concrete representation of a session on disk """
+    context: IdentifyingContext = serialized_attribute_field()
+    path: Path = serialized_attribute_field()
+    
+    @property 
+    def session_pickle(self) -> Path:
+        return self.path.joinpath('loadedSessPickle.pkl').resolve()
+    
+    @property 
+    def output_folder(self) -> Path:
+        return self.path.joinpath('output').resolve()
+    
+    @property 
+    def pipeline_results_h5(self) -> Path:
+        return self.output_folder.joinpath('pipeline_results.h5').resolve()
+    
+    @property 
+    def global_computation_result_pickle(self) -> Path:
+        return self.output_folder.joinpath('global_computation_results.pkl').resolve()
+
+    @classmethod
+    def backup_output_files(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, skip_non_extant_src_files:bool=True, only_include_file_types=None, debug_print=False):
+        """ builds the copydict and actually performs the copy
+
+        """
+        copy_dict = cls.backup_output_files(good_session_concrete_folders, backup_mode=backup_mode, target_dir=target_dir, rename_backup_suffix=rename_backup_suffix, skip_non_extant_src_files=skip_non_extant_src_files, only_include_file_types=only_include_file_types, debug_print=debug_print)
+        moved_files_dict_files = copy_movedict(copy_dict)
+        return moved_files_dict_files
+
+    @classmethod
+    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, skip_non_extant_src_files:bool=True, only_include_file_types=['local_pkl', 'global_pkl','h5'], debug_print=False):
+        """ backs up the list of backup files to a specified target_dir. 
+        
+        ## Usage 1:
+            target_dir = Path('/home/halechr/cloud/turbo/Pho/Output/across_session_results/2023-10-03').resolve()
+            copy_dict = ConcreteSessionFolder.build_backup_copydict(good_session_concrete_folders, target_dir=target_dir)
+            copy_dict
+
+        ## Usage 2:
+            copy_dict = ConcreteSessionFolder.build_backup_copydict(good_session_concrete_folders, backup_mode=BackupMethods.RenameInSourceDirectory, rename_backup_suffix='2023-10-05')
+            copy_dict
+
+
+        Parameters:
+            target_dir: only used if (backup_mode.name == BackupMethods.CommonTargetDirectory.name)
+            rename_backup_suffix: Optional[str] only used if (backup_mode.name == BackupMethods.RenameInSourceDirectory.name)
+            only_include_file_types: subet of file types to include: ['local_pkl', 'global_pkl','h5']
+
+
+        """        
+        if rename_backup_suffix is not None:
+            assert (backup_mode.name == BackupMethods.RenameInSourceDirectory.name), f"rename_backup_suffix: {rename_backup_suffix} is only used if (backup_mode.name == BackupMethods.RenameInSourceDirectory.name), but backup_mode: {backup_mode} and rename_backup_suffix is not None!"
+        if backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
+            assert rename_backup_suffix is not None, f"rename_backup_suffix is required if backup_mode == BackupMethods.RenameInSourceDirectory"
+
+        if target_dir is not None:
+            assert (backup_mode.name == BackupMethods.CommonTargetDirectory.name)
+        if backup_mode.name == BackupMethods.CommonTargetDirectory.name:
+            assert target_dir is not None
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+        copy_dict = {}
+
+        for a_session_folder in good_session_concrete_folders:
+            session_descr: str = a_session_folder.context.get_description()
+            if debug_print:
+                print(f'a_session_folder: {session_descr}')
+            src_files_dict = {'h5':a_session_folder.pipeline_results_h5, 'local_pkl':a_session_folder.session_pickle, 'global_pkl':a_session_folder.global_computation_result_pickle}
+            for src_file_kind, src_file in src_files_dict.items():
+                if src_file_kind in (only_include_file_types or ['local_pkl', 'global_pkl','h5']):
+                    if debug_print:
+                        print(f'a_session_folder.src_file: {src_file}')
+                    if skip_non_extant_src_files and (not src_file.exists()):
+                        if debug_print:
+                            print(f'src_file: "{src_file}" does not exist and skip_non_extant_src_files==True, so omitting from output copy_dict')
+                    else:
+                        # src_file: Path = a_session_folder.pipeline_results_h5
+                        basename: str = src_file.stem
+                        if backup_mode.name == BackupMethods.CommonTargetDirectory.name:
+                            final_dest_basename:str = '_'.join([session_descr, basename])
+                            final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
+                            if debug_print:
+                                print(f'\tfinal_dest_name: {final_dest_name}')
+                            dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
+                        elif backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
+                            assert rename_backup_suffix is not None
+                            target_dir = src_file.parent
+                            final_dest_basename:str = '_'.join([basename, rename_backup_suffix])
+                            final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
+                            if debug_print:
+                                print(f'\tfinal_dest_name: {final_dest_name}')
+                            dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
+                        else:
+                            raise ValueError
+
+                        copy_dict[src_file] = dest_path
+        return copy_dict
 
 
 @unique
@@ -125,88 +223,8 @@ class SessionBatchProgress(Enum):
     FAILED = "FAILED"
     ABORTED = "ABORTED"
 
-@custom_define(slots=False)
-class BatchComputationProcessOptions(HDF_SerializationMixin):
-    should_load: bool = serialized_attribute_field() # should try to load from existing results from disk at all
-        # never
-        # always (fail if loading unsuccessful)
-        # always (warning but continue if unsuccessful)
-    should_compute: bool = serialized_attribute_field() # should try to run computations (which will just verify that loaded computations are good if that option is true)
-        # never
-        # if needed (required results are missing)
-        # always
-    should_save: bool = serialized_attribute_field() # should consider save at all
-        # never
-        # if changed
-        # always
-
-
-
-@custom_define(slots=False)
-class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
-    """ Class representing the specific results extratracted from the loaded pipeline and returned as return values from the post-execution callback function. """
-    long_epoch_name: str = serialized_attribute_field()
-    long_laps: Epoch = serialized_field()
-    long_replays: Epoch = serialized_field()
-    
-    short_epoch_name: str = serialized_attribute_field()
-    short_laps: Epoch = serialized_field()
-    short_replays: Epoch = serialized_field()
-    
-    delta_since_last_compute: timedelta = non_serialized_field() #serialized_attribute_field(serialization_fn=HDF_Converter._prepare_datetime_timedelta_value_to_for_hdf_fn)
-    outputs_local: Dict[str, Optional[Path]] = non_serialized_field() # serialization_fn=(lambda f, k, v: f[f'{key}/{sub_k}'] = str(sub_v) for sub_k, sub_v in value.items()), is_hdf_handled_custom=True
-    outputs_global: Dict[str, Optional[Path]] = non_serialized_field()
-
-    across_session_results: Dict[str, Optional[object]] = non_serialized_field()
-
-     # HDFMixin Conformances ______________________________________________________________________________________________ #
-    
-    def to_hdf(self, file_path, key: str, **kwargs):
-        """ Saves the object to key in the hdf5 file specified by file_path"""
-        super().to_hdf(file_path, key=key, **kwargs)
-        # Finish for the custom properties
-        
-        #TODO 2023-08-04 12:09: - [ ] Included outputs_local/global
-
-        # with tb.open_file(file_path, mode='a') as f:
-
-        #     outputs_local_key = f"{key}/outputs_local"
-        #     an_outputs_local_group = f.create_group(key, 'outputs_local', title='the sessions output file paths.', createparents=True)
-
-        #     value = self.outputs_local
-        #     for sub_k, sub_v in value.items():
-        #         an_outputs_local_group[f'{outputs_local_key}/{sub_k}'] = str(sub_v) 
-
-        #     an_outputs_global_group = f.create_group(key, 'outputs_global', title='the sessions output file paths.', createparents=True)
-        #     value = self.outputs_global
-        #     outputs_global_key = f"{key}/outputs_global"
-        #     for sub_k, sub_v in value.items():
-        #         an_outputs_global_group[f'{outputs_global_key}/{sub_k}'] = str(sub_v) 
-
-
 
 # PyTables Definitions for Output Tables: ____________________________________________________________________________ #
-class PipelineCompletionResultTable(tb.IsDescription):
-    """ PyTables class representing epoch data built from a dictionary. """
-    long_epoch_name = tb.StringCol(itemsize=100)
-    # long_laps = EpochTable()
-    # long_replays = EpochTable()
-    long_n_laps = tb.UInt16Col()
-    long_n_replays = tb.UInt16Col()
-    short_epoch_name = tb.StringCol(itemsize=100)
-    # short_laps = EpochTable()
-    # short_replays = EpochTable()
-    short_n_laps = tb.UInt16Col()
-    short_n_replays = tb.UInt16Col()
-
-    delta_since_last_compute = tb.Time64Col()  # Use tb.Time64Col for timedelta
-    
-    # outputs_local = OutputFilesTable()  
-    # outputs_global = OutputFilesTable()
-    
-    # across_sessions_batch_results_inst_fr_comps = tb.StringCol(itemsize=100)
-
-
 
 
 @custom_define(slots=False)
@@ -216,7 +234,8 @@ class BatchRun(HDF_SerializationMixin):
     session_batch_status: Dict[IdentifyingContext, SessionBatchProgress] = serialized_field(default=Factory(dict)) 
     session_batch_basedirs: Dict[IdentifyingContext, Path] = serialized_field(default=Factory(dict))
     session_batch_errors: Dict[IdentifyingContext, Optional[str]] = serialized_field(default=Factory(dict))
-    session_batch_outputs: Dict[IdentifyingContext, Optional[PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
+    session_batch_outputs: Dict[IdentifyingContext, Optional[
+        PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
@@ -602,8 +621,8 @@ class BatchRun(HDF_SerializationMixin):
         return session_identifiers, pkl_output_paths, hdf5_output_paths
 
     @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
-    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True):
-        """
+    def generate_batch_slurm_jobs(self, included_session_contexts, output_directory, use_separate_run_directories:bool=True, create_slurm_scripts:bool=True, **script_generation_kwargs):
+        """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
         output_directory
         use_separate_run_directories:bool = True - If True, separate directories are made in `output_directory` containing each script for all sessions.
@@ -611,50 +630,15 @@ class BatchRun(HDF_SerializationMixin):
 
         Usage:
             ## Build Slurm Scripts:
-            global_batch_run.generate_batch_slurm_jobs(included_session_contexts, Path('output/generated_slurm_scripts/').resolve(), use_separate_run_directories=True)
+            output_included_session_contexts, output_python_scripts, output_slurm_scripts = global_batch_run.generate_batch_slurm_jobs(included_session_contexts, Path('output/generated_slurm_scripts/').resolve(), use_separate_run_directories=True)
 
-        """
-        
-        # Set up Jinja2 environment
-        template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
-        env = Environment(loader=FileSystemLoader(template_path))
-        python_template = env.get_template('slurm_python_template.py.j2')
-        slurm_template = env.get_template('slurm_template.sh.j2')
-
-
-        output_python_scripts = []
-        output_slurm_scripts = []
-        # Make sure the output directory exists
-        os.makedirs(output_directory, exist_ok=True)
-        
-        for curr_session_context in included_session_contexts:
-            curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-            if use_separate_run_directories:
-                curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}")
-                os.makedirs(curr_batch_script_rundir, exist_ok=True)
-            else:
-                curr_batch_script_rundir = output_directory
-
-            # Create the Python script
-            python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
-            with open(python_script_path, 'w') as script_file:
-                script_content = python_template.render(global_data_root_parent_path=self.global_data_root_parent_path,
-                                                        curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-                                                        curr_session_basedir=curr_session_basedir)
-                script_file.write(script_content)
+        Uses:
+            self.global_data_root_parent_path
+            self.session_batch_basedirs
             
-
-            # Create the SLURM script
-            slurm_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.sh')
-            with open(slurm_script_path, 'w') as script_file:
-                script_content = slurm_template.render(curr_session_context=f"{curr_session_context}", python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
-                script_file.write(script_content)
-
-            # Add the output files:
-            output_python_scripts.append(python_script_path)
-            output_slurm_scripts.append(slurm_script_path)
+        """
+        return generate_batch_single_session_scripts(self.global_data_root_parent_path, session_batch_basedirs=self.session_batch_basedirs, included_session_contexts=included_session_contexts, output_directory=output_directory, use_separate_run_directories=use_separate_run_directories, create_slurm_scripts=create_slurm_scripts, **script_generation_kwargs)
         
-        return included_session_contexts, output_python_scripts, output_slurm_scripts
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
 
@@ -861,7 +845,7 @@ class BatchResultDataframeAccessor():
 
     @classmethod
     def _validate(cls, obj):
-        """ verify there is a column that identifies the spike's neuron, the type of cell of this neuron ('cell_type'), and the timestamp at which each spike occured ('t'||'t_rel_seconds') """       
+        """ verify there is a column that identifies the spike's neuron, the type of cell of this neuron ('neuron_type'), and the timestamp at which each spike occured ('t'||'t_rel_seconds') """       
         # assert np.all(np.isin(obj.columns, cls._required_column_names))
         # TODO
         return obj # important! Must return the modified obj to be assigned (since its columns were altered by renaming
@@ -1017,318 +1001,7 @@ class BatchResultDataframeAccessor():
         return good_only_batch_progress_df, batch_progress_df
 
 
-
-
-@define(slots=False, repr=False)
-class BatchSessionCompletionHandler:
-    """ handles completion of a single session's batch processing. 
-
-    Allows accumulating results across sessions and runs.
-
-    
-    Usage:
-        from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler
-        
-    """
-
-    # Completion Result object returned from callback ____________________________________________________________________ #
-
-    # General:
-    debug_print: bool = field(default=False)
-    fail_on_exception: bool = field(default=False) # whether to raise exceptions that occur during the callback completion handler or not.
-
-    force_reload_all: bool = field(default=False)
-    saving_mode: PipelineSavingScheme = field(default=PipelineSavingScheme.SKIP_SAVING)
-    
-    # Multiprocessing    
-    use_multiprocessing: bool = field(default=False) 
-    num_processes: Optional[int] = field(default=None)
-
-    # Computations
-    enable_full_pipeline_in_ram: bool = field(default=False)
-    
-    override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
-
-    session_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=True))
-
-    global_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=True))
-    extended_computations_include_includelist: list = field(default=['long_short_fr_indicies_analyses', 'jonathan_firing_rate_analysis', 'long_short_decoding_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups']) # do only specifiedl
-    force_global_recompute: bool = field(default=False)
-    override_global_computation_results_pickle_path: Optional[Path] = field(default=None)
-
-    # Figures:
-    should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
-    should_generate_all_plots: bool = field(default=False) # controls whether all plots are generated (when True) or if only non-Neptune paper figure specific plots are generated. Has no effect if self.should_perform_figure_generation_to_file is False.
-    
-    
-    # Cross-session Results:
-    across_sessions_instantaneous_fr_dict: dict = Factory(dict) # Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation
-
-    @classmethod
-    def post_compute_validate(cls, curr_active_pipeline) -> bool:
-        """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
-        LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate()
-        # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
-        was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
-        print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
-
-        ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-        # assert long_epoch_context.filter_name == long_epoch_name, f"long_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}"
-        if long_epoch_context.filter_name != long_epoch_name:
-            print(f"WARNING: filtered_contexts[long_epoch_name]'s actual context name is incorrect. \n\tlong_epoch_context.filter_name: {long_epoch_context.filter_name} != long_epoch_name: {long_epoch_name}\n\tUpdating it. (THIS IS A HACK)")
-            # fix it if broken
-            long_epoch_context.filter_name = long_epoch_name
-            was_updated = True
-
-        return was_updated
-
-
-    def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
-        try:
-            ## To file only:
-            with matplotlib_file_only():
-                # Perform non-interactive Matplotlib operations with 'AGG' backend
-                # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
-                main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
-                
-            # IF thst's done, clear all the plots:
-            # from matplotlib import pyplot as plt
-            # plt.close('all') # this takes care of the matplotlib-backed figures.
-            curr_active_pipeline.clear_display_outputs()
-            curr_active_pipeline.clear_registered_output_files()
-            return True # completed successfully (without raising an error at least).
-        
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'main_complete_figure_generations failed with exception: {e}')
-            if self.fail_on_exception:
-                raise e.exc
-
-            return False
-
-
-    def try_output_neruon_identity_table_to_File(self, file_path, curr_active_pipeline):
-        try:
-            session_context = curr_active_pipeline.get_session_context() 
-            session_group_key: str = "/" + session_context.get_description(separator="/", include_property_names=False) # 'kdiba/gor01/one/2006-6-08_14-26-15'
-            session_uid: str = session_context.get_description(separator="|", include_property_names=False)
-
-            AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=curr_active_pipeline.sess.spikes_df, session_uid=session_uid)
-            return True # completed successfully
-
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'try_output_neruon_identity_table_to_File failed with exception: {e}')
-            # raise e
-            return False
-
-
-    def try_compute_global_computations_if_needed(self, curr_active_pipeline, curr_session_context):
-        """ tries to load/compute the global computations if needed depending on the self.global_computations_options specifications.
-        
-        Updates the passed `curr_active_pipeline` pipeline object.
-
-        If computations are loaded, they are loaded via `curr_active_pipeline.load_pickled_global_computation_results(...)`
-        If computations are needed, they are performed with the `batch_extended_computations(...)` function.
-
-        
-        """
-        if self.global_computations_options.should_load:
-            if not self.force_global_recompute: # not just force_reload, needs to recompute whenever the computation fails.
-                try:
-                    curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=self.override_global_computation_results_pickle_path)
-                except Exception as e:
-                    exception_info = sys.exc_info()
-                    e = CapturedException(e, exception_info)
-                    print(f'cannot load global results: {e}')
-                    if self.fail_on_exception:
-                        raise e.exc
-
-        if self.global_computations_options.should_compute:
-            try:
-                # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
-                curr_active_pipeline.reload_default_computation_functions()
-                newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=self.extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
-                #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
-
-                if (len(newly_computed_values) > 0):
-                    print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
-                    if (self.saving_mode.value == 'skip_saving'):
-                        print(f'WARNING: supposed to skip_saving because of self.saving_mode: {self.saving_mode} but supposedly has new global results! Figure out if these are actually new.')
-                    if self.global_computations_options.should_save:
-                        try:
-                            # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
-                            # Try to write out the global computation function results:
-                            curr_active_pipeline.save_global_computation_results()
-                        except Exception as e:
-                            print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
-                            print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
-                            if self.fail_on_exception:
-                                raise e.exc
-                    else:
-                        print(f'\n\n!!WARNING!!: self.global_computations_options.should_save == False, so the global results are unsaved!')
-                else:
-                    print(f'no changes in global results.')
-            except Exception as e:
-                ## TODO: catch/log saving error and indicate that it isn't saved.
-                exception_info = sys.exc_info()
-                e = CapturedException(e, exception_info)
-                print(f'ERROR SAVING GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
-                if self.fail_on_exception:
-                    raise e.exc
-
-
-    def try_export_pipeline_hdf5_if_needed(self, curr_active_pipeline, curr_session_context) -> Tuple[Optional[Path], Optional[CapturedException]]:
-        """ Export the pipeline's HDF5 as 'pipeline_results.h5' """
-        hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
-        print(f'pipeline hdf5_output_path: {hdf5_output_path}')
-        e = None
-        try:
-            AcrossSessionsResults.build_session_pipeline_to_hdf(hdf5_output_path, "/", curr_active_pipeline, debug_print=False) # coulduse key of "/{curr_session_context}" with context properly expanded.
-            return (hdf5_output_path, None)
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {e} while trying to build the session HDF output for {curr_session_context}")
-            if self.fail_on_exception:
-                raise e.exc
-            hdf5_output_path = None # set to None because it failed.
-            return (hdf5_output_path, e)
-    
-
-    ## Main function that's called with the complete pipeline:
-    def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
-        """ called when the execute_session completes like:
-            `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
-            
-            Meant to be assigned like:
-            , post_run_callback_fn=_on_complete_success_execution_session
-            
-            Captures nothing.
-            
-            from Spike3D.scripts.run_BatchAnalysis import _on_complete_success_execution_session
-            
-            
-            LOGIC: really we want to recompute global whenever local is recomputed.
-            
-            
-        """
-        print(f'on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-        # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
-        # Get existing laps from session:
-        long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
-        # short_replays.n_epochs: 6, long_replays.n_epochs: 8
-        if self.debug_print:
-            print(f'short_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
-            print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
-
-        # ## Post Compute Validate 2023-05-16:
-        try:
-            was_updated = self.post_compute_validate(curr_active_pipeline)
-        except Exception as e:
-            exception_info = sys.exc_info()
-            an_err = CapturedException(e, exception_info)
-            print(f'self.post_compute_validate(...) failed with exception: {an_err}')
-            raise 
-
-        ## Save the pipeline since that's disabled by default now:
-        try:
-            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.override_session_computation_results_pickle_filename) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
-        except Exception as e:
-            ## TODO: catch/log saving error and indicate that it isn't saved.
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
-            if self.fail_on_exception:
-                raise e.exc
-
-        ## GLOBAL FUNCTION:
-        if self.force_reload_all and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-            
-        if was_updated and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-
-        self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)     
-
-        # ### Programmatic Figure Outputs:
-        if self.should_perform_figure_generation_to_file:
-            self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_neptune_plots=self.should_generate_all_plots)
-        else:
-            print(f'skipping figure generation because should_perform_figure_generation_to_file == False')
-
-
-
-        ### Aggregate Outputs specific computations:
-
-        ## Get some more interesting session properties:
-        
-        
-        delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
-        
-        print(f'\t time since last computation: {delta_since_last_compute}')
-
-        # Export the pipeline's HDF5:
-        hdf5_output_path, hdf5_output_err = self.try_export_pipeline_hdf5_if_needed(curr_active_pipeline=curr_active_pipeline, curr_session_context=curr_session_context)
-        
-
-        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-        ## Specify the output file:
-        common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
-        print(f'common_file_path: {common_file_path}')
-        InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
-
-
-        try:
-            print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-            _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
-            _out_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-            
-            if not self.use_multiprocessing:
-                # Only modify self in non-multiprocessing mode (only shows 1 always).
-                self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
-                print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
-                
-            # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
-            # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
-            print(f'\t\t done (success).') 
-
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-            if self.fail_on_exception:
-                raise e.exc
-            _out_inst_fr_comps = None
-            
-        # On large ram systems, we can return the whole pipeline?
-        
-        if self.enable_full_pipeline_in_ram:
-            across_session_results_extended_dict = {'curr_active_pipeline': curr_active_pipeline}
-        else:
-            across_session_results_extended_dict = {}
-            
-        return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
-                                           short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
-                                           delta_since_last_compute=delta_since_last_compute,
-                                           outputs_local={'pkl': curr_active_pipeline.pickle_path},
-                                            outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path},
-                                            across_session_results={'inst_fr_comps': _out_inst_fr_comps, **across_session_results_extended_dict})
-                                          
-
-        
+from pyphocorehelpers.print_helpers import CapturedException
 
 
 # ==================================================================================================================== #
@@ -1355,58 +1028,34 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
         print(f'resusing extant_batch_run: {extant_batch_run}')
         active_batch_run = extant_batch_run
 
-
     active_data_mode_name = 'kdiba'
 
-    ## Data must be pre-processed using the MATLAB script located here: 
-    #     neuropy/data_session_pre_processing_scripts/KDIBA/IIDataMat_Export_ToPython_2022_08_01.m
-    # From pre-computed .mat files:
+    output_session_basedir_dict = KDibaOldDataSessionFormatRegisteredClass.build_session_basedirs_dict(global_data_root_parent_path)
+    
+    ## Initialize `session_batch_status` with the NOT_STARTED status if it doesn't already have a different status
+    for curr_session_context, curr_session_basedir in output_session_basedir_dict.items():
+        # basedir might be different (e.g. on different platforms), but context should be the same
+        curr_session_status = active_batch_run.session_batch_status.get(curr_session_context, None)
+        if curr_session_status is None:
+            active_batch_run.session_batch_basedirs[curr_session_context] = curr_session_basedir # use the current basedir if we're compute from this machine instead of loading a previous computed session
+            active_batch_run.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
+            active_batch_run.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
+            active_batch_run.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
 
-    local_session_root_parent_context = IdentifyingContext(format_name=active_data_mode_name) # , animal_name='', configuration_name='one', session_name=self.session_name
-    local_session_root_parent_path = global_data_root_parent_path.joinpath('KDIBA')
+            ## TODO: 2023-03-14 - Kick off computation?
+            if execute_all:
+                active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run.global_data_root_parent_path, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
 
-    animal_names = ['gor01', 'vvp01', 'pin01']
-    experiment_names_lists = [['one', 'two'], ['one', 'two'], ['one']] # there is no 'two' for animal 'pin01'
-    exclude_lists = [['PhoHelpers', 'Spike3D-Minimal-Test', 'Unused'], [], [], [], ['redundant','showclus','sleep','tmaze']]
-
-    for animal_name, an_experiment_names_list, exclude_list in zip(animal_names, experiment_names_lists, exclude_lists):
-        for an_experiment_name in an_experiment_names_list:
-            local_session_parent_context = local_session_root_parent_context.adding_context(collision_prefix='animal', animal=animal_name, exper_name=an_experiment_name)
-            local_session_parent_path = local_session_root_parent_path.joinpath(local_session_parent_context.animal, local_session_parent_context.exper_name)
-            local_session_paths_list, local_session_names_list =  find_local_session_paths(local_session_parent_path, exclude_list=exclude_list)
-
-            if debug_print:
-                print(f'local_session_paths_list: {local_session_paths_list}')
-                print(f'local_session_names_list: {local_session_names_list}')
-
-            ## Build session contexts list:
-            local_session_contexts_list = [local_session_parent_context.adding_context(collision_prefix='sess', session_name=a_name) for a_name in local_session_names_list] # [IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>, ..., IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-13_14-42-6')>]
-
-            ## Initialize `session_batch_status` with the NOT_STARTED status if it doesn't already have a different status
-            for curr_session_basedir, curr_session_context in zip(local_session_paths_list, local_session_contexts_list):
-                # basedir might be different (e.g. on different platforms), but context should be the same
-                curr_session_status = active_batch_run.session_batch_status.get(curr_session_context, None)
-                if curr_session_status is None:
-                    active_batch_run.session_batch_basedirs[curr_session_context] = curr_session_basedir # use the current basedir if we're compute from this machine instead of loading a previous computed session
-                    active_batch_run.session_batch_status[curr_session_context] = SessionBatchProgress.NOT_STARTED # set to not started if not present
-                    active_batch_run.session_batch_errors[curr_session_context] = None # indicate that there are no errors to start
-                    active_batch_run.session_batch_outputs[curr_session_context] = None # indicate that there are no outputs to start
-
-                    ## TODO: 2023-03-14 - Kick off computation?
-                    if execute_all:
-                        active_batch_run.session_batch_status[curr_session_context], active_batch_run.session_batch_errors[curr_session_context], active_batch_run.session_batch_outputs[curr_session_context] = run_specific_batch(active_batch_run.global_data_root_parent_path, curr_session_context, curr_session_basedir, post_run_callback_fn=post_run_callback_fn)
-
-                else:
-                    print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
-                    ## TODO 2023-04-19: shouldn't computation happen here too if needed?
-
+        else:
+            print(f'EXTANT SESSION! curr_session_context: {curr_session_context} curr_session_status: {curr_session_status}, curr_session_errors: {active_batch_run.session_batch_errors.get(curr_session_context, None)}')
+            ## TODO 2023-04-19: shouldn't computation happen here too if needed?
 
     ## end for
     return active_batch_run
 
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn:Optional[Callable]=None, **kwargs):
+def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)
             
@@ -1418,9 +1067,9 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     curr_task_logger = build_batch_task_logger(session_context=curr_session_context) # create logger , file_logging_dir=
     _line_sweep = '=========================='
     ## REPLACES THE `print` function within this scope
-    def new_print(*args):
+    def new_print(*args, **kwargs):
         # Call both regular print and logger.info
-        print(*args)
+        print(*args, **kwargs)
         curr_task_logger.info(*args)
 
     # Replace the print function within this scope
@@ -1459,7 +1108,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
                                             '_perform_firing_rate_trends_computation',
                                         ]
     
-    saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
+    # saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
     skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)
@@ -1556,18 +1205,18 @@ def main(active_result_suffix:str='CHANGEME_TEST', included_session_contexts: Op
         # Forced Reloading:
         print(f'forced reloading...')
         result_handler = BatchSessionCompletionHandler(force_reload_all=True,
-                                                        session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=True),
-                                                        global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=True),
-                                                        should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_global_recompute=True,
-                                                        **multiprocessing_kwargs)
+                                                       session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
+                                                       global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
+                                                       should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_global_recompute=True,
+                                                       **multiprocessing_kwargs)
 
     else:
         # No Reloading
         result_handler = BatchSessionCompletionHandler(force_reload_all=False,
-                                                        session_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=False),
-                                                        global_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=False),
-                                                        should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.SKIP_SAVING, force_global_recompute=False,
-                                                        **multiprocessing_kwargs)
+                                                       session_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=False, should_save=SavingOptions.NEVER),
+                                                       global_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED),
+                                                       should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.SKIP_SAVING, force_global_recompute=False,
+                                                       **multiprocessing_kwargs)
 
 
 
@@ -1644,43 +1293,3 @@ if __name__ == "__main__":
 
 
 
-def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debug_print=False):
-    """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
-
-    Usage:
-        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _update_pipeline_missing_preprocessing_parameters
-        was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
-        was_updated
-    """
-    def _subfn_update_session_missing_preprocessing_parameters(sess):
-        """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
-        preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
-        if preprocessing_parameters is None:
-            print(f'No existing preprocessing parameters! Assigning them!')
-            default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
-            default_PBE_estimation_parameters = DynamicContainer(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.300) # NewPaper's Parameters
-            default_replay_estimation_parameters = DynamicContainer(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=None, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=3)
-
-            sess.config.preprocessing_parameters = DynamicContainer(epoch_estimation_parameters=DynamicContainer.init_from_dict({
-                    'laps': default_lap_estimation_parameters,
-                    'PBEs': default_PBE_estimation_parameters,
-                    'replays': default_replay_estimation_parameters
-                }))
-            return True
-        else:
-            if debug_print:
-                print(f'preprocessing parameters exist.')
-            return False
-
-    # BEGIN MAIN FUNCTION BODY
-    was_updated = False
-    was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
-
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
-        was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.filtered_sessions[an_epoch_name])
-
-    if was_updated:
-        print(f'config was updated. Saving pipeline.')
-        curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE)
-    return was_updated

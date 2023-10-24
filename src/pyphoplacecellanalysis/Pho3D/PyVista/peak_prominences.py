@@ -11,7 +11,7 @@ import numpy as np
 import pyvista as pv # for building bounding boxes
 from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_point_labels, _perform_plot_point_labels
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList # used to wrap _render_peak_prominence_2d_results_on_pyvista_plotter's outputs
-
+from pyphocorehelpers.function_helpers import function_attributes
 
 
 def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, promenence_plot_threshold = 1.0, included_level_indicies=[1], debug_print=False):
@@ -253,6 +253,7 @@ out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors
 """
 
 
+@function_attributes(short_name=None, tags=['display', '3D', 'pf', 'peaks', 'promienence', 'ratemap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-18 14:32', related_items=[])
 def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, debug_print=False, **kwargs):
     """
     Computes the appropriate contour/peaks/rectangle/etc components for each neuron_id using the active_peak_prominence_2d_results and uses them to create new:
@@ -268,6 +269,8 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
         
     Usage:
     
+        from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences import render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter
+
         active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
         pActiveTuningCurvesPlotter = None
         display_output = display_output | curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', active_config_name, extant_plotter=display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt', should_nan_non_visited_elements=False, zScalingFactor=2000.0) # Works now!
@@ -276,17 +279,27 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
         pActiveTuningCurvesPlotter = display_output['pActiveTuningCurvesPlotter']
         root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets = display_output['pane'] # for Qt mode
         
-        
+        active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
+        render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results)
         
     """
+    active_peak_prominence_2d_results_aclus = np.array(list(active_peak_prominence_2d_results.results.keys()))
+
     for active_neuron_id in ipcDataExplorer.neuron_ids:
         if debug_print:
             print(f'processing active_neuron_id: {active_neuron_id}...')
-        all_peaks_data, all_peaks_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=active_neuron_id, render=False, debug_print=debug_print, **kwargs)
-        tuning_curve_is_visible = ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].main.GetVisibility() # either 0 or 1 depending on the visibility of this cell
-        all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
-        ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks = all_peaks_actors # sets the .peaks property of the CascadingDynamicPlotsList
-        ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = all_peaks_data
+        # Determine if this aclu is present in the `active_peak_prominence_2d_results`
+        if active_neuron_id in active_peak_prominence_2d_results_aclus:
+            all_peaks_data, all_peaks_actors = _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=active_neuron_id, render=False, debug_print=debug_print, **kwargs)
+            tuning_curve_is_visible = ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].main.GetVisibility() # either 0 or 1 depending on the visibility of this cell
+            all_peaks_actors.SetVisibility(tuning_curve_is_visible) # Change the visibility to match the current tuning_curve_visibility_state
+            ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id].peaks = all_peaks_actors # sets the .peaks property of the CascadingDynamicPlotsList
+            ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id]['peaks'] = all_peaks_data
+        else:
+            # neuron_id is missing from results:
+            print(f'WARN: neuron_id: {active_neuron_id} is present in ipcDataExplorer but missing from `active_peak_prominence_2d_results`!')
+            ipcDataExplorer.plots['tuningCurvePlotActors'][active_neuron_id] = None
+            ipcDataExplorer.plots_data['tuningCurvePlotData'][active_neuron_id] = None
 
 
     # Once done, render

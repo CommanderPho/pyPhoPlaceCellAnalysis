@@ -114,25 +114,41 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
     @staticmethod
     def _display_spike_rasters_window(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Displays a Spike3DRasterWindowWidget with a configurable set of raster widgets and controls in it.
+        
+        Uses:
+            computation_result.sess.spikes_df
+            
+        
         """
-        use_separate_windows = kwargs.get('separate_windows', False)
-        type_of_3d_plotter = kwargs.get('type_of_3d_plotter', 'pyqtgraph')
-        active_plotting_config = active_config.plotting_config
-        active_config_name = kwargs.get('active_config_name', 'Unknown')
-        active_identifying_context = kwargs.get('active_context', None)
+        use_separate_windows = kwargs.pop('separate_windows', False)
+        type_of_3d_plotter = kwargs.pop('type_of_3d_plotter', 'pyqtgraph')
+        # active_plotting_config = active_config.plotting_config # active_config is unused
+        active_config_name = kwargs.pop('active_config_name', 'Unknown')
+        active_identifying_context = kwargs.pop('active_context', None)
         assert active_identifying_context is not None
-        owning_pipeline_reference = kwargs.get('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
+        owning_pipeline_reference = kwargs.pop('owning_pipeline', None) # A reference to the pipeline upon which this display function is being called
+        neuron_colors=kwargs.pop('neuron_colors', None)
+        neuron_sort_order=kwargs.pop('neuron_sort_order', None)
+        
+        included_neuron_ids = kwargs.pop('included_neuron_ids', None)
+        spikes_df = computation_result.sess.spikes_df
+        if included_neuron_ids is None:
+            included_neuron_ids = spikes_df.spikes.neuron_ids
+
+        # TODO: slice neuron_sort_order, neuron_colors as well now
+
+        spikes_df = spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids).copy()
         
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_spike_rasters_window')
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
 
         ## It's passed a specific computation_result which has a .sess attribute that's used to determine which spikes are displayed or not.
-        spike_raster_window = Spike3DRasterWindowWidget(computation_result.sess.spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}')
-        
+        spike_raster_window = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
         # Set Window Title Options:
-        spike_raster_window.setWindowFilePath(str(computation_result.sess.filePrefix.resolve()))
-        spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {str(computation_result.sess.filePrefix.resolve())}')
+        a_file_prefix = str(computation_result.sess.filePrefix.resolve())
+        spike_raster_window.setWindowFilePath(a_file_prefix)
+        spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {a_file_prefix}')
         
         ## Build the additional menus:
         output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
@@ -177,7 +193,7 @@ class RasterPlotParams:
 
         Inputs:
             neuron_colors_list: a list of neuron colors
-                if None provided will call DataSeriesColorHelpers._build_cell_color_map(...) to build them.
+                if None provided will call DataSeriesColorHelpers._build_cell_qcolor_list(...) to build them.
             
             mode:
                 'preserve_fragile_linear_neuron_IDXs': color is assigned based off of fragile_linear_neuron_IDX value, meaning after re-sorting the fragile_linear_neuron_IDXs the colors will appear visually different along y but will correspond to the same units as before the sort.
@@ -207,11 +223,11 @@ class RasterPlotParams:
         n_cells = len(unsorted_fragile_linear_neuron_IDXs)
 
         if neuron_colors_list is None:
-            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=None)
             for a_color in neuron_qcolors_list:
                 a_color.setAlphaF(0.5)
         else:
-            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_color_map(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(unsorted_fragile_linear_neuron_IDXs, mode=coloring_mode, provided_cell_colors=neuron_colors_list.copy()) # builts a list of qcolors
                                 
         neuron_qcolors_map = dict(zip(unsorted_fragile_linear_neuron_IDXs, neuron_qcolors_list))
 
@@ -668,7 +684,7 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, spikes_df: pd.Data
 
 
     
-@function_attributes(short_name=None, tags=['spikes_df', 'raster', 'helper',' filter'], input_requires=[], output_provides=[], uses=[], used_by=['plot_multiple_raster_plot'], creation_date='2023-06-19 15:25', related_items=['plot_multiple_raster_plot'])
+@function_attributes(short_name=None, tags=['spikes_df', 'raster', 'helper',' filter'], input_requires=[], output_provides=[], uses=['add_epochs_id_identity'], used_by=['plot_multiple_raster_plot'], creation_date='2023-06-19 15:25', related_items=['plot_multiple_raster_plot'])
 def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, epoch_id_key_name='temp_epoch_id', no_interval_fill_value=-1, debug_print=False) -> pd.DataFrame:
     """ Prepares the spikes_df to be plotted for a given set of filter_epochs and included_neuron_ids by restricting to these periods/aclus, 
             - rebuilding the fragile_linear_neuron_IDXs by calling `.rebuild_fragile_linear_neuron_IDXs(...)`

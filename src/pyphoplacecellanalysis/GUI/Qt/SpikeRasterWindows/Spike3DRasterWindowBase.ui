@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1663</width>
-    <height>1112</height>
+    <width>1933</width>
+    <height>912</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -25,7 +25,7 @@ background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
 border-color: rgb(0, 0, 0);</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout" rowstretch="1,1,0">
+  <layout class="QGridLayout" name="gridLayout" rowstretch="1,0,0,0">
    <property name="leftMargin">
     <number>0</number>
    </property>
@@ -41,7 +41,7 @@ border-color: rgb(0, 0, 0);</string>
    <property name="verticalSpacing">
     <number>0</number>
    </property>
-   <item row="2" column="0" colspan="3">
+   <item row="3" column="0" colspan="4">
     <widget class="Spike3DRasterBottomPlaybackControlBar" name="bottomPlaybackControlBarWidget" native="true">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -69,29 +69,7 @@ border-color: rgb(0, 0, 0);</string>
      </property>
     </widget>
    </item>
-   <item row="0" column="0" rowspan="2">
-    <widget class="Spike3DRasterLeftSidebarControlBar" name="leftSideToolbarWidget" native="true">
-     <property name="minimumSize">
-      <size>
-       <width>52</width>
-       <height>768</height>
-      </size>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>60</width>
-       <height>16777215</height>
-      </size>
-     </property>
-     <property name="baseSize">
-      <size>
-       <width>52</width>
-       <height>1040</height>
-      </size>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="1" rowspan="2" colspan="2">
+   <item row="0" column="2" rowspan="3">
     <widget class="QFrame" name="mainContentFrame">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -177,6 +155,44 @@ border-color: rgb(0, 0, 0);</string>
      </layout>
     </widget>
    </item>
+   <item row="0" column="0" rowspan="3">
+    <widget class="Spike3DRasterLeftSidebarControlBar" name="leftSideToolbarWidget" native="true">
+     <property name="minimumSize">
+      <size>
+       <width>52</width>
+       <height>768</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>60</width>
+       <height>16777215</height>
+      </size>
+     </property>
+     <property name="baseSize">
+      <size>
+       <width>52</width>
+       <height>1040</height>
+      </size>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="3" rowspan="3">
+    <widget class="Spike3DRasterRightSidebarWidget" name="rightSideContainerWidget" native="true">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>200</width>
+       <height>0</height>
+      </size>
+     </property>
+    </widget>
+   </item>
   </layout>
   <action name="actionConnect">
    <property name="text">
@@ -198,6 +214,12 @@ border-color: rgb(0, 0, 0);</string>
    <class>Spike3DRasterLeftSidebarControlBar</class>
    <extends>QWidget</extends>
    <header location="global">pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>Spike3DRasterRightSidebarWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

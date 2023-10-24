@@ -3,6 +3,7 @@ from enum import Enum
 
 # import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
@@ -199,25 +200,25 @@ class DynamicDockDisplayAreaContentMixin:
     def displayDockArea(self, value):
         self.ui.area = value
     
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def DynamicDockDisplayAreaContentMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         self._dynamic_display_output_dict = OrderedDict() # for DynamicDockDisplayAreaContentMixin
 
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def DynamicDockDisplayAreaContentMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
 
 
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def DynamicDockDisplayAreaContentMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         ## TODO: currently temporary
         self.ui.dock_helper_widgets = [] # required for holding references to dynamically created dock_helper_Widgets.
         
     
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def DynamicDockDisplayAreaContentMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         self.clear_all_display_docks()
@@ -413,7 +414,7 @@ class DynamicDockDisplayAreaContentMixin:
         
         return test_dock_planning_widget, dDisplayItem
         
-    @QtCore.pyqtSlot(object, str)
+    @pyqtExceptionPrintingSlot(object, str)
     def perform_create_new_relative_dock(self, calling_widget, relative_position_string):
         """ NOTE: captures win """
         print(f'perform_create_new_relative_dock(calling_widget: {calling_widget}, relative_position_string: {relative_position_string})') ## Getting called with calling_widget == NONE for some reason.
@@ -430,7 +431,7 @@ class DynamicDockDisplayAreaContentMixin:
         return returned_helper_widget, returned_dock
  
 
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_dock_closed(self, closing_dock_item):
         print(f'on_dock_closed(closing_dock: {closing_dock_item})') ## Getting called with calling_widget == NONE for some reason.
         closing_dock_identifier = closing_dock_item.title()

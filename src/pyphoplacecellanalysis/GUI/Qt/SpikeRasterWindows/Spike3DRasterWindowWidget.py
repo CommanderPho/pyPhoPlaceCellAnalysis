@@ -1,6 +1,10 @@
+from copy import deepcopy
+from typing import Dict
 import numpy as np
 
 from qtpy import QtCore, QtWidgets
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
@@ -18,12 +22,19 @@ from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWi
 
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import SpikeRasterBottomFrameControlsMixin
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget import Spike3DRasterLeftSidebarControlBar, SpikeRasterLeftSidebarControlsMixin
+from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget import Spike3DRasterRightSidebarWidget, SpikeRasterRightSidebarOwningMixin
 
 from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
 
+from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers, UnitColoringMode, ColorData
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
+from pyphoplacecellanalysis.GUI.Qt.NeuronVisualSelectionControls.NeuronVisualSelectionControlsWidget import NeuronVisualSelectionControlsWidget, NeuronWidgetContainer, add_neuron_display_config_widget
+
+
+
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
-class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
+class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRasterRightSidebarOwningMixin, SpikeRasterLeftSidebarControlsMixin, SpikeRasterBottomFrameControlsMixin, SpikesWindowOwningMixin, QtWidgets.QWidget):
     """ A main raster window loaded from a Qt .ui file. 
     
     Manages the main raster views in addition to the shared window-related functions such as menu management, connections, etc.
@@ -223,10 +234,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         self.SpikeRasterBottomFrameControlsMixin_on_init()
         self.SpikeRasterLeftSidebarControlsMixin_on_init()
-        
+        self.SpikeRasterRightSidebarOwningMixin_on_init()
+
         # Helper Mixins: SETUP:
         self.SpikeRasterBottomFrameControlsMixin_on_setup()
         self.SpikeRasterLeftSidebarControlsMixin_on_setup()
+        self.SpikeRasterRightSidebarOwningMixin_on_setup()
         
         self.initUI(curr_spikes_df, core_app_name=application_name, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, type_of_3d_plotter=self.params.type_of_3d_plotter)
         
@@ -291,6 +304,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         ## Connect the UI Controls:
         # Helper Mixins: buildUI:
         self.SpikeRasterLeftSidebarControlsMixin_on_buildUI() # Call this to set the initial values for the UI before signals are connected.
+        self.SpikeRasterRightSidebarOwningMixin_on_buildUI()
+
+
         # self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.SpikeRasterBottomFrameControlsMixin_on_buildUI() # NOTE: do not call for the window as it already has a valid bottom bar widget
         # Connect the signals:
         self.ui.bottom_bar_connections = None 
@@ -298,8 +314,17 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         self.ui.left_side_bar_connections = None
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
+
+        self.ui.right_side_bar_connections = None
+        self.ui.right_side_bar_connections = self.SpikeRasterRightSidebarOwningMixin_connectSignals(self.ui.leftSideToolbarWidget)
+
         
-        
+        ## Setup the right side bar:
+        rightSideContainerWidget = self.ui.rightSideContainerWidget
+        self.ui.rightSideContainerWidget.setVisible(False) # collapses and hides the sidebar
+        # self.ui.rightSideContainerWidget.setVisible(True) # shows the sidebar
+
+
         ## Install the event filter in the 2D View to enable scroll wheel events:
         if self.ui.spike_raster_plt_2d is not None:
             # self.ui.spike_raster_plt_2d.installEventFilter(self) # Kinda works, but doesn't show when scrolling over plots
@@ -450,8 +475,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ##################################
     
 
-    
-    @QtCore.Slot(float)
+    @pyqtExceptionPrintingSlot(float)
     def update_animation(self, next_start_timestamp: float):
         """ Actually updates the animation given the next_start_timestep
             extracted from Spike3DRasterWindowWidget.shift_animation_frame_val(...)
@@ -467,7 +491,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
         
 
-    @QtCore.Slot(int)
+    @pyqtExceptionPrintingSlot(int)
     def shift_animation_frame_val(self, shift_frames: int):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.shift_animation_frame_val(shift_frames: {shift_frames})')
@@ -476,14 +500,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
 
     # Called from SliderRunner's thread when it emits the update_signal:        
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def increase_animation_frame_val(self):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.increase_animation_frame_val()')
         self.shift_animation_frame_val(1)
         
     ## Update Functions:
-    @QtCore.Slot(bool)
+    @pyqtExceptionPrintingSlot(bool)
     def play_pause(self, is_playing):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.play_pause(is_playing: {is_playing})')
@@ -493,14 +517,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.animationThread.terminate()
             
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def on_jump_left(self):
         # Skip back some frames
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_jump_left()')
         self.shift_animation_frame_val(-5)
         
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def on_jump_right(self):
         # Skip forward some frames
         if self.enable_debug_print:
@@ -508,7 +532,30 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.shift_animation_frame_val(5)
         
 
-    @QtCore.Slot(bool)
+    @pyqtExceptionPrintingSlot()
+    def on_jump_window_left(self):
+        """ jumps by the full width of the window, consistent with a PaegUp operation. """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_jump_window_left()')
+        time_window = self.animation_active_time_window # SpikesDataframeWindow
+        window_duration_sec = time_window.window_duration
+        proposed_next_window_start_time = time_window.active_window_start_time - window_duration_sec
+        self.update_animation(proposed_next_window_start_time)
+        
+
+    @pyqtExceptionPrintingSlot()
+    def on_jump_window_right(self):
+        """ jumps by the full width of the window, consistent with a PaegDown operation. """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_jump_window_right()')
+        time_window = self.animation_active_time_window # SpikesDataframeWindow
+        window_duration_sec = time_window.window_duration
+        proposed_next_window_start_time = time_window.active_window_start_time + window_duration_sec
+        self.update_animation(proposed_next_window_start_time)
+        
+
+
+    @pyqtExceptionPrintingSlot(bool)
     def on_reverse_held(self, is_reversed):
         print(f'Spike3DRasterWindowWidget.on_reverse_held(is_reversed: {is_reversed})')
         pass
@@ -516,21 +563,21 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ########################################################
     ## For SpikeRasterLeftSidebarControlsMixin conformance:
     ########################################################
-    @QtCore.Slot(float)
+    @pyqtExceptionPrintingSlot(float)
     def on_animation_timestep_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_animation_timestep_valueChanged(updated_val: {updated_val})')
         old_value = self.animation_time_step
         self.animation_time_step = updated_val
         
-    @QtCore.Slot(float)
+    @pyqtExceptionPrintingSlot(float)
     def on_temporal_zoom_factor_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_temporal_zoom_factor_valueChanged(updated_val: {updated_val})')
         old_value = self.temporal_zoom_factor        
         self.temporal_zoom_factor = updated_val
                 
-    @QtCore.Slot(float)
+    @pyqtExceptionPrintingSlot(float)
     def on_render_window_duration_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_render_window_duration_valueChanged(updated_val: {updated_val})')
@@ -544,7 +591,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ## For SpikeRasterBottomFrameControlsMixin conformance:
     ########################################################
 
-    @QtCore.Slot(str)
+    @pyqtExceptionPrintingSlot(str)
     def perform_jump_next_series_item(self, curr_jump_series_name):
         """ seeks the current active_time_Window to the start of the next epoch event (for the epoch event series specified in the bottom bar) 
 
@@ -569,10 +616,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # jump_change_time = next_target_jump_time - curr_time_window[0]
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
-        self.update_animation(next_start_timestamp=next_target_jump_time)
+        self.update_animation(next_target_jump_time)
 
 
-    @QtCore.Slot(str)
+    @pyqtExceptionPrintingSlot(str)
     def perform_jump_prev_series_item(self, curr_jump_series_name):
         """ seeks the current active_time_Window to the start of the previous epoch event (for the epoch event series specified in the bottom bar) 
 
@@ -592,10 +639,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # jump_change_time = next_target_jump_time - curr_time_window[0]
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
-        self.update_animation(next_start_timestamp=next_target_jump_time)
+        self.update_animation(next_target_jump_time)
 
 
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def perform_jump_specific_timestamp(self, next_start_timestamp: float, window_duration: float=None):
         """ Jumps to a specific time window (needs window size too)
         """
@@ -609,12 +656,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                     print(f'perform_jump_specific_timestamp(): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
                 self.animation_active_time_window.timeWindow.window_duration = window_duration
                 # TODO 2023-03-29 19:18: - [ ] See if anything needs to be updated manually when window duration changes.
-        self.update_animation(next_start_timestamp=next_start_timestamp)
+        self.update_animation(next_start_timestamp)
         
 
 
 
-    @QtCore.Slot(str)
+    @pyqtExceptionPrintingSlot(str)
     def perform_interval_series_remove_item(self, curr_series_name):
         """ Removes the interval series with the name specified by curr_series_name
         """
@@ -623,7 +670,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         assert curr_series_name in interval_datasources, f"curr_series_name: '{curr_series_name}' not in interval_datasources: {interval_datasources}"
         self.spike_raster_plt_2d.remove_rendered_intervals(name=curr_series_name)
 
-    @QtCore.Slot(str)
+    @pyqtExceptionPrintingSlot(str)
     def perform_interval_series_customize_item(self, curr_series_name):
         """ Launches a customization dialog for the interval series with the name specified by curr_series_name
         """
@@ -634,13 +681,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         print(f'perform_series_customize_item(curr_series_name: "{curr_series_name}"): NOT YET IMPLEMENTED')
 
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def perform_interval_series_clear_all(self):
         """ Removes all rendered interval series
         """
         self.spike_raster_plt_2d.clear_all_rendered_intervals()
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def perform_interval_series_request_add(self):
         """ Launches a dialog to add new rendered interval series
         """
@@ -681,7 +728,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ########################################################
     ## For Other conformances:
     ########################################################
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def on_spikes_df_changed(self):
         """ changes:
             self.fragile_linear_neuron_IDXs
@@ -690,7 +737,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_spikes_df_changed()')
         
-    @QtCore.Slot(float, float, float)
+    @pyqtExceptionPrintingSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
         if self.enable_debug_print:
@@ -698,7 +745,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # TODO 2023-03-29 19:03: - [ ] Shouldn't this at least update the plots like on_window_changed does? I know duration changing is more involved than just start_t changing.
 
 
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         if self.enable_debug_print:
@@ -709,13 +756,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
     
-    @QtCore.Slot(float, float, float, object)
+    @pyqtExceptionPrintingSlot(float, float, float, object)
     def on_windowed_data_window_duration_changed(self, start_t, end_t, duration, updated_data_value):
         """ changes self.half_render_window_duration """
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_windowed_data_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration}, updated_data_value: ...)')
 
-    @QtCore.Slot(float, float, object)
+    @pyqtExceptionPrintingSlot(float, float, object)
     def on_windowed_data_window_changed(self, start_t, end_t, updated_data_value):
         # called when the window is updated
         if self.enable_debug_print:
@@ -868,10 +915,187 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'\t wheelEvent(event: {event}')
     
 
+    @classmethod
+    def find_or_create_if_needed(cls, curr_active_pipeline, force_create_new:bool=False, **kwargs):
+        """ Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+        Usage:
+        
+        from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+        spike_raster_window = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline)
+
+        
+        """
+        # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+        from pyphocorehelpers.gui.Qt.TopLevelWindowHelper import TopLevelWindowHelper
+        import pyphoplacecellanalysis.External.pyqtgraph as pg # Used to get the app for TopLevelWindowHelper.top_level_windows
+        ## For searching with `TopLevelWindowHelper.all_widgets(...)`:
+
+        found_spike_raster_windows = TopLevelWindowHelper.all_widgets(pg.mkQApp(), searchType=cls)
+
+        if len(found_spike_raster_windows) < 1:
+            # no existing spike_raster_windows. Make a new one
+            print(f'no existing SpikeRasterWindow. Creating a new one.')
+            # Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
+            active_2d_plot, active_3d_plot, spike_raster_window = curr_active_pipeline.plot._display_spike_rasters_pyqtplot_2D(**kwargs).values()
+        else:
+            print(f'found {len(found_spike_raster_windows)} existing Spike3DRasterWindowWidget windows using TopLevelWindowHelper.all_widgets(...). Will use the most recent.')
+            if force_create_new:
+                print(f'force_create_new=True. Creating a new Spike3DRasterWindowWidget.')
+                # Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
+                active_2d_plot, active_3d_plot, spike_raster_window = curr_active_pipeline.plot._display_spike_rasters_pyqtplot_2D(**kwargs).values()
+            else:
+                # assert len(found_spike_raster_windows) == 1, f"found {len(found_spike_raster_windows)} Spike3DRasterWindowWidget windows using TopLevelWindowHelper.all_widgets(...) but require exactly one."
+                # Get the most recent existing one and reuse that:
+                spike_raster_window = found_spike_raster_windows[0]
+                # Extras:
+                active_2d_plot = spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+                active_3d_plot = spike_raster_window.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+
+        return spike_raster_window
     
     
+
+    # ==================================================================================================================== #
+    # Neuron Visual Configs Widget                                                                                         #
+    # ==================================================================================================================== #
+
+    @property
+    def neuron_visual_config_widget_container(self) -> NeuronWidgetContainer:
+        try:
+            return self.ui.rightSideContainerWidget.ui.neuron_widget_container
+        except (AttributeError, KeyError):
+            print(f'missing self.ui.rightSideContainerWidget.ui.neuron_widget_container. returning None.')
+            return None
+        except Exception:
+            """ unhandled exception """
+            raise
+
+
+    def on_neuron_color_display_config_changed(self, new_config):
+        """ The function called when the neuron color is changed in the widget
+
+        Recieves a SingleNeuronPlottingExtended config
+
+        Usage:
+            for a_widget in pf_widgets:
+                # Connect the signals to the debugging slots:
+                a_widget.spike_config_changed.connect(_on_spike_config_changed)
+                a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+        """
+        print(f'_on_neuron_color_display_config_changed(new_config: {new_config})')
+
+        if isinstance(new_config, SingleNeuronPlottingExtended):
+            # wrap it in a single-element dict before passing:
+            new_config = {int(new_config.name):new_config}
+
+        # extracted_neuron_id_updated_colors_map = {int(a_config.name):a_config.color for a_config in new_config}
+
+        # Update the raster when the configs change:
+        self.update_neurons_color_data(new_config)
+
+
+
+    ### Callbacks for NeuronWidgetContainer and `spike_raster_window`
+    def update_neuron_config_widgets_from_raster(self, *arg, block_signals: bool=True, **kwargs):
+        """ The function called when the neuron color is changed.
+        Implicitly captures spike_raster_window, active_raster_plot, neuron_widget_container
+
+        Recieves a SingleNeuronPlottingExtended config
+
+        Raster -> Configs
+
+        Usage:
+            for a_widget in pf_widgets:
+                # Connect the signals to the debugging slots:
+                a_widget.spike_config_changed.connect(_on_spike_config_changed)
+                a_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+        """
+        print(f'update_neuron_config_widgets_from_raster()')
+        # # Set colors from the raster:
+        # neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_2d_plot.neuron_ids, colormap_name='PAL-relaxed_bright', colormap_source=None)
+
+        ## Get 2D or 3D Raster from spike_raster_window
+        active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+        if active_raster_plot is None:
+            active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+            assert active_raster_plot is not None
+
+
+        ## Get the configs from the `active_raster_plot` widget's colors:
+        neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_raster_plot.neuron_ids, deepcopy(active_raster_plot.params.neuron_qcolors))
+        neuron_widget_container = self.ui.rightSideContainerWidget.ui.neuron_widget_container
+        
+        # TODO apply to neuron_widget_container
+        if block_signals:
+            neuron_widget_container.blockSignals(True) # Block signals so it doesn't recursively update
+        neuron_widget_container.applyUpdatedConfigs(neuron_plotting_configs_dict)
+        if block_signals:
+            neuron_widget_container.blockSignals(False)
+
+
+
+
+    def _perform_build_attached_neuron_visual_configs_widget(self, neuron_plotting_configs_dict: Dict):
+        # Standalone:
+        # neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict)
+        # neuron_widget_container.show()
+
+        assert not hasattr(self.ui.rightSideContainerWidget.ui, 'neuron_widget_container')
+        
+        ## Render in right sidebar:
+        self.ui.rightSideContainerWidget.ui.neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict, parent=self.right_sidebar_contents_container)
+        ## add reference to sidebar.ui.neuron_widget_container
+        self.right_sidebar_contents_container.addWidget(self.ui.rightSideContainerWidget.ui.neuron_widget_container)
+
+        ## Connect	
+        ## TODO: use `self.connection_man`?
+
+        _connections_list = []
+        for curr_widget in self.ui.rightSideContainerWidget.ui.neuron_widget_container.config_widgets:        
+            # Connect the signals to the widgets:
+            # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=neuron_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
+            # # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
+            # curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+            _connections_list.append(curr_widget.sig_neuron_color_changed.connect(self.on_neuron_color_display_config_changed))
+
+        self.ui.rightSideContainerWidget.ui.neuron_widget_container.rebuild_neuron_id_to_widget_map()
+        
+        _connections_list.append(self.ui.rightSideContainerWidget.ui.neuron_widget_container.sigRevert.connect(self.update_neuron_config_widgets_from_raster))
+        
+
+        return self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list
     
+        
+    def build_neuron_visual_configs_widget(self, build_new_neuron_colormap:bool=False):
+        """ addds to the right sidebar and connects controls """
+        ## Get 2D or 3D Raster from spike_raster_window
+        active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+        if active_raster_plot is None:
+            active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+            assert active_raster_plot is not None
+
+
+        ## Backup Existing Colors:
+        # _plot_backup_colors = ColorData.backup_raster_colors(active_raster_plot) # note that they are all 0.0-1.0 format. RGBA
+        # deepcopy(active_raster_plot.params.neuron_qcolors) #, active_raster_plot.params.neuron_qcolors_map
+
+        # Build updated configs from the raster_plot's colors:
+        if build_new_neuron_colormap:
+            # builds a new colormap
+            print(f'building new colormap')
+            neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_raster_plot.neuron_ids, colormap_name='PAL-relaxed_bright', colormap_source=None)
+        else:
+            # Uses the existing neuron colors from self:
+            neuron_plotting_configs_dict: Dict = DataSeriesColorHelpers.build_cell_display_configs(active_raster_plot.neuron_ids, deepcopy(active_raster_plot.params.neuron_qcolors))
+        
+        # neuron_widget_container, _connections_list = add_neuron_display_config_widget(self)
+         
+        self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
+
+        # Display the sidebar:
+        self.set_right_sidebar_visibility(is_visible=True)
     
+
 
 if __name__ == "__main__":
     import sys

@@ -5,6 +5,8 @@ from pyvista.plotting.plotting import Plotter
 from pyvistaqt import BackgroundPlotter
 from pyvistaqt.plotting import MultiPlotter
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import point_location_circle, point_location_trail_circle # Required for InteractivePyvistaPlotter_PointAndPathPlottingMixin
 
@@ -111,6 +113,7 @@ class InteractivePyvistaPlotter_PointAndPathPlottingMixin:
         Updates the existing plot if the same plot_name is reused. """
         ## COMPAT: merge operator '|'requires Python 3.9
         pdata_current_point = pv.PolyData(curr_animal_point) # a mesh
+        
         pc_current_point = pdata_current_point.glyph(scale=False, geom=point_location_circle)
         
         self.plots_data[plot_name] = {'pdata_current_point':pdata_current_point, 'pc_current_point':pc_current_point}
@@ -146,8 +149,49 @@ class InteractivePyvistaPlotter_PointAndPathPlottingMixin:
         return self.plots[plot_name], self.plots_data[plot_name]
             
             
+@metadata_attributes(short_name=None, tags=['pyvista','box','grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-18 14:37', related_items=[])
+class InteractivePyvistaPlotter_BoxPlottingMixin:
+    """ Implementor can render rects and boxes in the plotter
+    
+    Requires (Implementor Must Provide):
+        p
+        plots
+        plots_data
+    
+    Provides:
+        Provided Properties:
+            None
+        Provided Methods:
+            perform_plot_grid_bin_bounds_box(...)
+    
+    """
+    def perform_plot_grid_bin_bounds_box(self, grid_bin_bounds, render=True, **kwargs):
+        """ will render a flat box showing the grid_bin_bounds considered for computations. 
+            TODO: does NOT do this - Updates the existing plot if the same plot_name is reused. 
+
+        perform_plot_grid_bin_bounds_box(grid_bin_bounds=long_pf1D.config.grid_bin_bounds, render=True, **kwargs)
+
+        
+        """
+        plot_name, self.plots[plot_name], grid_bin_bounds_mesh = self.add_grid_bin_bounds_box(self.p, grid_bin_bounds)
+        self.plots_data[plot_name] = {'grid_bin_bounds_mesh':grid_bin_bounds_mesh, 'grid_bin_bounds':grid_bin_bounds}
+        return plot_name, self.plots[plot_name], self.plots_data[plot_name]
 
 
-
+    @classmethod
+    def add_grid_bin_bounds_box(cls, p, grid_bin_bounds, label='grid_bin_bounds'):
+        """ Render the grid_bin_bounds as a flat box under the maze: 
+        Usage:
+             plot_name, grid_bin_bounds_mesh_actor, grid_bin_bounds_mesh = add_grid_bin_bounds_box(pActiveSpikesBehaviorPlotter, long_pf1D.config.grid_bin_bounds)
+            
+        Remove via:
+            pActiveSpikesBehaviorPlotter.remove_actor(grid_bin_bounds_mesh_actor)
+        """
+        plot_name:str = f"{label}_bg"
+        add_mesh_kwargs = dict(show_edges=True, line_width=5, color='#fffb0086', name=plot_name, label=label)  
+        ((xMin, xMax), (yMin, yMax)) = grid_bin_bounds
+        grid_bin_bounds_mesh = pv.Box(bounds=(xMin, xMax, yMin, yMax, -2, -0.1), level=0)
+        grid_bin_bounds_mesh_actor = p.add_mesh(grid_bin_bounds_mesh, **add_mesh_kwargs)
+        return plot_name, grid_bin_bounds_mesh_actor, grid_bin_bounds_mesh
 
 

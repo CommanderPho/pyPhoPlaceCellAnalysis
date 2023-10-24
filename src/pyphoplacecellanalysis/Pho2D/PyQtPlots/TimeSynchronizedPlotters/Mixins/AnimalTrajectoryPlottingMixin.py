@@ -81,25 +81,27 @@ class AnimalTrajectoryPlottingMixin:
         curr_num_points = np.shape(curr_trajectory_rows)[0]
         
         ## Build Current Visual Settings:
+        if curr_num_points > 0:
+            # Fixed size for all points:
+            curr_desired_sizes = np.full((curr_num_points,), 20.0) # build an array of all ones of the same size as the number of points in the current path
+            # Decaying size over time
+            # decay_sizes = (curr_trajectory_rows['t'].to_numpy() - curr_occupancy_plotter.last_t) + curr_occupancy_plotter.params.recent_position_trajectory_max_seconds_ago
+            # curr_desired_sizes = decay_sizes
 
-        # Fixed size for all points:
-        curr_desired_sizes = np.full((curr_num_points,), 20.0) # build an array of all ones of the same size as the number of points in the current path
-        # Decaying size over time
-        # decay_sizes = (curr_trajectory_rows['t'].to_numpy() - curr_occupancy_plotter.last_t) + curr_occupancy_plotter.params.recent_position_trajectory_max_seconds_ago
-        # curr_desired_sizes = decay_sizes
+            # Map onto a range of sizes from 0-20
+            # curr_desired_sizes = np.interp(curr_desired_sizes, [0, curr_occupancy_plotter.params.recent_position_trajectory_max_seconds_ago], [0,20]) # map onto a size range from 0-20
 
-        # Map onto a range of sizes from 0-20
-        # curr_desired_sizes = np.interp(curr_desired_sizes, [0, curr_occupancy_plotter.params.recent_position_trajectory_max_seconds_ago], [0,20]) # map onto a size range from 0-20
+            # Fading Color over time:
+            desired_symbol_brushes = [pg.mkBrush(255, 255, 255, np.interp(i, [0,(curr_num_points-1)], [0,self.params.trajectory_path_marker_max_fill_opacity])) for i in np.arange(curr_num_points-1)] # -1 for the special last symbol
+            # Fixed Color for all but the last point
+            # fading_brush_color = pg.mkBrush(50, 50, 50, 100) # pg.mkBrush(R, G, B, A)
+            # desired_symbol_brushes = [fading_brush_color] * (curr_num_points - 1) # -1 for the special last symbol
 
-        # Fading Color over time:
-        desired_symbol_brushes = [pg.mkBrush(255, 255, 255, np.interp(i, [0,(curr_num_points-1)], [0,self.params.trajectory_path_marker_max_fill_opacity])) for i in np.arange(curr_num_points-1)] # -1 for the special last symbol
-        # Fixed Color for all but the last point
-        # fading_brush_color = pg.mkBrush(50, 50, 50, 100) # pg.mkBrush(R, G, B, A)
-        # desired_symbol_brushes = [fading_brush_color] * (curr_num_points - 1) # -1 for the special last symbol
+            ### Current Symbol:
+            curr_desired_sizes[-1] = self.params.trajectory_path_current_position_marker_size # only current point is big
+            desired_symbol_brushes.append(self.params.trajectory_path_current_position_marker_brush)
 
-        ### Current Symbol:
-        
-        curr_desired_sizes[-1] = self.params.trajectory_path_current_position_marker_size # only current point is big
-        desired_symbol_brushes.append(self.params.trajectory_path_current_position_marker_brush)
-
-        self.ui.trajectory_curve.setData(x=curr_trajectory_rows.x.to_numpy(), y=curr_trajectory_rows.y.to_numpy(), symbolSize=list(curr_desired_sizes), symbolBrush=desired_symbol_brushes) 
+            self.ui.trajectory_curve.setData(x=curr_trajectory_rows.x.to_numpy(), y=curr_trajectory_rows.y.to_numpy(), symbolSize=list(curr_desired_sizes), symbolBrush=desired_symbol_brushes) 
+        else:
+            # curr_num_points == 0, path is empty
+            self.ui.trajectory_curve.setData(x=None, y=None) 

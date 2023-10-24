@@ -42,6 +42,14 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PlacefieldOverlapMetricMode
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _plot_pho_jonathan_batch_plot_single_cell
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+# ==================================================================================================================== #
+# Long/Short Epoch Configs                                                                                             #
+# ==================================================================================================================== #
+
 
 
 @unique
@@ -51,6 +59,56 @@ class PlacefieldOverlapMetricMode(ExtendedEnum):
     CONVOLUTION = "CONVOLUTION"
     PRODUCT = "PRODUCT"
     REL_ENTROPY = "REL_ENTROPY"
+
+
+def build_extra_cell_info_label_string(row) -> str:
+    """ used in `_display_jonathan_interactive_replay_firing_rate_comparison` to format the extra info labels for each aclu like its firing rate indices. """
+    row_dict = dict(row._asdict())
+    has_instantaneous_version = np.all(np.isin(list(row_dict.keys()), ['laps_frs_index', 'laps_inst_frs_index', 'replays_frs_index', 'replays_inst_frs_index', 'non_replays_frs_index', 'non_replays_inst_frs_index']))
+    if has_instantaneous_version:
+        # if have inst
+        # pre-format row output values:
+        row = {k:f"<size:8><weight:bold>{round(v, 2)}</></>" for k,v in row_dict.items()}
+        return '\n'.join([f"<size:9><weight:bold>fri</></> (epochs: bin|inst)", 
+         f"laps: {row['laps_frs_index']}|{row['laps_inst_frs_index']}",
+         f"replays: {row['replays_frs_index']}|{row['replays_inst_frs_index']}",
+         f"non_replays: {row['non_replays_frs_index']}|{row['non_replays_inst_frs_index']}",
+        ])
+        # return '\n'.join([f"<size:12><weight:bold>fri</></> (epochs|bin|inst)", 
+        #  f"fri[laps]: {row['laps_frs_index']}|inst: {row['laps_inst_frs_index']}",
+        #  f"fri[replays]: {row['replays_frs_index']}|inst: {row['replays_inst_frs_index']}",
+        #  f"fri[non_replays]: {row['non_replays_frs_index']}|inst: {row['non_replays_inst_frs_index']}",
+        # ])
+    else:
+        return '\n'.join([f"{k}: {round(v, 3)}" for k,v in row_dict.items()])
+
+
+
+
+@function_attributes(short_name=None, tags=['pyqtgraph', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=['pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.build_pyqtgraph_epoch_indicator_regions'], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 19:04')
+def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch):
+    """Add session indicators to pyqtgraph plot for the long and the short epoch
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions
+
+            long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
+            short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
+            long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
+
+            long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
+            short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items
+    """
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions # Add session indicators to pyqtgraph plot
+
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+    long_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=long_epoch.t_start, t_stop=long_epoch.t_stop, **long_epoch_config)
+    short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
+    return long_epoch_indicator_region_items, short_epoch_indicator_region_items
+
 
 
 class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -92,19 +150,19 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
-            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
-            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
-            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.aclu_to_idx
+            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.rdf
+            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].irdf.irdf
             pos_df = global_computation_results.sess.position.to_dataframe()
 
             ## time_binned_unit_specific_binned_spike_rate mode:
-            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
-            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
+            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_bins']
+            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_binned_unit_specific_binned_spike_rate']
             # ## instantaneous_unit_specific_spike_rate mode:
             # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
             # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
 
-            neuron_replay_stats_df = deepcopy(global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'])
+            neuron_replay_stats_df = deepcopy(global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df)
 
             if 'neuron_type' not in neuron_replay_stats_df.columns:
                 ## Add neuron type to the replay stats dataframe:
@@ -118,11 +176,11 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 neuron_replay_stats_df = neuron_replay_stats_df[np.logical_or(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['has_short_pf'])]
 
             graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True)
-            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']}
+            graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate}
 
             return graphics_output_dict
 
-    @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
+    @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch', 'inefficient', 'slow'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display.
                 Usage:
@@ -163,9 +221,10 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 global_results.sess.spikes_df['is_included_global_pf1D'] = False
                 global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
 
-            cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
+            use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
+            cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions=use_filtered_positions) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
             time_variable_name = global_results.sess.spikes_df.spikes.time_variable_name
-
+            
             # pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
             # pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
             pf1D_all = global_results['computed_data']['pf1D'] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
@@ -175,17 +234,17 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             active_identifying_session_ctx = sess.get_context()
             t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
 
-            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['aclu_to_idx']
-            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['rdf']['rdf']
-            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis']['irdf']['irdf']
+            aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.aclu_to_idx
+            rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.rdf
+            irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].irdf.irdf
             # pos_df = global_computation_results.sess.position.to_dataframe()
             ## time_binned_unit_specific_binned_spike_rate mode:
-            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_bins']
-            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate']['time_binned_unit_specific_binned_spike_rate']
+            time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_bins']
+            time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate['time_binned_unit_specific_binned_spike_rate']
             # ## instantaneous_unit_specific_spike_rate mode:
             # time_bins = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['time_bins']
             # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
-            neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df']
+            neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df
             # compare_firing_rates(rdf, irdf)
 
             n_max_plot_rows = kwargs.pop('n_max_plot_rows', 6)
@@ -194,7 +253,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             
             # Get the provided context or use the session context:
             active_context = kwargs.get('active_context', active_identifying_session_ctx)
-
+            kwargs['active_context'] = active_context
 
             active_context = active_context.adding_context_if_missing(display_fn_name='batch_pho_jonathan_replay_firing_rate_comparison')
             curr_fig_num = kwargs.pop('fignum', None)
@@ -203,12 +262,30 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 curr_fig_num = f'long|short fr indicies_{active_context.get_description(separator="/")}'
             kwargs['fignum'] = curr_fig_num
 
+            ## Have to pull out the rate-remapping stats for each neuron_id
+            try:
+                curr_long_short_fr_indicies_analysis = global_computation_results.computed_data['long_short_fr_indicies_analysis']
+
+                # extract one set of keys for the aclus
+                
+                long_short_fr_indicies_df = curr_long_short_fr_indicies_analysis.long_short_fr_indicies_df # already has `long_short_fr_indicies_df` property now
+                _curr_aclus = list(long_short_fr_indicies_df['aclu'].to_numpy())
+                # build the labels for each cell using `build_extra_cell_info_label_string(...)`:
+                optional_cell_info_labels = {aclu:build_extra_cell_info_label_string(row) for aclu, row in zip(_curr_aclus, long_short_fr_indicies_df.itertuples(name='ExtraCellInfoLabels', index=False))}
+
+            except BaseException:
+                # set optional cell info labels to None
+                print(f'WARNING: could not get optional cell info labels from long_short_fr_indicies_df. Skipping.')
+                optional_cell_info_labels = {}
+
+
             graphics_output_dict: MatplotlibRenderPlots = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
-                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, **kwargs)
+                show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, optional_cell_info_labels=optional_cell_info_labels,
+                use_filtered_positions=use_filtered_positions, **kwargs)
 
             final_context = active_context
             graphics_output_dict['context'] = final_context
-            graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_unit_specific_spike_rate'],
+            graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate,
                 'time_variable_name':time_variable_name, 'fignum':curr_fig_num}
 
             def _perform_write_to_file_callback():
@@ -225,7 +302,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return graphics_output_dict
 
     @function_attributes(short_name='short_long_pf1D_comparison', tags=['long_short','1D','placefield'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_short_v_long_pf1D_comparison', 'determine_long_short_pf1D_indicies_sort_by_peak'], used_by=[], creation_date='2023-04-26 06:12', is_global=True)
-    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
+    def _display_short_long_pf1D_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
             """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
                 Usage:
 
@@ -244,13 +321,33 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             single_figure = kwargs.pop('single_figure', True)
             debug_print = kwargs.pop('debug_print', False)
 
-
+            active_config_name = kwargs.pop('active_config_name', None)
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+            
+
+            defer_render = kwargs.pop('defer_render', False) 
+
 
             # Plot 1D Keywoard args:
             shared_kwargs = kwargs.pop('shared_kwargs', {})
             long_kwargs = kwargs.pop('long_kwargs', {})
             short_kwargs = kwargs.pop('short_kwargs', {})
+
+            shared_kwargs['active_context'] = active_context
+
+            # Allow overriding the sortby for both long and short if a top-level sortby kwarg is passed:
+            override_sortby = kwargs.pop('sortby', None)
+            if (override_sortby is not None and isinstance(override_sortby, str)):
+                print(f'override_sortby: {override_sortby} is being used.')
+                # long_sortby = long_kwargs.get('sortby', None)
+                # short_sortby = short_kwargs.get('sortby', None)
+                # assert (not (long_sortby is not None and isinstance(long_sortby, str)) and (short_sortby is not None and isinstance(short_sortby, str))) # assert no valid sortby values are set for the individual kwargs
+                long_kwargs['sortby'] = override_sortby
+                short_kwargs['sortby'] = override_sortby
 
             if include_includelist is None:
                 include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
@@ -264,8 +361,15 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     
             long_results = computation_results[long_epoch_name]['computed_data']
             short_results = computation_results[short_epoch_name]['computed_data']
+
             # curr_any_context_neurons = _find_any_context_neurons(*[owning_pipeline_reference.computation_results[k].computed_data.pf1D.ratemap.neuron_ids for k in [long_epoch_name, short_epoch_name]])
             curr_any_context_neurons = _find_any_context_neurons(*[a_result.pf1D.ratemap.neuron_ids for a_result in [long_results, short_results]])
+
+            if included_any_context_neuron_ids is None:
+                included_any_context_neuron_ids = curr_any_context_neurons
+            else:
+                # include only the specified neuron_ids:
+                included_any_context_neuron_ids = curr_any_context_neurons[np.isin(curr_any_context_neurons, included_any_context_neuron_ids)]
 
             # SORT BY LONG PEAK LOCATION: Determine the sort indicies to align the placefields by the position on the long:
             ### to use this mode, you must pass the string 'peak_long' for both long_kwargs['sortby'] and short_kwargs['sortby']
@@ -274,14 +378,14 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             if (long_sortby is not None and isinstance(long_sortby, str)) and (short_sortby is not None and isinstance(short_sortby, str)):
                 assert long_sortby == 'peak_long'
                 assert short_sortby == 'peak_long'
-                new_all_aclus_sort_indicies = determine_long_short_pf1D_indicies_sort_by_peak(owning_pipeline_reference, curr_any_context_neurons, debug_print=False)
+                new_all_aclus_sort_indicies = determine_long_short_pf1D_indicies_sort_by_peak(owning_pipeline_reference, included_any_context_neuron_ids, debug_print=False)
                 # shared_kwargs['sortby'] = (shared_kwargs.get('sortby', None) or new_all_aclus_sort_indicies)
                 long_kwargs['sortby'] = new_all_aclus_sort_indicies # (long_kwargs.get('sortby', None) or 
                 short_kwargs['sortby'] = new_all_aclus_sort_indicies # (short_kwargs.get('sortby', None) or 
                 print(f'DEBUG: new_all_aclus_sort_indicies: {new_all_aclus_sort_indicies}')
             
-            (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure,
-                shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print)
+            (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, included_any_context_neuron_ids, reuse_axs_tuple=reuse_axs_tuple, single_figure=single_figure,
+                shared_kwargs=shared_kwargs, long_kwargs=long_kwargs, short_kwargs=short_kwargs, debug_print=debug_print, **kwargs)
 
             if single_figure:
                 final_context = active_context.adding_context('display_fn', display_fn_name='display_short_long_pf1D_comparison')
@@ -303,21 +407,21 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 active_out_figure_paths = []
 
             graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
-            graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
+            graphics_output_dict['plot_data'] = {'included_any_context_neuron_ids': included_any_context_neuron_ids, 'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
 
             return graphics_output_dict
 
     @function_attributes(short_name='short_long_pf1D_scalar_overlap_comparison', tags=['display','long_short'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 12:44', is_global=True)
     def _display_short_long_pf1D_scalar_overlap_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, **kwargs):
             """ Displays a figure for comparing the scalar comparison quantities computed for 1D placefields across-epochs (between the short and long tracks)
-                This currently renders as a bar-graph
+                This currently renders as a colorful bar-graph with one bar for each aclu
 
                 Usage:
 
                     %matplotlib qt
                     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
 
-                    graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
+                    graphics_output_dict = curr_active_pipeline.display('_display_short_long_pf1D_scalar_overlap_comparison', active_identifying_session_ctx)
                     fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
                     neuron_df, rdf, aclu_to_idx, irdf = plot_data['df'], plot_data['rdf'], plot_data['aclu_to_idx'], plot_data['irdf']
                     # Grab the output axes:
@@ -425,7 +529,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
             return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
+    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior', 'needs_footer', '1D'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
     def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
                 Usage:
@@ -442,7 +546,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
             from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import plot_laps_2d
-            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False)
+            fig, out_axes_list = plot_laps_2d(global_session, legacy_plotting_mode=False, **kwargs)
             out_axes_list[0].set_title('Estimated Laps')
             fig.canvas.manager.set_window_title('Estimated Laps')
 
@@ -589,11 +693,11 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         return graphics_output_dict
     
     @function_attributes(short_name='long_short_expected_v_observed_firing_rate', tags=['display','long_short','firing_rate', 'expected','observed'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-08 10:48', is_global=True)
-    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
+    def _display_long_short_expected_v_observed_firing_rate(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_neuron_IDs=None, defer_render=False, save_figure=True, **kwargs):
         """ Displays expected v observed firing rate for each cell independently
 
         """
-        def _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline, defer_render:bool):
+        def _subfn_prepare_plot_expected_vs_observed(curr_active_pipeline, included_neuron_IDs, defer_render:bool):
             """ 2023-06-01 - Sets up the `plot_expected_vs_observed` plot and exports it. 
             Captures: 'save_figure'
             
@@ -614,6 +718,15 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             neuron_IDs = decoder_1D_LONG.neuron_IDs.copy()
             assert (decoder_1D_LONG.neuron_IDXs == decoder_1D_SHORT.neuron_IDXs).all()
             neuron_IDXs = decoder_1D_LONG.neuron_IDXs.copy()
+            
+            if included_neuron_IDs is None:
+                included_neuron_IDs = neuron_IDs
+            else:
+                assert len(included_neuron_IDs) > 0, f"{included_neuron_IDs} should not be empty."
+                is_included_neuronID = np.isin(neuron_IDs, included_neuron_IDs)
+                neuron_IDs = neuron_IDs[is_included_neuronID]
+                neuron_IDXs = neuron_IDXs[is_included_neuronID]
+                
 
             ## Get global 'long_short_post_decoding' results:
             curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
@@ -678,7 +791,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # # figsize=(32,16)
             # figsize=(4, 13) #(24, 8)
             
-            fig, axes = plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs=neuron_IDXs, neuron_IDs=neuron_IDs, track_epochs=track_epochs, sharey=True, figsize=(4, 13), max_num_rows=150, y_scale="linear")
+            fig, axes = plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs=neuron_IDXs, neuron_IDs=neuron_IDs, track_epochs=track_epochs, sharey=True, figsize=(4, 13), max_num_rows=10, y_scale="linear")
             if not defer_render:
                 plt.show()
 
@@ -690,17 +803,17 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return fig, axes, final_context, active_out_figure_paths
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(owning_pipeline_reference, defer_render=defer_render)
+        fig, axes, final_context, active_out_figure_paths = _subfn_prepare_plot_expected_vs_observed(owning_pipeline_reference, included_neuron_IDs=included_neuron_IDs, defer_render=defer_render)
 
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), context=final_context, plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices', 'epoch'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
+    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices', 'epoch', 'needs_improvement', 'inefficient'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
     def _display_long_and_short_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_epoch_indicies=None, defer_render=False, save_figure=True, **kwargs):
         """ Plots two figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
         """
-        def _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, included_epoch_indicies=None, defer_render=True, save_figure=True):
+        def _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, included_epoch_indicies=None, defer_render=True, save_figure=True, **kwargs):
             """ 2023-06-01 - 
             
             ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
@@ -716,7 +829,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
             long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-            pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure)
+            pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
             fig_L = pagination_controller_L.plots.fig
             ax_L = fig_L.get_axes()
             if defer_render:
@@ -725,7 +838,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 pagination_controller_L = None
 
             
-            pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='short_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure)
+            pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='short_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
             fig_S = pagination_controller_S.plots.fig
             ax_S = fig_S.get_axes()
             if defer_render:
@@ -736,7 +849,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             return (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S)
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        pagination_controllers, figs, axs, ctxts, out_figure_paths = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(owning_pipeline_reference, included_epoch_indicies=included_epoch_indicies, defer_render=defer_render, save_figure=save_figure)
+        pagination_controllers, figs, axs, ctxts, out_figure_paths = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(owning_pipeline_reference, included_epoch_indicies=included_epoch_indicies, defer_render=defer_render, save_figure=save_figure, **kwargs)
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_stacked_epoch_slices', figures=figs, axes=axs, context=ctxts, plot_data={'context': ctxts, 'path': out_figure_paths})
         if not defer_render:
             graphics_output_dict.plot_data['controllers'] = pagination_controllers
@@ -753,6 +866,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
 
 # ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['make_fr', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
 def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
     """ Draws the time binned firing rates and the replay firing rates for a single cell
 
@@ -920,10 +1034,15 @@ def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_
         pass
 
 
+    ## Get the track configs for the colors:
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+    
     # Highlight the two epochs with their characteristic colors ['r','b'] - ideally this would be at the very back
     x_start, x_stop = ax.get_xlim()
-    ax.axvspan(x_start, t_split, color='red', alpha=0.2, zorder=0)
-    ax.axvspan(t_split, x_stop, color='blue', alpha=0.2, zorder=0)
+    ax.axvspan(x_start, t_split, color=long_epoch_config['facecolor'], alpha=0.2, zorder=0)
+    ax.axvspan(t_split, x_stop, color=short_epoch_config['facecolor'], alpha=0.2, zorder=0)
 
     # Draw the vertical epoch splitter line:
     required_epoch_bar_height = ax.get_ylim()[-1]
@@ -1052,14 +1171,26 @@ def _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, uni
     return graphics_output_dict, neuron_replay_stats_df
 # ==================================================================================================================== #
 
-def _build_spikes_df_interpolated_props(global_results):
+def _build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions:bool=False):
+    """ Interpolates the spikes_df's spike positions and other properties from the measured positions, etc. 
+
+    IMPORTANT: the position to be used for interpolation for each spike depends on whether we're only using the filtered positions or not.
+        2023-09-22 - as of now, deciding to NOT use filtered positions so the spike dots will render appropriately for the endcaps.
+
+    """
     # Group by the aclu (cluster indicator) column
     cell_grouped_spikes_df = global_results.sess.spikes_df.groupby(['aclu'])
     cell_spikes_dfs = [cell_grouped_spikes_df.get_group(a_neuron_id) for a_neuron_id in global_results.sess.spikes_df.spikes.neuron_ids] # a list of dataframes for each neuron_id
     aclu_to_fragile_linear_idx_map = {a_neuron_id:i for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}
     # get position variables usually used within pfND.setup(...) - self.t, self.x, self.y:
     ndim = global_results.computed_data.pf1D.ndim
-    pos_df = global_results.computed_data.pf1D.filtered_pos_df
+    if should_interpolate_to_filtered_positions:
+        # restrict to only the filtered positions. I think this is usually NOT what we want.
+        pos_df = global_results.computed_data.pf1D.filtered_pos_df
+    else:
+        # pos_df = global_results.computed_data.pf1D.pos_df
+        pos_df = global_results.computed_data.pf1D.position.to_dataframe()
+
     t = pos_df.t.to_numpy()
     x = pos_df.x.to_numpy()
     if (ndim > 1):
@@ -1090,13 +1221,15 @@ def _build_spikes_df_interpolated_props(global_results):
     # return cell_spikes_dfs_list, aclu_to_fragile_linear_idx_map #, (spk_t, spk_pos)
     return {a_neuron_id:cell_spikes_dfs[i] for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}, aclu_to_fragile_linear_idx_map # return a dict instead
 
-
+@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_general_all_spikes'], creation_date='2023-10-03 19:42', related_items=[])
 def _simple_plot_spikes(ax, a_spk_t, a_spk_pos, spikes_color_RGB=(1, 0, 0), spikes_alpha=0.2, **kwargs):
     spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
     spike_plot_kwargs = ({'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGBA, 'markeredgecolor':spikes_color_RGBA, 'zorder':10} | kwargs)
     ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
     return ax
 
+
+@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_simple_plot_spikes'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
 def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable_name='t', spikes_alpha=0.9, defer_render=True):
     """ Plots all spikes for a given cell from that cell's complete `active_spikes_df`
     There are three different classes of spikes: all (black), long (red), short (blue)
@@ -1133,10 +1266,13 @@ def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable
     return ax_activity_v_time
 
 
-@function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
-def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, **kwargs):
+@function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
+def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
     """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `plot_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
+
+    # Arguments:
+        disable_top_row: bool - default False, if True, disables the entire top row (which usually shows the firing rates during replays, the avg binned fr, etc).
 
     Used by:
         `_make_pho_jonathan_batch_plots`
@@ -1150,6 +1286,11 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
 
     formatted_cell_label_string = (f"<size:22><weight:bold>{aclu:02d}</></>")
     
+    ## Optional additional information about the cell to be rendered next to its aclu, like it's firing rate indicies, etc:
+    optional_cell_info_labels_dict = kwargs.get('optional_cell_info_labels', {})
+    optional_cell_info_labels = optional_cell_info_labels_dict.get(aclu, None) # get the single set of optional labels for this aclu
+
+
     # the index passed into `plot_1D_placecell_validation(...)` must be in terms of the `pf1D_all` ratemap that's provided. the `rdf_aclu_to_idx` does NOT work and will result in indexing errors
     # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
 
@@ -1161,10 +1302,25 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
         cell_neuron_extended_ids = pf1D_all.ratemap.neuron_extended_ids[cell_linear_fragile_IDX]
         # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
         # subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
-        subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>\ntype <size:10><weight:bold>{cell_neuron_extended_ids.cell_type}</></>'
+        try:
+            subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>\ntype <size:10><weight:bold>{cell_neuron_extended_ids.neuron_type}</></>'
+        except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'quality'
+            # Older definition that is missing the quality and neuron type:
+            subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>'
+            
+
         # print(f'\tsubtitle_string: {subtitle_string}')
         formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
     
+    if optional_cell_info_labels is not None:
+        if debug_print:
+            print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
+        optional_cell_info_labels_string: str = optional_cell_info_labels # already should be a string
+        # formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{optional_cell_info_labels_string}</>' # single label mode
+        optional_formatted_cell_label_string = f'<size:9>{optional_cell_info_labels_string}</>' # separate single mode
+    else:
+        optional_formatted_cell_label_string = ''
+
     # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
     # title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
     # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
@@ -1173,40 +1329,116 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation
     
     # gridspec mode:
-    curr_fig.set_facecolor('0.75')
+    curr_fig.set_facecolor('0.65') # light grey
 
-    num_gridspec_columns = 8 # hardcoded
-    gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
-    gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # num_gridspec_columns = 8 # hardcoded
+    # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+    # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
 
-    gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-    curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
-    curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
-    curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
-    curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+    # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+    # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
+    # curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
+    # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
+    # curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
 
+
+    # # New Gridspec - Both left and right columns:
+    # num_gridspec_columns = 10 # hardcoded
+    # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+    # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][-2] = 0.2 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+    # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+    # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-2]) # the whole top row except the last element (to match the firing rates below)
+    # curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0]) # the last element of the first row contains the labels that identify the cell
+    # curr_ax_extra_information_labels = curr_fig.add_subplot(gs[0, -2:]) # the last two element of the first row contains the labels that identify the cell
+    # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-2]) # all up to excluding the last element of the row
+    # curr_ax_placefield = curr_fig.add_subplot(gs[1, -2], sharey=curr_ax_lap_spikes) # only the last element of the row
+    
+    if disable_top_row:
+        # num_gridspec_rows = 1
+        # height_ratios=[1]
+        num_gridspec_rows = 2
+        height_ratios=[1,1]
+    else:
+        num_gridspec_rows = 2
+        height_ratios=[1,1]
+
+    # New Gridspec - Both left and right columns:
+    num_gridspec_columns = 9 # hardcoded
+    gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=height_ratios, wspace=0.0, hspace=0.0)
+    # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][1] = 0.0 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+    # gs_kw['width_ratios'][-1] = 0.1 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+    gs = curr_fig.add_gridspec(num_gridspec_rows, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+
+    if disable_top_row:
+        ## Currently make the lap spikes row two rows high so I can keep the separate cell_label and extra_information_labels rows
+        curr_ax_firing_rate = None
+        curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
+        curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
+        curr_ax_lap_spikes = curr_fig.add_subplot(gs[:, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
+        # curr_ax_left_placefield = curr_fig.add_subplot(gs[:, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
+        curr_ax_placefield = curr_fig.add_subplot(gs[:, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+
+    else:
+        curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-1], label=f'ax_firing_rate[{aclu:02d}]') # the whole top row except the last element (to match the firing rates below)
+        curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
+        curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
+        curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
+        # curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
+        curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+
+    
+    
+
+    text_formatter = FormattedFigureText()
+    text_formatter.left_margin = 0.5
+    text_formatter.top_margin = 0.5
+    # text_formatter.left_margin = 0.025
+    # text_formatter.top_margin = 0.00
+    
+    title_axes_kwargs = dict(ha="center", va="center", xycoords='axes fraction') # , ma="left"
+    # title_axes_kwargs = dict(ha="left", va="bottom", ma="left", xycoords='axes fraction')
     # Setup the aclu number ("title axis"):
     # title_axes_kwargs = dict(ha="center", va="center", fontsize=22, color="black")
     # curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
     # flexitext version:
-    title_text_obj = flexitext(0.5, 0.5, formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_cell_label, ha="center", va="center")
+    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, formatted_cell_label_string, ax=curr_ax_cell_label, **title_axes_kwargs)
+    # curr_ax_cell_label.set_facecolor('0.95')
+    extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center")
+
+    # # # `flexitext` version:
+    
+    # plt.title('')
+    # plt.suptitle('')
+    # fig = plt.gcf() # get figure to setup the margins on.
+    # text_formatter.setup_margins(curr_fig)
+    # # flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:crimson, weight:bold>long ($L$)</>|<color:royalblue, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
+    # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+
     curr_ax_cell_label.axis('off')
+    curr_ax_extra_information_labels.axis('off')
 
     custom_replay_scatter_markers_plot_kwargs_list = kwargs.pop('custom_replay_scatter_markers_plot_kwargs_list', None)
     # Whether to plot the orange horizontal indicator lines that show where spikes occur. Slows down plots a lot.
     should_plot_spike_indicator_points_on_placefield = kwargs.pop('should_plot_spike_indicator_points_on_placefield', False)
     
     ## New ax[0,1] draw method:
-    _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
-                        include_horizontal_labels=False, include_vertical_labels=False, should_render=False, custom_replay_markers=custom_replay_scatter_markers_plot_kwargs_list)
-    # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
-    curr_ax_firing_rate.set_xticklabels([])
-    curr_ax_firing_rate.spines['top'].set_visible(False)
-    curr_ax_firing_rate.spines['right'].set_visible(False)
-    # curr_ax_firing_rate.spines['bottom'].set_visible(False)
-    # curr_ax_firing_rate.spines['left'].set_visible(False)
-    curr_ax_firing_rate.get_xaxis().set_ticks([])
-    # curr_ax_firing_rate.get_yaxis().set_ticks([])
+    if not disable_top_row:
+        _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
+                            include_horizontal_labels=False, include_vertical_labels=False, should_render=False, custom_replay_markers=custom_replay_scatter_markers_plot_kwargs_list)
+        # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
+        curr_ax_firing_rate.set_xticklabels([])
+        curr_ax_firing_rate.spines['top'].set_visible(False)
+        curr_ax_firing_rate.spines['right'].set_visible(False)
+        # curr_ax_firing_rate.spines['bottom'].set_visible(False)
+        # curr_ax_firing_rate.spines['left'].set_visible(False)
+        curr_ax_firing_rate.get_xaxis().set_ticks([])
+        # curr_ax_firing_rate.get_yaxis().set_ticks([])
 
     # this plots where the neuron spiked on the track
     curr_ax_lap_spikes.set_xticklabels([])
@@ -1217,14 +1449,13 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
     curr_ax_placefield.set_yticklabels([])
     curr_ax_placefield.sharey(curr_ax_lap_spikes)
 
-
-    ## I think that `plot_1D_placecell_validation` is used to plot the little placefield on the right
+    ## I think that `plot_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
     _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
             **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield, 
                 'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
                 'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
 
-    # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_1D_placecell_validation` above so the native spikes aren't plotted
+    # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_1D_placecell_validation` above so the native spikes from that function aren't plotted
     cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
     time_variable_name = kwargs.get('time_variable_name', None)
     if cell_spikes_dfs_dict is not None:
@@ -1233,19 +1464,20 @@ def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_
         active_spikes_df = cell_spikes_dfs_dict[aclu]
         curr_ax_lap_spikes = _plot_general_all_spikes(curr_ax_lap_spikes, active_spikes_df, time_variable_name=time_variable_name, defer_render=True)
 
-    t_start, t_end = curr_ax_lap_spikes.get_xlim()
-    curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
-    curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
+    if not disable_top_row:
+        t_start, t_end = curr_ax_lap_spikes.get_xlim()
+        curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
+        curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
 
     return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
 
 
-@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=[], creation_date='2023-04-11 08:06')
-def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, debug_print=False, defer_render=False, **kwargs) -> MatplotlibRenderPlots:
+@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
+def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, optional_cell_info_labels=None, debug_print=False, defer_render=False, disable_top_row=False, **kwargs) -> MatplotlibRenderPlots:
     """ Stacked Jonathan-style firing-rate-across-epochs-plot
     Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
         n_max_plot_rows: the maximum number of rows to plot
-
+        disable_top_row: bool - default False, if True, disables the entire top row (which usually shows the firing rates during replays, the avg binned fr, etc).
 
     # The colors for each point indicating the percentage of participating cells that belong to which track.
         - More long_only -> more red
@@ -1268,10 +1500,11 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)} 
 
     actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows 
+    active_context = kwargs.get('active_context', None)
+
 
     ## Figure Setup:
     fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
-    # fig = plt.figure(constrained_layout=True, figsize=(10, 4))
     subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
     ##########################
 
@@ -1282,6 +1515,8 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
     custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, marker_split_mode=marker_split_mode, debug_print=debug_print)
     kwargs['custom_replay_scatter_markers_plot_kwargs_list'] = custom_replay_scatter_markers_plot_kwargs_list
 
+    # Set 'optional_cell_info_labels' on the kwargs passed to `_plot_pho_jonathan_batch_plot_single_cell`
+    kwargs['optional_cell_info_labels'] = optional_cell_info_labels
 
     # # Build all spikes interpolated positions/dfs:
     # cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
@@ -1310,7 +1545,7 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
             # Unhandled exception
             raise e
         
-        curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, **kwargs)
+        curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, disable_top_row=disable_top_row, **kwargs)
 
         # output the axes created:
         axs_list.append(curr_single_cell_out_dict)
@@ -1334,11 +1569,17 @@ def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, u
 # ==================================================================================================================== #
 
 @mpl.rc_context(Fig.get_mpl_style(style='figPublish'))
-def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, shared_kwargs=None, long_kwargs=None, short_kwargs=None, debug_print=False):
+def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=None, single_figure=False, shared_kwargs=None, long_kwargs=None, short_kwargs=None, title_string=None, subtitle_string=None, should_plot_vertical_track_bounds_lines=False, should_plot_linear_track_shapes=False, debug_print=False):
     """ Produces a figure to compare the 1D placefields on the long vs. the short track. 
     
     single_figure:bool - if True, both long and short are plotted on the same axes of a single shared figure. Otherwise seperate figures are used for each
+    should_plot_vertical_track_bounds_lines: bool - if True, vertical lines representing the bounds of the linear track are rendered
+    should_plot_linear_track_shapes: bool - if True, plots 2D linear tracks on the figure
     
+
+    Notes:
+
+        actual colors are built from cmap in `plot_ratemap_1D(...)`
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_short_v_long_pf1D_comparison
 
@@ -1351,6 +1592,8 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
 
     """
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
+    
     if shared_kwargs is None:
         shared_kwargs = {}
     if long_kwargs is None:
@@ -1359,11 +1602,36 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         short_kwargs = {}
 
     # Shared/Common kwargs:
-    plot_ratemap_1D_kwargs = (dict(pad=2, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True) | shared_kwargs)
-    
-    single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: pfmap # flip over the y-axis
-    single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -1.0 * pfmap # flip over the y-axis
+    plot_ratemap_1D_kwargs = (dict(pad=1, brev_mode=PlotStringBrevityModeEnum.NONE, normalize=True, debug_print=debug_print, normalize_tuning_curve=True, skip_figure_titles=single_figure) | shared_kwargs)
+    active_context = shared_kwargs.get('active_context', None)
+    print(f'active_context: {active_context}')
+    if single_figure:
+        plot_ratemap_1D_kwargs['skip_figure_titles'] = True
 
+    flat_stack_mode:bool = shared_kwargs.get('flat_stack_mode', False)
+
+    y_baseline_offset = 0.0 # 0.5 does not work uniform offset to be added to all pfmaps so that the negative-flipped one isn't cut off
+    single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: (0.5 * pfmap) + y_baseline_offset # scale down by 1/2 so that both it and the flipped version fit on the same axis
+    single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: (-0.5 * pfmap) + y_baseline_offset # flip over the y-axis
+    
+        
+    if flat_stack_mode:
+        y_lims_offset = None
+        ytick_location_shift:float = 0.0 # overrides with zero
+    else:
+        if single_figure:
+            y_lims_offset = -0.5 # shift the y-lims down by (-0.5 * pad) so it isn't cut off
+            ytick_location_shift:float = 0.0 # overrides with zero
+        else:
+            y_lims_offset = None
+            ytick_location_shift:float = 0.5 # default
+        
+    plot_ratemap_1D_kwargs['ytick_location_shift'] = ytick_location_shift
+
+    # single_cell_pfmap_processing_fn_identity = lambda i, aclu, pfmap: pfmap # flip over the y-axis
+    # single_cell_pfmap_processing_fn_flipped_y = lambda i, aclu, pfmap: -1.0 * pfmap # flip over the y-axis
+    # y_lims_offset = None
+    
     n_neurons = len(curr_any_context_neurons)
     shared_fragile_neuron_IDXs = np.arange(n_neurons)
     
@@ -1415,14 +1683,54 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
     ax_short_pf_1D, short_sort_ind, short_neurons_colors_array = plot_ratemap_1D(short_results.pf1D.ratemap, **short_kwargs, name=f"short")
     fig_short_pf_1D = ax_short_pf_1D.get_figure()
     
+    # Do set_ylim before calling `add_vertical_track_bounds_lines(...)` to make sure full vertical span is used
+    if y_lims_offset is not None:
+        ax_long_pf_1D.set_ylim((np.array(ax_long_pf_1D.get_ylim()) + y_lims_offset))
+        if not single_figure:
+            ax_short_pf_1D.set_ylim((np.array(ax_short_pf_1D.get_ylim()) + y_lims_offset)) # TODO: I think this is right
+
     if single_figure:
-        fig_long_pf_1D.suptitle('Long vs. Short (hatched)')
+        if (title_string is not None) or (subtitle_string is not None):
+            perform_update_title_subtitle(fig=fig_long_pf_1D, ax=ax_long_pf_1D, title_string=title_string, subtitle_string=subtitle_string, active_context=active_context, use_flexitext_titles=True)
+        else:
+            fig_long_pf_1D.suptitle('Long vs. Short (hatched)')
+            
+        # Plot the track bounds:
+        if should_plot_vertical_track_bounds_lines:
+            long_track_line_collection, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=True)
+    
+        if should_plot_linear_track_shapes:
+            long_rects_outputs, short_rects_outputs = add_track_shapes(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=True)
     else:
         fig_long_pf_1D.suptitle('Long')
         fig_short_pf_1D.suptitle('Short')
         ax_short_pf_1D.set_xlim(ax_long_pf_1D.get_xlim())
+
+        # Plot the track bounds:
+        if should_plot_vertical_track_bounds_lines:
+            long_track_line_collection, _ = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=False) # only long
+            _, short_track_line_collection = add_vertical_track_bounds_lines(grid_bin_bounds=deepcopy(short_results.pf1D.config.grid_bin_bounds), ax=ax_short_pf_1D, include_long=False, include_short=True) # only short
+
+        if should_plot_linear_track_shapes:
+            long_rects_outputs, _ = add_track_shapes(grid_bin_bounds=deepcopy(long_results.pf1D.config.grid_bin_bounds), ax=ax_long_pf_1D, include_long=True, include_short=False) # only long
+            _, short_rects_outputs = add_track_shapes(grid_bin_bounds=deepcopy(short_results.pf1D.config.grid_bin_bounds), ax=ax_short_pf_1D, include_long=False, include_short=True) # only short
+            
+
         # ax_long_pf_1D.sharex(ax_short_pf_1D)
         
+    if not should_plot_vertical_track_bounds_lines:
+        long_track_line_collection = None 
+        short_track_line_collection = None
+        
+    if not should_plot_linear_track_shapes:
+        long_rects_outputs = None
+        short_rects_outputs = None
+
+    # Could return: long_track_line_collection, short_track_line_collection
+    # graphics_output_dict = MatplotlibRenderPlots(name='display_short_long_pf1D_comparison', figures=(fig_long_pf_1D, fig_short_pf_1D), axes=(ax_long_pf_1D, ax_short_pf_1D), plot_data={}, context=final_context, saved_figures=active_out_figure_paths)
+    # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
+    # long_plots = {'long_track_line_collection': long_track_line_collection}
+    
     return (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array)
 
 
@@ -1498,8 +1806,8 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
     return fig, ax
 
 
-@function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True):
+@function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
 
@@ -1523,6 +1831,31 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # convert to pd.Series
         y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
                 
+    # \\theta_{\\Delta +}
+
+    # ## Old L/R style strings
+    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$'
+    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
+    
+
+    ## 2023-10-06 - Consistent "\\Delta +"/"\\Delta -" notation
+    laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta +}-\\theta_{\\Delta -}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
+    replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta +}-R_{\\Delta -}}{R_{\\Delta +} + R_{\\Delta -}}$'
+
+    # Optionally swap the x and y axes:
+    if swap_xy_axis:
+        # Swapped x: Replays, y: Laps
+        _y_frs_index = deepcopy(y_frs_index)
+        y_frs_index = deepcopy(x_frs_index)
+        x_frs_index = _y_frs_index
+        xlabel_str = replays_fri_label_str
+        ylabel_str =  laps_fri_label_str
+    else:
+        # Unswapped, x: Laps, y: Replays
+        xlabel_str = laps_fri_label_str
+        ylabel_str = replays_fri_label_str
+        
+
     if neurons_colors is not None:
         if isinstance(neurons_colors, dict):
             point_colors = [neurons_colors[aclu] for aclu in list(x_frs_index.keys())]
@@ -1544,10 +1877,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         xlabel_kwargs = dict(loc='left')
         ylabel_kwargs = dict(loc='bottom')
 
-    scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors) # , s=10, alpha=0.5
-    plt.xlabel('Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$', fontsize=16, **xlabel_kwargs)
-    plt.ylabel('Laps Firing Rate Index $\\frac{L_{\\theta}-S_{\\theta}}{L_{\\theta} + S_{\\theta}}$', fontsize=16, **ylabel_kwargs)
-
+    scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
+    plt.xlabel(xlabel_str, fontsize=16, **xlabel_kwargs)
+    plt.ylabel(ylabel_str, fontsize=16, **ylabel_kwargs)
 
     ## Non-flexitext version:
     # plt.title('long ($L$)|short($S$) firing rate indicies')
@@ -1601,28 +1933,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 # ==================================================================================================================== #
 # 2023-04-19 Surprise                                                                                                  #
 # ==================================================================================================================== #
-
-@function_attributes(short_name=None, tags=['pyqtgraph', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=['pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.build_pyqtgraph_epoch_indicator_regions'], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 19:04')
-def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch):
-    """Add session indicators to pyqtgraph plot for the long and the short epoch
-
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions
-
-            long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
-            short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
-            long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
-
-            long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
-            short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items
-    """
-    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions # Add session indicators to pyqtgraph plot
-    long_epoch_config = dict(epoch_label='long', pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00'))
-    short_epoch_config = dict(epoch_label='short', pen=pg.mkPen('#490000'), brush=pg.mkBrush('#f5161659'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00'))
-    
-    long_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=long_epoch.t_start, t_stop=long_epoch.t_stop, **long_epoch_config)
-    short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
-    return long_epoch_indicator_region_items, short_epoch_indicator_region_items
-
 
 @function_attributes(short_name='plot_long_short_expected_vs_observed_firing_rates', tags=['pyqtgraph','long_short'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 17:26', is_global=True)
 def plot_long_short_expected_vs_observed_firing_rates(long_results_obj, short_results_obj, limit_aclus=None):
@@ -1771,7 +2081,7 @@ def plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_
     
     Usage: 
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_long_short_surprise_difference_plot
-        win, self.plots = plot_long_short_surprise_difference_plot(long_results_obj, short_results_obj)
+        win, plots = plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_obj, short_results_obj, long_epoch_name, short_epoch_name)
     
     """
     # Private Subfunctions _______________________________________________________________________________________________ #
@@ -1919,7 +2229,7 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neu
         _subfn_draw_tick_and_label(ax, x=1, y=aclu_y, label='Short Only', sub_label='(long fr = 0)', tick_half_height=0.2, supress_labels=supress_labels)
 
         # Add markers for rr_laps and rr_replays
-        ax.plot(rr_laps, aclu_y, marker='^', markersize=10, color='black', label='rr_laps')
+        ax.plot(rr_laps, aclu_y, marker=r'$\theta$', markersize=10, color='black', label='rr_laps')
         ax.plot(rr_replays, aclu_y, marker='o', markersize=10, fillstyle='none', color='black', label='rr_replays')
 
         # Add text for aclu to the left of the plot
@@ -1998,6 +2308,10 @@ def plot_rr_aclu(aclu: list, rr_laps: np.ndarray, rr_replays: np.ndarray, rr_neu
 class RateRemappingPaginatedFigureController(PaginatedFigureController):
     """2023-05-09 - Aims to refactor `build_figure_and_control_widget_from_paginator`, a series of nested functions, into a stateful class
 
+    At its core uses `plot_rr_aclu` to plot the rate remapping number lines
+    
+    
+    
     Usage:
         import matplotlib.pyplot as plt
         %matplotlib qt
@@ -2151,22 +2465,8 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # 2023-05-25 - Long_replay|Long_laps and Short_replay|Short_laps plots                                                 #
 # ==================================================================================================================== #
 
-def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, defer_render=False):
-    """ 2023-05-25 - Plots a comparison of the lap vs. replay firing rates for a single track.
-    
-    Inputs:
-        `curr_active_pipeline`: is needed to register_output_file(...)
-        
-    Example:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_session_long_short_track_firing_rate_figures
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
-
-        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
-        long_plots, short_plots = _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
-        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S) = long_plots, short_plots
-
-    """
-    def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered = False):
+@function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
+def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, swap_xy_axis=True, defer_render=False):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
@@ -2176,6 +2476,19 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
         
         Captures: `defer_show`
         """
+        
+        # Optionally swap the x and y axes so laps is on the x-axis:
+        if swap_xy_axis:
+            _y_frs_dict = deepcopy(y_frs_dict)
+            y_frs_dict = deepcopy(x_frs_dict)
+            x_frs_dict = _y_frs_dict
+            ylabel_str = 'Replay Firing Rate (Hz)'
+            xlabel_str = 'Laps Firing Rate (Hz)'
+        else:
+            xlabel_str = 'Replay Firing Rate (Hz)'
+            ylabel_str = 'Laps Firing Rate (Hz)'
+            
+
         if neurons_colors is not None:
             if isinstance(neurons_colors, dict):
                 point_colors = [neurons_colors[aclu] for aclu in list(x_frs_dict.keys())]
@@ -2190,7 +2503,7 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
             point_colors = None
             # point_colors = 'black'
         
-        point_hover_labels = [f'{i}' for i in list(x_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints
+        point_hover_labels = [f'{i}' for i in list(x_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints. Don't do anything I don't think. , enable_hover_labels=False
         fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True)
         
         # TODO 2023-05-25 - build the display context:
@@ -2203,8 +2516,8 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
             ylabel_kwargs = dict(loc='bottom')
 
         scatter_plot = ax.scatter(x_frs_dict.values(), y_frs_dict.values(), c=point_colors) # , s=10, alpha=0.5
-        plt.xlabel('Replay Firing Rate (Hz)', fontsize=16, **xlabel_kwargs)
-        plt.ylabel('Laps Firing Rate (Hz)', fontsize=16, **ylabel_kwargs)
+        plt.xlabel(xlabel_str, fontsize=16, **xlabel_kwargs)
+        plt.ylabel(ylabel_str, fontsize=16, **ylabel_kwargs)
         
         # Non-flexitext title:
         # plt.title('Computed track_replay|track_laps firing rate')
@@ -2223,10 +2536,13 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
         footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
-        text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
-        texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
-        # texts = [ax.text(x, y, label, ha='center', va='center', fontsize=8) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
-        
+        if enable_tiny_point_labels:
+            text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
+            texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
+            # texts = [ax.text(x, y, label, ha='center', va='center', fontsize=8) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
+        else:
+            texts = []
+                    
         ## get current axes:
         # ax = plt.gca()
 
@@ -2244,6 +2560,24 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
 
         return fig, ax, active_display_context
 
+
+@function_attributes(short_name=None, tags=['private', 'long_short'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare', 'fit_both_axes'], used_by=[], creation_date='2023-05-25 00:00', related_items=[])
+def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, defer_render=False):
+    """ 2023-05-25 - Plots a comparison of the lap vs. replay firing rates for a single track.
+    
+    Inputs:
+        `curr_active_pipeline`: is needed to register_output_file(...)
+        
+    Example:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_session_long_short_track_firing_rate_figures
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
+
+        jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        long_plots, short_plots = _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jonathan_firing_rate_analysis_result, figures_parent_out_path=None)
+        (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S) = long_plots, short_plots
+
+    """
+    
         
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -2358,7 +2692,7 @@ def plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs, neuron_IDs
 
 
 @function_attributes(short_name=None, tags=[], conforms_to=[], input_requires=[], output_provides=[], uses=['JonathanFiringRateAnalysisResult'], used_by=['_display_short_long_pf1D_comparison'], creation_date='2023-06-16 13:01')
-def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_any_context_neurons, debug_print=False):
+def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_any_context_neurons, sortby=["long_pf_peak_x", "short_pf_peak_x", 'neuron_IDX'], debug_print=False):
     """ Builds proper sort indicies for '_display_short_long_pf1D_comparison'
     Captures Nothing
 
@@ -2402,15 +2736,17 @@ def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_a
 
     #### BEGIN FUNCTION BODY ###
     
+  
+    
 
-    ## Sorts aclus using `neuron_replay_stats_df`'s columns (  neuron_replay_stats_df = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']['neuron_replay_stats_df'] -- this is produced by '_perform_jonathan_replay_firing_rate_analyses') :
+    ## Sorts aclus using `neuron_replay_stats_df`'s columns (  neuron_replay_stats_df = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df -- this is produced by '_perform_jonathan_replay_firing_rate_analyses') :
     if not isinstance(curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, JonathanFiringRateAnalysisResult):
         jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
     else:
         jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
 
     neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df.copy()
-    _sorted_neuron_stats_df = neuron_replay_stats_df.sort_values(by=["long_pf_peak_x", "short_pf_peak_x", 'neuron_IDX'], ascending=[True, True, True], inplace=False).copy() # also did test_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True).copy()
+    _sorted_neuron_stats_df = neuron_replay_stats_df.sort_values(by=sortby, ascending=[True, True, True], inplace=False).copy() # also did test_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True).copy()
     _sorted_neuron_stats_df = _sorted_neuron_stats_df[np.isin(_sorted_neuron_stats_df.index, curr_any_context_neurons)] # clip to only those neurons included in `curr_any_context_neurons`
     _sorted_aclus = _sorted_neuron_stats_df.index.to_numpy()
     _sorted_neuron_IDXs = _sorted_neuron_stats_df.neuron_IDX.to_numpy()

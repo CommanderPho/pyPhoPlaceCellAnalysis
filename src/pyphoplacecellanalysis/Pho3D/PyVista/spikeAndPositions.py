@@ -45,7 +45,7 @@ spike_geom_box = pv.Box(bounds=[-0.2, 0.2, -0.2, 0.2, -0.05, 0.05])
 
 
 def _build_flat_arena_data(x, y, z=-0.01, smoothing=True, extrude_height=-5):
-        # Builds the flat base maze map that the other data will be plot on top of
+        # Builds the flat base maze map from the x, y position data that the other data will be plot on top of
         ## Implicitly relies on: x, y
         # z = np.zeros_like(x)
         z = np.full_like(x, z) # offset just slightly in the z direction to account for the thickness of the caps that are added upon extrude
@@ -88,13 +88,15 @@ def perform_plot_flat_arena(p, *args, z=-0.01, bShowSequenceTraversalGradient=Fa
     else:
         raise ValueError
 
-    # return p.add_mesh(pc_maze, name='maze_bg', label='maze', color="black", show_edges=False, render=True)
-    return p.add_mesh(pc_maze, **({'name': 'maze_bg', 'label': 'maze', 'color': [0.1, 0.1, 0.1], 'pbr': True, 'metallic': 0.8, 'roughness': 0.5, 'diffuse': 1, 'render': True} | kwargs))
-    # return p.add_mesh(pc_maze, **({'name': 'maze_bg', 'label': 'maze', 'color': [0.1, 0.1, 0.1, 1.0], 'pbr': True, 'metallic': 0.8, 'roughness': 0.5, 'diffuse': 1, 'render': True} | kwargs))
+    plot_name = kwargs.pop('name', 'maze_bg')
+
+    # return p.add_mesh(pc_maze, name=plot_name, label='maze', color="black", show_edges=False, render=True)
+    return p.add_mesh(pc_maze, **({'name': plot_name, 'label': 'maze', 'color': [0.1, 0.1, 0.1], 'pbr': True, 'metallic': 0.8, 'roughness': 0.5, 'diffuse': 1, 'render': True} | kwargs))
+    # return p.add_mesh(pc_maze, **({'name': plot_name, 'label': 'maze', 'color': [0.1, 0.1, 0.1, 1.0], 'pbr': True, 'metallic': 0.8, 'roughness': 0.5, 'diffuse': 1, 'render': True} | kwargs))
     # bShowSequenceTraversalGradient
     if bShowSequenceTraversalGradient:
         traversal_order_scalars = np.arange(len(x))
-        return p.add_mesh(pc_maze, **({'name': 'maze_bg', 'label': 'maze', 'scalars': traversal_order_scalars, 'render': True} | kwargs))
+        return p.add_mesh(pc_maze, **({'name': plot_name, 'label': 'maze', 'scalars': traversal_order_scalars, 'render': True} | kwargs))
 
 
 

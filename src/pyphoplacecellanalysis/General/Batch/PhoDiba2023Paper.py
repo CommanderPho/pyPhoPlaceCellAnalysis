@@ -3,14 +3,15 @@ from typing import Dict, Callable
 from attrs import define, field
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 
 import matplotlib as mpl
 import matplotlib.patches as mpatches # used for plot_epoch_track_assignments
 from flexitext import flexitext ## flexitext version
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import \
-    InstantaneousSpikeRateGroupsComputation
 from neuropy.utils.mixins.enum_helpers import ExtendedEnum # used in TrackAssignmentState
+from neuropy.core.epoch import Epoch
+from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
 
 from pyphocorehelpers.mixins.key_value_hashable import KeyValueHashableObject
 from pyphocorehelpers.indexing_helpers import partition # needed by `AssigningEpochs` to partition the dataframe by aclus
@@ -27,6 +28,9 @@ from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.result_context import providing_context
 from neuropy.core.user_annotations import UserAnnotationsManager
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends
+
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import determine_long_short_pf1D_indicies_sort_by_peak
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _prepare_spikes_df_from_filter_epochs
@@ -40,6 +44,8 @@ from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import interactive_good_e
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg # pyqtgraph
 import matplotlib.pyplot as plt
+
+from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_surprise_results, fig_remapping_cells
 
 
 # Testing:
@@ -389,18 +395,20 @@ class AssigningEpochs:
         assigning_epochs_obj._debug_print_assignment_statuses()
         fig, axs = assigning_epochs_obj._subfn_plot_epoch_track_assignments(axis_idx=axis_idx, defer_render=True)
 
-        # Partition based on whether the user included the epoch in the long or short track in the user-included epochs:
-        is_user_exclusive_L = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']))
-        is_user_exclusive_S = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included']))
-        is_user_unassigned_in_both_epochs = np.logical_and(np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']), np.logical_not(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'])) # the user said it was bad in both epochs, so assign it to neither with high confidence
 
-        # NOTE: be sure to assign to the filter_epochs_df, not the unassigned_epochs_df, because the unassigned_epochs_df is a subset of the filter_epochs_df, and we want to assign to the filter_epochs_df so that the unassigned_epochs_df will be a subset of the filter_epochs_df:
-        # assign the user_exclusive_L to long_track:
-        assigning_epochs_obj.filter_epochs_df.loc[is_user_exclusive_L, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.LONG_TRACK, 1.0)
-        # assign the user_exclusive_S to short_track:
-        assigning_epochs_obj.filter_epochs_df.loc[is_user_exclusive_S, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.SHORT_TRACK, 1.0)
-        # assign the user_unassigned_in_both_epochs to neither:
-        assigning_epochs_obj.filter_epochs_df.loc[is_user_unassigned_in_both_epochs, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.NEITHER, 1.0)
+        ## User Assignment:
+        # # Partition based on whether the user included the epoch in the long or short track in the user-included epochs:
+        # is_user_exclusive_L = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']))
+        # is_user_exclusive_S = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included']))
+        # is_user_unassigned_in_both_epochs = np.logical_and(np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']), np.logical_not(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'])) # the user said it was bad in both epochs, so assign it to neither with high confidence
+
+        # # NOTE: be sure to assign to the filter_epochs_df, not the unassigned_epochs_df, because the unassigned_epochs_df is a subset of the filter_epochs_df, and we want to assign to the filter_epochs_df so that the unassigned_epochs_df will be a subset of the filter_epochs_df:
+        # # assign the user_exclusive_L to long_track:
+        # assigning_epochs_obj.filter_epochs_df.loc[is_user_exclusive_L, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.LONG_TRACK, 1.0)
+        # # assign the user_exclusive_S to short_track:
+        # assigning_epochs_obj.filter_epochs_df.loc[is_user_exclusive_S, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.SHORT_TRACK, 1.0)
+        # # assign the user_unassigned_in_both_epochs to neither:
+        # assigning_epochs_obj.filter_epochs_df.loc[is_user_unassigned_in_both_epochs, 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.NEITHER, 1.0)
 
         # assigning_epochs_obj.filter_epochs_df[is_user_exclusive_S]
         # assigning_epochs_obj.filter_epochs_df[is_user_exclusive_L]
@@ -408,12 +416,16 @@ class AssigningEpochs:
         assigning_epochs_obj._debug_print_assignment_statuses()
         fig, axs = assigning_epochs_obj._subfn_plot_epoch_track_assignments(axis_idx=axis_idx, fig=fig, axs=axs, defer_render=True)
 
-
+        unassigned_epochs_df = assigning_epochs_obj.unassigned_epochs_df
         # Filter based on the active_set cells (LxC, SxC):
-        assigning_epochs_obj.unassigned_epochs_df.loc[np.logical_and(assigning_epochs_obj.unassigned_epochs_df['has_LONG_exclusive_aclu'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['has_SHORT_exclusive_aclu'])), 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.LONG_TRACK, 1.0)
+        unassigned_epochs_df.loc[np.logical_and(unassigned_epochs_df['has_LONG_exclusive_aclu'], np.logical_not(unassigned_epochs_df['has_SHORT_exclusive_aclu'])), 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.LONG_TRACK, 0.85)
         assigning_epochs_obj._debug_print_assignment_statuses()
         # assign the user_exclusive_S to short_track:
-        assigning_epochs_obj.unassigned_epochs_df.loc[np.logical_and(np.logical_not(assigning_epochs_obj.unassigned_epochs_df['has_LONG_exclusive_aclu']), assigning_epochs_obj.unassigned_epochs_df['has_SHORT_exclusive_aclu']), 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.SHORT_TRACK, 1.0)
+        unassigned_epochs_df.loc[np.logical_and(np.logical_not(unassigned_epochs_df['has_LONG_exclusive_aclu']), unassigned_epochs_df['has_SHORT_exclusive_aclu']), 'track_assignment'] = TrackAssignmentDecision(TrackAssignmentState.SHORT_TRACK, 0.85)
+
+        # Re assign
+        assigning_epochs_obj.unassigned_epochs_df = unassigned_epochs_df
+
         axis_idx = axis_idx + 1
         assigning_epochs_obj._debug_print_assignment_statuses()
         fig, axs = assigning_epochs_obj._subfn_plot_epoch_track_assignments(axis_idx=axis_idx, fig=fig, axs=axs, defer_render=True)
@@ -421,7 +433,7 @@ class AssigningEpochs:
         if not defer_render:
             fig.show() 
             
-        return fig, axs
+        return fig, axs, assigning_epochs_obj
 
 
 # ==================================================================================================================== #
@@ -448,7 +460,7 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
 
     ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
     jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
-    neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions()
+    neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.5)
 
     assigning_epochs_obj = AssigningEpochs(filter_epochs_df=deepcopy(long_results_obj.active_filter_epochs.to_dataframe()))
 
@@ -457,15 +469,23 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
     included_neuron_ids = EITHER_subset.track_exclusive_aclus
     spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df).spikes.sliced_by_neuron_type('pyr')
     # filter_epochs_df = deepcopy(long_results_obj.active_filter_epochs.to_dataframe())
+
+
+    ## TODO: need to usee the actual LxC/SxCs (hand-picked) instead of the ones based on placefields.
     filter_epoch_spikes_df, filter_epochs_df = assigning_epochs_obj.determine_if_contains_active_set_exclusive_cells(spikes_df, exclusive_aclus=EITHER_subset.track_exclusive_aclus, short_exclusive=short_exclusive, long_exclusive=long_exclusive, included_neuron_ids=included_neuron_ids) # adds 'active_unique_aclus'    
+
+
+    
+
+
+
     # filter_epoch_spikes_df, filter_epochs_df = assigning_epochs_obj._find_example_epochs(spikes_df, EITHER_subset.track_exclusive_aclus, included_neuron_ids=included_neuron_ids) # adds 'active_unique_aclus'
     # # epoch_contains_any_exclusive_aclus.append(np.isin(epoch_spikes_unique_aclus, exclusive_aclus).any())
     # filter_epochs_df['has_SHORT_exclusive_aclu'] = [np.isin(epoch_spikes_unique_aclus, short_exclusive.track_exclusive_aclus).any() for epoch_spikes_unique_aclus in filter_epochs_df['active_unique_aclus']]
     # filter_epochs_df['has_LONG_exclusive_aclu'] = [np.isin(epoch_spikes_unique_aclus, long_exclusive.track_exclusive_aclus).any() for epoch_spikes_unique_aclus in filter_epochs_df['active_unique_aclus']]
 
     # Get the manual user annotations to determine the good replays for both long/short decoding:
-    assigning_epochs_obj.filter_by_user_selections(curr_active_pipeline=curr_active_pipeline, allow_interactive_selection=allow_interactive_good_epochs_selection)
-    
+    # assigning_epochs_obj.filter_by_user_selections(curr_active_pipeline=curr_active_pipeline, allow_interactive_selection=allow_interactive_good_epochs_selection)
 
     #### Finally, get only the epochs that meet the criteria:
 
@@ -475,8 +495,17 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
     # considered_filter_epochs_df = considered_filter_epochs_df[np.logical_xor(filter_epochs_df['long_is_user_included'], filter_epochs_df['short_is_user_included'])]
 
     # Get separate long-side/short-side candidate replays:
-    epochs_df_L = filter_epochs_df[(filter_epochs_df['has_LONG_exclusive_aclu'] & filter_epochs_df['long_is_user_included'])].copy() # replay not considered good by user for short decoding, but it is for long decoding. Finally, has at least one LONG exclusive ACLU.
-    epochs_df_S = filter_epochs_df[(filter_epochs_df['has_SHORT_exclusive_aclu'] & filter_epochs_df['short_is_user_included'])].copy()  # replay not considered good by user for long decoding, but it is for short decoding. Finally, has at least one SHORT exclusive ACLU.
+    if 'long_is_user_included' not in filter_epochs_df:
+        print(f'WARNING: PAPER_FIGURE_figure_1_add_replay_epoch_rasters(...): no user-assigned manually labeled replay epochs. Reeturning all epochs.')
+        epochs_df_L = filter_epochs_df[(filter_epochs_df['has_LONG_exclusive_aclu'])].copy() # replay not considered good by user for short decoding, but it is for long decoding. Finally, has at least one LONG exclusive ACLU.
+        epochs_df_S = filter_epochs_df[(filter_epochs_df['has_SHORT_exclusive_aclu'])].copy()  # replay not considered good by user for long decoding, but it is for short decoding. Finally, has at least one SHORT exclusive ACLU.
+    else:
+        epochs_df_L = filter_epochs_df[(filter_epochs_df['has_LONG_exclusive_aclu'] & filter_epochs_df['long_is_user_included'])].copy() # replay not considered good by user for short decoding, but it is for long decoding. Finally, has at least one LONG exclusive ACLU.
+        epochs_df_S = filter_epochs_df[(filter_epochs_df['has_SHORT_exclusive_aclu'] & filter_epochs_df['short_is_user_included'])].copy()  # replay not considered good by user for long decoding, but it is for short decoding. Finally, has at least one SHORT exclusive ACLU.
+
+
+    # epochs_df_L = filter_epochs_df[(filter_epochs_df['has_LONG_exclusive_aclu'] & filter_epochs_df['long_is_user_included'])].copy() # replay not considered good by user for short decoding, but it is for long decoding. Finally, has at least one LONG exclusive ACLU.
+    # epochs_df_S = filter_epochs_df[(filter_epochs_df['has_SHORT_exclusive_aclu'] & filter_epochs_df['short_is_user_included'])].copy()  # replay not considered good by user for long decoding, but it is for short decoding. Finally, has at least one SHORT exclusive ACLU.
 
     # Common for all rasters:
     new_all_aclus_sort_indicies = determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline=curr_active_pipeline, curr_any_context_neurons=EITHER_subset.track_exclusive_aclus)
@@ -500,7 +529,16 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
 
 
 @function_attributes(short_name=None, tags=['FINAL', 'publication', 'figure', 'combined'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 14:33', related_items=[])
-def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figure=True, should_plot_pf1d_compare=True, should_plot_example_rasters=True, should_plot_stacked_epoch_slices=True, should_plot_pho_jonathan_figures=True):
+def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figure=True, should_plot_pf1d_compare=True, should_plot_example_rasters=True, should_plot_stacked_epoch_slices=True, should_plot_pho_jonathan_figures=True, show_only_refined_cells=True):
+    """ 
+    
+    show_only_refined_cells: bool - added 2023-09-28 to output LxC and SxC values "refined" by their firing rate index.
+
+    
+    Usage:
+        pf1d_compare_graphics, (example_epoch_rasters_L, example_epoch_rasters_S), example_stacked_epoch_graphics, fig_1c_figures_out_dict = PAPER_FIGURE_figure_1_full(curr_active_pipeline) # did not display the pf1
+    
+    """
     ## long_short_decoding_analyses:
     curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
     ## Extract variables from results object:
@@ -620,10 +658,13 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 
     ## Get global 'jonathan_firing_rate_analysis' results:
     curr_jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis']
-    neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis['neuron_replay_stats_df'], curr_jonathan_firing_rate_analysis['rdf']['rdf'], curr_jonathan_firing_rate_analysis['rdf']['aclu_to_idx'], curr_jonathan_firing_rate_analysis['irdf']['irdf']
-
+    neuron_replay_stats_df, rdf, aclu_to_idx, irdf = curr_jonathan_firing_rate_analysis.neuron_replay_stats_df, curr_jonathan_firing_rate_analysis.rdf.rdf, curr_jonathan_firing_rate_analysis.rdf.aclu_to_idx, curr_jonathan_firing_rate_analysis.irdf.irdf
+    
     if should_plot_pho_jonathan_figures:
-        fig_1c_figures_out_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=XOR_subset.track_exclusive_aclus, n_max_page_rows=20, write_vector_format=False, write_png=save_figure) # active_out_figures_dict: {IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'long_only', '(12,21,48)')>: <Figure size 1920x660 with 12 Axes>, IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'short_only', '(18,19,65)')>: <Figure size 1920x660 with 12 Axes>}
+        if show_only_refined_cells:
+            fig_1c_figures_out_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=XOR_subset.get_refined_track_exclusive_aclus(), n_max_page_rows=20, write_vector_format=False, write_png=save_figure, show_only_refined_cells=show_only_refined_cells, disable_top_row=True)
+        else:
+            fig_1c_figures_out_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=XOR_subset.track_exclusive_aclus, n_max_page_rows=20, write_vector_format=False, write_png=save_figure, disable_top_row=True) # active_out_figures_dict: {IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'long_only', '(12,21,48)')>: <Figure size 1920x660 with 12 Axes>, IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'BatchPhoJonathanReplayFRC', 'short_only', '(18,19,65)')>: <Figure size 1920x660 with 12 Axes>}
     else:
         fig_1c_figures_out_dict = None
 
@@ -632,10 +673,9 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # ==================================================================================================================== #
 # 2023-06-26 - Paper Figure 2 Code                                                                                     #
 # ==================================================================================================================== #
-
+# Shows the LxC/SxC metrics and firing rate indicies
 
 # Instantaneous versions:
-
 
 # @overwriting_display_context(
 @metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
@@ -781,6 +821,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         else:
             all_scatter_props = [{}, {}, {}, {}]
 
+        all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
+
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Laps Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
 
@@ -798,7 +840,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         if Fig2_Replay_FR[0].LxC_scatter_props is not None:
             # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
             all_scatter_props =  [Fig2_Replay_FR[0].LxC_scatter_props, Fig2_Replay_FR[1].LxC_scatter_props, Fig2_Replay_FR[2].SxC_scatter_props, Fig2_Replay_FR[3].SxC_scatter_props]
-        
+        else:
+            all_scatter_props = [{}, {}, {}, {}]
+            
+        all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
         # label_list = [LxC_aclus, LxC_aclus, SxC_aclus, SxC_aclus]
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
@@ -942,6 +987,163 @@ def PAPER_FIGURE_figure_3(curr_active_pipeline, defer_render=False, save_figure=
 
 
 
+# ==================================================================================================================== #
+# Statistical Tests                                                                                                    #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['stats', 'binomial', 'FRI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-10 16:55', related_items=[])
+def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table):
+    """ Performs a binomial test to see if the number of entries above/below the y=x diagnoal were greater than would be expected by chance.
+
+    Usage:
+        binom_test_chance_result = pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table)
+        binom_test_chance_result
+
+    """
+    # Drop column: 'index'
+    # long_short_fr_indicies_analysis_table = long_short_fr_indicies_analysis_table.drop(columns=['index'])
+    # Drop rows with missing data in columns: 'x_frs_index', 'y_frs_index', 'neuron_uid'
+    long_short_fr_indicies_analysis_table = long_short_fr_indicies_analysis_table.dropna(subset=['x_frs_index', 'y_frs_index', 'neuron_uid'])
+
+    ## Find the values above/below the main y=x diagonal:
+    x_minus_y_diff = (long_short_fr_indicies_analysis_table['x_frs_index'] - long_short_fr_indicies_analysis_table['y_frs_index'])
+    assert np.sum(np.logical_not(np.isfinite(x_minus_y_diff))) == 0, f"ERROR: contains {np.sum(np.logical_not(np.isfinite(x_minus_y_diff)))} non-finite values"
+    ## Find the counts for each:
+    n_total = len(x_minus_y_diff) # 856
+    n_below_diagonal = np.sum((0.0 > x_minus_y_diff)) # 365
+    n_above_diagonal = np.sum((0.0 < x_minus_y_diff)) # 487
+    n_exact_on_diagonal = np.sum((0.0 == x_minus_y_diff))
+    print(f'n_total: {n_total}, n_above_diagonal: {n_above_diagonal}, n_exact_on_diagonal: {n_exact_on_diagonal}, n_below_diagonal: {n_below_diagonal}')
+    assert (n_above_diagonal + n_below_diagonal + n_exact_on_diagonal) == n_total, f"they don't add up!" 
+    binom_test_chance_result = stats.binomtest(n_above_diagonal, n=n_total, p=0.5) # p=0.5 random assignment on each trial, n=n_total trials
+    return binom_test_chance_result
+
+
+
+def pho_stats_paired_t_test(values1, values2):
+    """ Paired (Dependent) T-Test of means
+
+    degrees of freedom (dof): n -1
+
+    from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import pho_stats_paired_t_test
+
+
+    """
+    assert len(values1) == len(values2), f"this is supposed to be a paired t-test so the number of samples in values1 should equal values2!! but {np.shape(values1)} and {np.shape(values2)}"
+    # # Manual Calculation:
+    # n_samples = len(values1) # sample_size (number of neurons)
+    # out_numerator = (np.mean(values1) - np.mean(values2))
+    # out_denom = np.std(values1 - values2) / np.sqrt(n_samples)
+    # T = out_numerator/out_denom
+    T_result = stats.ttest_rel(values1, values2)
+    # T_value = T_result.statistic
+    return T_result
+
+
+@function_attributes(short_name=None, tags=['stats', 'bar'], input_requires=[], output_provides=[], uses=['pho_stats_paired_t_test'], used_by=[], creation_date='2023-10-10 16:54', related_items=[])
+def pho_stats_bar_graph_t_tests(across_session_inst_fr_computation):
+    """ performs the statistical tests for the bar-graphs 
+
+    Usage:
+        LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(across_session_inst_fr_computation)
+
+    """
+    ## Laps Bar Graph Statistics:
+    LxC_Laps_T_result = pho_stats_paired_t_test(across_session_inst_fr_computation.Fig2_Laps_FR[0].values, across_session_inst_fr_computation.Fig2_Laps_FR[1].values)
+    SxC_Laps_T_result = pho_stats_paired_t_test(across_session_inst_fr_computation.Fig2_Laps_FR[2].values, across_session_inst_fr_computation.Fig2_Laps_FR[3].values)
+    print(f'LxC_Laps_T_result: {LxC_Laps_T_result}') # LxC_Laps_T_result: TtestResult(statistic=13.925882964152734, pvalue=2.3158087721181958e-10, df=16)
+    print(f'SxC_Laps_T_result: {SxC_Laps_T_result}') # SxC_Laps_T_result: TtestResult(statistic=-12.402705609994197, pvalue=8.279901167065766e-08, df=11)
+
+    ## Replay Bar Graph Statistics
+    LxC_Replay_T_result = pho_stats_paired_t_test(across_session_inst_fr_computation.Fig2_Replay_FR[0].values, across_session_inst_fr_computation.Fig2_Replay_FR[1].values)
+    SxC_Replay_T_result = pho_stats_paired_t_test(across_session_inst_fr_computation.Fig2_Replay_FR[2].values, across_session_inst_fr_computation.Fig2_Replay_FR[3].values)
+    print(f'LxC_Replay_T_result: {LxC_Replay_T_result}') # LxC_Replay_T_result: TtestResult(statistic=-0.44250837706672874, pvalue=0.6640450004297094, df=16) # LxC_Replay_T_result is NOT p<0.05 significant (pvalue=0.6640450004297094)
+    print(f'SxC_Replay_T_result: {SxC_Replay_T_result}') # SxC_Replay_T_result: TtestResult(statistic=-3.6555017036343607, pvalue=0.0037841961453242896, df=11) # SxC_Replay_T_result IS p<0.05 significant (pvalue=0.0037841961453242896)
+    
+    return LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result
+
+
+
+
+@function_attributes(short_name=None, tags=['epoch', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-11 14:13', related_items=[])
+def build_derived_epochs_dicts(owning_pipeline_reference):
+	""" builds three dictionaries containing all of the Epoch objects for {global, long, short}. Contains epochs that don't normally exist on the session object
+	
+	Usage:
+    	from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import build_derived_epochs_dicts
+    	all_epochs, long_only_all_epochs, short_only_all_epochs = build_derived_epochs_dicts(curr_active_pipeline)
+	
+	"""	
+    
+	long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+	long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
+
+	## Do all epoch computations on the original session. When done, should have: ['pbe', 'replay', 'laps', 'non_running_periods', 'non_replay_periods'
+	# dictionary of all epoch objects across the session
+	all_epochs: Dict[str,Epoch] = dict(
+		laps = owning_pipeline_reference.sess.laps.as_epoch_obj(),
+		pbe = owning_pipeline_reference.sess.pbe,
+		replay = Epoch(owning_pipeline_reference.sess.replay),
+		non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement()),
+		non_replay_periods = Epoch(Epoch.from_PortionInterval(owning_pipeline_reference.sess.replay.epochs.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]),  #[:-1] # any period except the replay ones, drop the infinite last entry
+	)
+
+	# Split into long/short only periods:
+	long_only_all_epochs: Dict[str,Epoch] = {k:v.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) for k,v in all_epochs.items()}
+	short_only_all_epochs: Dict[str,Epoch] = {k:v.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) for k,v in all_epochs.items()}
+
+	return all_epochs, long_only_all_epochs, short_only_all_epochs
+
+
+@function_attributes(short_name=None, tags=['inst_fr', 'spike_rate_Trends'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-11 14:13', related_items=[])
+def add_extra_spike_rate_trends(curr_active_pipeline) -> InstantaneousSpikeRateGroupsComputation:
+	""" independent of all other FR computations. Builds inst spike rate groups for the PBEs. 
+	
+    from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import add_extra_spike_rate_trends
+
+
+	"""
+	temp = InstantaneousSpikeRateGroupsComputation()
+	temp.active_identifying_session_ctx=curr_active_pipeline.sess.get_context()
+
+	long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+	long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
+
+	## Add additional Epochs:
+	all_epochs, long_only_all_epochs, short_only_all_epochs = build_derived_epochs_dicts(curr_active_pipeline)
+
+	## Manual User-annotation mode:
+	annotation_man: UserAnnotationsManager = UserAnnotationsManager()
+	session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[temp.active_identifying_session_ctx].get('session_cell_exclusivity', None)
+	if session_cell_exclusivity is not None:
+		print(f'setting LxC_aclus/SxC_aclus from user annotation.')
+		temp.LxC_aclus = session_cell_exclusivity.LxC
+		temp.SxC_aclus = session_cell_exclusivity.SxC
+	else:
+		print(f'WARN: no user annotation for session_cell_exclusivity')
+
+	are_LxC_empty: bool = (len(temp.LxC_aclus) == 0)
+	are_SxC_empty: bool = (len(temp.SxC_aclus) == 0)
+
+	temp.LxC_PBEsDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_only_all_epochs['pbe'], included_neuron_ids=temp.LxC_aclus, instantaneous_time_bin_size_seconds=temp.instantaneous_time_bin_size_seconds)
+	temp.LxC_PBEsDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_only_all_epochs['pbe'], included_neuron_ids=temp.LxC_aclus, instantaneous_time_bin_size_seconds=temp.instantaneous_time_bin_size_seconds)
+	temp.SxC_PBEsDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_only_all_epochs['pbe'], included_neuron_ids=temp.SxC_aclus, instantaneous_time_bin_size_seconds=temp.instantaneous_time_bin_size_seconds)
+	temp.SxC_PBEsDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_only_all_epochs['pbe'], included_neuron_ids=temp.SxC_aclus, instantaneous_time_bin_size_seconds=temp.instantaneous_time_bin_size_seconds)
+
+	# Note that in general LxC and SxC might have differing numbers of cells.
+	if (are_LxC_empty or are_SxC_empty):
+		temp.Fig2_PBEs_FR: list[SingleBarResult] = []
+		for v in (temp.LxC_PBEsDeltaMinus, temp.LxC_PBEsDeltaPlus, temp.SxC_PBEsDeltaMinus, temp.SxC_PBEsDeltaPlus):
+			if v is not None:
+				temp.Fig2_PBEs_FR.append(SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, temp.LxC_aclus, temp.SxC_aclus, None, None))
+			else:
+				temp.Fig2_PBEs_FR.append(SingleBarResult(None, None, np.array([], dtype=float), temp.LxC_aclus, temp.SxC_aclus, None, None))
+	else:
+		temp.Fig2_PBEs_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, temp.LxC_aclus, temp.SxC_aclus, None, None) for v in (temp.LxC_PBEsDeltaMinus, temp.LxC_PBEsDeltaPlus, temp.SxC_PBEsDeltaMinus, temp.SxC_PBEsDeltaPlus)]
+
+	return temp
+
+
 
 
 
@@ -1005,7 +1207,8 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
 
     # Critical new code: Not used anyhwere
     ratemap = long_pf1D.ratemap
-    included_unit_neuron_IDs = EITHER_subset.track_exclusive_aclus
+    # included_unit_neuron_IDs = EITHER_subset.track_exclusive_aclus
+    included_unit_neuron_IDs = EITHER_subset.get_refined_track_exclusive_aclus() # 2023-09-28 - "Refined"
     rediculous_final_sorted_all_included_neuron_ID, rediculous_final_sorted_all_included_pfmap = build_shared_sorted_neuronIDs(ratemap, included_unit_neuron_IDs, sort_ind=new_all_aclus_sort_indicies.copy())
 
 
@@ -1046,6 +1249,27 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
     # plot_aclus = EITHER_subset.track_exclusive_aclus[new_all_aclus_sort_indicies].copy()
     # _out_A = plot_kourosh_activity_style_figure(long_results_obj, long_session, plot_aclus, unit_sort_order=new_all_aclus_sort_indicies, epoch_idx=13, callout_epoch_IDXs=None, skip_rendering_callouts=False)
     # app, win, plots, plots_data = _out_A
+
+
+    # ==================================================================================================================== #
+    # 2023-09-26 - Presentation Figures:                                                                                   #
+    # ==================================================================================================================== #
+    
+    graphics_output_dict = {}
+
+    try:
+        # 2023-09-21 - Plot All
+        graphics_output_dict = graphics_output_dict | fig_remapping_cells(curr_active_pipeline)
+    except Exception:
+        print(f'plotting `fig_remapping_cells(...)` failed. Continuing.') 
+
+
+    try:
+        # 2023-09-21 - Plot All
+        graphics_outputs_list = fig_surprise_results(curr_active_pipeline)
+    except Exception:
+        print(f'plotting `fig_surprise_results(...)` failed. Continuing.')
+        
 
     # Unwrapping:
     # pf1d_compare_graphics, (example_epoch_rasters_L, example_epoch_rasters_S), example_stacked_epoch_graphics = _out_fig_1

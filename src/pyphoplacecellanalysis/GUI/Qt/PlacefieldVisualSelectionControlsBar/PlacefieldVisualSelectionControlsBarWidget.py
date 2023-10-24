@@ -18,12 +18,6 @@ from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlsBar.Uic_AUTO
 class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     """docstring for PlacefieldVisualSelectionControlsBarWidget."""
  
-    # spike_config_changed = QtCore.pyqtSignal(list, list, bool) # change_unit_spikes_included(self, neuron_IDXs=None, cell_IDs=None, are_included=True)
-    # tuning_curve_display_config_changed = QtCore.pyqtSignal(list, list) # on_update_tuning_curve_display_config(self, updated_config_indicies, updated_configs)
-    
-    # update_signal = QtCore.pyqtSignal(list, list, float, float, list, list, list, list)
-    # finish_signal = QtCore.pyqtSignal(float, float)
- 
     sigRefresh = QtCore.pyqtSignal(object)
     
     desired_full_panel_width = 1200
@@ -64,13 +58,6 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
         
         
     def initUI(self):
-        # self.setObjectName('placefieldControlsContainer')
-        # self.ui.btnToggleOccupancy
-        # self.ui.btnNonPlacefieldSpikes
-        
-        
-        
-        
         # self.ui.batchControlPanel.hide()
         self.resize(self.desired_full_panel_width, self.desired_full_panel_height)
         
@@ -122,7 +109,6 @@ class PlacefieldVisualSelectionControlsBarWidget(QtWidgets.QWidget):
     def onRefreshAction(self):
         print(f'PlacefieldVisualSelectionControlsBarWidget.onRefreshAction()')
         self.sigRefresh.emit(self)
-        # self.done(QtCore.Qt.WA_DeleteOnClose)
 
     @QtCore.pyqtSlot(object)
     def applyUpdatedConfigs(self, active_configs_map):

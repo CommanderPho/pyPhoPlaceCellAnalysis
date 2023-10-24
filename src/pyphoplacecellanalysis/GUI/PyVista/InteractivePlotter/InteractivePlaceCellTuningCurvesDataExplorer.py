@@ -32,6 +32,7 @@ from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsol
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import perform_plot_flat_arena
 #
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions3D
 
 
 # SpikesDataframeOwningFromSessionMixin
@@ -211,6 +212,12 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.params.setdefault('nan_opacity', 0.1)
         self.params.setdefault('should_override_disable_smooth_shading', True)
             
+        # Background Track/Maze rendering options:
+        self.params.setdefault('should_use_linear_track_geometry', False) # should only be True on the linear track with known geometry, otherwise it will be obviously incorrect.
+        if hasattr(self.active_config.plotting_config, 'should_use_linear_track_geometry') and (self.active_config.plotting_config.should_use_linear_track_geometry is not None):
+            self.params.should_use_linear_track_geometry = self.active_config.plotting_config.should_use_linear_track_geometry
+            
+
         ## TODO: I'm not sure about this one, we might want to override pf_colors_hex, or this could be where the issues where it wasn't displaying the colors I passed in were coming from.
         # if not self.params.hasattr('pf_colors_hex'):
         self.params.pf_colors_hex = [to_hex(self.params.pf_colors[:,i], keep_alpha=False) for i in self.tuning_curve_indicies]  ## TODO: where are these hex colors used, and is there an indexing issue here? (Confirm that self.tuning_curve_indicies is alsigned with self.params.pf_colors[:,i])
@@ -285,8 +292,8 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.p.enable_depth_peeling(number_of_peels=8, occlusion_ratio=0) # drastically improves rendering but bogs down performance
         
         # Plot the flat arena
-        self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
-        
+        self.plots['maze_bg'], self.plots_data['maze_bg'] = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
+
         if self.plot_placefields():
             needs_render = True
         

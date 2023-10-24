@@ -2,6 +2,7 @@ from attrs import define, field, asdict
 import numpy as np
 import pandas as pd
 from indexed import IndexedOrderedDict
+from typing import Optional, Dict, List
 import itertools
 
 # from neurodsp.burst import detect_bursts_dual_threshold, compute_burst_stats
@@ -25,6 +26,8 @@ from neuropy.utils.mixins.binning_helpers import BinningContainer # used in _per
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
@@ -39,10 +42,16 @@ import multiprocessing
 
 @custom_define(slots=False)
 class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
-
+    """ Computes instantaneous firing rates for each cell
+    
+    """
     epoch_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_epochs, n_cells)
     cell_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_cells,)
     all_agg_inst_fr: float = serialized_attribute_field(is_computable=True, init=False) # the scalar value that results from aggregating over ALL (timebins, epochs, cells)
+    
+    # Add aclu values:
+
+
     """ holds information relating to the firing rates of cells across time. 
     
     In general I'd want access to:
@@ -54,23 +63,46 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     #TODO 2023-07-31 08:36: - [ ] both of these properties would ideally be serialized to HDF, but they can't be right now.`
     inst_fr_df_list: list[pd.DataFrame] = non_serialized_field() # a list containing a inst_fr_df for each epoch. 
     inst_fr_signals_list: list[AnalogSignal] = non_serialized_field()
+    included_neuron_ids: Optional[np.ndarray] = serialized_field(default=None, is_computable=False) # .shape (n_cells,)
+    filter_epochs_df: pd.DataFrame = serialized_field(is_computable=False) # .shape (n_epochs, ...)
     
-
+    instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01, is_computable=False)
+    kernel_width_ms: float = serialized_attribute_field(default=10.0, is_computable=False)
+    
+    
     @classmethod
     def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms)) -> "SpikeRateTrends":
-        epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
-        _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list)
-        n_epochs = len(epoch_inst_fr_df_list)
+        if included_neuron_ids is None:
+            included_neuron_ids = spikes_df.spikes.neuron_ids
+        if len(included_neuron_ids)>0:
+            if isinstance(filter_epochs, pd.DataFrame):
+                filter_epochs_df = filter_epochs
+            else:
+                filter_epochs_df = filter_epochs.to_dataframe()
+                
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
+            _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
+                        instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
+            _out.recompute_on_update()
+        else:
+            _out = None # return None if included_neuron_ids are empty
+
+        return _out
+
+    def recompute_on_update(self):
+        """ called after update to self.inst_fr_df_list or self.inst_fr_signals_list to update all of the aggregate properties. 
+
+        """
+        n_epochs = len(self.inst_fr_df_list)
         assert n_epochs > 0        
-        n_cells = epoch_inst_fr_df_list[0].shape[1]
-        epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in _out.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
+        n_cells = self.inst_fr_df_list[0].shape[1]
+        epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
-        _out.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
+        self.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
         cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
         assert cell_agg_firing_rates_list.shape == (n_cells,)
-        _out.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
-        _out.all_agg_inst_fr = cell_agg_firing_rates_list.mean() # .magnitude.item() # scalar
-        return _out
+        self.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
+        self.all_agg_inst_fr = cell_agg_firing_rates_list.mean() # .magnitude.item() # scalar
 
 
     @classmethod
@@ -165,7 +197,8 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 4
     _is_global = False
 
-
+    @function_attributes(short_name='spike_burst_detection', tags=['spikes','burst'], input_requires=[], output_provides=[], uses=['safe_pandas_get_group','pybursts.kleinberg'], used_by=[], creation_date='2023-09-12 17:27', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['burst_detection'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['burst_detection']['burst_intervals']), is_global=False)
     def _perform_spike_burst_detection_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes periods when the cells are firing in bursts in a hierarchical manner
         
@@ -274,6 +307,9 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         return computation_result
     
     
+
+    @function_attributes(short_name='firing_rate_trends', tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-31 00:00', related_items=[],
+                         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends']['pf_included_spikes_only']), is_global=False)
     def _perform_firing_rate_trends_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes trends and time-courses of each neuron's firing rate. 
         
@@ -375,129 +411,6 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         # active_time_window_edges_binning_info = pf_included_spikes_only['time_window_edges_binning_info']
         # active_time_binned_unit_specific_binned_spike_rate = pf_included_spikes_only['time_binned_unit_specific_binned_spike_rate']
         # active_time_binned_unit_specific_binned_spike_counts = pf_included_spikes_only['time_binned_unit_specific_binned_spike_counts']
-
-
-    # def _perform_instantaneous_firing_rates_for_epochs_computation(computation_result: ComputationResult, debug_print=False):
-    #     """ Computes trends and time-courses of each neuron's firing rate. 
-        
-    #     Requires:
-    #         ['pf2D']
-            
-    #     Provides:
-    #         computation_result.computed_data['firing_rate_trends']
-    #             ['firing_rate_trends']['time_bin_size_seconds']
-                
-    #             ['firing_rate_trends']['all_session_spikes']:
-    #                 ['firing_rate_trends']['all_session_spikes']['time_binning_container']
-    #                 ['firing_rate_trends']['all_session_spikes']['time_window_edges']
-    #                 ['firing_rate_trends']['all_session_spikes']['time_window_edges_binning_info']
-    #                 ['firing_rate_trends']['all_session_spikes']['time_binned_unit_specific_binned_spike_rate']
-    #                 ['firing_rate_trends']['all_session_spikes']['min_spike_rates']
-    #                 ['firing_rate_trends']['all_session_spikes']['mean_spike_rates']
-    #                 ['firing_rate_trends']['all_session_spikes']['median_spike_rates']
-    #                 ['firing_rate_trends']['all_session_spikes']['max_spike_rates']
-    #                 ['firing_rate_trends']['all_session_spikes']['instantaneous_unit_specific_spike_rate']
-    #                 ['firing_rate_trends']['all_session_spikes']['instantaneous_unit_specific_spike_rate_values_df']
-                    
-    #             ['firing_rate_trends']['pf_included_spikes_only']:
-    #                 ['firing_rate_trends']['pf_included_spikes_only']['time_binning_container']
-    #                 ['firing_rate_trends']['pf_included_spikes_only']['time_window_edges']
-    #                 ['firing_rate_trends']['pf_included_spikes_only']['time_window_edges_binning_info']
-    #                 ['firing_rate_trends']['pf_included_spikes_only']['time_binned_unit_specific_binned_spike_rate']
-    #                 ['firing_rate_trends']['pf_included_spikes_only']['min_spike_rates']
-    #                 ['firing_rate_trends']['pf_included_spikes_only']['mean_spike_rates']
-    #                 ['firing_rate_trends']['pf_included_spikes_only']['median_spike_rates']
-    #                 ['firing_rate_trends']['pf_included_spikes_only']['max_spike_rates']
-        
-    #     """
-
-
-    #     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    #     long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
-    #     (epochs_df_L, epochs_df_S), (filter_epoch_spikes_df_L, filter_epoch_spikes_df_S), (good_example_epoch_indicies_L, good_example_epoch_indicies_S), (short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset), new_all_aclus_sort_indicies, assigning_epochs_obj = PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline)
-        
-
-    #     long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
-    #     x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
-    #     active_context = long_short_fr_indicies_analysis_results['active_context']
-    #     long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
-
-
-    #     # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
-    #     # LxC: `long_exclusive.track_exclusive_aclus`
-    #     # ReplayDeltaMinus: `long_replays`
-    #     LxC_ReplayDeltaMinus = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=long_exclusive.track_exclusive_aclus)
-    #     # ReplayDeltaPlus: `short_replays`
-    #     LxC_ReplayDeltaPlus = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=long_exclusive.track_exclusive_aclus)
-
-    #     # SxC: `short_exclusive.track_exclusive_aclus`
-    #     # ReplayDeltaMinus: `long_replays`
-    #     SxC_ReplayDeltaMinus = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=short_exclusive.track_exclusive_aclus)
-    #     # ReplayDeltaPlus: `short_replays`
-    #     SxC_ReplayDeltaPlus = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=short_exclusive.track_exclusive_aclus)
-
-    #     # Note that in general LxC and SxC might have differing numbers of cells.
-    #     Fig2_Replay_FR = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std()) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
-    #     Fig2_Replay_FR
-
-    #     # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
-    #     # LxC: `long_exclusive.track_exclusive_aclus`
-    #     # ThetaDeltaMinus: `long_laps`
-    #     LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=long_exclusive.track_exclusive_aclus)
-    #     # ThetaDeltaPlus: `short_laps`
-    #     LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=long_exclusive.track_exclusive_aclus)
-
-    #     # SxC: `short_exclusive.track_exclusive_aclus`
-    #     # ThetaDeltaMinus: `long_laps`
-    #     SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=short_exclusive.track_exclusive_aclus)
-    #     # ThetaDeltaPlus: `short_laps`
-    #     SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=short_exclusive.track_exclusive_aclus)
-
-    #     # Note that in general LxC and SxC might have differing numbers of cells.
-    #     Fig2_Laps_FR = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std()) for v in (LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus)]
-    #     Fig2_Laps_FR
-
-
-    #     computation_result.computed_data['firing_rate_trends'] = DynamicParameters.init_from_dict({
-    #         'time_bin_size_seconds': time_bin_size_seconds,
-    #         'all_session_spikes': DynamicParameters.init_from_dict({
-    #             'time_binning_container': sess_time_binning_container,
-    #             'time_window_edges': sess_time_window_edges,
-    #             'time_window_edges_binning_info': sess_time_window_edges_binning_info,
-    #             'time_binned_unit_specific_binned_spike_rate': sess_unit_specific_binned_spike_rate_df,
-    #             'time_binned_unit_specific_binned_spike_counts': sess_unit_specific_binned_spike_counts_df,
-    #             'min_spike_rates': sess_min_spike_rates,
-    #             'mean_spike_rates': sess_mean_spike_rates,
-    #             'median_spike_rates': sess_median_spike_rates,
-    #             'max_spike_rates': sess_max_spike_rates,
-    #             'instantaneous_unit_specific_spike_rate': sess_unit_specific_inst_spike_rate,
-    #             'instantaneous_unit_specific_spike_rate_values_df': sess_unit_specific_inst_spike_rate_values_df,
-    #         }),
-    #         'pf_included_spikes_only': DynamicParameters.init_from_dict({
-    #             'time_binning_container': pf_only_time_binning_container,
-    #             'time_window_edges': pf_only_time_window_edges,
-    #             'time_window_edges_binning_info': pf_only_time_window_edges_binning_info,
-    #             'time_binned_unit_specific_binned_spike_rate': pf_only_unit_specific_binned_spike_rate_df,
-    #             'time_binned_unit_specific_binned_spike_counts': pf_only_unit_specific_binned_spike_counts_df,
-    #             'min_spike_rates': pf_only_min_spike_rates,
-    #             'mean_spike_rates': pf_only_mean_spike_rates,
-    #             'median_spike_rates': pf_only_median_spike_rates,
-    #             'max_spike_rates': pf_only_max_spike_rates,                
-    #         }),
-    #     })
-    #     return computation_result
-    #     # can access via:
-    #     # active_firing_rate_trends = curr_active_pipeline.computation_results[global_epoch_name].computed_data.get('firing_rate_trends', None)
-    #     # active_time_bin_size_seconds = active_firing_rate_trends['time_bin_size_seconds']
-    #     # active_all_session_spikes = active_firing_rate_trends['all_session_spikes']
-    #     # active_pf_included_spikes_only = active_firing_rate_trends['pf_included_spikes_only']
-    #     # active_time_binning_container, active_time_window_edges, active_time_window_edges_binning_info, active_time_binned_unit_specific_binned_spike_rate, active_time_binned_unit_specific_binned_spike_counts = pf_included_spikes_only['time_binning_container'], pf_included_spikes_only['time_window_edges'], pf_included_spikes_only['time_window_edges_binning_info'], pf_included_spikes_only['time_binned_unit_specific_binned_spike_rate'], pf_included_spikes_only['time_binned_unit_specific_binned_spike_counts']
-
-    #     # active_time_binning_container = pf_included_spikes_only['time_binning_container']
-    #     # active_time_window_edges = pf_included_spikes_only['time_window_edges']
-    #     # active_time_window_edges_binning_info = pf_included_spikes_only['time_window_edges_binning_info']
-    #     # active_time_binned_unit_specific_binned_spike_rate = pf_included_spikes_only['time_binned_unit_specific_binned_spike_rate']
-    #     # active_time_binned_unit_specific_binned_spike_counts = pf_included_spikes_only['time_binned_unit_specific_binned_spike_counts']
 
 
 

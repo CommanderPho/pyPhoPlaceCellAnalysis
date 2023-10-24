@@ -6,7 +6,7 @@ from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 
 from pyphocorehelpers.indexing_helpers import get_dict_subset
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins import NeuronConfigOwningMixin
+from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import NeuronConfigOwningMixin
 from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_placefields2D, update_plotColorsPlacefield2D
 
 class PlacefieldOwningMixin(NeuronIdentityAccessingMixin, NeuronConfigOwningMixin):

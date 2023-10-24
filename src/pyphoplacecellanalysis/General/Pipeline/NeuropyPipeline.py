@@ -23,9 +23,10 @@ from attrs import define, field, Factory
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
-importlib.reload(core)
+# importlib.reload(core)
 
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.hashing_helpers import get_hash_tuple, freeze
 from pyphocorehelpers.mixins.diffable import DiffableObject
 from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
@@ -35,6 +36,7 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 from neuropy.utils.result_context import IdentifyingContext
 
+from pyphocorehelpers.print_helpers import CapturedException
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
@@ -584,7 +586,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         del state['_persistance_state']
         del state['_plot_object']
         #TODO 2023-06-09 12:06: - [ ] What about the display objects?
-        
+
+        # ## self.stage approach:
+        # stage = state.get('stage', None)
+        # if stage is not None:
+        #     del stage['display_output'] # self.stage.display_output
+        #     del stage['display_output'] # self.stage.display_output
+
+
         del state['_registered_output_files']
         del state['_outputs_specifier']
         # del state['_pickle_path']
@@ -634,11 +643,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # Reload both the computation and display functions to get the updated values:
         self.reload_default_computation_functions()
         self.reload_default_display_functions()
+        self.clear_display_outputs()
         self.clear_registered_output_files() # outputs are reset each load, should they be?
 
 
 
-    def save_pipeline(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle.pkl'):
+    def save_pipeline(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle.pkl', override_pickle_path: Optional[Path]=None):
         """ pickles (saves) the entire pipeline to a file that can be loaded later without recomputing.
 
         Args:
@@ -661,12 +671,30 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         else:
             ## Build Pickle Path:
             used_existing_pickle_path = False
-            if active_pickle_filename is None:
+            if (active_pickle_filename is None) and (override_pickle_path is None):
+                # simplest case, use existing path because nothing is provided
                 assert self.has_associated_pickle
                 finalized_loaded_sess_pickle_path = self.pickle_path # get the internal pickle path that it was loaded from if none specified
+                
+                # get existing pickle path:
+                # finalized_loaded_sess_pickle_path.stem
                 used_existing_pickle_path = True
-            else:        
-                finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve() # Uses the './loadedSessPickle.pkl' path
+
+            else:
+                if override_pickle_path is not None:
+                    if not override_pickle_path.is_dir():
+                        # a full filepath, just use that directly
+                        finalized_loaded_sess_pickle_path = override_pickle_path.resolve()
+                    else:
+                        # default case, assumed to be a directory and we'll use the normal filename.
+                        assert self.has_associated_pickle
+                        # get existing pickle filename:
+                        active_pickle_filename = self.pickle_path.name
+                        finalized_loaded_sess_pickle_path = Path(override_pickle_path).joinpath(active_pickle_filename).resolve()                     
+                else:
+                    # use `self.sess.basepath`
+                    finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve() # Uses the './loadedSessPickle.pkl' path
+
                 # finalized_loaded_sess_pickle_path = self.get_output_path().joinpath(active_pickle_filename).resolve() # Changed to use the 'output/loadedSessPickle.pkl' directory 
                 used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
             
@@ -762,19 +790,29 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
         # Flat_epoch_time_bins_mean, Flat_decoder_time_bin_centers, num_neurons, num_timebins_in_epoch, num_total_flat_timebins, is_short_track_epoch, is_long_track_epoch, short_short_diff, long_long_diff = expected_v_observed_result.Flat_epoch_time_bins_mean, expected_v_observed_result.Flat_decoder_time_bin_centers, expected_v_observed_result.num_neurons, expected_v_observed_result.num_timebins_in_epoch, expected_v_observed_result.num_total_flat_timebins, expected_v_observed_result.is_short_track_epoch, expected_v_observed_result.is_long_track_epoch, expected_v_observed_result.short_short_diff, expected_v_observed_result.long_long_diff
 
+
+        # Rate Remapping _____________________________________________________________________________________________________ #
+        rate_remapping_df = rate_remapping_df[['laps',	'replays',	'skew',	'max_axis_distance_from_center',	'distance_from_center', 	'has_considerable_remapping']]
+        rate_remapping_df.to_hdf(file_path, key=f'{a_global_computations_group_key}/rate_remapping', format='table', data_columns=True)
+
         # jonathan_firing_rate_analysis_result _______________________________________________________________________________ #
         jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = self.global_computation_results.computed_data.jonathan_firing_rate_analysis
         jonathan_firing_rate_analysis_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/jonathan_fr_analysis', active_context=session_context)
 
         # InstantaneousSpikeRateGroupsComputation ____________________________________________________________________________ #
-        inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
-        # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
-        inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+        try:
+            inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+            # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
+            inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
+        except KeyError:
+            print(f'long_short_inst_spike_rate_groups is missing and will be skipped')
+        except BaseException:
+            raise
 
         if not isinstance(expected_v_observed_result, ExpectedVsObservedResult):
             expected_v_observed_result = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
         
-        expected_v_observed_result.to_hdf('output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
+        expected_v_observed_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/expected_v_observed_result', active_context=session_context) # 'output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
 
 
         ##TODO: remainder of global_computations
@@ -782,7 +820,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
         AcrossSessionsResults.build_neuron_identity_table_to_hdf(file_path, key=session_group_key, spikes_df=self.sess.spikes_df, session_uid=session_uid)
 
-        
 
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path
@@ -821,7 +858,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             a_computed_data.pf2D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D")
             ## TODO: encode the rest of the computed_data
 
-
+            try:
+                a_computed_data.pf1D_dt.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D_dt") # damn this will be called with the `tb` still having the thingy open
+                a_computed_data.pf2D_dt.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D_dt")
+            except BaseException:
+                print(f'could not output time-dependent placefields to .h5. Skipping.')
+                pass
 
         # Done, in future could potentially return the properties that it couldn't serialize so the defaults can be tried on them.
         # or maybe returns groups? a_filter_group
@@ -829,7 +871,55 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # super().to_hdf(self, file_path, key, **kwargs)
 
 
-        
+    @property
+    def h5_export_path(self):
+        hdf5_output_path: Path = self.get_output_path().joinpath('pipeline_results.h5').resolve()
+        return hdf5_output_path
+
+
+    @function_attributes(short_name=None, tags=['h5', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-26 06:38', related_items=[])
+    def export_pipeline_to_h5(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True):
+        """ Export the pipeline's HDF5 as 'pipeline_results.h5'
+
+        TODO: check timestamp of last computed file.
+
+        """
+        ## Case 1. `override_path` is provided:
+        if override_path is not None:
+            ## override_path is provided:
+            if not isinstance(override_path, Path):
+                override_path = Path(override_path).resolve()
+            # Case 1a: `override_path` is a complete file path
+            if not override_path.is_dir():
+                # a full filepath, just use that directly
+                hdf5_output_path = override_path.resolve()
+            else:
+                # default case, assumed to be a directory and we'll use the normal filename.
+                active_global_pickle_filename: str = (override_filename or self.h5_export_path.name or 'pipeline_results.h5')
+                hdf5_output_path = override_path.joinpath(active_global_pickle_filename).resolve()
+        else:
+            # No override path provided
+            if override_filename is None:
+                # no filename provided either, use default global pickle path:
+                hdf5_output_path = self.h5_export_path
+            else:
+                # Otherwise use default output path but specified override_global_pickle_filename:
+                hdf5_output_path = self.get_output_path().joinpath(override_filename).resolve() 
+
+        print(f'pipeline hdf5_output_path: {hdf5_output_path}')
+        e = None
+        try:
+            self.to_hdf(file_path=hdf5_output_path, key="/")
+            return (hdf5_output_path, None)
+        except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {e} while trying to build the session HDF output.")
+            if fail_on_exception:
+                raise e.exc
+            hdf5_output_path = None # set to None because it failed.
+            return (hdf5_output_path, e)
+
     
 
 

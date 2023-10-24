@@ -2,11 +2,9 @@ from pathlib import Path
 import pyvista as pv
 import pyvistaqt as pvqt
 
-from neuropy.utils.dynamic_container import overriding_dict_with
-
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
-from pyphoplacecellanalysis.General.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
+from pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs import PlottingConfig, InteractivePlaceCellConfig
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 

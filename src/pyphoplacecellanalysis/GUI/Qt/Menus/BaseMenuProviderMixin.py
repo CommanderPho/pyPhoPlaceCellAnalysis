@@ -1,6 +1,8 @@
 from qtpy import QtCore, QtGui, QtWidgets
+from attrs import define, field, Factory
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 # from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
@@ -11,13 +13,14 @@ def initialize_global_menu_ui_variables_if_needed(a_main_window):
     """
     return PhoMenuHelper.initialize_global_menu_ui_variables_if_needed(a_main_window)
     
-         
+
+@define(slots=False)
 class BaseMenuCommand:
     """
     An abstract base command to be executed from a Menu item
     """
-    def __init__(self) -> None:
-        pass
+    # def __init__(self) -> None:
+    #     pass
 
     @property
     def is_visible(self):
@@ -33,6 +36,30 @@ class BaseMenuCommand:
     
     def __call__(self, *args, **kwds):
         return self.execute(*args, **kwds)
+    
+
+
+# class BaseMenuCommand:
+#     """
+#     An abstract base command to be executed from a Menu item
+#     """
+#     def __init__(self) -> None:
+#         pass
+
+#     @property
+#     def is_visible(self):
+#         return True
+    
+#     @property
+#     def is_enabled(self):
+#         return True
+        
+#     def execute(self, *args, **kwargs) -> None:
+#         """ Implicitly captures spike_raster_window """
+#         raise NotImplementedError # implementors must override        
+    
+#     def __call__(self, *args, **kwds):
+#         return self.execute(*args, **kwds)
 
 
 class BaseMenuProviderMixin(QtCore.QObject):
@@ -91,7 +118,7 @@ class BaseMenuProviderMixin(QtCore.QObject):
         self._root_window = PhoMenuHelper.try_get_menu_window(render_widget)
     
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def BaseMenuProviderMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         # Assumes that self is a QWidget subclass:
@@ -102,7 +129,7 @@ class BaseMenuProviderMixin(QtCore.QObject):
         
 
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def BaseMenuProviderMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
@@ -127,20 +154,20 @@ class BaseMenuProviderMixin(QtCore.QObject):
         pass
     
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def BaseMenuProviderMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self._BaseMenuProviderMixin_build_actions()
         self._BaseMenuProviderMixin_build_menus()
     
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def BaseMenuProviderMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         pass
 
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def BaseMenuProviderMixin_on_menus_update(self):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         pass

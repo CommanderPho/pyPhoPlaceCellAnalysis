@@ -26,7 +26,8 @@ from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpe
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
-
+from neuropy.utils.mixins.peak_location_representing import PeakLocationRepresentingMixin
+    
 
 # cut_bins = np.linspace(59200, 60800, 9)
 # pd.cut(df['column_name'], bins=cut_bins)
@@ -388,8 +389,8 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
     """
-    decoding_time_bin_size: float
-    num_filter_epochs: int # depends on the number of epochs
+    decoding_time_bin_size: float # the time bin_size in seconds
+    num_filter_epochs: int # depends on the number of epochs (`n_epochs`)
     most_likely_positions_list: list = field(metadata={'shape': ('n_epochs',)})
     p_x_given_n_list: list = field(metadata={'shape': ('n_epochs',)})
     marginal_x_list: list = field(metadata={'shape': ('n_epochs',)})
@@ -411,6 +412,55 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         timebins_p_x_given_n = np.hstack(self.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
         # TODO 2023-04-13 -can these squished similar way?: most_likely_positions_list, most_likely_position_indicies_list 
         return n_timebins, flat_time_bin_containers, timebins_p_x_given_n
+
+
+    def flatten_to_masked_values(self):
+        """ appends np.nan values to the beginning and end of each posterior (adding a start and end timebin as well) to allow flat plotting via matplotlib.
+
+
+        """
+        # returns a flattened version of self over all epochs
+        updated_is_masked_bin = []
+        updated_time_bin_containers = []
+        updated_timebins_p_x_given_n = []
+
+        decoding_time_bin_size: float = self.decoding_time_bin_size
+        desired_n_timebins = self.nbins + 2 # add two to each element for the start/end bin
+
+        total_n_timebins = np.sum(self.nbins)
+        desired_total_n_timebins = np.sum(desired_n_timebins)
+
+
+        for epoch_idx in np.arange(self.num_filter_epochs):
+            a_curr_num_bins: int = self.nbins[epoch_idx]
+            updated_curr_num_bins = a_curr_num_bins + 2 # add two (start/end) bins
+            a_centers = self.time_bin_containers[epoch_idx].centers
+            a_posterior = self.p_x_given_n_list[epoch_idx]
+            n_pos_bins = np.shape(a_posterior)[0]
+            
+            updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
+            updated_posterior[:,1:-1] = a_posterior
+
+            curr_is_masked_bin = np.full((updated_curr_num_bins,), True)
+            curr_is_masked_bin[1:-1] = False
+
+            ## Add the start/end bin
+            # a_centers.
+            updated_time_bin_containers.append([(a_centers[0]-decoding_time_bin_size), list(a_centers), (a_centers[-1]+decoding_time_bin_size)])
+            updated_timebins_p_x_given_n.append(updated_posterior)
+            updated_is_masked_bin.append(curr_is_masked_bin)
+
+    
+        updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        updated_time_bin_containers = np.hstack(np.hstack(updated_time_bin_containers))
+        updated_is_masked_bin = np.hstack(updated_is_masked_bin)
+
+        assert np.shape(updated_time_bin_containers)[0] == desired_total_n_timebins
+        assert np.shape(updated_timebins_p_x_given_n)[1] == desired_total_n_timebins
+        assert np.shape(updated_is_masked_bin)[0] == desired_total_n_timebins
+
+        return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
+
 
 
     def filtered_by_epochs(self, included_epoch_indicies):
@@ -444,7 +494,7 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
 # ==================================================================================================================== #
 
 @custom_define(slots=False)
-class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicableObjectProtocol):
+class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
 
@@ -504,6 +554,13 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicab
     def flat_position_size(self):
         """The flat_position_size property."""
         return np.shape(self.F)[0] # like 288
+
+    # PeakLocationRepresentingMixin conformances:
+    @property
+    def PeakLocationRepresentingMixin_peak_curves_variable(self) -> np.array:
+        """ the variable that the peaks are calculated and returned for """
+        return self.ratemap.PeakLocationRepresentingMixin_peak_curves_variable
+    
 
     # ==================================================================================================================== #
     # Initialization                                                                                                       #
@@ -957,7 +1014,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, NeuronUnitSlicab
     @classmethod
     def perform_compute_most_likely_positions(cls, flat_p_x_given_n, original_position_data_shape):
         """ Computes the most likely positions at each timestep from flat_p_x_given_n and the shape of the original position data """
-        most_likely_position_flat_indicies = np.argmax(flat_p_x_given_n, axis=0)        
+        most_likely_position_flat_indicies = np.argmax(flat_p_x_given_n, axis=0)
         most_likely_position_indicies = np.array(np.unravel_index(most_likely_position_flat_indicies, original_position_data_shape)) # convert back to an array
         # np.shape(most_likely_position_flat_indicies) # (85841,)
         # np.shape(most_likely_position_indicies) # (2, 85841)

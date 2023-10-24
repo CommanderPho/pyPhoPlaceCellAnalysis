@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from datetime import datetime
 import pathlib
 from pathlib import Path
+import shutil # for _backup_extant_file(...)
+
+import pandas as pd
+
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -25,25 +30,105 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.LoadFunctions.LoadFunctionRe
 import dill as pickle # requires mamba install dill -c conda-forge
 
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter
+from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
 
-# Its important to use binary mode
-def saveData(pkl_path, db, should_append=False):
+
+def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_original:bool=False, backup_minimum_difference_MB:int=5):
+    """ saves the output data in a way that doesn't corrupt it if the pickling fails and the original file is retained.
+    
+    backup_file_if_smaller_than_original:bool - if True, creates a backup of the old file if the new file is smaller.
+    backup_minimum_difference_MB:int = 5 # don't backup for an increase of 5MB or less, ignored unless backup_file_if_smaller_than_original==True
+    """
+    if not isinstance(pkl_path, Path):
+        pkl_path = Path(pkl_path).resolve()
     if should_append:
         file_mode = 'ab' # 'ab' opens the file as binary and appends to the end
     else:
         file_mode = 'w+b' # 'w+b' opens and truncates the file to 0 bytes (overwritting)
-    with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
-        with open(pkl_path, file_mode) as dbfile: 
-            # source, destination
-            pickle.dump(db, dbfile)
-            dbfile.close()
 
+    is_temporary_file_used:bool = False
+    _desired_final_pickle_path = None
+    if pkl_path.exists():
+        # file already exists:
+        
+        ## Save under a temporary name in the same output directory, and then compare post-hoc
+        _desired_final_pickle_path = pkl_path
+        pkl_path, _ = build_unique_filename(pkl_path, additional_postfix_extension='tmp') # changes the final path to the temporary file created.
+        is_temporary_file_used = True # this is the only condition where this is true
+            
+    # Save reloaded pipeline out to pickle for future loading
+    with ProgressMessagePrinter(_desired_final_pickle_path, f"Saving (file mode '{_desired_final_pickle_path}')", 'saved session pickle file'):
+        try:
+            with open(pkl_path, file_mode) as dbfile: 
+                # source, destination
+                pickle.dump(db, dbfile)
+                dbfile.close()
+            # Pickling succeeded
+
+            # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
+            if is_temporary_file_used:
+                assert _desired_final_pickle_path is not None
+                if backup_file_if_smaller_than_original:
+                    prev_extant_file_size_MB = print_filesystem_file_size(_desired_final_pickle_path, enable_print=False)
+                    new_temporary_file_size_MB = print_filesystem_file_size(pkl_path, enable_print=False)
+                    if (backup_minimum_difference_MB < (prev_extant_file_size_MB - new_temporary_file_size_MB)):
+                        print(f'\tWARNING: prev_extant_file_size_MB ({prev_extant_file_size_MB} MB) > new_temporary_file_size_MB ({new_temporary_file_size_MB} MB)! A backup will be made!')
+                        # Backup old file:
+                        backup_extant_file(_desired_final_pickle_path) # only backup if the new file is smaller than the older one (meaning the older one has more info)
+                
+                # replace the old file with the new one:
+                print(f"\tmoving new output at '{pkl_path}' -> to desired location: '{_desired_final_pickle_path}'")
+                shutil.move(pkl_path, _desired_final_pickle_path) # move the temporary file to the desired destination, overwriting it
+
+        except Exception as e:
+            print(f"pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!\nException: {e}")
+            # delete the incomplete pickle file
+            if is_temporary_file_used:
+                pkl_path.unlink(missing_ok=True) # removes the incomplete file. The user's file located at _desired_final_pickle_path is still intact.
+            raise e
+    
+    
+        
+
+# Its important to use binary mode
+def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
+    """ 
+    
+    safe_save: If True, a temporary extension is added to the save path if the file already exists and the file is only overwritten if pickling doesn't throw an exception.
+        This temporarily requires double the disk space.
+        
+    """
+    if safe_save:
+        safeSaveData(pkl_path, db=db, should_append=should_append)
+    else:
+        if should_append:
+            file_mode = 'ab' # 'ab' opens the file as binary and appends to the end
+        else:
+            file_mode = 'w+b' # 'w+b' opens and truncates the file to 0 bytes (overwritting)
+        if not isinstance(pkl_path, Path):
+            pkl_path = Path(pkl_path).resolve()
+            
+        with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
+            with open(pkl_path, file_mode) as dbfile: 
+                # source, destination
+                pickle.dump(db, dbfile)
+                dbfile.close()
+
+    
 
 # global_move_modules_list: Dict[str, str] - a dict with keys equal to the old full path to a class and values equal to the updated (replacement) full path to the class. Used to update the path to class definitions for loading previously pickled results after refactoring.
 
 global_move_modules_list:Dict={
     'pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper.SingleBarResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.SingleBarResult',
     'pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper.InstantaneousSpikeRateGroupsComputation':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations.InstantaneousSpikeRateGroupsComputation',
+    	# 'pyphoplacecellanalysis.General.Configs.DynamicConfigs.*':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.*', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.VideoOutputModeConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.VideoOutputModeConfig', # VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
+	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.PlottingConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.PlottingConfig',
+	'pyphoplacecellanalysis.General.Configs.DynamicConfigs.InteractivePlaceCellConfig':'pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs.InteractivePlaceCellConfig',
+	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
+	'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.SingleNeuronPlottingExtended':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig.SingleNeuronPlottingExtended',
+	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
 }
 
 
@@ -168,6 +253,23 @@ class LoadableSessionInput:
     @session_name.setter
     def session_name(self, value):
         self.sess.name = value
+        
+
+    @function_attributes(tags=['output_files', 'filesystem'], related_items=[])
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        return self.sess.get_output_path()
+
+    def get_session_context(self) -> IdentifyingContext:
+        """ returns the context of the unfiltered session (self.sess) """
+        return self.sess.get_context()
+
+    def get_session_unique_aclu_information(self) -> pd.DataFrame:
+        """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns """
+        return self.sess.spikes_df.spikes.extract_unique_neuron_identities()
+    
+
+
 
 
 @metadata_attributes(short_name=None, tags=['registered_output_files', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-24 09:00', related_items=[])
@@ -302,8 +404,6 @@ class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipeli
         self.registered_load_function_dict[registered_name] = load_function
         
 
-
-
     def post_load(self, progress_logger=None, debug_print=False):
         """ Called after load is complete to post-process the data """
         if (len(self.post_load_functions) > 0):
@@ -320,6 +420,32 @@ class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipeli
                 print(f'No post_load_functions, skipping post_load.')
             if progress_logger is not None:
                 progress_logger.debug(f'No post_load_functions, skipping post_load.')
+                
+
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        del state['registered_load_function_dict']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(LoadedPipelineStage, self).__init__() # from 
+
+        self.registered_load_function_dict = {}
+        self.register_default_known_load_functions() # registers the default load functions
+
+
+    
+
+
+
+
+
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #
@@ -372,4 +498,16 @@ class PipelineWithLoadableStage(RegisteredOutputsMixin):
         self.stage.post_load(progress_logger=self.logger)
 
         
+    ## Session passthroughs:
+    @function_attributes(tags=['output_files', 'filesystem'], related_items=[])
+    def get_output_path(self) -> Path:
+        """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
+        return self.stage.get_output_path()
 
+    def get_session_context(self) -> IdentifyingContext:
+        """ returns the context of the unfiltered session (self.sess) """
+        return self.stage.get_session_context()
+
+    def get_session_unique_aclu_information(self) -> pd.DataFrame:
+        """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns """
+        return self.stage.get_session_unique_aclu_information()

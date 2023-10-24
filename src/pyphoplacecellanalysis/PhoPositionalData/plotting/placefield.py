@@ -17,6 +17,7 @@ from qtpy import QtGui # for QColor
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList
+from pyphocorehelpers.function_helpers import function_attributes
 
 # Fixed Geometry objects:
 animal_location_sphere = pv.Sphere(radius=2.3)
@@ -37,6 +38,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import minmax_scale
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.saving import save_to_multipage_pdf
+
 
 # noinspection PyUnresolvedReferences
 import vtkmodules.vtkRenderingOpenGL2
@@ -151,6 +153,7 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
 
 
 # 2d Placefield comparison figure:
+@function_attributes(short_name=None, tags=['pf1D', '1D'], input_requires=[], output_provides=[], uses=['plot_placefield_tuning_curve', 'active_epoch_placefields1D.plotRaw_v_time'], used_by=['plot_1d_placecell_validations'], creation_date='2023-09-06 01:55', related_items=[])
 def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None, extant_axes=None, **kwargs):
     """ A single cell method of analyzing 1D placefields and the spikes that create them 
     
@@ -183,6 +186,7 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     should_include_trajectory = kwargs.get('should_include_trajectory', True) # whether the plot should include 
     should_include_labels = kwargs.get('should_include_labels', True) # whether the plot should include text labels, like the title, axes labels, etc
     should_include_plotRaw_v_time_spikes = kwargs.get('should_include_spikes', True) # whether the plot should include plotRaw_v_time-spikes, should be set to False to plot completely with the new all spikes mode
+    use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
 
     if extant_fig is not None:
         fig = extant_fig # use the existing passed figure
@@ -199,8 +203,8 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
         # Layout Subplots in Figure:
         gs = fig.add_gridspec(1, 8)
         gs.update(wspace=0, hspace=0.05) # set the spacing between axes.
-        ax_activity_v_time = fig.add_subplot(gs[0, :-1])
-        ax_pf_tuning_curve = fig.add_subplot(gs[0, -1], sharey=ax_activity_v_time)
+        ax_activity_v_time = fig.add_subplot(gs[0, :-1]) # all except the last element are the trajectory over time
+        ax_pf_tuning_curve = fig.add_subplot(gs[0, -1], sharey=ax_activity_v_time) # The last element is the tuning curve
         if should_include_labels:
             ax_pf_tuning_curve.set_title('Normalized Placefield', fontsize='14')
         ax_pf_tuning_curve.set_xticklabels([])
@@ -218,7 +222,8 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_alpha=spikes_alpha,
             position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5},
             spike_plot_kwargs=spike_plot_kwargs,
-            should_include_labels=should_include_labels, should_include_trajectory=should_include_trajectory, should_include_spikes=should_include_plotRaw_v_time_spikes
+            should_include_labels=should_include_labels, should_include_trajectory=should_include_trajectory, should_include_spikes=should_include_plotRaw_v_time_spikes,
+            use_filtered_positions=use_filtered_positions,
         ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
     t_start = kwargs.get('t_start', active_epoch_placefields1D.t[0])
     t_end = kwargs.get('t_end', active_epoch_placefields1D.t[-1])
@@ -282,13 +287,13 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
 # Private _____________________________________________________________________________________________________________ #
 def _build_custom_placefield_maps_lookup_table(curr_active_neuron_color, num_opacity_tiers, opacity_tier_values):
     """
-Inputs:
-    curr_active_neuron_color: an RGBA value
-Usage:
-    build_custom_placefield_maps_lookup_table(curr_active_neuron_color, 3, [0.0, 0.6, 1.0])
-"""
-# opacity_tier_values: [0.0, 0.6, 1.0]
-# Build a simple lookup table of the curr_active_neuron_color with varying opacities
+    Inputs:
+        curr_active_neuron_color: an RGBA value
+    Usage:
+        build_custom_placefield_maps_lookup_table(curr_active_neuron_color, 3, [0.0, 0.6, 1.0])
+    """
+    # opacity_tier_values: [0.0, 0.6, 1.0]
+    # Build a simple lookup table of the curr_active_neuron_color with varying opacities
 
     if isinstance(curr_active_neuron_color, (tuple, list)):
         curr_active_neuron_color = np.array(curr_active_neuron_color)
@@ -322,7 +327,7 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
         placefield_plotting_mixins.PlacefieldRenderingPyVistaMixin.plot_placefields()
         
     """
-# active_placefields: Pf2D    
+    # active_placefields: Pf2D    
 
     params = ({'should_use_normalized_tuning_curves':True, # Default True
     'should_pdf_normalize_manually':False, # Default False.

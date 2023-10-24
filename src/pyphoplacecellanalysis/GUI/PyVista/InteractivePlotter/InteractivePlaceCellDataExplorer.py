@@ -12,6 +12,8 @@ import pyvista as pv
 from qtpy import QtCore, QtGui # for Slot
 # Signal
 
+from neuropy.utils.debug_helpers import safely_accepts_kwargs
+
 from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import MultilineTextConsoleWidget
@@ -24,9 +26,6 @@ from pyphoplacecellanalysis.Pho3D.PyVista.gui import customize_default_pyvista_t
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, spike_geom_box, spike_geom_cone
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
 from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
-
-from neuropy.utils.debug_helpers import safely_accepts_kwargs
-
 
 class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, InteractiveDataExplorerBase):
     """ This 3D PyVista GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
@@ -117,6 +116,13 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         self.params.active_trail_size_values = np.linspace(1.2, 0.4, self.params.curr_view_window_length_samples) # fade from a scale of 0.2 to 0.6
         # active_trail_size_values[-1] = 6.0 # except for the end (current) point, which has a scale of 1.0
         # active_trail_size_values = sharply_fading_opacity_values.copy()
+
+        # Background Track/Maze rendering options:
+        self.params.setdefault('should_use_linear_track_geometry', False) # should only be True on the linear track with known geometry, otherwise it will be obviously incorrect.
+        if hasattr(self.active_config.plotting_config, 'should_use_linear_track_geometry') and (self.active_config.plotting_config.should_use_linear_track_geometry is not None):
+            self.params.should_use_linear_track_geometry = self.active_config.plotting_config.should_use_linear_track_geometry
+
+
 
     # legacy compatability properties:
     @property
@@ -399,8 +405,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             # debug_console_widget.add_line_to_buffer('test log 2')
 
         # Plot the flat arena
-        self.plots['maze_bg'] = perform_plot_flat_arena(self.p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.use_smoothed_maze_rendering)
-
+        self.plots['maze_bg'], self.plots_data['maze_bg'] = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
+        
+    
         # Legend:
         
         # the legend is supposed to be for the placefields, of which there are fewer than the neuron_ids (because some cells don't have a good placefield).

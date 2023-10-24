@@ -82,7 +82,7 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
     @property
     def rendered_epoch_series_names(self):
         """The rendered_epoch_names property."""
-        return [a_name for a_name in self.rendered_epochs.keys() if a_name != 'name']
+        return [a_name for a_name in self.rendered_epochs.keys() if ((a_name != 'name') and (a_name != 'context'))]
 
 
     @property
@@ -91,12 +91,11 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
         if self.rendered_epochs is None:
             return False
         # Find at least one plot:
-        # curr_rendered_epoch_names = [a_name for a_name in self.rendered_epochs.keys() if a_name != 'name'] # done to prevent problems with dict changing size during iteration
         curr_rendered_epoch_names = self.rendered_epoch_series_names
         child_plots = self.interval_rendering_plots
         # See if we have at least one set of non-empty rendered rects
         for a_name in curr_rendered_epoch_names:
-            if a_name != 'name':
+            if ((a_name != 'name') and (a_name != 'context')):
                 for a_plot in child_plots:
                     extant_rect_plot_item_meshes = self.rendered_epochs[a_name][a_plot]
                     if len(extant_rect_plot_item_meshes) > 0:
@@ -361,7 +360,7 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
         """
         curr_rendered_epoch_names = list(self.rendered_epochs.keys()) # done to prevent problems with dict changing size during iteration
         for a_name in curr_rendered_epoch_names:
-            if a_name != 'name':
+            if ((a_name != 'name') and (a_name != 'context')):
                 # print(f'updating: {a_name}...')
                 self._perform_update_epoch_meshes(a_name, self.interval_datasources[a_name].time_column_values.t_start.to_numpy(),
                                              self.interval_datasources[a_name].time_column_values.t_duration.to_numpy(),
@@ -377,7 +376,7 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
         child_plots = self.interval_rendering_plots
         flat_mesh_list = []
         for a_name in curr_rendered_epoch_names:
-            if a_name != 'name':
+            if ((a_name != 'name') and (a_name != 'context')):
                 for a_plot in child_plots:
                     extant_rect_plot_item_meshes = self.rendered_epochs[a_name][a_plot]
                     flat_mesh_list.extend(extant_rect_plot_item_meshes) # append these meshes with those of previous names/plots

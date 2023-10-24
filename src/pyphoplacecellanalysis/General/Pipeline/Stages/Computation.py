@@ -2,7 +2,7 @@ from collections import OrderedDict
 import sys
 from datetime import datetime, timedelta
 import typing
-from typing import Optional
+from typing import Optional, Dict, List
 from warnings import warn
 import numpy as np
 import pandas as pd
@@ -26,9 +26,11 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData # us
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # used for `save_global_computation_results`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
+from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
+
 
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
-# from General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _wrap_multi_context_computation_function
 
@@ -64,7 +66,7 @@ class FunctionsSearchMode(Enum):
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipelineStage, BaseNeuropyPipelineStage):
+class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     """Docstring for ComputedPipelineStage.
 
     global_comparison_results has keys of type IdentifyingContext
@@ -196,20 +198,47 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
             active_registered_computation_function_dict = self.registered_computation_function_dict
         elif search_mode.name == FunctionsSearchMode.ANY.name:
             # build a merged function dictionary containing both global and non-global functions:
-            merged_computation_function_dict = (self.registered_global_computation_function_dict | self.registered_computation_function_dict)
-            active_registered_computation_function_dict = merged_computation_function_dict
+            active_registered_computation_function_dict = self.registered_merged_computation_function_dict
+
+
         else:
             raise NotImplementedError
 
         if names_list_is_excludelist:
             # excludelist-style operation: treat the registered_names_list as a excludelist and return all registered functions EXCEPT those that are in registered_names_list
-            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name not in registered_names_list}
+            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if ((a_computation_fn_name not in registered_names_list) and (getattr(a_computation_fn, 'short_name', a_computation_fn.__name__) not in registered_names_list))}
         else:
             # default includelist-style operation:
-            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if a_computation_fn_name in registered_names_list}
+            active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if ((a_computation_fn_name in registered_names_list) or (getattr(a_computation_fn, 'short_name', a_computation_fn.__name__) in registered_names_list))}
+
         return list(active_computation_function_dict.values())
         
 
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        del state['registered_load_function_dict']
+        del state['registered_computation_function_dict']
+        del state['registered_global_computation_function_dict']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(LoadedPipelineStage, self).__init__() # from 
+
+        self.registered_load_function_dict = {}
+        self.register_default_known_load_functions() # registers the default load functions
+        
+        self.registered_computation_function_dict = OrderedDict()
+        self.registered_global_computation_function_dict = OrderedDict()
+        self.reload_default_computation_functions() # registers the default
+
+
+        
 
     # ==================================================================================================================== #
     # Specific Context Computation Helpers                                                                                 #
@@ -307,7 +336,7 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         """ gets the latest computation_times from `curr_active_pipeline.computation_results`
         
         Usage:
-            any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times = curr_active_pipeline.stage.get_computation_times()
+            any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times, (global_computations_latest_computation_time, global_computation_completion_times) = curr_active_pipeline.stage.get_computation_times()
             each_epoch_latest_computation_time
         """
         each_epoch_each_result_computation_completion_times = {}
@@ -316,18 +345,28 @@ class ComputedPipelineStage(LoadableInput, LoadableSessionInput, FilterablePipel
         for k, v in self.computation_results.items():
             extracted_computation_times_dict = v['computation_times']
             each_epoch_each_result_computation_completion_times[k] = {k.__name__:v for k,v in extracted_computation_times_dict.items()}
-            each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()))
+            each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()), default=datetime.min)
 
-        any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values())) # newest computation out of any of the epochs
+        non_global_any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values()), default=datetime.min) # newest computation out of any of the epochs
+
+        ## Global computations:
+        global_computation_completion_times = {k.__name__:v for k,v in self.global_computation_results.computation_times.items()}
+        global_computations_latest_computation_time: datetime = max(list(global_computation_completion_times.values()), default=datetime.min)
+
+        ## Any (global or non-global) computation most recent time):
+        any_most_recent_computation_time: datetime = max(non_global_any_most_recent_computation_time, global_computations_latest_computation_time, datetime.min) # returns `datetime.min` if the first arguments are empty
+
         if debug_print:
             print(f'any_most_recent_computation_time: {any_most_recent_computation_time}')
             print(f'each_epoch_latest_computation_time: {each_epoch_latest_computation_time}')
-        return any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times
+            print(f'global_computation_completion_times: {global_computation_completion_times}')
+        return any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times, (global_computations_latest_computation_time, global_computation_completion_times)
         
+
     def get_time_since_last_computation(self, debug_print_timedelta:bool=False) -> timedelta:
         ## Successfully prints the time since the last calculation was performed:
         run_time = datetime.now()
-        any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times = self.get_computation_times()
+        any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times, (global_computations_latest_computation_time, global_computation_completion_times) = self.get_computation_times()
         
         delta = run_time - any_most_recent_computation_time
         if debug_print_timedelta:
@@ -810,6 +849,24 @@ class PipelineWithComputedPipelineStageMixin:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_global_computation_function_dict.items()}
     
+
+    # 'merged' refers to the fact that both global and non-global computation functions are included _____________________ #
+    @property
+    def registered_merged_computation_function_dict(self):
+        """build a merged function dictionary containing both global and non-global functions:"""
+        return self.stage.registered_merged_computation_function_dict
+    @property
+    def registered_merged_computation_functions(self):
+        return self.stage.registered_merged_computation_functions
+    @property
+    def registered_merged_computation_function_names(self):
+        return self.stage.registered_merged_computation_function_names
+
+    def get_merged_computation_function_validators(self) -> Dict[str, SpecificComputationValidator]:
+        ## From the registered computation functions, gather any validators and build the SpecificComputationValidator for them, then append them to `_comp_specifiers`:
+        return {k:SpecificComputationValidator.init_from_decorated_fn(v) for k,v in self.registered_merged_computation_function_dict.items() if hasattr(v, 'validate_computation_test') and (v.validate_computation_test is not None)}
+
+
     def reload_default_computation_functions(self):
         """ reloads/re-registers the default display functions after adding a new one """
         self.stage.reload_default_computation_functions()
@@ -950,6 +1007,12 @@ class PipelineWithComputedPipelineStageMixin:
         return self.sess.get_context()
 
 
+    def get_session_unique_aclu_information(self) -> pd.DataFrame:
+        """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns """
+        return self.sess.spikes_df.spikes.extract_unique_neuron_identities()
+
+
+
     # @property
     def get_output_manager(self) -> FileOutputManager:
         """ returns the FileOutputManager that specifies where outputs are stored. """
@@ -995,15 +1058,35 @@ class PipelineWithComputedPipelineStageMixin:
         return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
 
     ## Global Computation Result Persistance Hacks:
-    def save_global_computation_results(self, override_global_pickle_filename='global_computation_results.pkl'):
+    def save_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
         Usage:
             curr_active_pipeline.save_global_computation_results()
         """
-        if override_global_pickle_filename is None:
-            global_computation_results_pickle_path = self.global_computation_results_pickle_path
+        'global_computation_results.pkl'
+        ## Case 1. `override_global_pickle_path` is provided:
+        if override_global_pickle_path is not None:
+            ## override_global_pickle_path is provided:
+            if not isinstance(override_global_pickle_path, Path):
+                override_global_pickle_path = Path(override_global_pickle_path).resolve()
+            # Case 1a: `override_global_pickle_path` is a complete file path
+            if not override_global_pickle_path.is_dir():
+                # a full filepath, just use that directly
+                global_computation_results_pickle_path = override_global_pickle_path.resolve()
+            else:
+                # default case, assumed to be a directory and we'll use the normal filename.
+                active_global_pickle_filename: str = (override_global_pickle_filename or self.global_computation_results_pickle_path or "global_computation_results.pkl")
+                global_computation_results_pickle_path = override_global_pickle_path.joinpath(active_global_pickle_filename).resolve()
+
         else:
-            global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+            # No override path provided
+            if override_global_pickle_filename is None:
+                # no filename provided either, use default global pickle path:
+                global_computation_results_pickle_path = self.global_computation_results_pickle_path
+            else:
+                # Otherwise use default output path but specified override_global_pickle_filename:
+                global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+
         print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
         saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
         return global_computation_results_pickle_path

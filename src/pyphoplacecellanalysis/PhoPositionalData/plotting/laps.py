@@ -155,12 +155,16 @@ def _build_included_mask(mask_shape, crossing_beginings, crossing_endings):
         included_mask[aRange] = True
     return included_mask, included_index_ranges
 
-def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, crossing_midpoints, crossing_endings, color='g', include_highlight=False, ax=None):
+def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, crossing_midpoints, crossing_endings, color='y', include_highlight=False, ax=None, zorder:int=-5):
     """ renders a set of estimated laps with the provided settings
     Usage:
         fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=False, include_accel=False)
         _plot_helper_render_lap(pos_df['t'].to_numpy(), pos_df['x'].to_numpy(), desc_crossing_beginings, desc_crossing_midpoints, desc_crossing_endings, color='r', ax=out_axes_list[0])
         _plot_helper_render_lap(pos_df['t'].to_numpy(), pos_df['x'].to_numpy(), asc_crossing_beginings, asc_crossing_midpoints, asc_crossing_endings, color='g', ax=out_axes_list[0])
+        
+    Refactoring/TODO:
+        #TODO 2023-09-22 21:23: - [ ] I noticed that this seems to replicate a lot of the functionality of `neuropy.utils.matplotlib_helpers.draw_epoch_regions` which is more general I think. 
+    
     """
     # assert np.shape(pos_t_rel_seconds) == np.shape(crossing_beginings), f"pos_t_rel_seconds and crossing_beginings should be the same shape. Instead pos_t_rel_seconds is of size {np.shape(pos_t_rel_seconds)} and crossing_beginings is of size {np.shape(crossing_beginings)}."
     assert np.shape(pos_t_rel_seconds)[0] >= np.max(crossing_beginings), f"crossing_beginings contains an index {np.max(crossing_beginings)} that is out of bounds for pos_t_rel_seconds with a size of {np.shape(pos_t_rel_seconds)}."
@@ -171,31 +175,32 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
     
     # Plots the computed midpoint center-crossing for each lap. This is the basis of the calculation initially.
     if crossing_midpoints is not None:
-        ax.scatter(pos_t_rel_seconds[crossing_midpoints], pos_value[crossing_midpoints], s=15, c=color)
+        ax.scatter(pos_t_rel_seconds[crossing_midpoints], pos_value[crossing_midpoints], s=15, c=color, label='lap_crossing_midpoints', zorder=(zorder+1))
     
     # Plots the concrete vertical lines denoting the start/end of each lap
-    ax.vlines(pos_t_rel_seconds[crossing_beginings], 0, 1, transform=ax.get_xaxis_transform(), colors=color) # index 57100 is out of bounds for axis 0 with size 51455 -> pos_t_rel_seconds has size 51455, and crossing_beginings is too long!
-    ax.vlines(pos_t_rel_seconds[crossing_endings], 0, 1, transform=ax.get_xaxis_transform(), colors=color)
+    ax.vlines(pos_t_rel_seconds[crossing_beginings], 0, 1, transform=ax.get_xaxis_transform(), colors=color, label='lap_crossing_beginings', zorder=(zorder)) # index 57100 is out of bounds for axis 0 with size 51455 -> pos_t_rel_seconds has size 51455, and crossing_beginings is too long!
+    ax.vlines(pos_t_rel_seconds[crossing_endings], 0, 1, transform=ax.get_xaxis_transform(), colors=color, label='lap_crossing_endings', zorder=(zorder))
     # Plot the ranges for the ascending and descending laps:
     curr_included_mask, curr_included_index_ranges = _build_included_mask(np.shape(pos_value), crossing_beginings, crossing_endings)
-    collection = BrokenBarHCollection.span_where(pos_t_rel_seconds, ymin=0, ymax=1, transform=ax.get_xaxis_transform(), where=curr_included_mask, facecolor=color, alpha=0.35)
+    collection = BrokenBarHCollection.span_where(pos_t_rel_seconds, ymin=0, ymax=1, transform=ax.get_xaxis_transform(), where=curr_included_mask, facecolor=color, alpha=0.35, label='lap_span_where', zorder=(zorder-1))
     ax.add_collection(collection)
     
      # Add highlight/overlay
     if include_highlight:
         curr_highlight_indicies = np.where(curr_included_mask)[0]
-        ax.scatter(pos_t_rel_seconds[curr_highlight_indicies], pos_value[curr_highlight_indicies], s=0.5, c=color)
+        ax.scatter(pos_t_rel_seconds[curr_highlight_indicies], pos_value[curr_highlight_indicies], s=0.5, c=color, label='lap_highlight', zorder=(zorder+2))
         # ax.scatter(pos_t_rel_seconds[curr_included_mask], pos_value[curr_included_mask], s=0.5, c=color)
 
 
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
 
 # ==================================================================================================================== #
 # MAIN FUNCTIONS                                                                                                       #
 # ==================================================================================================================== #
-    
+
 @function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[],
     uses=['plot_position_curves_figure','_plot_helper_add_span_where_ranges','_plot_helper_render_laps'], used_by=['estimation_session_laps'], creation_date='2023-05-09 05:13', related_items=[])
-def plot_laps_2d(sess, legacy_plotting_mode=True):
+def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     """ This generates a position/velocity/acceleration curve for the animal and highlights the currently recognized track epochs using green and red span overlays (corresponding to egress and ingress directions) 
         TODO: currently legacy_plotting_mode=True does not function if the session has been filtered because the indicies no longer line up. 
             I think that perhaps excluding invalid laps (filtering sess.laps just like the other session members) would prevent this issue, but partially out-of-bounds laps might also need to be dealt with.
@@ -203,6 +208,10 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     Called by:
         estimation_session_laps
     """
+    # Passed 'even_lap_kwargs', 'odd_lap_kwargs' are to `_plot_helper_render_laps` when rendering the laps
+    default_even_lap_kwargs = dict(color=DisplayColorsEnum.Laps.even.value, include_highlight=True) # a yellowish-green
+    default_odd_lap_kwargs = dict(color=DisplayColorsEnum.Laps.odd.value, include_highlight=True) # a purplish-royal-blue
+
     pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
     position_obj = sess.position
     position_obj.compute_higher_order_derivatives()
@@ -211,7 +220,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
     
     curr_laps_df = sess.laps.to_dataframe()
     
-    fig, out_axes_list = plot_position_curves_figure(position_obj, include_velocity=True, include_accel=True, figsize=(24, 10))
+    fig, out_axes_list = plot_position_curves_figure(position_obj, **(dict(include_velocity=True, include_accel=False, figsize=(24, 10)) | kwargs)) #include_velocity=True, include_accel=True, figsize=(24, 10))
 
     ## Draw on top of the existing position curves with the lap colors:
     if legacy_plotting_mode:
@@ -225,7 +234,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
         curr_odd_lap_dir_points = pos_df[pos_df_is_odd_lap][['t','x']].to_numpy()
         out_axes_list[0].scatter(curr_odd_lap_dir_points[:,0], curr_odd_lap_dir_points[:,1], s=0.5, c='r')
     
-    
+
     ## Draw the horizontal spans for each subplot:
     # _plot_helper_add_span_where_ranges(pos_df.t.to_numpy(), pos_df_is_even_lap, pos_df_is_odd_lap, out_axes_list[0])
     # _plot_helper_add_span_where_ranges(pos_df.t.to_numpy(), pos_df_is_even_lap, pos_df_is_odd_lap, out_axes_list[1])
@@ -237,12 +246,12 @@ def plot_laps_2d(sess, legacy_plotting_mode=True):
             _plot_helper_render_laps(pos_df['t'].to_numpy(), pos_df['x'].to_numpy(),
                                 curr_laps_df.loc[(curr_laps_df.lap_dir == 0), 'start_position_index'].to_numpy(),
                                 None, 
-                                curr_laps_df.loc[(curr_laps_df.lap_dir == 0),'end_position_index'].to_numpy(), color='r', include_highlight=True, ax=an_axis)
+                                curr_laps_df.loc[(curr_laps_df.lap_dir == 0),'end_position_index'].to_numpy(), **(default_even_lap_kwargs | kwargs.get('even_lap_kwargs', {})), ax=an_axis) # color='r', include_highlight=True
 
             _plot_helper_render_laps(pos_df['t'].to_numpy(), pos_df['x'].to_numpy(),
                                     curr_laps_df.loc[(curr_laps_df.lap_dir == 1), 'start_position_index'].to_numpy(),
                                     None, 
-                                    curr_laps_df.loc[(curr_laps_df.lap_dir == 1),'end_position_index'].to_numpy(), color='g', include_highlight=True, ax=an_axis)
+                                    curr_laps_df.loc[(curr_laps_df.lap_dir == 1),'end_position_index'].to_numpy(), **(default_odd_lap_kwargs | kwargs.get('odd_lap_kwargs', {})), ax=an_axis)
             
     
     # _plot_helper_render_lap(pos_df['t'].to_numpy(), pos_df['x'].to_numpy(), desc_crossing_beginings, None, desc_crossing_endings, color='r', ax=out_axes_list[0])
