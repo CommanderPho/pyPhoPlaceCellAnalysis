@@ -158,7 +158,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         # grid_bin_bounds = PlacefieldComputationParameters.compute_grid_bin_bounds(grid_bin_bounding_session.position.x, grid_bin_bounding_session.position.y)
 
         ## OR use no grid_bin_bounds meaning they will be determined dynamically for each epoch:
-        grid_bin_bounds = None
+        # grid_bin_bounds = None
         # time_bin_size = 0.03333 #1.0/30.0 # decode at 30fps to match the position sampling frequency
         # time_bin_size = 0.1 # 10 fps
         time_bin_size = kwargs.get('time_bin_size', 0.03333) # 0.03333 = 1.0/30.0 # decode at 30fps to match the position sampling frequency
@@ -186,7 +186,11 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         computation_functions_name_excludelist=None
 
     ## For every computation config we build a fake (duplicate) filter config).
-    if len(active_session_computation_configs) > 3:
+    lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
+    assert lap_estimation_parameters is not None
+    use_direction_dependent_laps: bool = lap_estimation_parameters['use_direction_dependent_laps'] # whether to split the laps into left and right directions
+
+    if (use_direction_dependent_laps or (len(active_session_computation_configs) > 3)):
         lap_direction_suffix_list = ['_odd', '_even', '_any'] # ['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']
     else:
         lap_direction_suffix_list = ['']
