@@ -20,6 +20,7 @@ from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import DirectionalLapsHelpers
 
 @unique
 class SavingOptions(Enum):
@@ -219,11 +220,16 @@ class BatchSessionCompletionHandler:
             _split_parts = a_name.split('_')
             if (len(_split_parts) >= 2):
                 # also have lap_dir:
-                a_split_name, lap_dir = a_name.split('_')
-                if (a_filtered_ctxt.filter_name != filter_name) or (a_filtered_ctxt.lap_dir != lap_dir):
+                a_split_name, lap_dir, *remainder_list = a_name.split('_') # successfully splits 'maze_odd_laps' into good
+                if (a_filtered_ctxt.filter_name != filter_name):
                     was_updated = True
                     print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
                     a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name, lap_dir=lap_dir)
+
+                a_filtered_ctxt = a_filtered_ctxt.adding_context_if_missing(lap_dir=lap_dir)
+                # if (a_filtered_ctxt.get('lap_dir', None) is None) or (a_filtered_ctxt.lap_dir != lap_dir):
+                    # was_updated = True
+                    # a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name, lap_dir=lap_dir)
 
             else:
                 if a_filtered_ctxt.filter_name != filter_name:
@@ -308,6 +314,36 @@ class BatchSessionCompletionHandler:
             was_updated = True
 
         return was_updated
+
+    @classmethod
+    def try_compute_directional_laps_for_global_epoch(cls, curr_active_pipeline) -> bool:
+        """ 2023-10-24 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
+        
+
+        prev_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
+
+        try:
+            ## perform the computation:
+            curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline, add_created_configs_to_pipeline=True)
+            # curr_active_pipeline, directional_lap_specific_configs = constrain_to_laps(curr_active_pipeline)
+            # list(directional_lap_specific_configs.keys())
+            post_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
+
+            # was_updated = not np.all(np.isin(['maze1', 'maze2', 'maze', 'maze_odd_laps', 'maze_even_laps'], ['maze1', 'maze2', 'maze']))
+            was_updated = not np.all(np.isin(post_active_config_names, prev_active_config_names))
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f'.try_compute_directional_laps_for_global_epoch(...) failed with exception: {e}')
+            if self.fail_on_exception:
+                raise e.exc
+
+            return False
+
+
+        return was_updated
+
 
 
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
@@ -554,9 +590,13 @@ class BatchSessionCompletionHandler:
             print(f'short_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
             print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
+
+        # try to compute the directional laps from the global epoch:
+        was_updated = self.try_compute_directional_laps_for_global_epoch(curr_active_pipeline)
+
         # ## Post Compute Validate 2023-05-16:
         try:
-            was_updated = self.post_compute_validate(curr_active_pipeline)
+            was_updated = was_updated | self.post_compute_validate(curr_active_pipeline)
         except Exception as e:
             exception_info = sys.exc_info()
             an_err = CapturedException(e, exception_info)
@@ -570,8 +610,7 @@ class BatchSessionCompletionHandler:
             self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
 
         try:
-            self.session_computations_options.override_file
-            
+            # self.session_computations_options.override_file
             curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.session_computations_options.override_output_file) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
         except Exception as e:
             ## TODO: catch/log saving error and indicate that it isn't saved.
@@ -606,8 +645,6 @@ class BatchSessionCompletionHandler:
         ### Aggregate Outputs specific computations:
 
         ## Get some more interesting session properties:
-
-
         delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
         print(f'\t time since last computation: {delta_since_last_compute}')
 
@@ -660,6 +697,7 @@ class BatchSessionCompletionHandler:
             print(f'\t>> calling external computation function: {a_fn.__name__}')
             across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
             
+
 
         return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
                                            short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
