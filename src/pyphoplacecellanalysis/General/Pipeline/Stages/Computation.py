@@ -9,6 +9,8 @@ import pandas as pd
 from pathlib import Path
 from enum import Enum # for EvaluationActions
 from datetime import datetime
+from attrs import define, field, Factory
+
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
@@ -66,38 +68,68 @@ class FunctionsSearchMode(Enum):
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
+@define(slots=False)
 class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     """Docstring for ComputedPipelineStage.
 
     global_comparison_results has keys of type IdentifyingContext
     """
-    identity: PipelineStage = PipelineStage.Computed
-    filtered_sessions: Optional[DynamicParameters] = None
-    filtered_epochs: Optional[DynamicParameters] = None
-    filtered_contexts: Optional[DynamicParameters] = None
-    active_configs: Optional[DynamicParameters] = None
-    computation_results: Optional[DynamicParameters] = None
-    global_computation_results: Optional[ComputationResult] = None
+    identity: PipelineStage = field(default=PipelineStage.Computed)
 
-    def __init__(self, loaded_stage: LoadedPipelineStage):
-        # super(ClassName, self).__init__()
-        self.stage_name = loaded_stage.stage_name
-        self.basedir = loaded_stage.basedir
-        self.loaded_data = loaded_stage.loaded_data
+    filtered_sessions: Optional[DynamicParameters] = field(default=None)
+    filtered_epochs: Optional[DynamicParameters] = field(default=None)
+    filtered_contexts: Optional[DynamicParameters] = field(default=None)
+    active_configs: Optional[DynamicParameters] = field(default=None)
+    computation_results: Optional[DynamicParameters] = field(default=None)
+    global_computation_results: Optional[ComputationResult] = field(default=None)
+
+    registered_computation_function_dict: OrderedDict = field(default=Factory(OrderedDict))
+    registered_global_computation_function_dict: OrderedDict = field(default=Factory(OrderedDict))
+
+
+    # def __init__(self, loaded_stage: LoadedPipelineStage):
+    #     # super(ClassName, self).__init__()
+    #     self.stage_name = loaded_stage.stage_name
+    #     self.basedir = loaded_stage.basedir
+    #     self.loaded_data = loaded_stage.loaded_data
+
+    #     # Initialize custom fields:
+    #     self.filtered_sessions = DynamicParameters()
+    #     self.filtered_epochs = DynamicParameters()
+    #     self.filtered_contexts = DynamicParameters()
+
+    #     self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
+    #     self.computation_results = DynamicParameters() # computation_results is a DynamicParameters with keys of type IdentifyingContext and values of type ComputationResult
+
+    #     self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, None) # proper type setup
+
+    #     self.registered_computation_function_dict = OrderedDict()
+    #     self.registered_global_computation_function_dict = OrderedDict()
+    #     self.reload_default_computation_functions() # registers the default
+
+
+    @classmethod
+    def init_from_previous_stage(cls, loaded_stage: LoadedPipelineStage):
+        _obj = cls()
+        _obj.stage_name = loaded_stage.stage_name
+        _obj.basedir = loaded_stage.basedir
+        _obj.loaded_data = loaded_stage.loaded_data
 
         # Initialize custom fields:
-        self.filtered_sessions = DynamicParameters()
-        self.filtered_epochs = DynamicParameters()
-        self.filtered_contexts = DynamicParameters()
+        _obj.filtered_sessions = DynamicParameters()
+        _obj.filtered_epochs = DynamicParameters()
+        _obj.filtered_contexts = DynamicParameters()
 
-        self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
-        self.computation_results = DynamicParameters() # computation_results is a DynamicParameters with keys of type IdentifyingContext and values of type ComputationResult
+        _obj.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
+        _obj.computation_results = DynamicParameters() # computation_results is a DynamicParameters with keys of type IdentifyingContext and values of type ComputationResult
 
-        self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, None) # proper type setup
+        _obj.global_computation_results = ComputedPipelineStage._build_initial_computationResult(_obj.sess, None) # proper type setup
 
-        self.registered_computation_function_dict = OrderedDict()
-        self.registered_global_computation_function_dict = OrderedDict()
-        self.reload_default_computation_functions() # registers the default
+        _obj.registered_computation_function_dict = OrderedDict()
+        _obj.registered_global_computation_function_dict = OrderedDict()
+        _obj.reload_default_computation_functions() # registers the default
+        return _obj
+
 
     @property
     def active_completed_computation_result_names(self):
