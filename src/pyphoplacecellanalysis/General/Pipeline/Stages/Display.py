@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import numpy as np
+from attrs import define, field, Factory
 
 from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
 from neuropy.utils.result_context import IdentifyingContext
@@ -172,32 +173,68 @@ def update_figure_files_output_path(computation_result, active_config, root_outp
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
+@define(slots=False)
 class DisplayPipelineStage(ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
-    identity: PipelineStage = PipelineStage.Displayed
+    identity: PipelineStage = field(default=PipelineStage.Displayed)
     
-    def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, override_filtered_contexts=None):
-        # super(DisplayPipelineStage, self).__init__()
-        # ComputedPipelineStage fields:
-        self.stage_name = computed_stage.stage_name
-        self.basedir = computed_stage.basedir
-        self.loaded_data = computed_stage.loaded_data
-        self.filtered_sessions = computed_stage.filtered_sessions
-        self.filtered_epochs = computed_stage.filtered_epochs
-        self.filtered_contexts = override_filtered_contexts or computed_stage.filtered_contexts
-        self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
-        self.computation_results = computed_stage.computation_results
-        self.global_computation_results = computed_stage.global_computation_results
-        self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
-        self.registered_global_computation_function_dict = computed_stage.registered_global_computation_function_dict
+
+    display_output: Optional[DynamicParameters] = field(default=None)
+    render_actions: Optional[DynamicParameters] = field(default=None)
+
+    registered_display_function_dict: OrderedDict = field(default=Factory(OrderedDict))
+
+
+    # def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, override_filtered_contexts=None):
+    #     # super(DisplayPipelineStage, self).__init__()
+    #     # ComputedPipelineStage fields:
+    #     self.stage_name = computed_stage.stage_name
+    #     self.basedir = computed_stage.basedir
+    #     self.loaded_data = computed_stage.loaded_data
+    #     self.filtered_sessions = computed_stage.filtered_sessions
+    #     self.filtered_epochs = computed_stage.filtered_epochs
+    #     self.filtered_contexts = override_filtered_contexts or computed_stage.filtered_contexts
+    #     self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
+    #     self.computation_results = computed_stage.computation_results
+    #     self.global_computation_results = computed_stage.global_computation_results
+    #     self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
+    #     self.registered_global_computation_function_dict = computed_stage.registered_global_computation_function_dict
+
+    #     # Initialize custom fields:
+    #     self.display_output = display_output or DynamicParameters()
+    #     self.render_actions = render_actions or DynamicParameters()
+    #     # self.filtered_contexts = override_filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
+    #     self.registered_display_function_dict = OrderedDict()
+    #     self.register_default_known_display_functions() # registers the default display functions
+
+
+    @classmethod
+    def init_from_previous_stage(cls, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, override_filtered_contexts=None):
+        _obj = cls()
+        _obj.stage_name = computed_stage.stage_name
+        _obj.basedir = computed_stage.basedir
+        _obj.loaded_data = computed_stage.loaded_data
+        _obj.filtered_sessions = computed_stage.filtered_sessions
+        _obj.filtered_epochs = computed_stage.filtered_epochs
+        _obj.filtered_contexts = override_filtered_contexts or computed_stage.filtered_contexts
+        _obj.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
+        _obj.computation_results = computed_stage.computation_results
+        _obj.global_computation_results = computed_stage.global_computation_results
+        _obj.registered_computation_function_dict = computed_stage.registered_computation_function_dict
+        _obj.registered_global_computation_function_dict = computed_stage.registered_global_computation_function_dict
 
         # Initialize custom fields:
-        self.display_output = display_output or DynamicParameters()
-        self.render_actions = render_actions or DynamicParameters()
+        _obj.display_output = display_output or DynamicParameters()
+        _obj.render_actions = render_actions or DynamicParameters()
         # self.filtered_contexts = override_filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
-        self.registered_display_function_dict = OrderedDict()
-        self.register_default_known_display_functions() # registers the default display functions
-        
+        _obj.registered_display_function_dict = OrderedDict()
+        _obj.register_default_known_display_functions() # registers the default display functions
+
+        return _obj
+
+
+
+
     @property
     def registered_display_functions(self):
         """The registered_display_functions property."""
@@ -367,7 +404,8 @@ class PipelineWithDisplayPipelineStageMixin:
 
     def prepare_for_display(self, root_output_dir=r'W:\data\Output', should_smooth_maze=True):
         assert (self.is_computed), "Current self.is_computed must be true. Call self.perform_computations to reach this step."
-        self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
+        # self.stage = DisplayPipelineStage(self.stage)  # build the Display stage
+        self.stage = DisplayPipelineStage.init_from_previous_stage(self.stage)  # build the Display stage
         
         # Empty the dicts:
         # self.filtered_contexts = DynamicParameters()
