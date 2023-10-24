@@ -1382,8 +1382,9 @@ def constrain_to_laps(curr_active_pipeline):
             a_result.pf1D = lap_filtered_curr_pf1D
             a_result.pf2D = lap_filtered_curr_pf2D
 
-        return curr_active_pipeline
 
+
+    return curr_active_pipeline
 
 def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
     """ 2023-04-14 - Computes both 1D & 2D Decoders constrained to each other's position bins 
