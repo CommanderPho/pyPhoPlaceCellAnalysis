@@ -285,6 +285,11 @@ class DisplayPipelineStage(ComputedPipelineStage):
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        if 'identity' not in state:
+            print(f'unpickling from old NeuropyPipelineStage')
+            state['identity'] = None
+            state['identity'] = type(self).get_stage_identity()
+
         self.__dict__.update(state)
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         # super(LoadedPipelineStage, self).__init__() # from 
