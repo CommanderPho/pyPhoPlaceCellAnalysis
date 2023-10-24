@@ -58,13 +58,13 @@ Usage:
 """
 
 
-class DisplayColorsEnum(Enum):
+class DisplayColorsEnum:
     """ Hardcoded Theme Colors for visual consistancy - 2023-10-18
     
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
     
     """
-    class Laps(Enum):
+    class Laps:
         even = '#5522de' # a yellowish-green
         odd = '#aadd21'# a purplish-royal-blue
 
