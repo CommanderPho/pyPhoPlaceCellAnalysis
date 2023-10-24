@@ -1331,6 +1331,13 @@ class DirectionalLapsHelpers:
 
     use_direction_dependent_laps
 
+    from neuropy.core.laps import Laps
+    from neuropy.analyses.laps import build_lap_computation_epochs
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import DirectionalLapsHelpers
+
+
+    curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
+
     """
 
 
@@ -1340,7 +1347,8 @@ class DirectionalLapsHelpers:
 
     @classmethod
     def split_to_directional_laps(cls, curr_active_pipeline, add_created_configs_to_pipeline:bool=True):
-        """ 2023-10-23 - Splits to directional laps 
+        """ 2023-10-23 - Duplicates the global_epoch and all of its derived properties (filtered*, computed*, etc) but restricts its computation_config.computation_epochs to be either the odd or even laps
+                (restricting the motion to one of the two directions) allowing us to observe the directional placefields 
 
         if add_created_configs_to_pipeline is False, just returns the built configs and doesn't add them to the pipeline.
 
