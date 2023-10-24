@@ -289,10 +289,16 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             active_data_mode_registered_class = active_data_session_types_registered_classes_dict[type_name]
             desired_time_variable_name = active_data_mode_registered_class._time_variable_name # Requires desired_time_variable_name
             pipeline_needs_resave = _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name=type_name, basedir=Path(basepath), desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
-            # NeuropyPipeline.build_pipeline_compare_dict(curr_active_pipeline)
+
+            if hasattr(curr_active_pipeline, 'pipeline_compare_dict'):
+                pipeline_compare_dict = curr_active_pipeline.pipeline_compare_dict
+            else:
+                pipeline_compare_dict = cls.build_pipeline_compare_dict(curr_active_pipeline)
+            # 
             # AttributeError: 'NeuropyPipeline' object has no attribute 'last_completed_stage'
                 # self.stage.identity
-            curr_active_pipeline._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=curr_active_pipeline.pipeline_compare_dict)
+            # type(curr_active_pipeline.stage).get_stage_identity()
+            curr_active_pipeline._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=pipeline_compare_dict)
             ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
             if pipeline_needs_resave:
                 if not skip_save_on_initial_load:
