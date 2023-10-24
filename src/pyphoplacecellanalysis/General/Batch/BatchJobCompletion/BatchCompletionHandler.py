@@ -317,10 +317,8 @@ class BatchSessionCompletionHandler:
         return was_updated
 
     @classmethod
-    def try_compute_directional_laps_for_global_epoch(cls, curr_active_pipeline) -> bool:
+    def try_compute_directional_laps_for_global_epoch(cls, curr_active_pipeline, fail_on_exception=True) -> bool:
         """ 2023-10-24 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
-        
-
         prev_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
 
         try:
@@ -337,7 +335,7 @@ class BatchSessionCompletionHandler:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f'.try_compute_directional_laps_for_global_epoch(...) failed with exception: {e}')
-            if self.fail_on_exception:
+            if fail_on_exception:
                 raise e.exc
 
             return False
@@ -593,7 +591,7 @@ class BatchSessionCompletionHandler:
 
 
         # try to compute the directional laps from the global epoch:
-        was_updated = self.try_compute_directional_laps_for_global_epoch(curr_active_pipeline)
+        was_updated = self.try_compute_directional_laps_for_global_epoch(curr_active_pipeline, fail_on_exception=self.fail_on_exception)
 
         # ## Post Compute Validate 2023-05-16:
         try:
