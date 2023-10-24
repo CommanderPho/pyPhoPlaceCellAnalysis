@@ -89,8 +89,10 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         self.filtered_sessions = DynamicParameters()
         self.filtered_epochs = DynamicParameters()
         self.filtered_contexts = DynamicParameters()
+
         self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
         self.computation_results = DynamicParameters() # computation_results is a DynamicParameters with keys of type IdentifyingContext and values of type ComputationResult
+
         self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, None) # proper type setup
 
         self.registered_computation_function_dict = OrderedDict()
@@ -391,12 +393,24 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         """
         include_includelist = self.active_completed_computation_result_names # ['maze', 'sprinkle']
         assert (len(include_includelist) >= 3), "Must have at least 3 completed computation results to find the long, short, and global epoch names."
-        # long_epoch_name = include_includelist[0] # 'maze1_PYR'
-        # short_epoch_name = include_includelist[1] # 'maze2_PYR'
-        # they must all have the same suffix:
-        long_epoch_name = include_includelist[-3] # 'maze1_PYR'
-        short_epoch_name = include_includelist[-2] # 'maze2_PYR'
-        global_epoch_name = include_includelist[-1] # 'maze_PYR'
+        if (len(include_includelist) > 3):
+            """ more than three computed epochs, probably split by laps. Figure out the correct ones. """
+            # include_includelist = self.filtered_epochs
+            non_global_epoch_names = list(self.sess.paradigm.get_unique_labels()) # ['maze1', 'maze2']
+            global_epoch_name: str = 'maze'
+            known_epoch_names = [*non_global_epoch_names, global_epoch_name] # a list of names
+            assert len(known_epoch_names) == 3, f"Must have exactly 3: {known_epoch_names}"
+            long_epoch_name, short_epoch_name, global_epoch_name = known_epoch_names # unwrap
+        else:
+            # Old method of unwrapping based on hard-coded values:
+            assert len(include_includelist) == 3, f"Must have exactly 3: {include_includelist}"
+            # long_epoch_name = include_includelist[0] # 'maze1_PYR'
+            # short_epoch_name = include_includelist[1] # 'maze2_PYR'
+            # they must all have the same suffix:
+            long_epoch_name = include_includelist[-3] # 'maze1_PYR'
+            short_epoch_name = include_includelist[-2] # 'maze2_PYR'
+            global_epoch_name = include_includelist[-1] # 'maze_PYR'
+
         return long_epoch_name, short_epoch_name, global_epoch_name
 
 
