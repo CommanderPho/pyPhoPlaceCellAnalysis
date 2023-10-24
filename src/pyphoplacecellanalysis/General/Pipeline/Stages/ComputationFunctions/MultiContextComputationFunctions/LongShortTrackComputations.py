@@ -1383,8 +1383,40 @@ def constrain_to_laps(curr_active_pipeline):
             a_result.pf2D = lap_filtered_curr_pf2D
 
 
+    ## After all top-level computations are done, compute the subsets for direction laps
+    if use_direction_dependent_laps:
+        print(f'constrain_to_laps(...) processing for directional laps...')
+
+        for a_name, a_sess, a_result in zip((long_epoch_name, short_epoch_name, global_epoch_name), (long_session, short_session, global_session), (long_results, short_results, global_results)):
+            
+
+            lap_specific_epochs = a_sess.laps.as_epoch_obj() # set this to the laps object
+            lap_specific_epochs = lap_specific_epochs.get_non_overlapping()
+            lap_specific_epochs = lap_specific_epochs.filtered_by_duration(1.0, 30.0) # the lap must be at least 1 second long and at most 10 seconds long
+            
+            any_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(len(a_sess.laps.lap_id))])
+            even_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(0, len(a_sess.laps.lap_id), 2)])
+            odd_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(1, len(a_sess.laps.lap_id), 2)])
+            split_directional_laps_dict = {'odd_laps': odd_lap_specific_epochs, 'even_laps': even_lap_specific_epochs, 'any_laps': lap_specific_epochs}
+
+            print(f'any_lap_specific_epochs: {any_lap_specific_epochs}, even_lap_specific_epochs: {even_lap_specific_epochs}, odd_lap_specific_epochs: {odd_lap_specific_epochs}')
+            for a_lap_dir_description, lap_dir_epochs in split_directional_laps_dict.items():
+                new_name = f'{a_name}_{a_lap_dir_description}'
+                print(f'\tnew_name: {new_name}')
+                active_config_copy = deepcopy(curr_active_pipeline.active_configs[a_name])
+                # active_config_copy.computation_config.pf_params.computation_epochs = active_config_copy.computation_config.pf_params.computation_epochs.label_slice(odd_lap_specific_epochs.labels)
+                ## Just overwrite directly:
+                active_config_copy.computation_config.pf_params.computation_epochs = lap_dir_epochs
+                directional_lap_specific_configs[new_name] = active_config_copy
+
+
+            curr_active_pipeline.active_configs[a_name]
+
+
+
 
     return curr_active_pipeline
+
 
 def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
     """ 2023-04-14 - Computes both 1D & 2D Decoders constrained to each other's position bins 
