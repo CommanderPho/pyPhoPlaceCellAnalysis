@@ -1,4 +1,5 @@
 import sys
+import datetime
 import logging
 import pathlib
 from pathlib import Path
@@ -20,7 +21,8 @@ from pyphocorehelpers.function_helpers import function_attributes
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
 from neuropy.utils.result_context import IdentifyingContext
-from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
+from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass # used in build_concrete_session_folders
+from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for build_concrete_session_folders
 
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
@@ -53,6 +55,9 @@ def build_batch_processing_session_task_identifier(session_context: IdentifyingC
     hostname: str = socket.gethostname() # get the system's hostname
     # print(f"Hostname: {hostname}") # Hostname: LNX00052
     session_component: str = session_context.get_description(separator='.') # 'kdiba.gor01.two.2006-6-07_16-40-19'
+    ## Get runtime:
+    # runtime_start_str: str = f'{datetime.now().strftime("%Y%m%d%H%M%S")}'
+
     return f"{hostname}.{session_component}"
 
 def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), debug_print=False):
@@ -212,6 +217,32 @@ class ConcreteSessionFolder:
 
                         copy_dict[src_file] = dest_path
         return copy_dict
+
+
+    @classmethod
+    def build_concrete_session_folders(cls, global_data_root_parent_path: Path, included_session_contexts: list, debug_print=False) -> List["ConcreteSessionFolder"]:
+        """ 
+
+        good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
+
+        """
+        assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+
+        known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
+        active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+
+        all_data_mode_names = [a_ctxt.format_name for a_ctxt in included_session_contexts] # ['kdiba', ...]
+        active_data_mode_name: str = all_data_mode_names.pop(0) # 'kdiba'
+        assert np.all([(v == active_data_mode_name) for v in all_data_mode_names]), f"all contexts must be from the same data mode (arbitrarily). active_data_mode_name: {active_data_mode_name}, all_data_mode_names: {all_data_mode_names}"
+
+        ## Get known properties for this type:
+        active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
+        active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
+
+        ## get specifics using the known properties:
+        output_session_basedir_dict = active_data_mode_registered_class.build_session_basedirs_dict(global_data_root_parent_path, debug_print=debug_print)
+        good_session_concrete_folders = [ConcreteSessionFolder(a_context, a_basedir) for a_context, a_basedir in output_session_basedir_dict.items()]
+        return good_session_concrete_folders
 
 
 @unique
