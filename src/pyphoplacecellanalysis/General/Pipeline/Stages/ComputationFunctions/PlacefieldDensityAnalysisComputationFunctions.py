@@ -28,6 +28,114 @@ from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_pos
 
 modify_dict_mode = True # if True, writes the dict
 
+
+class FindpeaksHelpers:
+    
+    def ratemap_find_placefields(ratemap, debug_print=False):
+        """ Uses the `findpeaks` library for finding local maxima of TuningMaps
+        Input:
+        ratemap: a 2D ratemap
+        
+        Returns:
+        
+        
+        """
+        from findpeaks import findpeaks # for _perform_pf_find_ratemap_peaks_computation. Install with pip install findpeaks. Specifically used in `ratemap_find_placefields` subfunction
+        
+        def _ratemap_compute_peaks(X, debug_print):
+            if debug_print:
+                print(f'np.shape(X): {np.shape(X)}') # np.shape(X): (60, 8)
+            
+            if debug_print:
+                verboosity_level = 3 # info
+            else:
+                # verboosity_level = 2 # warnings only
+                verboosity_level = 1 # errors only
+            # Initialize
+            
+            fp_mask = findpeaks(method='mask', verbose=verboosity_level)
+            # Fit
+            results_mask = fp_mask.fit(X)
+            # Initialize
+            fp_topo = findpeaks(method='topology', verbose=verboosity_level)
+            # Fit
+            results_topo = fp_topo.fit(X)
+            return fp_mask, results_mask, fp_topo, results_topo
+
+        def _expand_mask_results(results_mask):
+            """ Expands the results from peak detection with the 'mask' method and returns a dataframe """
+            # list(results_mask.keys()) # ['Xraw', 'Xproc', 'Xdetect', 'Xranked']
+            ranked_peaks = results_mask['Xranked'] # detected peaks with respect the input image. Elements are the ranked peaks (1=best).
+            peak_scores = results_mask['Xdetect'] # the scores
+            peak_indicies = np.argwhere(ranked_peaks) # [[ 3  7],[ 7 14],[ 7 15],[13 17],[13 18],[25 17],[29 11],[44 15],[59 22]]
+            if debug_print:
+                print(peak_indicies) 
+            peak_ranks = ranked_peaks[peak_indicies[:,0], peak_indicies[:,1]] # array([1, 2, 3, 4, 5, 6, 7, 8, 9])
+            if debug_print:
+                print(f'peak_ranks: {peak_ranks}')
+            peak_scores = peak_scores[peak_indicies[:,0], peak_indicies[:,1]]
+            if debug_print:
+                print(f'peak_scores: {peak_ranks}')
+            peak_values = results_mask['Xraw'][peak_indicies[:,0], peak_indicies[:,1]]
+            if debug_print:
+                print(f'peak_values: {peak_values}')
+            # scipy.ndimage.measurements.label # to label the found peaks?
+            return pd.DataFrame({'rank': peak_ranks, 'peak_score': peak_scores, 'xbin_idx':peak_indicies[:,0], 'ybin_idx':peak_indicies[:,1], 'value': peak_values})
+        
+        def _expand_topo_results(results_topo):
+            """ Expands the results from peak detection with the 'topology' method and returns a dataframe """
+            # list(results_mask.keys()) # results_topo.keys(): ['Xraw', 'Xproc', 'Xdetect', 'Xranked', 'persistence', 'groups0']
+            ranked_peaks = results_topo['Xranked'] # detected peaks with respect the input image. Elements are the ranked peaks (1=best).
+            peak_scores = results_topo['Xdetect'] # the scores (higher is better)
+            peak_indicies = np.argwhere(ranked_peaks) # [[ 3  7],[ 7 14],[ 7 15],[13 17],[13 18],[25 17],[29 11],[44 15],[59 22]]
+            peak_ranks = ranked_peaks[peak_indicies[:,0], peak_indicies[:,1]] # array([1, 2, 3, 4, 5, 6, 7, 8, 9])
+            # is_peak = results_topo['persistence'].peak.to_numpy() # Bool array, True if it is a peak, false otherwise
+            is_peak = peak_ranks > 0 # Bool array, True if it is a peak, false otherwise
+            peak_indicies = peak_indicies[is_peak] # only get the peak_indicies corresponding to peaks (not valleys)
+            peak_ranks = peak_ranks[is_peak] # remove non-peak indicies
+            if debug_print:
+                print(peak_indicies)
+            if debug_print:
+                print(f'peak_ranks: {peak_ranks}')
+            peak_scores = peak_scores[peak_indicies[:,0], peak_indicies[:,1]]
+            if debug_print:
+                print(f'peak_scores: {peak_ranks}')
+            peak_values = results_topo['Xraw'][peak_indicies[:,0], peak_indicies[:,1]]
+            if debug_print:
+                print(f'peak_values: {peak_values}')
+            if debug_print:
+                print(f"Xproc: {results_topo['Xproc']}, groups0: {results_topo['groups0']}") # , persistence: {results_topo['persistence']}
+            
+            out_df = pd.DataFrame({'rank': peak_ranks, 'peak_score': peak_scores, 'xbin_idx':peak_indicies[:,0], 'ybin_idx':peak_indicies[:,1], 'value': peak_values})
+            out_df.sort_values(by=['rank'], ascending=True, inplace=True, ignore_index=True)
+            
+            return (out_df, results_topo['persistence'])
+        
+        fp_mask, results_mask, fp_topo, results_topo = _ratemap_compute_peaks(ratemap, debug_print=debug_print)
+        if debug_print:
+            print(f'results_topo.keys(): {list(results_topo.keys())}')
+        topo_results_df, topo_persistence_df =_expand_topo_results(results_topo)
+        mask_results_df = _expand_mask_results(results_mask)
+        return fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
+        
+        
+    def _filter_found_peaks_by_exclusion_threshold(df_list, peak_xy_points_pos_list, peak_score_inclusion_percent_threshold=0.25, debug_print=False):
+        peak_score_inclusion_threshold = peak_score_inclusion_percent_threshold * 255.0 # it must be at least 1/4 of the promenance of the largest peak (which is always 255.0)
+        peaks_are_included_list = [(result_df['peak_score'] > peak_score_inclusion_threshold) for result_df in df_list]
+        
+        ## filter by the peaks_are_included_list:
+        filtered_df_list = [a_df[peak_is_included] for a_df, peak_is_included in zip(df_list, peaks_are_included_list)] # Also works
+        filtered_peak_xy_points_pos_list = [a_xy_points_pos[:, peak_is_included] for a_xy_points_pos, peak_is_included in zip(peak_xy_points_pos_list, peaks_are_included_list)]
+
+        if debug_print:
+            print(f'peaks_are_included_list: {peaks_are_included_list}')
+            print(f'filtered_df_list: {filtered_df_list}')
+            print(f'filtered_peak_xy_points_pos_list: {filtered_peak_xy_points_pos_list}')
+
+        return peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list
+        
+
+
             
 class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """Performs analyeses related to placefield densities and overlap across spactial bins. Includes analyses for Eloy from 07-2022. 
@@ -227,120 +335,15 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     computed_data['RatemapPeaksAnalysis']['final_filtered_results']['peak_xy_points_pos_list']:
                     
             """            
-            from findpeaks import findpeaks # for _perform_pf_find_ratemap_peaks_computation. Install with pip install findpeaks. Specifically used in `ratemap_find_placefields` subfunction
-            def ratemap_find_placefields(ratemap, debug_print=False):
-                """ Uses the `findpeaks` library for finding local maxima of TuningMaps
-                Input:
-                ratemap: a 2D ratemap
-                
-                Returns:
-                
-                
-                """
-                def _ratemap_compute_peaks(X, debug_print):
-                    if debug_print:
-                        print(f'np.shape(X): {np.shape(X)}') # np.shape(X): (60, 8)
-                    
-                    if debug_print:
-                        verboosity_level = 3 # info
-                    else:
-                        # verboosity_level = 2 # warnings only
-                        verboosity_level = 1 # errors only
-                    # Initialize
-                    
-                    fp_mask = findpeaks(method='mask', verbose=verboosity_level)
-                    # Fit
-                    results_mask = fp_mask.fit(X)
-                    # Initialize
-                    fp_topo = findpeaks(method='topology', verbose=verboosity_level)
-                    # Fit
-                    results_topo = fp_topo.fit(X)
-                    return fp_mask, results_mask, fp_topo, results_topo
 
-                def _expand_mask_results(results_mask):
-                    """ Expands the results from peak detection with the 'mask' method and returns a dataframe """
-                    # list(results_mask.keys()) # ['Xraw', 'Xproc', 'Xdetect', 'Xranked']
-                    ranked_peaks = results_mask['Xranked'] # detected peaks with respect the input image. Elements are the ranked peaks (1=best).
-                    peak_scores = results_mask['Xdetect'] # the scores
-                    peak_indicies = np.argwhere(ranked_peaks) # [[ 3  7],[ 7 14],[ 7 15],[13 17],[13 18],[25 17],[29 11],[44 15],[59 22]]
-                    if debug_print:
-                        print(peak_indicies) 
-                    peak_ranks = ranked_peaks[peak_indicies[:,0], peak_indicies[:,1]] # array([1, 2, 3, 4, 5, 6, 7, 8, 9])
-                    if debug_print:
-                        print(f'peak_ranks: {peak_ranks}')
-                    peak_scores = peak_scores[peak_indicies[:,0], peak_indicies[:,1]]
-                    if debug_print:
-                        print(f'peak_scores: {peak_ranks}')
-                    peak_values = results_mask['Xraw'][peak_indicies[:,0], peak_indicies[:,1]]
-                    if debug_print:
-                        print(f'peak_values: {peak_values}')
-                    # scipy.ndimage.measurements.label # to label the found peaks?
-                    return pd.DataFrame({'rank': peak_ranks, 'peak_score': peak_scores, 'xbin_idx':peak_indicies[:,0], 'ybin_idx':peak_indicies[:,1], 'value': peak_values})
-                
-                def _expand_topo_results(results_topo):
-                    """ Expands the results from peak detection with the 'topology' method and returns a dataframe """
-                    # list(results_mask.keys()) # results_topo.keys(): ['Xraw', 'Xproc', 'Xdetect', 'Xranked', 'persistence', 'groups0']
-                    ranked_peaks = results_topo['Xranked'] # detected peaks with respect the input image. Elements are the ranked peaks (1=best).
-                    peak_scores = results_topo['Xdetect'] # the scores (higher is better)
-                    peak_indicies = np.argwhere(ranked_peaks) # [[ 3  7],[ 7 14],[ 7 15],[13 17],[13 18],[25 17],[29 11],[44 15],[59 22]]
-                    peak_ranks = ranked_peaks[peak_indicies[:,0], peak_indicies[:,1]] # array([1, 2, 3, 4, 5, 6, 7, 8, 9])
-                    # is_peak = results_topo['persistence'].peak.to_numpy() # Bool array, True if it is a peak, false otherwise
-                    is_peak = peak_ranks > 0 # Bool array, True if it is a peak, false otherwise
-                    peak_indicies = peak_indicies[is_peak] # only get the peak_indicies corresponding to peaks (not valleys)
-                    peak_ranks = peak_ranks[is_peak] # remove non-peak indicies
-                    if debug_print:
-                        print(peak_indicies)
-                    if debug_print:
-                        print(f'peak_ranks: {peak_ranks}')
-                    peak_scores = peak_scores[peak_indicies[:,0], peak_indicies[:,1]]
-                    if debug_print:
-                        print(f'peak_scores: {peak_ranks}')
-                    peak_values = results_topo['Xraw'][peak_indicies[:,0], peak_indicies[:,1]]
-                    if debug_print:
-                        print(f'peak_values: {peak_values}')
-                    if debug_print:
-                        print(f"Xproc: {results_topo['Xproc']}, groups0: {results_topo['groups0']}") # , persistence: {results_topo['persistence']}
-                    
-                    out_df = pd.DataFrame({'rank': peak_ranks, 'peak_score': peak_scores, 'xbin_idx':peak_indicies[:,0], 'ybin_idx':peak_indicies[:,1], 'value': peak_values})
-                    out_df.sort_values(by=['rank'], ascending=True, inplace=True, ignore_index=True)
-                    
-                    return (out_df, results_topo['persistence'])
-                
-                fp_mask, results_mask, fp_topo, results_topo = _ratemap_compute_peaks(ratemap, debug_print=debug_print)
-                if debug_print:
-                    print(f'results_topo.keys(): {list(results_topo.keys())}')
-                topo_results_df, topo_persistence_df =_expand_topo_results(results_topo)
-                mask_results_df = _expand_mask_results(results_mask)
-                return fp_mask, mask_results_df, fp_topo, topo_results_df, topo_persistence_df
-                
-                
-            def _filter_found_peaks_by_exclusion_threshold(df_list, peak_xy_points_pos_list, peak_score_inclusion_percent_threshold=0.25):
-                peak_score_inclusion_threshold = peak_score_inclusion_percent_threshold * 255.0 # it must be at least 1/4 of the promenance of the largest peak (which is always 255.0)
-                peaks_are_included_list = [(result_df['peak_score'] > peak_score_inclusion_threshold) for result_df in df_list]
-                
-                # inclusion_filter_function = lambda result_list: [a_result[peak_is_included, :] for a_result, peak_is_included in zip(result_list, peaks_are_included_list)]
-                ## filter by the peaks_are_included_list:
-                # filtered_df_list = [result_df[(result_df['peak_score'] > peak_score_inclusion_threshold)] for result_df in df_list]  # WORKS
-                # filtered_df_list = [df_list[i][peak_is_included] for i, peak_is_included in enumerate(peaks_are_included_list)] # Also works
-                # filtered_peak_xy_points_pos_list = [peak_xy_points_pos_list[i][:, peak_is_included] for i, peak_is_included in enumerate(peaks_are_included_list)]
-                
-                filtered_df_list = [a_df[peak_is_included] for a_df, peak_is_included in zip(df_list, peaks_are_included_list)] # Also works
-                filtered_peak_xy_points_pos_list = [a_xy_points_pos[:, peak_is_included] for a_xy_points_pos, peak_is_included in zip(peak_xy_points_pos_list, peaks_are_included_list)]
-
-                # print(f'peaks_are_included_list: {peaks_are_included_list}')
-                # print(f'filtered_df_list: {filtered_df_list}')
-                # print(f'filtered_peak_xy_points_pos_list: {filtered_peak_xy_points_pos_list}')
-
-                return peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list
-                
             # ==================================================================================================================== #
             # BEGIN MAIN FUNCTION BODY                                                                                             #
             # ==================================================================================================================== #
-            # active_pf_1D = computation_result.computed_data['pf1D']
+            active_pf_1D = computation_result.computed_data['pf1D']
             active_pf_2D = computation_result.computed_data['pf2D']
-            fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*[ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]))
+            fp_mask_list, mask_results_df_list, fp_topo_list, topo_results_df_list, topo_persistence_df_list = tuple(zip(*[FindpeaksHelpers.ratemap_find_placefields(a_tuning_curve.copy(), debug_print=debug_print) for a_tuning_curve in active_pf_2D.ratemap.pdf_normalized_tuning_curves]))
             topo_results_peak_xy_pos_list = [np.vstack((active_pf_2D.xbin[curr_topo_result_df['xbin_idx'].to_numpy()], active_pf_2D.ybin[curr_topo_result_df['ybin_idx'].to_numpy()])) for curr_topo_result_df in topo_results_df_list]
-            peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list = _filter_found_peaks_by_exclusion_threshold(topo_results_df_list, topo_results_peak_xy_pos_list, peak_score_inclusion_percent_threshold=peak_score_inclusion_percent_threshold)
+            peaks_are_included_list, filtered_df_list, filtered_peak_xy_points_pos_list = FindpeaksHelpers._filter_found_peaks_by_exclusion_threshold(topo_results_df_list, topo_results_peak_xy_pos_list, peak_score_inclusion_percent_threshold=peak_score_inclusion_percent_threshold)
             
             computation_result.computed_data['RatemapPeaksAnalysis'] = DynamicParameters(mask_results=DynamicParameters(fp_list=fp_mask_list, df_list=mask_results_df_list),
                                                                                          topo_results=DynamicParameters(fp_list=fp_topo_list, df_list=topo_results_df_list, persistence_df_list=topo_persistence_df_list, peak_xy_points_pos_list=topo_results_peak_xy_pos_list),
