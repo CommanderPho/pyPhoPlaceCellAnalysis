@@ -4,7 +4,7 @@ import sys
 import traceback
 import types
 import os
-from typing import Optional
+from typing import Optional, List, Dict
 from functools import wraps
 
 from PyQt5 import QtGui, QtWidgets, uic
@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, 
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
-from pyphoplacecellanalysis.General.Pipeline.Stages.Display import Plot
+from pyphoplacecellanalysis.General.Pipeline.Stages.Display import Plot, DisplayFunctionItem
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 
@@ -55,6 +55,11 @@ class LauncherWidget(QWidget):
         return self._curr_active_pipeline_ref
     
 
+    # @property
+    # def display_function_items(self) -> Dict[str,DisplayFunctionItem]:
+    #     return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self._pipeline_reference.registered_display_function_dict.items()}
+
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
@@ -66,6 +71,11 @@ class LauncherWidget(QWidget):
         # Connect the itemDoubleClicked signal to the on_tree_item_double_clicked slot
         self.treeWidget.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
 
+
+    def get_display_function_items(self) -> Dict[str,DisplayFunctionItem]:
+        assert self._curr_active_pipeline_ref is not None
+        return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self.curr_active_pipeline.registered_display_function_dict.items()}
+
     # Define a function to be executed when a tree widget item is double-clicked
     # @QtCore.Slot(object, int)
     @pyqtExceptionPrintingSlot(object)
@@ -73,9 +83,16 @@ class LauncherWidget(QWidget):
         print(f"Item double-clicked: {item}, column: {column}\n\t", item.text(column))
         # print(f'\titem.data: {item.data}')
         # raise NotImplementedError
+        # item_data = item.data(column, 0) # ItemDataRole 
         item_data = item.data(column, 0) # ItemDataRole 
         print(f'\titem_data: {item_data}')
-        a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data)
+        display_function_items = self.get_display_function_items()
+        a_disp_fn_item = display_function_items[item_data]
+        # a_disp_fn_item = self.display_function_items[item_data]
+        print(f'\ta_disp_fn_item: {a_disp_fn_item}')
+        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data)
+        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.fn_callable)
+        a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.name)
         return a_fn_handle()
         
 
@@ -87,23 +104,30 @@ class LauncherWidget(QWidget):
         displayFunctionTreeItem = QtWidgets.QTreeWidgetItem(["Display Functions"])
         # si.gitem = 
         # self.treeWidget.addTopLevelItem(displayFunctionTreeItem)
+        display_function_items = self.get_display_function_items() # {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in curr_active_pipeline.registered_display_function_dict.items()}
+        # display_function_items
 
-        for a_fcn_name, a_fcn in curr_active_pipeline.registered_display_function_dict.items():
+        # for a_fcn_name, a_fcn in curr_active_pipeline.registered_display_function_dict.items():
+        for a_fcn_name, a_disp_fn_item in display_function_items.items():
             # extract the info from the function:
-            if hasattr(a_fcn, 'short_name') and a_fcn.short_name is not None:
-                active_name = a_fcn.short_name or a_fcn_name
-            else:
-                active_name = a_fcn_name
-                
+            # if hasattr(a_fcn, 'short_name') and a_fcn.short_name is not None:
+            #     active_name = a_fcn.short_name or a_fcn_name
+            # else:
+            #     active_name = a_fcn_name
+
+            active_name: str = a_disp_fn_item.name
             print(f'adding {active_name}')
             childDisplayFunctionTreeItem = QtWidgets.QTreeWidgetItem([active_name])
             # childDisplayFunctionTreeItem.setText(0, active_name)
             # Set the tooltip for the item
-            active_tooltip_text = curr_active_pipeline.registered_display_function_docs_dict.get(a_fcn_name, "No tooltip")
+            # active_tooltip_text = curr_active_pipeline.registered_display_function_docs_dict.get(a_fcn_name, "No tooltip")
                         
+            active_tooltip_text = (a_disp_fn_item.docs or "No tooltip")
             childDisplayFunctionTreeItem.setToolTip(0, active_tooltip_text)
             
             childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_fcn_name) # "Child 1 custom data"
+            # childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_disp_fn_item) # "Child 1 custom data"
+
             # childDisplayFunctionTreeItem.setIcon(0, QtGui.QIcon("child_1_icon.png"))
             # childDisplayFunctionTreeItem
             # displayFunctionTreeItem.addChild(childDisplayFunctionTreeItem)

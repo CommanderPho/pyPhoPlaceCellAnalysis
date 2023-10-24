@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional, List, Dict
 import numpy as np
 from attrs import define, field, Factory
 
@@ -27,6 +27,28 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContex
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import LongShortTrackComparingDisplayFunctions
 
 
+@define(slots=False)
+class DisplayFunctionItem:
+    """ for helping to render a UI display function tree.
+
+    display_function_items = {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in curr_active_pipeline.registered_display_function_dict.items()}
+    display_function_items
+
+
+    """
+    name: str
+    fn_callable: Callable
+
+    short_name: str = field()
+    docs: str = field()
+
+    @classmethod
+    def init_from_fn_object(cls, a_fn):
+        _obj = cls(name=a_fn.__name__, fn_callable=a_fn, short_name=(getattr(a_fn,'short_name', a_fn.__name__) or a_fn.__name__),
+            docs=a_fn.__doc__)
+        return _obj
+
+
 
 
 class Plot:
@@ -45,6 +67,11 @@ class Plot:
     def __init__(self, curr_active_pipeline):
         super(Plot, self).__init__()
         self._pipeline_reference = curr_active_pipeline
+
+    @property
+    def display_function_items(self) -> Dict[str,DisplayFunctionItem]:
+        return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self._pipeline_reference.registered_display_function_dict.items()}
+
 
     def __dir__(self):
         return self._pipeline_reference.registered_display_function_names # ['area', 'perimeter', 'location']
