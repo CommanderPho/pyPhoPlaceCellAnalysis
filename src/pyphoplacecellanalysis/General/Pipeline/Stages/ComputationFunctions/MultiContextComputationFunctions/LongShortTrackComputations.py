@@ -545,7 +545,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
     @function_attributes(short_name='long_short_decoding_analyses', tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=[], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10',
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True)
-    def _perform_long_short_decoding_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
+    def _perform_long_short_decoding_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False, override_long_epoch_name:Optional[str]=None, override_short_epoch_name:Optional[str]=None):
         """ Performs decoding for replay epochs after ensuring that the long and short placefields are properly constrained to match one another.
         
         Requires:
@@ -556,13 +556,25 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
                 # ['long_short_leave_one_out_decoding_analysis']['short_long_neurons_diff']
                 # ['long_short_leave_one_out_decoding_analysis']['poly_overlap_df']
         
+
+
+        Call Hierarchy:
+            - if not `is_certain_properly_constrained`, calls `compute_long_short_constrained_decoders` to build placefields and decoders constrained to the same position bins
+
+
+
         """
         # # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
         # x_frs_index, y_frs_index, active_context, all_results_dict = pipeline_complete_compute_long_short_fr_indicies(owning_pipeline_reference) # use the all_results_dict as the computed data value
         # global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
 
-
-        is_certain_properly_constrained = LongShortPipelineTests(owning_pipeline_reference).validate()
+        ## Get the active long/short epoch names:
+        long_epoch_name, short_epoch_name, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        if override_long_epoch_name is not None:
+            long_epoch_name = override_long_epoch_name
+        if override_short_epoch_name is not None:
+            short_epoch_name = override_short_epoch_name
+        is_certain_properly_constrained = LongShortPipelineTests(owning_pipeline_reference, override_long_epoch_name=long_epoch_name, override_short_epoch_name=short_epoch_name).validate()
         # is_certain_properly_constrained = False
 
         """ a properly constrained pipeline has the computation_epochs for its placefields equal to its laps, 
@@ -624,8 +636,15 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
                 long_one_step_decoder_1D.time_bin_size = decoding_time_bin_size
                 
 
+
+        ## Perform the actual `_long_short_decoding_analysis_from_decoders`:
         leave_one_out_decoding_analysis_obj = _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session,
                                                                                            decoding_time_bin_size=decoding_time_bin_size, perform_cache_load=perform_cache_load)
+
+
+        #TODO 2023-10-25 08:45: - [ ] Need to make separate results based on the passed in long/short epoch names.
+
+
         # TODO 2023-05-10 - need to update existing ['long_short'] if it exists:
         # global_computation_results.computed_data['long_short'] = {
         #     'leave_one_out_decoding_analysis': leave_one_out_decoding_analysis_obj
@@ -1346,7 +1365,7 @@ from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.analyses.laps import build_lap_computation_epochs # used in `DirectionalLapsHelpers.split_to_directional_laps`
 
 class DirectionalLapsHelpers:
-    """ 
+    """ 2023-10-24 - Directional Placefields Computations
 
     use_direction_dependent_laps
 
@@ -1557,7 +1576,7 @@ def constrain_to_laps(curr_active_pipeline):
     return curr_active_pipeline, directional_lap_specific_configs
 
 
-
+@function_attributes(short_name=None, tags=['long_short', 'decoder', 'constrained', 'important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-25 08:32', related_items=[])
 def compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_name:str, short_epoch_name:str, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
     """ 2023-04-14 - Computes both 1D & 2D Decoders constrained to each other's position bins 
     Usage:
@@ -1637,7 +1656,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_nam
 # 2023-05-10 - Long Short Decoding Analysis                                                                            #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['decoding', 'surprise'], input_requires=[], output_provides=[], uses=['LeaveOneOutDecodingAnalysis', 'perform_full_session_leave_one_out_decoding_analysis'], used_by=[], creation_date='2023-09-21 17:25', related_items=[])
+@function_attributes(short_name=None, tags=['decoding', 'loo', 'surprise'], input_requires=[], output_provides=[], uses=['LeaveOneOutDecodingAnalysis', 'perform_full_session_leave_one_out_decoding_analysis'], used_by=[], creation_date='2023-09-21 17:25', related_items=[])
 def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session, decoding_time_bin_size = 0.025, perform_cache_load=False) -> LeaveOneOutDecodingAnalysis:
     """ Uses existing decoders and other long/short variables to run `perform_full_session_leave_one_out_decoding_analysis` on each. """
     # Get existing long/short decoders from the cell under "# 2023-02-24 Decoders"
