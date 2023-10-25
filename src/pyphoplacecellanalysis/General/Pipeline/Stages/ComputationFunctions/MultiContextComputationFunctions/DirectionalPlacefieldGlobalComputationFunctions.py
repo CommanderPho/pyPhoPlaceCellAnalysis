@@ -162,13 +162,13 @@ class DirectionalLapsHelpers:
 
                 ## Actually do the filtering now. We have 
                 updated_active_session_pseudo_filter_configs = {k:curr_active_pipeline.active_configs[k].filter_config['filter_function'] for k in split_directional_laps_config_names} # split_directional_laps_config_names: ['maze_odd_laps', 'maze_even_laps']
-                curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
+                curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=True)
 
                 ## Perform the computations which builds the computation results:
-                _out = curr_active_pipeline.perform_computations(computation_functions_name_includelist=['pf_computation', 'firing_rate_trends', 'position_decoding'], # , 'pfdt_computation'
+                _out = curr_active_pipeline.perform_computations(computation_functions_name_includelist=['pf_computation'], # , 'pfdt_computation', 'firing_rate_trends', 'position_decoding'
                     enabled_filter_names=split_directional_laps_config_names,
                     # computation_kwargs_list=[dict(ndim=1)],
-                    fail_on_exception=True, debug_print=True)
+                    fail_on_exception=False, debug_print=True)
 
                 computed_base_epoch_names.append(an_epoch_name)
                 
