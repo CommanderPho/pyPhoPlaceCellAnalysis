@@ -21,7 +21,7 @@ from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import DirectionalLapsHelpers
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
 
 @unique
 class SavingOptions(Enum):

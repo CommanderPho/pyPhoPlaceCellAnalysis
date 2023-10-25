@@ -540,7 +540,7 @@ class LongShortPipelineTests:
 class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
     _computationGroupName = 'long_short_track'
-    _computationPrecidence = 1001
+    _computationPrecidence = 1003
     _is_global = True
 
     @function_attributes(short_name='long_short_decoding_analyses', tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=[], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10',
@@ -585,8 +585,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # 2023-05-16 - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions:
         # is_certain_properly_constrained = True
 
-
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
         if not is_certain_properly_constrained:
             print(f'WARN: _perform_long_short_decoding_analyses: Not certain if pipeline results are properly constrained. Need to recompute and update.')
@@ -1364,123 +1362,6 @@ def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.analyses.laps import build_lap_computation_epochs # used in `DirectionalLapsHelpers.split_to_directional_laps`
 
-class DirectionalLapsHelpers:
-    """ 2023-10-24 - Directional Placefields Computations
-
-    use_direction_dependent_laps
-
-    from neuropy.core.laps import Laps
-    from neuropy.analyses.laps import build_lap_computation_epochs
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import DirectionalLapsHelpers
-
-
-    curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
-
-    """
-
-
-    # lap_direction_suffix_list = ['_odd', '_even', '_any'] # ['maze1_odd', 'maze1_even', 'maze1_any', 'maze2_odd', 'maze2_even', 'maze2_any', 'maze_odd', 'maze_even', 'maze_any']
-    # lap_direction_suffix_list = ['_odd', '_even', ''] # no '_any' prefix, instead reuses the existing names
-    split_directional_laps_name_parts = ['odd_laps', 'even_laps'] # , 'any_laps'
-
-    @classmethod
-    def split_to_directional_laps(cls, curr_active_pipeline, add_created_configs_to_pipeline:bool=True):
-        """ 2023-10-23 - Duplicates the global_epoch and all of its derived properties (filtered*, computed*, etc) but restricts its computation_config.computation_epochs to be either the odd or even laps
-                (restricting the motion to one of the two directions) allowing us to observe the directional placefields 
-
-        if add_created_configs_to_pipeline is False, just returns the built configs and doesn't add them to the pipeline.
-
-        """
-        use_global_epoch_only_mode: bool = True # 2023-10-24 - 4:19pm - Duplicates only the `global_epoch_name` results for the directional laps and then filters from there
-        lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
-        assert lap_estimation_parameters is not None
-        use_direction_dependent_laps: bool = lap_estimation_parameters.get('use_direction_dependent_laps', True)
-        print(f'split_to_directional_laps(...): use_direction_dependent_laps: {use_direction_dependent_laps}')
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        ## After all top-level computations are done, compute the subsets for direction laps
-        directional_lap_specific_configs = {}
-        if use_direction_dependent_laps:
-            print(f'split_to_directional_laps(...) processing for directional laps...')
-            # for a_name, a_sess, a_result in zip((long_epoch_name, short_epoch_name, global_epoch_name), (long_session, short_session, global_session), (long_results, short_results, global_results)):
-            # for `use_global_epoch_only_mode == True` mode:
-            a_name, a_sess, a_result = global_epoch_name, global_session, global_results
-
-            split_directional_laps_config_names = [f'{a_name}_{a_lap_dir_description}' for a_lap_dir_description in cls.split_directional_laps_name_parts] # ['maze_odd_laps', 'maze_even_laps']
-            print(f'\tsplit_directional_laps_config_names: {split_directional_laps_config_names}')
-
-            # 'build_lap_computation_epochs(...)' based mode:
-            desired_computation_epochs = build_lap_computation_epochs(a_sess, use_direction_dependent_laps=use_direction_dependent_laps)
-            even_lap_specific_epochs, odd_lap_specific_epochs, any_lap_specific_epochs = desired_computation_epochs
-
-            split_directional_laps_dict = dict(zip(split_directional_laps_config_names, (even_lap_specific_epochs, odd_lap_specific_epochs)))
-
-            # # manual mode:
-            # lap_specific_epochs = a_sess.laps.as_epoch_obj().get_non_overlapping().filtered_by_duration(1.0, 30.0) # set this to the laps object
-            # any_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(len(a_sess.laps.lap_id))])
-            # even_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(0, len(a_sess.laps.lap_id), 2)])
-            # odd_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(1, len(a_sess.laps.lap_id), 2)])
-
-            # split_directional_laps_dict = {'even_laps': even_lap_specific_epochs, 'odd_laps': odd_lap_specific_epochs, 'any_laps': any_lap_specific_epochs}
-
-            print(f'any_lap_specific_epochs: {any_lap_specific_epochs}\n\teven_lap_specific_epochs: {even_lap_specific_epochs}\n\todd_lap_specific_epochs: {odd_lap_specific_epochs}\n') # lap_specific_epochs: {lap_specific_epochs}\n\t
-
-            updated_active_session_pseudo_filter_configs = {} # empty list, woot!
-            for a_split_directional_laps_config_name, lap_dir_epochs in split_directional_laps_dict.items():
-                print(f'\ta_split_directional_laps_config_name: {a_split_directional_laps_config_name}')
-                active_config_copy = deepcopy(curr_active_pipeline.active_configs[a_name])
-                # active_config_copy.computation_config.pf_params.computation_epochs = active_config_copy.computation_config.pf_params.computation_epochs.label_slice(odd_lap_specific_epochs.labels)
-                ## Just overwrite directly:
-                active_config_copy.computation_config.pf_params.computation_epochs = lap_dir_epochs
-                directional_lap_specific_configs[a_split_directional_laps_config_name] = active_config_copy
-                if add_created_configs_to_pipeline:
-                    curr_active_pipeline.active_configs[a_split_directional_laps_config_name] = active_config_copy
-                    # When a new config is added, new results and stuff should be added too.
-                    curr_active_pipeline.filtered_sessions[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_sessions[a_name]
-                    curr_active_pipeline.filtered_epochs[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_epochs[a_name]
-                    curr_active_pipeline.filtered_contexts[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_contexts[a_name]
-
-                    curr_active_pipeline.computation_results[a_split_directional_laps_config_name] = None # empty
-
-                    # for an_epoch_dependent_state_property_name in ['filtered_sessions', 'filtered_epochs', 'filtered_contexts', 'active_configs', 'computation_results']
-                    #     # copy properties
-                    #     curr_active_pipeline.get(an_epoch_dependent_state_property_name, None)[a_split_directional_laps_config_name] = deepcopy(curr_active_pipeline[an_epoch_dependent_state_property_name][a_name])
-                    # [curr_active_pipeline[an_epoch_dependent_state_property_name][an_epoch_name] for an_epoch_dependent_state_property_name in ['filtered_sessions', 'filtered_epochs', 'filtered_contexts', 'active_configs', 'computation_results']]
-                    # curr_active_pipeline.computation_results
-            # end for split_directional_laps_dict
-
-            # for a_lap_dir_description, lap_dir_epochs in split_directional_laps_dict.items():
-            #     new_name = f'{a_name}_{a_lap_dir_description}'
-            #     print(f'\tnew_name: {new_name}')
-            #     active_config_copy = deepcopy(curr_active_pipeline.active_configs[a_name])
-            #     # active_config_copy.computation_config.pf_params.computation_epochs = active_config_copy.computation_config.pf_params.computation_epochs.label_slice(odd_lap_specific_epochs.labels)
-            #     ## Just overwrite directly:
-            #     active_config_copy.computation_config.pf_params.computation_epochs = lap_dir_epochs
-            #     directional_lap_specific_configs[new_name] = active_config_copy
-            #     if add_created_configs_to_pipeline:
-            #         curr_active_pipeline.active_configs[new_name] = active_config_copy
-            #         # When a new config is added, new results and stuff should be added too.
-
-                # end loop over split_directional_lap types:
-            # end loop over filter epochs:
-
-            print(f'directional_lap_specific_configs: {directional_lap_specific_configs}')
-
-            ## Actually do the filtering now. We have 
-            updated_active_session_pseudo_filter_configs = {k:curr_active_pipeline.active_configs[k].filter_config['filter_function'] for k in ['maze_odd_laps', 'maze_even_laps']}
-            curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
-
-            ## Perform the computations which builds the computation results:
-            _out = curr_active_pipeline.perform_computations(computation_functions_name_includelist=['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'position_decoding'],
-                enabled_filter_names=['maze_even_laps', 'maze_odd_laps'],
-                # computation_kwargs_list=[dict(ndim=1)],
-                fail_on_exception=True, debug_print=True)
-            _out
-        # end if use_direction_dependent_laps
-
-        return curr_active_pipeline, directional_lap_specific_configs
-
 
 
 def constrain_to_laps(curr_active_pipeline):
@@ -1758,56 +1639,6 @@ def _fr_index(long_fr, short_fr):
     """ Pho's 2023 firing-rate-index [`fri`] measure."""
     return ((long_fr - short_fr) / (long_fr + short_fr))
 
-# @function_attributes(short_name='_compute_long_short_firing_rate_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-01-19 00:00')
-# def _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=None):
-#     """A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
-
-#     Args:
-#         spikes_df (_type_): _description_
-#         long_laps (_type_): _description_
-#         long_replays (_type_): _description_
-#         short_laps (_type_): _description_
-#         short_replays (_type_): _description_
-
-#     Returns:
-#         _type_: _description_
-
-
-#     The backups saved with this function can be loaded via:
-
-#     # Load previously computed from data:
-#     long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index = loadData("data/temp_2023-01-20_results.pkl").values()
-
-#     """
-#     assert short_laps.n_epochs > 0, f"No short laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
-#     assert long_laps.n_epochs > 0, f"No long laps!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
-#     assert long_replays.n_epochs > 0, f"No short replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
-#     assert short_replays.n_epochs > 0, f"No long replays!\t long: (laps: {long_laps.n_epochs > 0}, replays: {long_replays.n_epochs}), \t short: (laps: {short_laps.n_epochs}, replays: {short_replays.n_epochs})"
-
-
-#     long_mean_laps_all_frs, long_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, long_laps)
-#     long_mean_replays_all_frs, long_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, long_replays)
-
-#     short_mean_laps_all_frs, short_mean_laps_frs = _epoch_unit_avg_firing_rates(spikes_df, short_laps)
-#     short_mean_replays_all_frs, short_mean_replays_frs = _epoch_unit_avg_firing_rates(spikes_df, short_replays)
-
-#     all_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs])) # all variables
-#     all_results_dict.update(dict(zip(['long_mean_laps_all_frs', 'long_mean_replays_all_frs', 'short_mean_laps_all_frs', 'short_mean_replays_all_frs'], [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]))) # all variables
-
-#     y_frs_index = {aclu:_fr_index(long_mean_laps_frs[aclu], short_mean_laps_frs[aclu]) for aclu in long_mean_laps_frs.keys()}
-#     x_frs_index = {aclu:_fr_index(long_mean_replays_frs[aclu], short_mean_replays_frs[aclu]) for aclu in long_mean_replays_frs.keys()}
-
-#     all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # all variables
-#     # long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs = [np.array(list(fr_dict.values())) for fr_dict in [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]]	
-
-#     # Save a backup of the data:
-#     if save_path is not None:
-#         # save_path: e.g. 'temp_2023-01-20_results.pkl'
-#         # backup_results_dict = dict(zip(['long_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_laps_frs', 'short_mean_replays_frs', 'x_frs_index', 'y_frs_index'], [long_mean_laps_frs, long_mean_replays_frs, short_mean_laps_frs, short_mean_replays_frs, x_frs_index, y_frs_index])) # all variables
-#         backup_results_dict = all_results_dict # really all of the variables
-#         saveData(save_path, backup_results_dict)
-
-#     return x_frs_index, y_frs_index, all_results_dict
 
 @function_attributes(short_name=None, tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-09-07 19:49', related_items=[])
 def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneous_time_bin_size_seconds: Optional[float]=None, save_path=None, **kwargs):
@@ -1918,7 +1749,7 @@ def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thr
     # num_cells_included_in_epoch_mat
     return num_cells_included_in_epoch_mat
 
-@function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
+@function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'top_level', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
     """ wraps `compute_long_short_firing_rate_indicies(...)` to compute the long_short_fr_index for the complete pipeline
 
