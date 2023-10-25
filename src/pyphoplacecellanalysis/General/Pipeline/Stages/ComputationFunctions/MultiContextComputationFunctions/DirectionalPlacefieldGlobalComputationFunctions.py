@@ -10,6 +10,7 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.analyses.laps import build_lap_computation_epochs # used in `DirectionalLapsHelpers.split_to_directional_laps`
+from neuropy.utils.result_context import IdentifyingContext
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_long_short_constrained_decoders
 
@@ -34,6 +35,31 @@ class DirectionalLapsHelpers:
     split_directional_laps_name_parts = ['odd_laps', 'even_laps'] # , 'any_laps'
 
     # ['maze_even_laps', 'maze_odd_laps']
+
+    @classmethod
+    def format_directional_laps_context(cls, a_context: IdentifyingContext, a_directional_epoch_name: str, a_lap_dir_name: str) -> IdentifyingContext:
+        """ Builds the correct context for a lap-direction-specific epoch from the base epoch
+
+        originally:
+            'maze2_even_laps': IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'maze2')>
+
+
+        a_lap_dir_name: str - like "odd_laps" or "even_laps"
+
+
+        Usage:
+            a_context = deepcopy(curr_active_pipeline.filtered_contexts[a_name])
+            a_context = DirectionalLapsHelpers.format_directional_laps_context(a_context, a_split_directional_laps_config_name, a_lap_dir)
+            curr_active_pipeline.filtered_contexts[a_split_directional_laps_config_name] = a_context
+
+
+        """
+        a_context: IdentifyingContext = a_context.adding_context_if_missing(maze_name=a_context.filter_name, lap_dir=a_directional_epoch_name)
+        a_context = a_context.overwriting_context(filter_name=a_directional_epoch_name)
+        a_context.maze_name = a_context.filter_name
+        a_context.lap_dir = a_directional_epoch_name
+        a_context.filter_name = a_directional_epoch_name
+        return a_context
 
     @classmethod
     def split_specific_epoch_to_directional_laps(cls, a_name: str, a_sess, a_result, curr_active_pipeline, add_created_configs_to_pipeline:bool=True, use_direction_dependent_laps=True, debug_print=False):
@@ -66,9 +92,10 @@ class DirectionalLapsHelpers:
         if debug_print:
             print(f'any_lap_specific_epochs: {any_lap_specific_epochs}\n\teven_lap_specific_epochs: {even_lap_specific_epochs}\n\todd_lap_specific_epochs: {odd_lap_specific_epochs}\n') # lap_specific_epochs: {lap_specific_epochs}\n\t
 
-        for a_split_directional_laps_config_name, lap_dir_epochs in split_directional_laps_dict.items():
+        for i, (a_split_directional_laps_config_name, lap_dir_epochs) in enumerate(split_directional_laps_dict.items()):
+            a_lap_dir: str = cls.split_directional_laps_name_parts[i]
             if debug_print:
-                print(f'\ta_split_directional_laps_config_name: {a_split_directional_laps_config_name}')
+                print(f'\ta_split_directional_laps_config_name: {a_split_directional_laps_config_name}, a_lap_dir: {a_lap_dir}')
             active_config_copy = deepcopy(curr_active_pipeline.active_configs[a_name])
             # active_config_copy.computation_config.pf_params.computation_epochs = active_config_copy.computation_config.pf_params.computation_epochs.label_slice(odd_lap_specific_epochs.labels)
             ## Just overwrite directly:
@@ -79,7 +106,10 @@ class DirectionalLapsHelpers:
                 # When a new config is added, new results and stuff should be added too.
                 curr_active_pipeline.filtered_sessions[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_sessions[a_name]
                 curr_active_pipeline.filtered_epochs[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_epochs[a_name]
-                curr_active_pipeline.filtered_contexts[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_contexts[a_name]
+
+                a_context = deepcopy(curr_active_pipeline.filtered_contexts[a_name])
+                a_context = cls.format_directional_laps_context(a_context, a_split_directional_laps_config_name, a_lap_dir)
+                curr_active_pipeline.filtered_contexts[a_split_directional_laps_config_name] = a_context
 
                 curr_active_pipeline.computation_results[a_split_directional_laps_config_name] = None # empty
 
@@ -199,7 +229,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             'split_directional_laps_names': split_directional_laps_config_names,
             'computed_base_epoch_names': computed_base_epoch_names,
         })
-        
+
+        owning_pipeline_reference.prepare_for_display() # TODO: pass a display config
+
         """ Usage:
         
         directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
