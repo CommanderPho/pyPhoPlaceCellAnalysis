@@ -643,7 +643,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
 
         #TODO 2023-10-25 08:45: - [ ] Need to make separate results based on the passed in long/short epoch names.
-
+        # specifically the directional placefield analyses only need `long_shared_aclus_only_decoder`, `short_shared_aclus_only_decoder` from this analysis
 
         # TODO 2023-05-10 - need to update existing ['long_short'] if it exists:
         # global_computation_results.computed_data['long_short'] = {
