@@ -178,11 +178,11 @@ class DirectionalLapsHelpers:
 
     @classmethod
     def validate_has_directional_laps(cls, curr_active_pipeline, computation_filter_name='maze'):
-        return (
-                    curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'],
-                    curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']['computed_base_epoch_names'],
-                    (computation_filter_name in curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']['computed_base_epoch_names']) 
-                )
+        # Unpacking:
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
+        # assert (computation_filter_name in computed_base_epoch_names), f'computation_filter_name: {computation_filter_name} is missing from computed_base_epoch_names: {computed_base_epoch_names} '
+        return (computation_filter_name in computed_base_epoch_names)
 
 
 
