@@ -1023,8 +1023,11 @@ class PipelineWithComputedPipelineStageMixin:
     # Utility/Debugging Functions:
     def perform_drop_entire_computed_config(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
         """ Loops through all the configs and drops all results of the specified configs
-        2022-09-13 - Unfinished 
-        2022-10-23 - This seems to drop ALL the computed items for a specified set of configs/contexts, not a specific computed item across configs/contexts        
+        2023-10-25 - Seems to work to drop ALL of the computed items for a specified set of configs/contexts (not a specific computed item across configs/contexts)
+
+        Usage:
+          curr_active_pipeline.perform_drop_entire_computed_config(config_names_to_drop=['maze1_odd_laps', 'maze1_even_laps', 'maze2_odd_laps', 'maze2_even_laps'])
+
         """
         # config_names_to_drop
         print(f'_drop_computed_items(config_names_to_drop: {config_names_to_drop}):\n\tpre keys: {list(self.active_configs.keys())}')
@@ -1033,11 +1036,14 @@ class PipelineWithComputedPipelineStageMixin:
             a_config_to_drop = self.active_configs.pop(a_config_name, None)
             if a_config_to_drop is not None:
                 print(f'\tpreparing to drop: {a_config_name}')
-                ## TODO: filtered_sessions, filtered_epochs
+                
                 _dropped_computation_results = self.computation_results.pop(a_config_name, None)
                 a_filter_context_to_drop = self.filtered_contexts.pop(a_config_name, None)
                 if a_filter_context_to_drop is not None:
                     _dropped_display_items = self.display_output.pop(a_filter_context_to_drop, None)
+                ## filtered_sessions, filtered_epochs
+                a_filter_epoch_to_drop = self.filtered_epochs.pop(a_config_name, None)
+                a_filter_session_to_drop = self.filtered_sessions.pop(a_config_name, None)
 
             print(f'\t dropped.')
             
