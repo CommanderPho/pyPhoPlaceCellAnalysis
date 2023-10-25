@@ -176,7 +176,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         
         """
         if include_includelist is None:
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             # include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
             include_includelist = [global_epoch_name] # ['maze'] # only for maze
         
