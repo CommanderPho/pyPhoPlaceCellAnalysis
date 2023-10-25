@@ -37,7 +37,7 @@ class DirectionalLapsHelpers:
     # ['maze_even_laps', 'maze_odd_laps']
 
     @classmethod
-    def format_directional_laps_context(cls, a_context: IdentifyingContext, a_directional_epoch_name: str, a_lap_dir_name: str) -> IdentifyingContext:
+    def format_directional_laps_context(cls, a_context: IdentifyingContext, a_maze_name: str = 'maze1', a_directional_epoch_name: str, a_lap_dir_name: str) -> IdentifyingContext:
         """ Builds the correct context for a lap-direction-specific epoch from the base epoch
 
         originally:
@@ -54,11 +54,7 @@ class DirectionalLapsHelpers:
 
 
         """
-        a_context: IdentifyingContext = a_context.adding_context_if_missing(maze_name=a_context.filter_name, lap_dir=a_directional_epoch_name)
-        a_context = a_context.overwriting_context(filter_name=a_directional_epoch_name)
-        a_context.maze_name = a_context.filter_name
-        a_context.lap_dir = a_directional_epoch_name
-        a_context.filter_name = a_directional_epoch_name
+        a_context = a_context.overwriting_context(filter_name=a_directional_epoch_name, maze_name=a_maze_name, lap_dir=a_lap_dir_name)
         return a_context
 
     @classmethod
@@ -108,7 +104,7 @@ class DirectionalLapsHelpers:
                 curr_active_pipeline.filtered_epochs[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_epochs[a_name]
 
                 a_context = deepcopy(curr_active_pipeline.filtered_contexts[a_name])
-                a_context = cls.format_directional_laps_context(a_context, a_split_directional_laps_config_name, a_lap_dir)
+                a_context = cls.format_directional_laps_context(a_context, a_maze_name=a_name, a_directional_epoch_name=a_split_directional_laps_config_name, a_lap_dir_name=a_lap_dir)
                 curr_active_pipeline.filtered_contexts[a_split_directional_laps_config_name] = a_context
 
                 curr_active_pipeline.computation_results[a_split_directional_laps_config_name] = None # empty
@@ -158,7 +154,7 @@ class DirectionalLapsHelpers:
 
                 directional_lap_specific_configs |= curr_epoch_directional_lap_specific_configs
                 split_directional_laps_dict |= curr_epoch_split_directional_laps_dict
-                split_directional_laps_config_names.extend(curr_epoch_split_directional_laps_dict)
+                split_directional_laps_config_names.extend(curr_epoch_split_directional_laps_config_names)
 
                 # end loop over filter epochs:
                 if debug_print:
