@@ -27,6 +27,7 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metada
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
 
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPlacefieldGlobalComputationFunctions
 
 """ 
 
@@ -287,7 +288,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     newly_computed_values = []
 
     non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
-    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis'] # , 'long_short_rate_remapping'
+    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis', 'split_specific_epoch_to_directional_laps'] # , 'long_short_rate_remapping'
 
     # 'firing_rate_trends', 'pf_dt_sequential_surprise'
     # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
