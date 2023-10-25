@@ -167,7 +167,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             ['sess']
             
         Provides:
-            computation_result.computed_data['DirectionalLaps']
+            global_computation_results.computed_data['DirectionalLaps']
                 ['DirectionalLaps']['directional_lap_specific_configs']
                 ['DirectionalLaps']['split_directional_laps_dict']
                 ['DirectionalLaps']['split_directional_laps_names']
