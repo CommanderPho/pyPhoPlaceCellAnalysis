@@ -139,7 +139,7 @@ class DirectionalLapsHelpers:
                 curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
 
                 ## Perform the computations which builds the computation results:
-                _out = curr_active_pipeline.perform_computations(computation_functions_name_includelist=['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'position_decoding'],
+                _out = curr_active_pipeline.perform_computations(computation_functions_name_includelist=['pf_computation', 'firing_rate_trends', 'position_decoding'], # , 'pfdt_computation'
                     enabled_filter_names=split_directional_laps_config_names,
                     # computation_kwargs_list=[dict(ndim=1)],
                     fail_on_exception=True, debug_print=True)
@@ -150,6 +150,14 @@ class DirectionalLapsHelpers:
         # end if use_direction_dependent_laps
         return curr_active_pipeline, directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names
 
+    @classmethod
+    def validate_has_directional_laps(cls, curr_active_pipeline, computation_filter_name='maze'):
+        return (
+                    curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'],
+                    curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']['computed_base_epoch_names'],
+                    (computation_filter_name in curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']['computed_base_epoch_names']) 
+                )
+
 
 
 class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
@@ -159,7 +167,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     _is_global = True
 
     @function_attributes(short_name='split_to_directional_laps', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
-        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'], curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']['computed_base_epoch_names'], (computation_filter_name in curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']['computed_base_epoch_names']) ), is_global=True)
+        validate_computation_test=DirectionalLapsHelpers.validate_has_directional_laps, is_global=True)
     def _split_to_directional_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ 
         
