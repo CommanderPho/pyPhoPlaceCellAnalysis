@@ -226,7 +226,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             'computed_base_epoch_names': computed_base_epoch_names,
         })
 
-        owning_pipeline_reference.prepare_for_display() # TODO: pass a display config
+        ## Needs to call `owning_pipeline_reference.prepare_for_display()` before display functions can be used with new directional results
 
         """ Usage:
         
