@@ -121,7 +121,13 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         # return isinstance(self, ComputedPipelineStage) # this is redundant
         return True
 
-
+    # Computation Properties: _______________________________________________________________________________________________ #
+    
+    @property
+    def can_compute(self):
+        """The can_compute property."""
+        return True # (self.last_completed_stage >= PipelineStage.Filtered)
+    
     @property
     def active_completed_computation_result_names(self):
         """The this list of all computed configs."""
@@ -631,6 +637,35 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
 
 
+    ## Computation Helpers: 
+    # perform_computations: The main computation function for the computation stage
+    @function_attributes(short_name=None, tags=['main', 'computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-25 12:26', related_items=[])
+    def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
+        """The main computation function for the pipeline.
+
+        Wraps `perform_action_for_all_contexts`
+        
+        Internally updates the
+            .computation_results
+
+
+        Args:
+            active_computation_params (Optional[DynamicParameters], optional): _description_. Defaults to None.
+            enabled_filter_names (_type_, optional): _description_. Defaults to None.
+            overwrite_extant_results (bool, optional): _description_. Defaults to False.
+            computation_functions_name_includelist (_type_, optional): _description_. Defaults to None.
+            computation_functions_name_excludelist (_type_, optional): _description_. Defaults to None.
+            fail_on_exception (bool, optional): _description_. Defaults to False.
+            debug_print (bool, optional): _description_. Defaults to False.
+
+        History:
+            factored out of `NeuropyPipeline` for use in GlobalComputationFunctions
+        """
+        assert (self.can_compute), "Current stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
+        self.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
+            computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
+
+
     # ==================================================================================================================== #
     # CLASS/STATIC METHODS                                                                                                 #
     # ==================================================================================================================== #
@@ -811,6 +846,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
             ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the excludelist but now are not:
 
+
         
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
@@ -951,8 +987,11 @@ class PipelineWithComputedPipelineStageMixin:
         """
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         progress_logger_callback=(lambda x: self.logger.info(x))
+        # self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
+        #     computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
 
-        self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
+        # Calls self.stage's version:
+        self.stage.perform_computations(enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
             computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
         
         # Global MultiContext computations will be done here:

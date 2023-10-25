@@ -191,5 +191,12 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             'split_directional_laps_names': split_directional_laps_config_names,
             'computed_base_epoch_names': computed_base_epoch_names,
         })
+        
+        """ Usage:
+        
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
+
+        """
         return global_computation_results
 
