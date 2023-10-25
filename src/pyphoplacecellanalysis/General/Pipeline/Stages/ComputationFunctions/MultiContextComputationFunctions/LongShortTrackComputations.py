@@ -555,12 +555,14 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # 2023-05-16 - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions:
         # is_certain_properly_constrained = True
 
+
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
         if not is_certain_properly_constrained:
             print(f'WARN: _perform_long_short_decoding_analyses: Not certain if pipeline results are properly constrained. Need to recompute and update.')
             owning_pipeline_reference = constrain_to_laps(owning_pipeline_reference) # Constrains placefields to laps
             
-            (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_long_short_constrained_decoders(owning_pipeline_reference, recalculate_anyway=True)
-            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_long_short_constrained_decoders(owning_pipeline_reference, long_epoch_name=long_epoch_name, short_epoch_name=short_epoch_name, recalculate_anyway=True)
             long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
             long_results, short_results, global_results = [owning_pipeline_reference.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -586,7 +588,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             print(f'`is_certain_properly_constrained`: True - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions')
             if always_recompute_replays:
                 print(f'\t `is_certain_properly_constrained` IGNORES always_recompute_replays!')
-            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
             long_results, short_results, global_results = [owning_pipeline_reference.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
             long_one_step_decoder_1D, short_one_step_decoder_1D  = [deepcopy(results_data.get('pf1D_Decoder', None)) for results_data in (long_results, short_results)]
@@ -1538,20 +1539,22 @@ def constrain_to_laps(curr_active_pipeline):
     return curr_active_pipeline, directional_lap_specific_configs
 
 
-def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
+
+def compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_name:str, short_epoch_name:str, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
     """ 2023-04-14 - Computes both 1D & 2D Decoders constrained to each other's position bins 
     Usage:
-
-        (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_long_short_constrained_decoders(curr_active_pipeline)
+        
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_name=long_epoch_name, short_epoch_name=short_epoch_name)
 
         With Two-step Decoders:
-        (long_one_step_decoder_1D, short_one_step_decoder_1D, long_two_step_decoder_1D, short_two_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D, long_two_step_decoder_2D, short_two_step_decoder_2D) = compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_step_decoders=True)
+        (long_one_step_decoder_1D, short_one_step_decoder_1D, long_two_step_decoder_1D, short_two_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D, long_two_step_decoder_2D, short_two_step_decoder_2D) = compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_name=long_epoch_name, short_epoch_name=short_epoch_name, enable_two_step_decoders=True)
 
     """
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    
 
     # 1D Decoders constrained to each other
-    def compute_short_long_constrained_decoders_1D(curr_active_pipeline, enable_two_step_decoders:bool = False):
+    def compute_short_long_constrained_decoders_1D(curr_active_pipeline, long_epoch_name:str, short_epoch_name:str, enable_two_step_decoders:bool = False):
         """ 2023-04-14 - 1D Decoders constrained to each other, captures: recalculate_anyway, long_epoch_name, short_epoch_name """
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_position_decoding_computation'], computation_kwargs_list=[dict(ndim=1)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
         long_results, short_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name]]
@@ -1573,7 +1576,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_ste
 
         return long_one_step_decoder_1D, short_one_step_decoder_1D, long_two_step_decoder_1D, short_two_step_decoder_1D
 
-    def compute_short_long_constrained_decoders_2D(curr_active_pipeline, enable_two_step_decoders:bool = False):
+    def compute_short_long_constrained_decoders_2D(curr_active_pipeline, long_epoch_name:str, short_epoch_name:str, enable_two_step_decoders:bool = False):
         """ 2023-04-14 - 2D Decoders constrained to each other, captures: recalculate_anyway, long_epoch_name, short_epoch_name """
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_position_decoding_computation'], computation_kwargs_list=[dict(ndim=2)], enabled_filter_names=[long_epoch_name, short_epoch_name], fail_on_exception=True, debug_print=True)
         long_results, short_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name]]
@@ -1603,8 +1606,8 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, enable_two_ste
         return long_one_step_decoder_2D, short_one_step_decoder_2D, long_two_step_decoder_2D, short_two_step_decoder_2D
 
     ## BEGIN MAIN FUNCTION BODY:
-    long_one_step_decoder_1D, short_one_step_decoder_1D, long_two_step_decoder_1D, short_two_step_decoder_1D = compute_short_long_constrained_decoders_1D(curr_active_pipeline, enable_two_step_decoders=enable_two_step_decoders)
-    long_one_step_decoder_2D, short_one_step_decoder_2D, long_two_step_decoder_2D, short_two_step_decoder_2D = compute_short_long_constrained_decoders_2D(curr_active_pipeline, enable_two_step_decoders=enable_two_step_decoders)
+    long_one_step_decoder_1D, short_one_step_decoder_1D, long_two_step_decoder_1D, short_two_step_decoder_1D = compute_short_long_constrained_decoders_1D(curr_active_pipeline, long_epoch_name=long_epoch_name, short_epoch_name=short_epoch_name, enable_two_step_decoders=enable_two_step_decoders)
+    long_one_step_decoder_2D, short_one_step_decoder_2D, long_two_step_decoder_2D, short_two_step_decoder_2D = compute_short_long_constrained_decoders_2D(curr_active_pipeline, long_epoch_name=long_epoch_name, short_epoch_name=short_epoch_name, enable_two_step_decoders=enable_two_step_decoders)
 
     if enable_two_step_decoders:
         return (long_one_step_decoder_1D, short_one_step_decoder_1D, long_two_step_decoder_1D, short_two_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D, long_two_step_decoder_2D, short_two_step_decoder_2D)
