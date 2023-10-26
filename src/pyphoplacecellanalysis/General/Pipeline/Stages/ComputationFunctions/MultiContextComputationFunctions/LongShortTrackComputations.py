@@ -569,12 +569,12 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # global_computation_results.computed_data['long_short_fr_indicies_analysis'] = DynamicParameters.init_from_dict({**all_results_dict, 'active_context': active_context})
 
         ## Get the active long/short epoch names:
-        long_epoch_name, short_epoch_name, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         if override_long_epoch_name is not None:
             long_epoch_name = override_long_epoch_name
         if override_short_epoch_name is not None:
             short_epoch_name = override_short_epoch_name
-        is_certain_properly_constrained = LongShortPipelineTests(owning_pipeline_reference, override_long_epoch_name=long_epoch_name, override_short_epoch_name=short_epoch_name).validate()
+        is_certain_properly_constrained = LongShortPipelineTests(owning_pipeline_reference).validate(override_long_epoch_name=long_epoch_name, override_short_epoch_name=short_epoch_name)
         # is_certain_properly_constrained = False
 
         """ a properly constrained pipeline has the computation_epochs for its placefields equal to its laps, 
@@ -647,7 +647,12 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # global_computation_results.computed_data['long_short'] = {
         #     'leave_one_out_decoding_analysis': leave_one_out_decoding_analysis_obj
         # } # end long_short
-        global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] = leave_one_out_decoding_analysis_obj # end long_short
+
+        if not 'long_short_leave_one_out_decoding_analysis' in global_computation_results.computed_data:
+            global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] = leave_one_out_decoding_analysis_obj # end long_short
+        else:
+            print(f'WARN: overwriting existing result `_perform_long_short_decoding_analyses`.')
+            global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] = leave_one_out_decoding_analysis_obj
         # TODO 2023-05-10 - Do I want long_one_step_decoder_2D, short_one_step_decoder_2D that I computed?
 
         """ Getting outputs:
