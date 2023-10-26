@@ -94,14 +94,19 @@ class DirectionalLapsHelpers:
             a_lap_dir: str = cls.split_directional_laps_name_parts[i]
             if debug_print:
                 print(f'\ta_split_directional_laps_config_name: {a_split_directional_laps_config_name}, a_lap_dir: {a_lap_dir}')
-            active_config_copy = deepcopy(curr_active_pipeline.active_configs[a_name])
-            # active_config_copy.computation_config.pf_params.computation_epochs = active_config_copy.computation_config.pf_params.computation_epochs.label_slice(odd_lap_specific_epochs.labels)
+            directional_lap_specific_configs[a_split_directional_laps_config_name] = deepcopy(curr_active_pipeline.active_configs[a_name])
+            
             ## Just overwrite directly:
-            active_config_copy.computation_config.pf_params.computation_epochs = lap_dir_epochs
-            directional_lap_specific_configs[a_split_directional_laps_config_name] = active_config_copy
+            directional_lap_specific_configs[a_split_directional_laps_config_name].computation_config = DynamicContainer.init_from_dict(deepcopy(curr_active_pipeline.active_configs[a_name].computation_config.to_dict()))
+            # directional_lap_specific_configs[a_split_directional_laps_config_name].computation_config.pf_params.computation_epochs = deepcopy(directional_lap_specific_configs[a_split_directional_laps_config_name].computation_config.pf_params.computation_epochs.label_slice(lap_dir_epochs.labels)) # does this work?
+            directional_lap_specific_configs[a_split_directional_laps_config_name].computation_config.pf_params.computation_epochs = deepcopy(split_directional_laps_dict[a_split_directional_laps_config_name])
+            # directional_lap_specific_configs[a_split_directional_laps_config_name] = active_config_copy
+
             if add_created_configs_to_pipeline:
-                curr_active_pipeline.active_configs[a_split_directional_laps_config_name] = active_config_copy
+                curr_active_pipeline.active_configs[a_split_directional_laps_config_name] = deepcopy(directional_lap_specific_configs[a_split_directional_laps_config_name])
                 # When a new config is added, new results and stuff should be added too.
+                # Set the laps... AGAIN
+                curr_active_pipeline.active_configs[a_split_directional_laps_config_name].computation_config.pf_params.computation_epochs = deepcopy(split_directional_laps_dict[a_split_directional_laps_config_name])
                 curr_active_pipeline.filtered_sessions[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_sessions[a_name]
                 curr_active_pipeline.filtered_epochs[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_epochs[a_name]
 
