@@ -14,6 +14,13 @@ class FilterablePipelineStage:
     """    
     
     def select_filters(self, active_session_filter_configurations, clear_filtered_results=True, progress_logger=None):
+        """ 
+        Clears/Updates:
+            self.filtered_sessions, self.filtered_epochs, self.filtered_contexts,
+            self.active_configs
+            self.computation_results
+
+        """
         if clear_filtered_results:
             # if clear_filtered_results is True, initialize the filtered_* properties. Otherwise just continue with the extant values (they must exist)
             self.filtered_sessions = dict()
@@ -30,7 +37,7 @@ class FilterablePipelineStage:
             print(f'Applying session filter named "{a_filter_config_name}"...')
             if progress_logger is not None:
                 progress_logger.info(f'\tApplying session filter named "{a_filter_config_name}"...')
-            self.filtered_sessions[a_filter_config_name], self.filtered_epochs[a_filter_config_name], self.filtered_contexts[a_filter_config_name] = a_select_config_filter_function(self.sess)
+            self.filtered_sessions[a_filter_config_name], self.filtered_epochs[a_filter_config_name], self.filtered_contexts[a_filter_config_name] = a_select_config_filter_function(self.sess) # `a_select_config_filter_function` call the filter select function
             ## Add the filter to the active context (IdentifyingContext)
             # self.filtered_contexts[a_filter_config_name] = active_identifying_session_ctx.adding_context('filter', filter_name=a_filter_config_name) # 'bapun_RatN_Day4_2019-10-15_11-30-06_maze'
 
@@ -54,6 +61,10 @@ class FilterablePipelineStage:
             changed_filters_ignore_list: <list> a list of names of changed filters which will be ignored if they exists
             
             Uses: `self.active_configs, self.logger, self.is_filtered, self.stage
+            
+            Call Hierarchy:
+                - `self.active_configs`
+            
             
             Stage's equivalent is:
             
