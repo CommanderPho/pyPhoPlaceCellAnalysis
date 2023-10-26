@@ -109,6 +109,11 @@ class DirectionalLapsHelpers:
 
                 curr_active_pipeline.computation_results[a_split_directional_laps_config_name] = None # empty
 
+                active_computation_params = deepcopy(directional_lap_specific_configs[a_split_directional_laps_config_name].computation_config)
+                curr_active_pipeline.computation_results[a_split_directional_laps_config_name] = ComputedPipelineStage._build_initial_computationResult(curr_active_pipeline.filtered_sessions[a_split_directional_laps_config_name], active_computation_params)
+                print(f'\t\n\tcomputation_epochs: {curr_active_pipeline.active_configs[a_split_directional_laps_config_name].computation_config.pf_params.computation_epochs}\n\n')
+
+
             # end loop over split_directional_lap types:
         return directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names
 
