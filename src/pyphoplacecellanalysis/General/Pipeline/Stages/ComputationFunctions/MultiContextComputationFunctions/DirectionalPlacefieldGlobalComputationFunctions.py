@@ -20,6 +20,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedP
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_long_short_constrained_decoders
 
 
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+
+
 class DirectionalLapsHelpers:
     """ 2023-10-24 - Directional Placefields Computations
 
@@ -62,44 +66,6 @@ class DirectionalLapsHelpers:
         a_context = a_context.overwriting_context(filter_name=a_directional_epoch_name, maze_name=a_maze_name, lap_dir=a_lap_dir_name)
         return a_context
 
-    # @classmethod
-    # def split_specific_epoch_to_directional_laps(cls, a_name: str, a_sess, a_result, curr_active_pipeline, add_created_configs_to_pipeline:bool=True, use_direction_dependent_laps=True, debug_print=False):
-    #     """ 
-
-    #         a_name, a_sess, a_result = global_epoch_name, global_session, global_results
-    #         curr_epoch_directional_lap_specific_configs, curr_epoch_split_directional_laps_dict, curr_epoch_split_directional_laps_config_names = cls.split_specific_epoch_to_directional_laps(a_name, a_sess, a_result, curr_active_pipeline, add_created_configs_to_pipeline=add_created_configs_to_pipeline)
-
-    #     """
-    #     # directional_lap_specific_configs = {}
-
-    #     split_directional_laps_config_names: List[str] = [f'{a_name}_{a_lap_dir_description}' for a_lap_dir_description in cls.split_directional_laps_name_parts] # ['maze_odd_laps', 'maze_even_laps']
-    #     if debug_print:
-    #         print(f'\tsplit_directional_laps_config_names: {split_directional_laps_config_names}')
-
-    #     # 'build_lap_computation_epochs(...)' based mode:
-    #     desired_computation_epochs = build_lap_computation_epochs(a_sess, use_direction_dependent_laps=use_direction_dependent_laps)
-    #     even_lap_specific_epochs, odd_lap_specific_epochs, any_lap_specific_epochs = desired_computation_epochs
-
-    #     split_directional_laps_contexts_dict: Dict[IdentifyingContext,str] = {cls.format_directional_laps_context(deepcopy(curr_active_pipeline.filtered_contexts[a_name]), a_maze_name=a_name, a_directional_epoch_name=a_split_directional_laps_config_name, a_lap_dir_name=a_lap_dir_description):a_split_directional_laps_config_name  for a_lap_dir_description, a_split_directional_laps_config_name in zip(cls.split_directional_laps_name_parts, split_directional_laps_config_names)}
-    #     split_directional_laps_dict: Dict[IdentifyingContext, Epoch] = dict(zip(list(split_directional_laps_contexts_dict.values()), (even_lap_specific_epochs, odd_lap_specific_epochs)))
-
-
-    #     # # manual mode:
-    #     # lap_specific_epochs = a_sess.laps.as_epoch_obj().get_non_overlapping().filtered_by_duration(1.0, 30.0) # set this to the laps object
-    #     # any_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(len(a_sess.laps.lap_id))])
-    #     # even_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(0, len(a_sess.laps.lap_id), 2)])
-    #     # odd_lap_specific_epochs = lap_specific_epochs.label_slice(lap_specific_epochs.labels[np.arange(1, len(a_sess.laps.lap_id), 2)])
-
-    #     # split_directional_laps_dict = {'even_laps': even_lap_specific_epochs, 'odd_laps': odd_lap_specific_epochs, 'any_laps': any_lap_specific_epochs}
-
-    #     if debug_print:
-    #         print(f'any_lap_specific_epochs: {any_lap_specific_epochs}\n\teven_lap_specific_epochs: {even_lap_specific_epochs}\n\todd_lap_specific_epochs: {odd_lap_specific_epochs}\n') # lap_specific_epochs: {lap_specific_epochs}\n\t
-
-    #     # for i, (a_split_directional_laps_config_name, lap_dir_epochs) in enumerate(split_directional_laps_dict.items()):
-
-    #     return split_directional_laps_contexts_dict, split_directional_laps_dict
-
-    #     # return directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names
 
     @classmethod
     def split_to_directional_laps(cls, curr_active_pipeline, include_includelist=None, add_created_configs_to_pipeline:bool=True, debug_print=False):
@@ -254,6 +220,139 @@ class DirectionalLapsHelpers:
         directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
         # assert (computation_filter_name in computed_base_epoch_names), f'computation_filter_name: {computation_filter_name} is missing from computed_base_epoch_names: {computed_base_epoch_names} '
         return (computation_filter_name in computed_base_epoch_names)
+
+
+    @classmethod
+    def build_directional_constrained_decoders(cls, curr_active_pipeline):
+        """ 2023-10-26 - Builds the four templates for the directioanl placefields 
+        Uses: cls.split_directional_laps_name_parts, cls.split_to_directional_laps
+        
+        """
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        odd_laps_suffix, even_laps_suffix = cls.split_directional_laps_name_parts
+
+        long_odd_laps_name, long_even_laps_name = [f'{long_epoch_name}_{a_suffix}' for a_suffix in (odd_laps_suffix, even_laps_suffix)]
+        short_odd_laps_name, short_even_laps_name = [f'{short_epoch_name}_{a_suffix}' for a_suffix in (odd_laps_suffix, even_laps_suffix)]
+
+        print(long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name) # ('maze1_odd_laps', 'maze1_even_laps', 'maze2_odd_laps', 'maze2_even_laps')
+
+        # Unpacking for non-direction specific epochs (to get the replays, etc):
+        long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_replays, short_replays, global_replays = [a_session.replay for a_session in [long_session, short_session, global_session]]
+
+        # Unpacking for `(long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)`
+        (long_odd_laps_context, long_even_laps_context, short_odd_laps_context, short_even_laps_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_obj, long_even_laps_obj, short_odd_laps_obj, short_even_laps_obj) = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_session, long_even_laps_session, short_odd_laps_session, short_even_laps_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_results, long_even_laps_results, short_odd_laps_results, short_even_laps_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_computation_config, long_even_laps_computation_config, short_odd_laps_computation_config, short_even_laps_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_pf1D, long_even_laps_pf1D, short_odd_laps_pf1D, short_even_laps_pf1D) = (long_odd_laps_results.pf1D, long_even_laps_results.pf1D, short_odd_laps_results.pf1D, short_even_laps_results.pf1D)
+        (long_odd_laps_pf2D, long_even_laps_pf2D, short_odd_laps_pf2D, short_even_laps_pf2D) = (long_odd_laps_results.pf2D, long_even_laps_results.pf2D, short_odd_laps_results.pf2D, short_even_laps_results.pf2D)
+
+        # Validate:
+        assert not (curr_active_pipeline.computation_results[long_odd_laps_name]['computation_config']['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_even_laps_name]['computation_config']['pf_params'].computation_epochs)
+        assert not (curr_active_pipeline.computation_results[short_odd_laps_name]['computation_config']['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_even_laps_name]['computation_config']['pf_params'].computation_epochs)
+
+        ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
+        long_odd_laps_one_step_decoder_1D, long_even_laps_one_step_decoder_1D, short_odd_laps_one_step_decoder_1D, short_even_laps_one_step_decoder_1D  = [BasePositionDecoder.init_from_stateful_decoder(deepcopy(results_data.get('pf1D_Decoder', None))) for results_data in (long_odd_laps_results, long_even_laps_results, short_odd_laps_results, short_even_laps_results)]
+
+        # Prune to the shared aclus in both epochs (short/long):
+        active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_odd_laps_one_step_decoder_1D, long_even_laps_one_step_decoder_1D, short_odd_laps_one_step_decoder_1D, short_even_laps_one_step_decoder_1D)]
+
+        # Find only the common aclus amongst all four templates:
+        shared_aclus = np.array(list(set.intersection(*map(set,active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
+        n_neurons = len(shared_aclus)
+        print(f'n_neurons: {n_neurons}, shared_aclus: {shared_aclus}')
+
+        # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
+        long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(shared_aclus) for a_decoder in (long_odd_laps_one_step_decoder_1D, long_even_laps_one_step_decoder_1D, short_odd_laps_one_step_decoder_1D, short_even_laps_one_step_decoder_1D)]
+
+        return long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D 
+
+
+
+    @classmethod
+    def complete_directional_pfs_computations(cls, curr_active_pipeline):
+        """ Explicit recomputation of laps: ^^top-level computation^^
+            Calls `cls.build_directional_constrained_decoders(...)` 
+        
+        """
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+        # Explicit recomputation of laps
+        curr_active_pipeline, directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names = cls.split_to_directional_laps(curr_active_pipeline, include_includelist=['maze1', 'maze2'], add_created_configs_to_pipeline=True)
+        ## Explicit recomputation for the placefields of the given epochs:
+        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=['pf_computation', 'position_decoding'], included_computation_filter_names=split_directional_laps_config_names, # , 'position_decoding', 'firing_rate_trends'
+                                                            include_global_functions=True, fail_on_exception=False, progress_print=True, force_recompute=False, debug_print=True)
+        # prepare for display:
+        # curr_active_pipeline.prepare_for_display(root_output_dir=global_data_root_parent_path.joinpath('Output'), should_smooth_maze=True) # TODO: pass a display config
+        print(f'newly_computed_values: {newly_computed_values}')
+        curr_active_pipeline.prepare_for_display()
+
+
+        ### 2023-10-26 - Extract Directional Laps Outputs and computed items:
+        # (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_short_long_constrained_decoders(curr_active_pipeline, recalculate_anyway=True)
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
+        long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_pf1D, short_pf1D, global_pf1D = long_results.pf1D, short_results.pf1D, global_results.pf1D
+        long_pf2D, short_pf2D, global_pf2D = long_results.pf2D, short_results.pf2D, global_results.pf2D
+
+
+        # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        odd_laps_suffix, even_laps_suffix = cls.split_directional_laps_name_parts
+
+        long_odd_laps_name, long_even_laps_name = [f'{long_epoch_name}_{a_suffix}' for a_suffix in (odd_laps_suffix, even_laps_suffix)]
+        short_odd_laps_name, short_even_laps_name = [f'{short_epoch_name}_{a_suffix}' for a_suffix in (odd_laps_suffix, even_laps_suffix)]
+
+        print(long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name) # ('maze1_odd_laps', 'maze1_even_laps', 'maze2_odd_laps', 'maze2_even_laps')
+
+        # Unpacking for non-direction specific epochs (to get the replays, etc):
+        long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_replays, short_replays, global_replays = [a_session.replay for a_session in [long_session, short_session, global_session]]
+
+        # Unpacking for `(long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)`
+        (long_odd_laps_context, long_even_laps_context, short_odd_laps_context, short_even_laps_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_obj, long_even_laps_obj, short_odd_laps_obj, short_even_laps_obj) = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_session, long_even_laps_session, short_odd_laps_session, short_even_laps_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_results, long_even_laps_results, short_odd_laps_results, short_even_laps_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_computation_config, long_even_laps_computation_config, short_odd_laps_computation_config, short_even_laps_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
+        (long_odd_laps_pf1D, long_even_laps_pf1D, short_odd_laps_pf1D, short_even_laps_pf1D) = (long_odd_laps_results.pf1D, long_even_laps_results.pf1D, short_odd_laps_results.pf1D, short_even_laps_results.pf1D)
+        (long_odd_laps_pf2D, long_even_laps_pf2D, short_odd_laps_pf2D, short_even_laps_pf2D) = (long_odd_laps_results.pf2D, long_even_laps_results.pf2D, short_odd_laps_results.pf2D, short_even_laps_results.pf2D)
+
+        # Validate:
+        assert not (curr_active_pipeline.computation_results[long_odd_laps_name]['computation_config']['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_even_laps_name]['computation_config']['pf_params'].computation_epochs)
+        assert not (curr_active_pipeline.computation_results[short_odd_laps_name]['computation_config']['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_even_laps_name]['computation_config']['pf_params'].computation_epochs)
+
+        # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
+        long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D  = cls.build_directional_constrained_decoders(curr_active_pipeline)
+
+        # ## Encode/Decode from global result:
+        # # Unpacking:
+        # directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
+        # # split_directional_laps_config_names
+        
+        ## Build a `ComputedResult` container object to hold the result:
+        directional_laps_result = ComputedResult()
+        directional_laps_result.directional_lap_specific_configs = directional_lap_specific_configs
+        directional_laps_result.split_directional_laps_dict = split_directional_laps_dict
+        directional_laps_result.split_directional_laps_contexts_dict = split_directional_laps_contexts_dict
+        directional_laps_result.split_directional_laps_config_names = split_directional_laps_config_names
+        directional_laps_result.computed_base_epoch_names = computed_base_epoch_names
+
+        # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names
+        directional_laps_result.long_odd_shared_aclus_only_one_step_decoder_1D = long_odd_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.long_even_shared_aclus_only_one_step_decoder_1D = long_even_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.short_odd_shared_aclus_only_one_step_decoder_1D = short_odd_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.short_even_shared_aclus_only_one_step_decoder_1D = short_even_shared_aclus_only_one_step_decoder_1D
+
+        ## Set the global result:
+        # curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] = directional_laps_result
+
+        return directional_laps_result
 
 
 
