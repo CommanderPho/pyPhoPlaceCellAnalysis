@@ -11,7 +11,9 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.analyses.laps import build_lap_computation_epochs # used in `DirectionalLapsHelpers.split_to_directional_laps`
 from neuropy.utils.result_context import IdentifyingContext
+from neuropy.utils.dynamic_container import DynamicContainer # used to build config
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage # for building computation result
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import compute_long_short_constrained_decoders
 
 
