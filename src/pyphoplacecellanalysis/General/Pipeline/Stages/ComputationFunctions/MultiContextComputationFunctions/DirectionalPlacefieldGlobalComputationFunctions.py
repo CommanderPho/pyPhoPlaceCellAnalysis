@@ -37,13 +37,13 @@ class DirectionalLapsHelpers:
     # ['maze_even_laps', 'maze_odd_laps']
 
     @classmethod
-    def format_directional_laps_context(cls, a_context: IdentifyingContext, a_maze_name: str = 'maze1', a_directional_epoch_name: str, a_lap_dir_name: str) -> IdentifyingContext:
+    def format_directional_laps_context(cls, a_context: IdentifyingContext, a_maze_name: str, a_directional_epoch_name: str, a_lap_dir_name: str) -> IdentifyingContext:
         """ Builds the correct context for a lap-direction-specific epoch from the base epoch
 
         originally:
             'maze2_even_laps': IdentifyingContext<('kdiba', 'gor01', 'two', '2006-6-07_16-40-19', 'maze2')>
 
-
+         a_maze_name: str = 'maze1'
         a_lap_dir_name: str - like "odd_laps" or "even_laps"
 
 
