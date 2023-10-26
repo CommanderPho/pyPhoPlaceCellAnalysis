@@ -20,6 +20,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidget
 # from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDialog
 
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
 
 # AbstractDataFileDialog
 
@@ -81,6 +82,31 @@ def try_save_pickle_as(original_file_path, file_confirmed_callback):
 	fileDialog = saveFile(_perform_try_save_pickle_as, caption="Save pickle as..", startDir=original_file_path.parent, suggestedFileName=f'{original_file_path.stem}_bak.pkl', filter="Pickle File (*.pkl)", default_suffix="pkl")
 	# dialog = saveFile(lambda fileName: print(f'_on_save_file(fileName: {fileName})'), caption="Save HDF5 file as..", startDir=None, suggestedFileName='test.h5', filter="H5py File (*.h5)", default_suffix="h5")
 	return
+
+
+
+class PipelineJupyterHelpers:
+	
+
+    @classmethod
+    def perform_pipeline_save(cls, curr_active_pipeline):
+        if curr_active_pipeline.updated_since_last_pickle:
+            _bak_saving_mode = saving_mode
+
+        saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+        try:
+            curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+            curr_active_pipeline.save_global_computation_results()
+
+        except Exception as e:
+            ## TODO: catch/log saving error and indicate that it isn't saved.
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f'ERROR RE-SAVING PIPELINE after update. error: {e}')
+        finally:
+            saving_mode = _bak_saving_mode
+			
+
 
 
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:
