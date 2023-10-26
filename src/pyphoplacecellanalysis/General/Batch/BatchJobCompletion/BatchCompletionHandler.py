@@ -4,6 +4,7 @@ from datetime import timedelta, datetime
 from enum import unique, Enum
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
+import numpy as np
 
 import tables as tb
 from attr import define, field, Factory

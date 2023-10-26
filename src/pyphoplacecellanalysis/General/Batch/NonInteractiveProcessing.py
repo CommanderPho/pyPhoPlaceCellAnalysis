@@ -298,8 +298,10 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         include_includelist = non_global_comp_names + global_comp_names
     else:
         print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
+
     ## Get computed relative entropy measures:
-    global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
 
     if included_computation_filter_names is None:
         included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
