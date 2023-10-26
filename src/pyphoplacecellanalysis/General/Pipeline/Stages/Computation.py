@@ -505,7 +505,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
                 else:
                     # set/update the computation configs:
-                    self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+                    self.active_configs[a_select_config_name].computation_config = deepcopy(active_computation_params) #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
                 
                 if action.name == EvaluationActions.EVALUATE_COMPUTATIONS.name:
                     # active_function = self.perform_registered_computations_single_context
