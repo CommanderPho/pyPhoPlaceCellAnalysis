@@ -43,8 +43,16 @@ class DirectionalLapsHelpers:
     # lap_direction_suffix_list = ['_odd', '_even', ''] # no '_any' prefix, instead reuses the existing names
     split_directional_laps_name_parts = ['odd_laps', 'even_laps'] # , 'any_laps'
 
+    split_all_laps_name_parts = ['odd_laps', 'even_laps', 'any']
     # ['maze_even_laps', 'maze_odd_laps']
 
+    @classmethod
+    def parse_directional_lap_name(cls, an_epoch_name: str):
+        for a_suffix in cls.split_all_laps_name_parts:
+            if an_epoch_name.endswith(f"_{a_suffix}"):
+                a_base_epoch_name = an_epoch_name.removesuffix(f"_{a_suffix}")
+                return a_base_epoch_name, a_suffix # return (base_epoch_name, suffix_name): ('maze1', 'any')
+        return an_epoch_name, None # returns the unchanged epoch_name and None if it wasn't suffixed
     @classmethod
     def format_directional_laps_context(cls, a_context: IdentifyingContext, a_maze_name: str, a_directional_epoch_name: str, a_lap_dir_name: str) -> IdentifyingContext:
         """ Builds the correct context for a lap-direction-specific epoch from the base epoch
