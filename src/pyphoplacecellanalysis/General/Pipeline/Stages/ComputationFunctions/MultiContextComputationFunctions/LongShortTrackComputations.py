@@ -1390,7 +1390,7 @@ def constrain_to_laps(curr_active_pipeline):
 
     lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
     assert lap_estimation_parameters is not None
-
+    
     use_direction_dependent_laps: bool = lap_estimation_parameters.get('use_direction_dependent_laps', True)
     print(f'constrain_to_laps(...): use_direction_dependent_laps: {use_direction_dependent_laps}')
 
@@ -1456,7 +1456,7 @@ def constrain_to_laps(curr_active_pipeline):
             # end loop over split_directional_lap types:
         # end loop over filter epochs:
 
-        print('directional_lap_specific_configs: {directional_lap_specific_configs}')
+        print(f'directional_lap_specific_configs: {directional_lap_specific_configs}')
 
 
     return curr_active_pipeline, directional_lap_specific_configs
