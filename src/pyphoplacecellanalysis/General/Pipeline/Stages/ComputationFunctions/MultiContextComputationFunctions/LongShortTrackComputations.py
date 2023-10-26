@@ -1797,6 +1797,13 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
     
+    ## The issue comes in when attempting to label_slice on the session's `.epochs` object, which has labels: ['maze1', 'maze2', 'maze'] and not ['maze1_any', 'maze2_any', 'maze_any']
+    if ((long_epoch_obj.n_epochs == 0) or (short_epoch_obj.n_epochs == 0)):
+        # if either epoch is missing its info, we should try to use the filtered_epochs instead.
+        long_epoch_obj, short_epoch_obj = [curr_active_pipeline.filtered_epochs[an_epoch_name].to_Epoch() for an_epoch_name in [long_epoch_name, short_epoch_name]] # `curr_active_pipeline.filtered_epochs[an_epoch_name]` actually contains a NamedTimerange, but we can get an Epoch if we want
+        assert ((long_epoch_obj.n_epochs > 0) or (short_epoch_obj.n_epochs > 0))
+    
+
     active_context = active_identifying_session_ctx.adding_context(collision_prefix='fn', fn_name='long_short_firing_rate_indicies')
 
     spikes_df = curr_active_pipeline.sess.spikes_df # TODO: CORRECTNESS: should I be using this spikes_df instead of the filtered ones?
