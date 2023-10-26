@@ -109,12 +109,18 @@ class DirectionalLapsHelpers:
         if add_created_configs_to_pipeline is False, just returns the built configs and doesn't add them to the pipeline.
 
         """
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations # required for re-computation
+
         if include_includelist is None:
             use_global_epoch_only_mode: bool = True # 2023-10-24 - 4:19pm - Duplicates only the `global_epoch_name` results for the directional laps and then filters from there
             long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
             # include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
             include_includelist = [global_epoch_name] # ['maze'] # only for maze
         
+
+        ## Ensure no doublely-directional
+        include_includelist = [an_epoch_name for an_epoch_name in include_includelist if np.all([not an_epoch_name.endswith(a_lap_dir_description) for a_lap_dir_description in cls.split_directional_laps_name_parts])]
+
         computed_base_epoch_names = []
         lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
         assert lap_estimation_parameters is not None
@@ -131,23 +137,27 @@ class DirectionalLapsHelpers:
 
         directional_lap_specific_configs = {} # old
 
-
         if use_direction_dependent_laps:
             if debug_print:
                 print(f'split_to_directional_laps(...) processing for directional laps...')
             # for a_name, a_sess, a_result in zip((long_epoch_name, short_epoch_name, global_epoch_name), (long_session, short_session, global_session), (long_results, short_results, global_results)):
 
             for an_epoch_name in include_includelist:
+                curr_epoch_split_directional_laps_config_names: List[str] = [f'{an_epoch_name}_{a_lap_dir_description}' for a_lap_dir_description in cls.split_directional_laps_name_parts] # ['maze_odd_laps', 'maze_even_laps']
+                if debug_print:
+                    print(f'\tcurr_epoch_split_directional_laps_config_names: {curr_epoch_split_directional_laps_config_names}')
+
+
                 # for `use_global_epoch_only_mode == True` mode:
                 # an_epoch_name, a_sess, a_result = global_epoch_name, global_session, global_results
-                a_sess, a_result = curr_active_pipeline.filtered_sessions[an_epoch_name], curr_active_pipeline.computation_results[an_epoch_name]['computed_data']
+                # a_sess, a_result = curr_active_pipeline.filtered_sessions[an_epoch_name], curr_active_pipeline.computation_results[an_epoch_name]['computed_data']
+
+                a_sess = curr_active_pipeline.filtered_sessions[an_epoch_name]
 
                 # curr_epoch_directional_lap_specific_configs, curr_epoch_split_directional_laps_dict, curr_epoch_split_directional_laps_config_names = cls.split_specific_epoch_to_directional_laps(an_epoch_name, a_sess, a_result, curr_active_pipeline, add_created_configs_to_pipeline=add_created_configs_to_pipeline)
                 # split_directional_laps_contexts_dict, split_directional_laps_dict = cls.split_specific_epoch_to_directional_laps(an_epoch_name, a_sess, a_result, curr_active_pipeline, add_created_configs_to_pipeline=add_created_configs_to_pipeline)
 
-                curr_epoch_split_directional_laps_config_names: List[str] = [f'{an_epoch_name}_{a_lap_dir_description}' for a_lap_dir_description in cls.split_directional_laps_name_parts] # ['maze_odd_laps', 'maze_even_laps']
-                if debug_print:
-                    print(f'\tcurr_epoch_split_directional_laps_config_names: {curr_epoch_split_directional_laps_config_names}')
+                
 
                 # 'build_lap_computation_epochs(...)' based mode:
                 desired_computation_epochs = build_lap_computation_epochs(a_sess, use_direction_dependent_laps=use_direction_dependent_laps)
@@ -226,10 +236,11 @@ class DirectionalLapsHelpers:
 
 
             # COMPUTATION DONE HERE ______________________________________________________________________________________________ #
-            newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=['pf_computation'],
-                    included_computation_filter_names=split_directional_laps_config_names,
-                    include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=True, debug_print=True)
-            print(f'newly_computed_values: {newly_computed_values}')
+            #TODO 2023-10-26 05:56: - [ ] Can't work because `AttributeError: 'DisplayPipelineStage' object has no attribute 'get_merged_computation_function_validators'`, the stage is never going to work.
+            # newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=['pf_computation'],
+            #         included_computation_filter_names=split_directional_laps_config_names,
+            #         include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=True, debug_print=True)
+            # print(f'newly_computed_values: {newly_computed_values}')
 
 
 
@@ -273,7 +284,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         if include_includelist is None:
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             # include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
-            include_includelist = [global_epoch_name] # ['maze'] # only for maze
+            # include_includelist = [global_epoch_name] # ['maze'] # only for maze
+            include_includelist = [long_epoch_name, short_epoch_name] # ['maze1', 'maze2'] # only for maze
         
         ## Adds ['*_even_laps', '*_odd_laps'] pseduofilters
 
