@@ -587,7 +587,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
 @providing_context(fn_name='plot_multiple_raster_plot')
 @function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])
 def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name="Pho Stacked Replays", defer_show=False, active_context=None, **kwargs):
-    """ This renders a stack of raster plots
+    """ This renders a stack of raster plots for the epochs specified in `filter_epochs_df`. The rasters are determined from spikes_df.
 
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multiple_raster_plot
