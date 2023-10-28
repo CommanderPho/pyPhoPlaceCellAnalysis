@@ -128,6 +128,7 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 			("pipeline pickle", lambda _: reveal_in_system_file_manager(curr_active_pipeline.pickle_path)),
 			(".h5 export", lambda _: reveal_in_system_file_manager(curr_active_pipeline.h5_export_path)),
 			("TEST - Dialog", lambda _: try_save_pickle_as(curr_active_pipeline.global_computation_results_pickle_path)),
+			("Save Pipeline", lambda _: PipelineJupyterHelpers.perform_pipeline_save(curr_active_pipeline)),
 			# ("ViTables .h5 export", lambda _: reveal_in_system_file_manager(curr_active_pipeline.h5_export_path))
 		]
 		
@@ -143,6 +144,34 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 	# combined_button_executor = widgets.VBox((widgets.HBox(button_executor.button_list), widgets.HBox(updating_button_executor.button_list)))
 	# combined_button_executor = widgets.VBox((button_executor.button_list, updating_button_executor.button_list))
 	# return display(combined_button_executor)
+
+
+	# ## New Method, need to convert
+	# btn_layout = widgets.Layout(width='auto', height='40px') #set width and height
+	# default_kwargs = dict(display='flex', flex_flow='column', align_items='stretch', layout=btn_layout)
+
+	# _out_row = JupyterButtonRowWidget.init_from_button_defns(button_defns=[
+	# 	("Documentation Folder", lambda _: reveal_in_system_file_manager(self.doc_output_parent_folder), default_kwargs),
+	# 	("Generated Documentation", lambda _: self.reveal_output_files_in_system_file_manager(), default_kwargs),
+	# 	])
+
+	# _out_row_html = JupyterButtonRowWidget.init_from_button_defns(button_defns=[
+	# 		("Open generated .html Documentation", lambda _: open_file_with_system_default(str(self.output_html_file.resolve())), default_kwargs),
+	# 		("Reveal Generated .html Documentation", lambda _: reveal_in_system_file_manager(self.output_html_file), default_kwargs),
+	# 	])
+
+	# _out_row_md = JupyterButtonRowWidget.init_from_button_defns(button_defns=[
+	# 		("Open generated .md Documentation", lambda _: open_file_with_system_default(str(self.output_md_file.resolve())), default_kwargs),
+	# 		("Reveal Generated .md Documentation", lambda _: reveal_in_system_file_manager(self.output_md_file), default_kwargs),
+	# 	])
+
+	# return widgets.VBox([_out_row.root_widget,
+	# 	_out_row_html.root_widget,
+	# 	_out_row_md.root_widget,
+	# ])
+
+
+
 	return button_executor
 
 
