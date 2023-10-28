@@ -1,3 +1,4 @@
+import sys
 import ipywidgets as widgets
 from IPython.display import display
 import matplotlib
@@ -10,9 +11,12 @@ import silx.io
 
 
 from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
-from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import JupyterButtonRowWidget
+from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
 from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
+from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default
 
+
+from pyphocorehelpers.print_helpers import CapturedException
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
