@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from attrs import define, field, Factory, asdict, astuple
 from functools import wraps
 from copy import deepcopy
 from typing import List, Dict, Optional
@@ -24,6 +25,44 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 
 
+
+@define(slots=False, repr=False)
+class DirectionalLapsResult(ComputedResult):
+    """ a container for holding information regarding the computation of directional laps.
+    
+    ## Build a `DirectionalLapsResult` container object to hold the result:
+    directional_laps_result = DirectionalLapsResult()
+    directional_laps_result.directional_lap_specific_configs = directional_lap_specific_configs
+    directional_laps_result.split_directional_laps_dict = split_directional_laps_dict
+    directional_laps_result.split_directional_laps_contexts_dict = split_directional_laps_contexts_dict
+    directional_laps_result.split_directional_laps_config_names = split_directional_laps_config_names
+    directional_laps_result.computed_base_epoch_names = computed_base_epoch_names
+
+    # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names
+    directional_laps_result.long_odd_shared_aclus_only_one_step_decoder_1D = long_odd_shared_aclus_only_one_step_decoder_1D
+    directional_laps_result.long_even_shared_aclus_only_one_step_decoder_1D = long_even_shared_aclus_only_one_step_decoder_1D
+    directional_laps_result.short_odd_shared_aclus_only_one_step_decoder_1D = short_odd_shared_aclus_only_one_step_decoder_1D
+    directional_laps_result.short_even_shared_aclus_only_one_step_decoder_1D = short_even_shared_aclus_only_one_step_decoder_1D
+
+        
+    """
+    directional_lap_specific_configs: Dict = field(default=Factory(dict))
+    split_directional_laps_dict: Dict = field(default=Factory(dict))
+    split_directional_laps_contexts_dict: Dict = field(default=Factory(dict))
+    split_directional_laps_config_names: List[str] = field(default=Factory(list))
+    computed_base_epoch_names: List[str] = field(default=Factory(list))
+    long_odd_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = field(default=None)
+    long_even_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = field(default=None)
+    short_odd_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = field(default=None)
+    short_even_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = field(default=None)
+
+    # shared_aclus: np.ndarray
+    # long_short_pf_neurons_diff: SetPartition
+    # n_neurons: int
+
+    
+
+
 class DirectionalLapsHelpers:
     """ 2023-10-24 - Directional Placefields Computations
 
@@ -36,6 +75,17 @@ class DirectionalLapsHelpers:
 
     curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
 
+    
+    
+    
+    Computing:
+    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
+        
+        # Run directional laps and set the global result:
+        curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] = DirectionalLapsHelpers.complete_directional_pfs_computations(curr_active_pipeline)
+
+    
     """
 
 
@@ -53,6 +103,7 @@ class DirectionalLapsHelpers:
                 a_base_epoch_name = an_epoch_name.removesuffix(f"_{a_suffix}")
                 return a_base_epoch_name, a_suffix # return (base_epoch_name, suffix_name): ('maze1', 'any')
         return an_epoch_name, None # returns the unchanged epoch_name and None if it wasn't suffixed
+    
     @classmethod
     def format_directional_laps_context(cls, a_context: IdentifyingContext, a_maze_name: str, a_directional_epoch_name: str, a_lap_dir_name: str) -> IdentifyingContext:
         """ Builds the correct context for a lap-direction-specific epoch from the base epoch
@@ -347,7 +398,8 @@ class DirectionalLapsHelpers:
         # # split_directional_laps_config_names
         
         ## Build a `ComputedResult` container object to hold the result:
-        directional_laps_result = ComputedResult()
+        # directional_laps_result = ComputedResult()
+        directional_laps_result = DirectionalLapsResult()
         directional_laps_result.directional_lap_specific_configs = directional_lap_specific_configs
         directional_laps_result.split_directional_laps_dict = split_directional_laps_dict
         directional_laps_result.split_directional_laps_contexts_dict = split_directional_laps_contexts_dict
