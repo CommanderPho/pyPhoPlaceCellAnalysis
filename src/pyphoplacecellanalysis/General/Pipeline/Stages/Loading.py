@@ -313,16 +313,36 @@ class RegisteredOutputsMixin:
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-@define(slots=False)
+@define(slots=False, repr=False)
 class InputPipelineStage(LoadableInput, BaseNeuropyPipelineStage):
     """ The first stage of the NeuropyPipeline. Allows specifying the inputs that will be used.
     
         post_load_functions: List[Callable] a list of Callables that accept the loaded session as input and return the potentially modified session as output.
     """
+    @classmethod
+    def get_stage_identity(cls) -> PipelineStage:
+        return PipelineStage.Input
+    
     identity: PipelineStage = field(default=PipelineStage.Input)
     basedir: Path = field(default=Path(""))
     load_function: Callable = field(default=None)
     post_load_functions: List[Callable] = field(default=Factory(list))
+
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        if 'identity' not in state:
+            print(f'unpickling from old NeuropyPipelineStage')
+            state['identity'] = None
+            state['identity'] = type(self).get_stage_identity()
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(NeuropyPipeline, self).__init__() # from
 
 
 # ==================================================================================================================== #
@@ -370,27 +390,17 @@ class PipelineWithInputStage:
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
 @define(slots=False, repr=False) # , init=False
-class LoadedPipelineStage(LoadableInput, LoadableSessionInput, BaseNeuropyPipelineStage):
+class LoadedPipelineStage(LoadableSessionInput, InputPipelineStage):
     """Docstring for LoadedPipelineStage."""
     @classmethod
     def get_stage_identity(cls) -> PipelineStage:
         return PipelineStage.Loaded
 
     identity: PipelineStage = field(default=PipelineStage.Loaded)
-    # identity: PipelineStage = PipelineStage.Loaded
     loaded_data: dict = field(default=None)
 
     # Custom Fields:
     registered_load_function_dict: dict = field(default=Factory(dict))
-
-    # def __init__(self, input_stage: InputPipelineStage):
-    #     self.stage_name = input_stage.stage_name
-    #     self.basedir = input_stage.basedir
-    #     self.loaded_data = input_stage.loaded_data
-    #     self.post_load_functions = input_stage.post_load_functions # the functions to be called post load
-    #     # Initialize custom fields:
-    #     self.registered_load_function_dict = {}
-    #     self.register_default_known_load_functions() # registers the default load functions
 
 
     @classmethod
