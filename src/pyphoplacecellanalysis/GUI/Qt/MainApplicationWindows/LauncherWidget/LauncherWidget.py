@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import Plot, DisplayFunctionItem
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-
+from pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
@@ -74,7 +74,7 @@ class LauncherWidget(QWidget):
     def initUI(self):
         # Connect the itemDoubleClicked signal to the on_tree_item_double_clicked slot
         self.treeWidget.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
-
+        
 
     def get_display_function_items(self) -> Dict[str,DisplayFunctionItem]:
         assert self._curr_active_pipeline_ref is not None
