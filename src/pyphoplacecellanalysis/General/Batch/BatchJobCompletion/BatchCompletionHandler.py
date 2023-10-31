@@ -592,7 +592,8 @@ class BatchSessionCompletionHandler:
 
 
         # try to compute the directional laps from the global epoch:
-        was_updated = self.try_compute_directional_laps_for_global_epoch(curr_active_pipeline, fail_on_exception=self.fail_on_exception)
+        # was_updated = self.try_compute_directional_laps_for_global_epoch(curr_active_pipeline, fail_on_exception=self.fail_on_exception)
+        was_updated = False
 
         # ## Post Compute Validate 2023-05-16:
         try:
