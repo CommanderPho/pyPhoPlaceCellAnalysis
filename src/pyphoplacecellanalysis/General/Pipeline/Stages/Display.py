@@ -501,14 +501,16 @@ class PipelineWithDisplayPipelineStageMixin:
             if active_session_configuration_name is not None:
                 assert active_session_configuration_context.filter_name == active_session_configuration_name
     
+            # if active_session_configuration_context.has_keys(['lap_dir'])[0]:
+            #     # directional laps version:
+            #     active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
+            # else:
+            #     # typical (non-directional laps) version:
+            #     active_session_configuration_name = active_session_configuration_context.filter_name
 
-            if active_session_configuration_context.has_keys(['lap_dir'])[0]:
-                # directional laps version:
-                active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
-            else:
-                # typical (non-directional laps) version:
-                active_session_configuration_name = active_session_configuration_context.filter_name
-
+            # typical (non-directional laps) version:
+            active_session_configuration_name = active_session_configuration_context.filter_name
+                
 
             ## Sanity checking:
             assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
