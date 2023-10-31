@@ -5,6 +5,9 @@ import sys
 import os
 import numpy as np
 
+# from pyphoplacecellanalysis.External.pyqtgraph import QtWidgets, QtCore, QtGui
+
+
 from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem, QCheckBox
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
@@ -12,6 +15,8 @@ from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
 
 ## IMPORTS:
+
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin, ComboBoxCtrlOwningMixin
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 
@@ -41,11 +46,12 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
 
     
     # ==================================================================================================================== #
-    def __init__(self, parent=None, owning_pipeline=None):
+    def __init__(self, parent=None, owning_pipeline=None, enable_multi_context_select:bool=False):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
 
         ## Set member properties:
+        self._enable_multi_context_select = enable_multi_context_select
         self._owning_pipeline = owning_pipeline
 
         self.initUI()
@@ -57,12 +63,14 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
         # self.ui.btnConfirm.clicked.
 
         ## Setup checktable:
-        self._programmaticallyBuildCheckTable()
-
+        if self._enable_multi_context_select:
+            self._programmaticallyBuildCheckTable()
+        self.updateUi()
     
     def updateUi(self):
         self._tryUpdateComboItemsUi()
-        self._tryUpdateCheckTableUi()
+        if self._enable_multi_context_select:
+            self._tryUpdateCheckTableUi()
 
     
     # ==================================================================================================================== #
@@ -141,7 +149,7 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
             found_desired_index = None
         return found_desired_index
 
-    @pyqtSlot(int)
+    @pyqtExceptionPrintingSlot(int)
     def on_selected_context_index_changed(self, new_index):
         if new_index < 0:
             new_key = None
@@ -265,7 +273,7 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
         #     item.setText(curr_active_contexts[i])
             
     # checkedSignal = pyqtSignal(int, Qt.CheckState) # (rowIndex: int, flag: Qt.CheckState)
-    @pyqtSlot(int, Qt.CheckState)
+    @pyqtExceptionPrintingSlot(int, Qt.CheckState)
     def on_checktable_checked_state_changed(self, row, state):
         print(f'on_checktable_checked_state_changed(row:{row}, state:{state})')
         # Emit sigMultiContextChanged = pyqtSignal(dict) #contexts: dict<str:IdentifyingContext> 

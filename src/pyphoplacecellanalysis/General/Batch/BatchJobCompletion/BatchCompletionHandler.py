@@ -1,8 +1,10 @@
 import sys
+from copy import deepcopy
 from datetime import timedelta, datetime
 from enum import unique, Enum
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Union
+import numpy as np
 
 import tables as tb
 from attr import define, field, Factory
@@ -20,6 +22,7 @@ from neuropy.utils.matplotlib_helpers import matplotlib_file_only
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
 
 @unique
 class SavingOptions(Enum):
@@ -43,6 +46,17 @@ class BatchComputationProcessOptions(HDF_SerializationMixin):
         # never
         # if changed
         # always
+    override_file: Optional[Union[str,Path]] = serialized_attribute_field(default=None) # 'output/loadedSessPickle.pkl'
+    override_output_file: Optional[Union[str,Path]] = serialized_attribute_field(default=None)
+
+    # override_output_file
+    def __attrs_post_init__(self):
+        """ called after initializer built by `attrs` library. """
+        if self.override_file is not None:
+            if self.override_output_file is None:
+                # Want the output to default to the input
+                self.override_output_file = self.override_file
+             
 
 
 @custom_define(slots=False)
@@ -140,8 +154,7 @@ class BatchSessionCompletionHandler:
 
     # a list of functions to be called upon completion, will be called sequentially. 
     completion_functions: List[Callable] = field(default=Factory(list))
-
-    override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
+    # override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
 
 
     ## Computation Options:
@@ -157,7 +170,24 @@ class BatchSessionCompletionHandler:
                                         'long_short_endcap_analysis']) # do only specified
 
     force_global_recompute: bool = field(default=False)
-    override_global_computation_results_pickle_path: Optional[Path] = field(default=None)
+
+
+    # @property
+    # def override_session_computation_results_pickle_filename(self) -> Optional[str]:
+    #     return self.session_computations_options.override_file
+    # @override_session_computation_results_pickle_filename.setter
+    # def override_session_computation_results_pickle_filename(self, value):
+    #     self.session_computations_options.override_file = value
+
+
+    # @property
+    # def override_global_computation_results_pickle_path(self) -> Optional[Path]:
+    #     return self.global_computations_options.override_file
+    # @override_global_computation_results_pickle_path.setter
+    # def override_global_computation_results_pickle_path(self, value):
+    #     self.global_computations_options.override_file = value
+
+
 
     # Figures:
     should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
@@ -175,7 +205,7 @@ class BatchSessionCompletionHandler:
 
     @classmethod
     def _post_fix_filtered_contexts(cls, curr_active_pipeline, debug_print=False) -> bool:
-        """ 2023-10-24 - tries to update 
+        """ 2023-10-24 - tries to update misnamed `curr_active_pipeline.filtered_contexts`
 
             curr_active_pipeline.filtered_contexts with correct filter_names
 
@@ -183,6 +213,7 @@ class BatchSessionCompletionHandler:
             Updates: `curr_active_pipeline.filtered_contexts`
 
         """
+        was_updated = False
         for a_name, a_named_timerange in curr_active_pipeline.filtered_epochs.items():
             filter_name:str = a_named_timerange.name
             if debug_print:
@@ -191,20 +222,73 @@ class BatchSessionCompletionHandler:
             _split_parts = a_name.split('_')
             if (len(_split_parts) >= 2):
                 # also have lap_dir:
-                a_split_name, lap_dir = a_name.split('_')
-                if (a_filtered_ctxt.filter_name != filter_name) or (a_filtered_ctxt.lap_dir != lap_dir):
+                a_split_name, lap_dir, *remainder_list = a_name.split('_') # successfully splits 'maze_odd_laps' into good
+                if (a_filtered_ctxt.filter_name != filter_name):
                     was_updated = True
+                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
                     a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name, lap_dir=lap_dir)
+
+                a_filtered_ctxt = a_filtered_ctxt.adding_context_if_missing(lap_dir=lap_dir)
+                # if (a_filtered_ctxt.get('lap_dir', None) is None) or (a_filtered_ctxt.lap_dir != lap_dir):
+                    # was_updated = True
+                    # a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name, lap_dir=lap_dir)
 
             else:
                 if a_filtered_ctxt.filter_name != filter_name:
                     was_updated = True
+                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
                     a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name)
+                    
+
             if debug_print:
                 print(f'\t{a_filtered_ctxt.to_dict()}')
             curr_active_pipeline.filtered_contexts[a_name] = a_filtered_ctxt # correct the context
 
         # end for
+        return was_updated
+
+    @classmethod
+    def _update_pipeline_missing_preprocessing_parameters(cls, curr_active_pipeline, debug_print=False):
+        """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
+
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _update_pipeline_missing_preprocessing_parameters
+            was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
+            was_updated
+        """
+        def _subfn_update_session_missing_preprocessing_parameters(sess):
+            """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
+            preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
+            if preprocessing_parameters is None:
+                print(f'No existing preprocessing parameters! Assigning them!')
+                default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True, use_direction_dependent_laps=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
+                default_PBE_estimation_parameters = DynamicContainer(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.600) # 2023-10-05 Kamran's imposed Parameters, wants to remove the effect of the max_dur which was previously at 0.300
+                default_replay_estimation_parameters = DynamicContainer(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=0.600, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=5)
+
+                sess.config.preprocessing_parameters = DynamicContainer(epoch_estimation_parameters=DynamicContainer.init_from_dict({
+                        'laps': default_lap_estimation_parameters,
+                        'PBEs': default_PBE_estimation_parameters,
+                        'replays': default_replay_estimation_parameters
+                    }))
+                return True
+            else:
+                if debug_print:
+                    print(f'preprocessing parameters exist.')
+                # TODO: update them as needed?
+                return False
+
+        # BEGIN MAIN FUNCTION BODY
+        was_updated = False
+        was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
+
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
+            was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.filtered_sessions[an_epoch_name])
+
+        # if was_updated:
+        #     print(f'config was updated. Saving pipeline.')
+        #     curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE)
+
         return was_updated
 
 
@@ -216,7 +300,7 @@ class BatchSessionCompletionHandler:
             return False
         
         # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
-        was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
+        was_updated = cls._update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
         print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
 
         ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
@@ -232,6 +316,34 @@ class BatchSessionCompletionHandler:
             was_updated = True
 
         return was_updated
+
+    @classmethod
+    def try_compute_directional_laps_for_global_epoch(cls, curr_active_pipeline, fail_on_exception=True) -> bool:
+        """ 2023-10-24 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
+        prev_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
+
+        try:
+            ## perform the computation:
+            curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline, add_created_configs_to_pipeline=True)
+            # curr_active_pipeline, directional_lap_specific_configs = constrain_to_laps(curr_active_pipeline)
+            # list(directional_lap_specific_configs.keys())
+            post_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
+
+            # was_updated = not np.all(np.isin(['maze1', 'maze2', 'maze', 'maze_odd_laps', 'maze_even_laps'], ['maze1', 'maze2', 'maze']))
+            was_updated = not np.all(np.isin(post_active_config_names, prev_active_config_names))
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f'.try_compute_directional_laps_for_global_epoch(...) failed with exception: {e}')
+            if fail_on_exception:
+                raise e.exc
+
+            return False
+
+
+        return was_updated
+
 
 
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
@@ -286,7 +398,12 @@ class BatchSessionCompletionHandler:
                 try:
                     # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
                     # Try to write out the global computation function results:
-                    curr_active_pipeline.save_global_computation_results()
+                    # curr_active_pipeline.save_global_computation_results()
+                    an_override_save_path = (self.global_computations_options.override_output_file or self.global_computations_options.override_file)
+                    if an_override_save_path is not None:
+                        curr_active_pipeline.save_global_computation_results(override_global_pickle_path=an_override_save_path)
+                    else:
+                        curr_active_pipeline.save_global_computation_results()
                 except Exception as e:
                     print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
                     print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
@@ -301,7 +418,11 @@ class BatchSessionCompletionHandler:
                 try:
                     # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
                     # Try to write out the global computation function results:
-                    curr_active_pipeline.save_global_computation_results()
+                    an_override_save_path = (self.global_computations_options.override_output_file or self.global_computations_options.override_file)
+                    if an_override_save_path is not None:
+                        curr_active_pipeline.save_global_computation_results(override_global_pickle_path=an_override_save_path)
+                    else:
+                        curr_active_pipeline.save_global_computation_results()
                 except Exception as e:
                     print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
                     if self.fail_on_exception:
@@ -320,11 +441,14 @@ class BatchSessionCompletionHandler:
         If `.global_computations_options.should_compute` then computations will be tried and saved out as needed. If an error occurs, those will not be saved.
 
         """
+        # self.session_computations_options.override_output_file
+        # self.global_computations_options.override_file
+
         newly_computed_values = []
         if self.global_computations_options.should_load:
             if not self.force_global_recompute: # not just force_reload, needs to recompute whenever the computation fails.
                 try:
-                    curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=self.override_global_computation_results_pickle_path)
+                    curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=self.global_computations_options.override_file)
                 except Exception as e:
                     exception_info = sys.exc_info()
                     e = CapturedException(e, exception_info)
@@ -466,9 +590,13 @@ class BatchSessionCompletionHandler:
             print(f'short_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
             print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
+
+        # try to compute the directional laps from the global epoch:
+        was_updated = self.try_compute_directional_laps_for_global_epoch(curr_active_pipeline, fail_on_exception=self.fail_on_exception)
+
         # ## Post Compute Validate 2023-05-16:
         try:
-            was_updated = self.post_compute_validate(curr_active_pipeline)
+            was_updated = was_updated | self.post_compute_validate(curr_active_pipeline)
         except Exception as e:
             exception_info = sys.exc_info()
             an_err = CapturedException(e, exception_info)
@@ -482,7 +610,8 @@ class BatchSessionCompletionHandler:
             self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
 
         try:
-            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.override_session_computation_results_pickle_filename) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
+            # self.session_computations_options.override_file
+            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.session_computations_options.override_output_file) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
         except Exception as e:
             ## TODO: catch/log saving error and indicate that it isn't saved.
             exception_info = sys.exc_info()
@@ -516,8 +645,6 @@ class BatchSessionCompletionHandler:
         ### Aggregate Outputs specific computations:
 
         ## Get some more interesting session properties:
-
-
         delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
         print(f'\t time since last computation: {delta_since_last_compute}')
 
@@ -571,6 +698,7 @@ class BatchSessionCompletionHandler:
             across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
             
 
+
         return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
                                            short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
                                            delta_since_last_compute=delta_since_last_compute,
@@ -579,155 +707,7 @@ class BatchSessionCompletionHandler:
                                             across_session_results={'inst_fr_comps': _out_inst_fr_comps, 'recomputed_inst_fr_comps': _out_recomputed_inst_fr_comps, **across_session_results_extended_dict})
 
 
-@define(slots=False, repr=False)
-class HDFSpecificBatchSessionCompletionHandler(BatchSessionCompletionHandler):
-    """ 2023-08-25 - an alternative completion handler that just the .h5 stuff.
-
-    """
-
-    # Cross-session Results:
-    across_sessions_instantaneous_fr_dict: dict = Factory(dict) # Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation
-
-    ## Main function that's called with the complete pipeline:
-    def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
-        """ called when the execute_session completes like:
-            `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
-
-            Meant to be assigned like:
-            , post_run_callback_fn=_on_complete_success_execution_session
-
-            Captures nothing.
-
-            from Spike3D.scripts.run_BatchAnalysis import _on_complete_success_execution_session
 
 
-            LOGIC: really we want to recompute global whenever local is recomputed.
-
-
-        """
-        print(f'HDFProcessing.on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-        # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
-        # Get existing laps from session:
-        long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
-        # short_replays.n_epochs: 6, long_replays.n_epochs: 8
-        if self.debug_print:
-            print(f'short_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
-            print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
-
-        # ## Post Compute Validate 2023-05-16:
-        try:
-            was_updated = self.post_compute_validate(curr_active_pipeline)
-        except Exception as e:
-            exception_info = sys.exc_info()
-            an_err = CapturedException(e, exception_info)
-            print(f'self.post_compute_validate(...) failed with exception: {an_err}')
-            raise
-
-        delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
-        print(f'\t time since last computation: {delta_since_last_compute}')
-
-        ## Save the pipeline since that's disabled by default now:
-        try:
-            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.override_session_computation_results_pickle_filename) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
-        except Exception as e:
-            ## TODO: catch/log saving error and indicate that it isn't saved.
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
-
-
-        ## GLOBAL FUNCTION:
-        if self.force_reload_all and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-
-        if was_updated and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-
-
-        ## GLOBAL FUNCTION:
-        if self.force_reload_all and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-
-        if was_updated and (not self.force_global_recompute):
-            print(f'WARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
-            self.force_global_recompute = True
-
-        self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
-
-        ### Aggregate Outputs specific computations:
-
-        ## Get some more interesting session properties:
-
-        delta_since_last_compute: timedelta = curr_active_pipeline.get_time_since_last_computation()
-
-        print(f'\t time since last computation: {delta_since_last_compute}')
-
-        # Export the pipeline's HDF5:
-        hdf5_output_path, hdf5_output_err = self.try_export_pipeline_hdf5_if_needed(curr_active_pipeline=curr_active_pipeline, curr_session_context=curr_session_context)
-
-        # ## Specify the output file:
-        # common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
-        # print(f'common_file_path: {common_file_path}')
-        # InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
-
-        across_session_results_extended_dict = {}
-
-        return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
-                                           short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
-                                           delta_since_last_compute=delta_since_last_compute,
-                                           outputs_local={'pkl': curr_active_pipeline.pickle_path},
-                                            outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path},
-                                            across_session_results=across_session_results_extended_dict)
-
-
-def _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline, debug_print=False):
-    """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
-
-    Usage:
-        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import _update_pipeline_missing_preprocessing_parameters
-        was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
-        was_updated
-    """
-    def _subfn_update_session_missing_preprocessing_parameters(sess):
-        """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
-        preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
-        if preprocessing_parameters is None:
-            print(f'No existing preprocessing parameters! Assigning them!')
-            default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True, use_direction_dependent_laps=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
-            default_PBE_estimation_parameters = DynamicContainer(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.600) # 2023-10-05 Kamran's imposed Parameters, wants to remove the effect of the max_dur which was previously at 0.300
-            default_replay_estimation_parameters = DynamicContainer(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=0.600, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=5)
-
-            sess.config.preprocessing_parameters = DynamicContainer(epoch_estimation_parameters=DynamicContainer.init_from_dict({
-                    'laps': default_lap_estimation_parameters,
-                    'PBEs': default_PBE_estimation_parameters,
-                    'replays': default_replay_estimation_parameters
-                }))
-            return True
-        else:
-            if debug_print:
-                print(f'preprocessing parameters exist.')
-            return False
-
-    # BEGIN MAIN FUNCTION BODY
-    was_updated = False
-    was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
-
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
-        was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.filtered_sessions[an_epoch_name])
-
-    if was_updated:
-        print(f'config was updated. Saving pipeline.')
-        curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE)
-    return was_updated
 
 

@@ -23,7 +23,7 @@ def _wrap_multi_context_computation_function(global_comp_fcn):
 class MultiContextComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     
     _computationGroupName = 'multi_context'
-    _computationPrecidence = 1000
+    _computationPrecidence = 1001
     _is_global = True
 
     @function_attributes(short_name='PBE_stats', tags=['PBE', 'stats'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-09-12 17:37', related_items=[],

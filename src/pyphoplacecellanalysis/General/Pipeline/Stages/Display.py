@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional, List, Dict
 import numpy as np
 from attrs import define, field, Factory
 
@@ -27,6 +27,29 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContex
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import LongShortTrackComparingDisplayFunctions
 
 
+@define(slots=False)
+class DisplayFunctionItem:
+    """ for helping to render a UI display function tree.
+
+    display_function_items = {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in curr_active_pipeline.registered_display_function_dict.items()}
+    display_function_items
+
+
+    """
+    name: str = field()
+    fn_callable: Callable = field()
+
+    is_global: bool = field()
+    short_name: str = field()
+    docs: str = field()
+
+    @classmethod
+    def init_from_fn_object(cls, a_fn):
+        _obj = cls(name=a_fn.__name__, fn_callable=a_fn, is_global=getattr(a_fn,'is_global', False), short_name=(getattr(a_fn,'short_name', a_fn.__name__) or a_fn.__name__),
+            docs=a_fn.__doc__)
+        return _obj
+
+
 
 
 class Plot:
@@ -45,6 +68,11 @@ class Plot:
     def __init__(self, curr_active_pipeline):
         super(Plot, self).__init__()
         self._pipeline_reference = curr_active_pipeline
+
+    @property
+    def display_function_items(self) -> Dict[str,DisplayFunctionItem]:
+        return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self._pipeline_reference.registered_display_function_dict.items()}
+
 
     def __dir__(self):
         return self._pipeline_reference.registered_display_function_names # ['area', 'perimeter', 'location']
@@ -173,39 +201,20 @@ def update_figure_files_output_path(computation_result, active_config, root_outp
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-@define(slots=False)
+@define(slots=False, repr=False)
 class DisplayPipelineStage(ComputedPipelineStage):
     """ The concrete pipeline stage for displaying the output computed in previous stages."""
+    @classmethod
+    def get_stage_identity(cls) -> PipelineStage:
+        return PipelineStage.Displayed
+
     identity: PipelineStage = field(default=PipelineStage.Displayed)
-    
+    # identity: PipelineStage = PipelineStage.Displayed
 
     display_output: Optional[DynamicParameters] = field(default=None)
     render_actions: Optional[DynamicParameters] = field(default=None)
 
     registered_display_function_dict: OrderedDict = field(default=Factory(OrderedDict))
-
-
-    # def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, override_filtered_contexts=None):
-    #     # super(DisplayPipelineStage, self).__init__()
-    #     # ComputedPipelineStage fields:
-    #     self.stage_name = computed_stage.stage_name
-    #     self.basedir = computed_stage.basedir
-    #     self.loaded_data = computed_stage.loaded_data
-    #     self.filtered_sessions = computed_stage.filtered_sessions
-    #     self.filtered_epochs = computed_stage.filtered_epochs
-    #     self.filtered_contexts = override_filtered_contexts or computed_stage.filtered_contexts
-    #     self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
-    #     self.computation_results = computed_stage.computation_results
-    #     self.global_computation_results = computed_stage.global_computation_results
-    #     self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
-    #     self.registered_global_computation_function_dict = computed_stage.registered_global_computation_function_dict
-
-    #     # Initialize custom fields:
-    #     self.display_output = display_output or DynamicParameters()
-    #     self.render_actions = render_actions or DynamicParameters()
-    #     # self.filtered_contexts = override_filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
-    #     self.registered_display_function_dict = OrderedDict()
-    #     self.register_default_known_display_functions() # registers the default display functions
 
 
     @classmethod
@@ -281,6 +290,11 @@ class DisplayPipelineStage(ComputedPipelineStage):
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        if 'identity' not in state:
+            print(f'unpickling from old NeuropyPipelineStage')
+            state['identity'] = None
+            state['identity'] = type(self).get_stage_identity()
+
         self.__dict__.update(state)
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         # super(LoadedPipelineStage, self).__init__() # from 
@@ -487,8 +501,17 @@ class PipelineWithDisplayPipelineStageMixin:
             if active_session_configuration_name is not None:
                 assert active_session_configuration_context.filter_name == active_session_configuration_name
     
+            # if active_session_configuration_context.has_keys(['lap_dir'])[0]:
+            #     # directional laps version:
+            #     active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
+            # else:
+            #     # typical (non-directional laps) version:
+            #     active_session_configuration_name = active_session_configuration_context.filter_name
+
+            # typical (non-directional laps) version:
             active_session_configuration_name = active_session_configuration_context.filter_name
-                    
+                
+
             ## Sanity checking:
             assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
             # We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        

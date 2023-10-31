@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import sys
+from copy import deepcopy
 from datetime import datetime, timedelta
 import typing
 from typing import Optional, Dict, List
@@ -68,13 +69,18 @@ class FunctionsSearchMode(Enum):
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
-@define(slots=False)
+@define(slots=False, repr=False)
 class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     """Docstring for ComputedPipelineStage.
 
     global_comparison_results has keys of type IdentifyingContext
     """
+    @classmethod
+    def get_stage_identity(cls) -> PipelineStage:
+        return PipelineStage.Computed
+
     identity: PipelineStage = field(default=PipelineStage.Computed)
+    # identity: PipelineStage = PipelineStage.Computed
 
     filtered_sessions: Optional[DynamicParameters] = field(default=None)
     filtered_epochs: Optional[DynamicParameters] = field(default=None)
@@ -85,27 +91,6 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
     registered_computation_function_dict: OrderedDict = field(default=Factory(OrderedDict))
     registered_global_computation_function_dict: OrderedDict = field(default=Factory(OrderedDict))
-
-
-    # def __init__(self, loaded_stage: LoadedPipelineStage):
-    #     # super(ClassName, self).__init__()
-    #     self.stage_name = loaded_stage.stage_name
-    #     self.basedir = loaded_stage.basedir
-    #     self.loaded_data = loaded_stage.loaded_data
-
-    #     # Initialize custom fields:
-    #     self.filtered_sessions = DynamicParameters()
-    #     self.filtered_epochs = DynamicParameters()
-    #     self.filtered_contexts = DynamicParameters()
-
-    #     self.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
-    #     self.computation_results = DynamicParameters() # computation_results is a DynamicParameters with keys of type IdentifyingContext and values of type ComputationResult
-
-    #     self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, None) # proper type setup
-
-    #     self.registered_computation_function_dict = OrderedDict()
-    #     self.registered_global_computation_function_dict = OrderedDict()
-    #     self.reload_default_computation_functions() # registers the default
 
 
     @classmethod
@@ -130,7 +115,20 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         _obj.reload_default_computation_functions() # registers the default
         return _obj
 
+    # Filtered Properties: _______________________________________________________________________________________________ #
+    @property
+    def is_filtered(self):
+        """The is_filtered property."""
+        # return isinstance(self, ComputedPipelineStage) # this is redundant
+        return True
 
+    # Computation Properties: _______________________________________________________________________________________________ #
+    
+    @property
+    def can_compute(self):
+        """The can_compute property."""
+        return True # (self.last_completed_stage >= PipelineStage.Filtered)
+    
     @property
     def active_completed_computation_result_names(self):
         """The this list of all computed configs."""
@@ -260,6 +258,11 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        if 'identity' not in state:
+            print(f'unpickling from old NeuropyPipelineStage')
+            state['identity'] = None
+            state['identity'] = type(self).get_stage_identity()
+
         self.__dict__.update(state)
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         # super(LoadedPipelineStage, self).__init__() # from 
@@ -503,7 +506,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
                 else:
                     # set/update the computation configs:
-                    self.active_configs[a_select_config_name].computation_config = active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+                    self.active_configs[a_select_config_name].computation_config = deepcopy(active_computation_params) #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
                 
                 if action.name == EvaluationActions.EVALUATE_COMPUTATIONS.name:
                     # active_function = self.perform_registered_computations_single_context
@@ -633,6 +636,35 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
         
         ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
+
+
+    ## Computation Helpers: 
+    # perform_computations: The main computation function for the computation stage
+    @function_attributes(short_name=None, tags=['main', 'computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-25 12:26', related_items=[])
+    def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
+        """The main computation function for the pipeline.
+
+        Wraps `perform_action_for_all_contexts`
+        
+        Internally updates the
+            .computation_results
+
+
+        Args:
+            active_computation_params (Optional[DynamicParameters], optional): _description_. Defaults to None.
+            enabled_filter_names (_type_, optional): _description_. Defaults to None.
+            overwrite_extant_results (bool, optional): _description_. Defaults to False.
+            computation_functions_name_includelist (_type_, optional): _description_. Defaults to None.
+            computation_functions_name_excludelist (_type_, optional): _description_. Defaults to None.
+            fail_on_exception (bool, optional): _description_. Defaults to False.
+            debug_print (bool, optional): _description_. Defaults to False.
+
+        History:
+            factored out of `NeuropyPipeline` for use in GlobalComputationFunctions
+        """
+        assert (self.can_compute), "Current stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
+        self.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
+            computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
 
 
     # ==================================================================================================================== #
@@ -815,6 +847,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
             ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the excludelist but now are not:
 
+
         
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
@@ -955,8 +988,11 @@ class PipelineWithComputedPipelineStageMixin:
         """
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
         progress_logger_callback=(lambda x: self.logger.info(x))
+        # self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
+        #     computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
 
-        self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
+        # Calls self.stage's version:
+        self.stage.perform_computations(enabled_filter_names=enabled_filter_names, active_computation_params=active_computation_params, overwrite_extant_results=overwrite_extant_results,
             computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, debug_print=debug_print)
         
         # Global MultiContext computations will be done here:
@@ -988,8 +1024,11 @@ class PipelineWithComputedPipelineStageMixin:
     # Utility/Debugging Functions:
     def perform_drop_entire_computed_config(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
         """ Loops through all the configs and drops all results of the specified configs
-        2022-09-13 - Unfinished 
-        2022-10-23 - This seems to drop ALL the computed items for a specified set of configs/contexts, not a specific computed item across configs/contexts        
+        2023-10-25 - Seems to work to drop ALL of the computed items for a specified set of configs/contexts (not a specific computed item across configs/contexts)
+
+        Usage:
+          curr_active_pipeline.perform_drop_entire_computed_config(config_names_to_drop=['maze1_odd_laps', 'maze1_even_laps', 'maze2_odd_laps', 'maze2_even_laps'])
+
         """
         # config_names_to_drop
         print(f'_drop_computed_items(config_names_to_drop: {config_names_to_drop}):\n\tpre keys: {list(self.active_configs.keys())}')
@@ -998,11 +1037,14 @@ class PipelineWithComputedPipelineStageMixin:
             a_config_to_drop = self.active_configs.pop(a_config_name, None)
             if a_config_to_drop is not None:
                 print(f'\tpreparing to drop: {a_config_name}')
-                ## TODO: filtered_sessions, filtered_epochs
+                
                 _dropped_computation_results = self.computation_results.pop(a_config_name, None)
                 a_filter_context_to_drop = self.filtered_contexts.pop(a_config_name, None)
                 if a_filter_context_to_drop is not None:
                     _dropped_display_items = self.display_output.pop(a_filter_context_to_drop, None)
+                ## filtered_sessions, filtered_epochs
+                a_filter_epoch_to_drop = self.filtered_epochs.pop(a_config_name, None)
+                a_filter_session_to_drop = self.filtered_sessions.pop(a_config_name, None)
 
             print(f'\t dropped.')
             

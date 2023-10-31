@@ -1,3 +1,4 @@
+import sys
 import ipywidgets as widgets
 from IPython.display import display
 import matplotlib
@@ -10,9 +11,12 @@ import silx.io
 
 
 from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
-from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import JupyterButtonRowWidget
+from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
 from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
+from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default
 
+
+from pyphocorehelpers.print_helpers import CapturedException
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -20,6 +24,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidget
 # from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDialog
 
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
 
 # AbstractDataFileDialog
 
@@ -83,6 +88,31 @@ def try_save_pickle_as(original_file_path, file_confirmed_callback):
 	return
 
 
+
+class PipelineJupyterHelpers:
+	
+
+    @classmethod
+    def perform_pipeline_save(cls, curr_active_pipeline):
+        if curr_active_pipeline.updated_since_last_pickle:
+            _bak_saving_mode = saving_mode
+
+        saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+        try:
+            curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+            curr_active_pipeline.save_global_computation_results()
+
+        except Exception as e:
+            ## TODO: catch/log saving error and indicate that it isn't saved.
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f'ERROR RE-SAVING PIPELINE after update. error: {e}')
+        finally:
+            saving_mode = _bak_saving_mode
+			
+
+
+
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:
 	"""	Displays a row of four buttons relating to the curr_active_pipeline that reveal the Output Folder, global pickle, pipeline pickle, and .h5 export path in the system file explorer.
 
@@ -98,6 +128,7 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 			("pipeline pickle", lambda _: reveal_in_system_file_manager(curr_active_pipeline.pickle_path)),
 			(".h5 export", lambda _: reveal_in_system_file_manager(curr_active_pipeline.h5_export_path)),
 			("TEST - Dialog", lambda _: try_save_pickle_as(curr_active_pipeline.global_computation_results_pickle_path)),
+			("Save Pipeline", lambda _: PipelineJupyterHelpers.perform_pipeline_save(curr_active_pipeline)),
 			# ("ViTables .h5 export", lambda _: reveal_in_system_file_manager(curr_active_pipeline.h5_export_path))
 		]
 		
@@ -113,6 +144,34 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 	# combined_button_executor = widgets.VBox((widgets.HBox(button_executor.button_list), widgets.HBox(updating_button_executor.button_list)))
 	# combined_button_executor = widgets.VBox((button_executor.button_list, updating_button_executor.button_list))
 	# return display(combined_button_executor)
+
+
+	# ## New Method, need to convert
+	# btn_layout = widgets.Layout(width='auto', height='40px') #set width and height
+	# default_kwargs = dict(display='flex', flex_flow='column', align_items='stretch', layout=btn_layout)
+
+	# _out_row = JupyterButtonRowWidget.init_from_button_defns(button_defns=[
+	# 	("Documentation Folder", lambda _: reveal_in_system_file_manager(self.doc_output_parent_folder), default_kwargs),
+	# 	("Generated Documentation", lambda _: self.reveal_output_files_in_system_file_manager(), default_kwargs),
+	# 	])
+
+	# _out_row_html = JupyterButtonRowWidget.init_from_button_defns(button_defns=[
+	# 		("Open generated .html Documentation", lambda _: open_file_with_system_default(str(self.output_html_file.resolve())), default_kwargs),
+	# 		("Reveal Generated .html Documentation", lambda _: reveal_in_system_file_manager(self.output_html_file), default_kwargs),
+	# 	])
+
+	# _out_row_md = JupyterButtonRowWidget.init_from_button_defns(button_defns=[
+	# 		("Open generated .md Documentation", lambda _: open_file_with_system_default(str(self.output_md_file.resolve())), default_kwargs),
+	# 		("Reveal Generated .md Documentation", lambda _: reveal_in_system_file_manager(self.output_md_file), default_kwargs),
+	# 	])
+
+	# return widgets.VBox([_out_row.root_widget,
+	# 	_out_row_html.root_widget,
+	# 	_out_row_md.root_widget,
+	# ])
+
+
+
 	return button_executor
 
 

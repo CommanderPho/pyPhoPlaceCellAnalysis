@@ -27,6 +27,7 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_pdf_metada
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # for batch_load_session
 
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPlacefieldGlobalComputationFunctions
 
 """ 
 
@@ -170,7 +171,11 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         # time_bin_size = 0.1 # 10 fps
         time_bin_size = kwargs.get('time_bin_size', 0.03333) # 0.03333 = 1.0/30.0 # decode at 30fps to match the position sampling frequency
         # time_bin_size = kwargs.get('time_bin_size', 0.1) # 10 fps
+    
+        # lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
+        # assert lap_estimation_parameters is not None
         active_session_computation_configs = active_data_mode_registered_class.build_active_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size) # , grid_bin_bounds=grid_bin_bounds
+    
     else:
         # Use the provided `active_session_computation_configs`:
         assert 'time_bin_size' not in kwargs, f"time_bin_size kwarg provided but will not be used because a custom active_session_computation_configs was provided as well."
@@ -283,7 +288,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     newly_computed_values = []
 
     non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
-    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis'] # , 'long_short_rate_remapping'
+    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis', 'split_to_directional_laps'] # , 'long_short_rate_remapping'
 
     # 'firing_rate_trends', 'pf_dt_sequential_surprise'
     # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
@@ -293,8 +298,10 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         include_includelist = non_global_comp_names + global_comp_names
     else:
         print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
+
     ## Get computed relative entropy measures:
-    global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
 
     if included_computation_filter_names is None:
         included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']

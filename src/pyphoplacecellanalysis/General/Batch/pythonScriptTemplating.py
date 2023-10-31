@@ -42,6 +42,13 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 		## Build Slurm Scripts:
 		included_session_contexts, output_python_scripts, output_slurm_scripts = generate_batch_single_session_scripts(global_data_root_parent_path, included_session_contexts, Path('output/generated_slurm_scripts/').resolve(), use_separate_run_directories=True)
 
+	Usage 2 - 2023-10-24 - Without global_batch
+
+		## Build Slurm Scripts:
+		session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
+		included_session_contexts, output_python_scripts, output_slurm_scripts = generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs=session_basedirs_dict, included_session_contexts=included_session_contexts, output_directory=Path('output/generated_slurm_scripts/').resolve(), use_separate_run_directories=True)
+		output_python_scripts
+
 		
 	"""
 	assert isinstance(session_batch_basedirs, dict)
@@ -52,7 +59,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	# if script_generation_kwargs is None:
 	# 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
 
-	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False) | script_generation_kwargs
+	script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=True, should_perform_figure_generation_to_file=False) | script_generation_kwargs # No recomputing at all:
+	script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=False) | script_generation_kwargs
+	script_generation_kwargs = dict(should_force_reload_all=True, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=False) | script_generation_kwargs # Forced Reloading:
 	# script_generation_kwargs
 
 	if included_session_contexts is None:
@@ -62,6 +71,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
 	env = Environment(loader=FileSystemLoader(template_path))
 	python_template = env.get_template('slurm_python_template.py.j2')
+	# base_python_template = env.get_template('slurm_python_template_base.py.j2')
+	# python_template = env.get_template('slurm_python_template_NoRecompute.py.j2', parent='slurm_python_template_base.py.j2')
 	slurm_template = env.get_template('slurm_template.sh.j2')
 
 	output_python_scripts = []

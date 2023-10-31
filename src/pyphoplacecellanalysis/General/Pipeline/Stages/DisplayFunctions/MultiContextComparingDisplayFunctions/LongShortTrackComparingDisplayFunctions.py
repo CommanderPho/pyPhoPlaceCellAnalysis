@@ -15,6 +15,7 @@ from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_
 from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
 from neuropy.utils.matplotlib_helpers import fit_both_axes
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions # plot_expected_vs_observed
+from neuropy.utils.indexing_helpers import find_desired_sort_indicies # used in `determine_long_short_pf1D_indicies_sort_by_peak`
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -2690,7 +2691,6 @@ def plot_expected_vs_observed(t_SHARED, y_SHORT, y_LONG, neuron_IDXs, neuron_IDs
     return fig, axes
 
 
-
 @function_attributes(short_name=None, tags=[], conforms_to=[], input_requires=[], output_provides=[], uses=['JonathanFiringRateAnalysisResult'], used_by=['_display_short_long_pf1D_comparison'], creation_date='2023-06-16 13:01')
 def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_any_context_neurons, sortby=["long_pf_peak_x", "short_pf_peak_x", 'neuron_IDX'], debug_print=False):
     """ Builds proper sort indicies for '_display_short_long_pf1D_comparison'
@@ -2708,32 +2708,6 @@ def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_a
     curr_any_context_neurons = _find_any_context_neurons(*[k.neuron_ids for k in [long_ratemap, short_ratemap]])
     
     """
-    def _subfn_sort_desired(extant_arr, desired_sort_arr):
-        """ 
-        Want to find the set of sort indicies that can be applied to extant_arr s.t.
-        (extant_arr[out_sort_idxs] == desired_sort_arr)
-        
-        INEFFICIENT: O^n^2
-        
-        Usage:
-        
-            new_all_aclus_sort_indicies = _sort_desired(active_2d_plot.neuron_ids, all_sorted_aclus)
-            assert len(new_all_aclus_sort_indicies) == len(active_2d_plot.neuron_ids), f"need to have one new_all_aclus_sort_indicies value for each neuron_id"
-            assert np.all(active_2d_plot.neuron_ids[new_all_aclus_sort_indicies] == all_sorted_aclus), f"must sort "
-            new_all_aclus_sort_indicies
-        """
-        missing_aclu_indicies = np.isin(extant_arr, desired_sort_arr, invert=True)
-        missing_aclus = extant_arr[missing_aclu_indicies] # array([ 3,  4,  8, 13, 24, 34, 56, 87])
-        if len(missing_aclus) > 0:
-            desired_sort_arr = np.concatenate((desired_sort_arr, missing_aclus)) # the final desired output order of aclus. Want to compute the indicies that are required to sort an ordered array of indicies in this order
-            ## TODO: what about entries in desired_sort_arr that might be missing in extant_arr?? Hopefully never happens.
-        assert len(desired_sort_arr) == len(extant_arr), f"need to have one all_sorted_aclu value for each neuron_id but len(desired_sort_arr): {len(desired_sort_arr)} and len(extant_arr): {len(extant_arr)}"
-        # sort_idxs = np.array([desired_sort_arr.tolist().index(v) for v in extant_arr])
-        sort_idxs = np.array([extant_arr.tolist().index(v) for v in desired_sort_arr])
-        assert len(sort_idxs) == len(extant_arr), f"need to have one new_all_aclus_sort_indicies value for each neuron_id"
-        assert np.all(extant_arr[sort_idxs] == desired_sort_arr), f"must sort: extant_arr[sort_idxs]: {extant_arr[sort_idxs]}\n desired_sort_arr: {desired_sort_arr}"
-        return sort_idxs, desired_sort_arr
-
     #### BEGIN FUNCTION BODY ###
     
   
@@ -2755,7 +2729,7 @@ def determine_long_short_pf1D_indicies_sort_by_peak(curr_active_pipeline, curr_a
         print(f'_sorted_neuron_IDXs: {_sorted_neuron_IDXs}')
 
     ## Use this sort for the 'curr_any_context_neurons' sort order:
-    new_all_aclus_sort_indicies, desired_sort_arr = _subfn_sort_desired(curr_any_context_neurons, _sorted_aclus)
+    new_all_aclus_sort_indicies, desired_sort_arr = find_desired_sort_indicies(curr_any_context_neurons, _sorted_aclus)
     if debug_print:
         print(f'new_all_aclus_sort_indicies: {new_all_aclus_sort_indicies}')
     return new_all_aclus_sort_indicies
