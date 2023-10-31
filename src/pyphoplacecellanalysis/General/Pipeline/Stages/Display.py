@@ -217,29 +217,6 @@ class DisplayPipelineStage(ComputedPipelineStage):
     registered_display_function_dict: OrderedDict = field(default=Factory(OrderedDict))
 
 
-    # def __init__(self, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, override_filtered_contexts=None):
-    #     # super(DisplayPipelineStage, self).__init__()
-    #     # ComputedPipelineStage fields:
-    #     self.stage_name = computed_stage.stage_name
-    #     self.basedir = computed_stage.basedir
-    #     self.loaded_data = computed_stage.loaded_data
-    #     self.filtered_sessions = computed_stage.filtered_sessions
-    #     self.filtered_epochs = computed_stage.filtered_epochs
-    #     self.filtered_contexts = override_filtered_contexts or computed_stage.filtered_contexts
-    #     self.active_configs = computed_stage.active_configs # active_config corresponding to each filtered session/epoch
-    #     self.computation_results = computed_stage.computation_results
-    #     self.global_computation_results = computed_stage.global_computation_results
-    #     self.registered_computation_function_dict = computed_stage.registered_computation_function_dict
-    #     self.registered_global_computation_function_dict = computed_stage.registered_global_computation_function_dict
-
-    #     # Initialize custom fields:
-    #     self.display_output = display_output or DynamicParameters()
-    #     self.render_actions = render_actions or DynamicParameters()
-    #     # self.filtered_contexts = override_filtered_contexts or DynamicParameters() # None by default, otherwise IdentifyingContext
-    #     self.registered_display_function_dict = OrderedDict()
-    #     self.register_default_known_display_functions() # registers the default display functions
-
-
     @classmethod
     def init_from_previous_stage(cls, computed_stage: ComputedPipelineStage, display_output=None, render_actions=None, override_filtered_contexts=None):
         _obj = cls()
