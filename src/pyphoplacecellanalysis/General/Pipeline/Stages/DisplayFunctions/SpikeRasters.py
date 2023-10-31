@@ -640,16 +640,33 @@ def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identif
 @function_attributes(short_name=None, tags=['plotting','raster', 'sort'], input_requires=[], output_provides=[], uses=['_subfn_build_and_add_scatterplot_row'], used_by=[], creation_date='2023-10-30 22:23', related_items=[])
 def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_orders_dict=None, unit_colors_list_dict=None, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None):
     """ 
-    
-    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
 
-    included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
-    unit_sort_orders_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (even_long, odd_long, even_short, odd_short)))
-    unit_colors_list_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
+    Basic Plotting:    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
 
-    app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = _plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
+        included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
+        unit_sort_orders_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (even_long, odd_long, even_short, odd_short)))
+        unit_colors_list_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
+
+        app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = _plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
 
 
+    Updating Raster Epoch:
+
+        active_epoch_idx: int = 11
+        curr_epoch_spikes = spikes_df[(spikes_df.new_lap_IDX == active_epoch_idx)]
+        curr_epoch_df = active_epochs_df[(active_epochs_df.lap_id == (active_epoch_idx+1))]
+        curr_epoch = list(curr_epoch_df.itertuples())[0]
+
+        on_update_active_epoch(curr_epoch)
+
+
+
+    Updating Raster Display:
+
+        vtick = _build_default_tick(tick_width=0.0, tick_height=0.9)
+        override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick, size=1, hoverable=False) # , pen=None, brush=None
+        on_update_active_scatterplot_kwargs(override_scatter_plot_kwargs)
 
 
     """
@@ -675,7 +692,7 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     plots_data.all_spots_dict = {}
     plots_data.all_scatterplot_tooltips_kwargs_dict = {}
 
-    
+    # Build the base data that will be copied for each epoch:
     plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=list(unit_sort_orders_dict.values())[0], unit_colors_list=list(unit_colors_list_dict.values())[0])
     # Update the dataframe
     spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
@@ -689,26 +706,16 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
 
     vtick_simple_line = _build_default_tick(tick_width=0.0, tick_height=0.9)
     override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1, hoverable=False) # , pen=None, brush=None
-
     # print(f'override_scatter_plot_kwargs: {override_scatter_plot_kwargs}')
 
-    i = 0
-    long_even_scatter_plot, long_even_new_ax, long_even_y_grid = _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identifier='long_even', row=(i), col=0, left_label='long_even', scatter_plot_kwargs=override_scatter_plot_kwargs)
-    i = i+1
-    long_odd_scatter_plot, long_odd_ax, long_odd_y_grid = _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identifier='long_odd', row=(i), col=0, left_label='long_odd', scatter_plot_kwargs=override_scatter_plot_kwargs)
-    i = i+1
-    short_even_scatter_plot, short_even_ax, short_even_y_grid = _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identifier='short_even', row=(i), col=0, left_label='short_even', scatter_plot_kwargs=override_scatter_plot_kwargs)
-    i = i+1
-    short_odd_scatter_plot, short_odd_ax, short_odd_y_grid = _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identifier='short_odd', row=(i), col=0, left_label='short_odd', scatter_plot_kwargs=override_scatter_plot_kwargs)
-    i = i+1
+    
     # list(plots.scatter_plots.keys()) # ['long_even', 'long_odd', 'short_even', 'short_odd']
 
+    i = 0
     plots_data_dict = {} # new dict to hold plot data
     plots_spikes_df_dict = {}
 
-    
-    # for _active_plot_identifier, active_unit_sort_order in zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (even_long, odd_long, even_short, odd_short)):
-    for _active_plot_identifier, active_unit_sort_order in unit_sort_orders_dict.items():		
+    for _active_plot_identifier, active_unit_sort_order in unit_sort_orders_dict.items():
         # new_plots_data = deepcopy(plots_data)
         new_plots_data = plots_data
 
@@ -716,6 +723,8 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
             unit_colors_list = unit_colors_list_dict.get(_active_plot_identifier, None)
         else:
             unit_colors_list = None
+
+        
         new_plots_data = _build_scatter_plotting_managers(new_plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=active_unit_sort_order, unit_colors_list=unit_colors_list)
         plots_data_dict[_active_plot_identifier] = new_plots_data
         
@@ -726,6 +735,9 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
         # plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
         
         plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_spikes_df_dict[_active_plot_identifier], plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+
+        _subfn_build_and_add_scatterplot_row(plots_data_dict[_active_plot_identifier], plots, _active_plot_identifier=_active_plot_identifier, row=(i), col=0, left_label=_active_plot_identifier, scatter_plot_kwargs=override_scatter_plot_kwargs)
+        i = i+1
 
         ## Get the scatterplot and update the points:
         a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
