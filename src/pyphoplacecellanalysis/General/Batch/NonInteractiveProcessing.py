@@ -227,6 +227,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
 
         ## TODO 2023-01-15 - perform_computations for all configs!!
+        #TODO 2023-10-31 14:58: - [ ] This is where the computations are being done multiple times!
         curr_active_pipeline.perform_computations(a_computation_config, computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
 
