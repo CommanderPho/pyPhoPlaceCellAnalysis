@@ -209,7 +209,6 @@ class DisplayPipelineStage(ComputedPipelineStage):
         return PipelineStage.Displayed
 
     identity: PipelineStage = field(default=PipelineStage.Displayed)
-    # identity: PipelineStage = PipelineStage.Displayed
 
     display_output: Optional[DynamicParameters] = field(default=None)
     render_actions: Optional[DynamicParameters] = field(default=None)
@@ -240,9 +239,6 @@ class DisplayPipelineStage(ComputedPipelineStage):
         _obj.register_default_known_display_functions() # registers the default display functions
 
         return _obj
-
-
-
 
     @property
     def registered_display_functions(self):
