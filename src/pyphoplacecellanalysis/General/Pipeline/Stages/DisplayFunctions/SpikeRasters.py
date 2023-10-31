@@ -424,42 +424,6 @@ def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False,
     return app, win, plots, plots_data
 
 
-
-def _plot_multi_grid_raster_plot_frame(scatter_app_name='pho_test', defer_show=False, active_context=None) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
-    """ simple helper to initialize the mkQApp, spawn the window, and build the plots and plots_data. """
-    ## Perform the plotting:
-    app = pg.mkQApp(scatter_app_name)
-    win = pg.GraphicsLayoutWidget(show=(not defer_show), title=scatter_app_name)
-    win.resize(1000,600)
-    # window_title_prefix = 'pyqtgraph: Raster Spikes: '
-    window_title_prefix = '' # no prefix before the provided title
-    win.setWindowTitle(f'{window_title_prefix}{scatter_app_name}')
-
-    # Enable antialiasing for prettier plots
-    pg.setConfigOptions(antialias=True)
-    
-    plots = RenderPlots(scatter_app_name)
-    plots_data = RenderPlotsData(scatter_app_name)
-    if active_context is not None:
-        plots.context = active_context
-        plots_data.active_context = active_context
-
-    plots.layout = win.addLayout()
-    plots.ax = {}
-    plots.scatter_plots = {} # index is the _active_plot_identifier
-    plots.grid = {} # index is the _active_plot_identifier
-
-    plots_data.all_spots_dict = {}
-    plots_data.all_scatterplot_tooltips_kwargs_dict = {}
-
-    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
-
-
-    return app, win, plots, plots_data
-
-
-
-
 def _build_default_tick(tick_width: float = 0.1, tick_height: float = 1.0) -> QtGui.QPainterPath:
     """ 
 
@@ -505,9 +469,6 @@ def build_scatter_plot_kwargs(scatter_plot_kwargs=None):
     print(f'merged_kwargs: {merged_kwargs}')
     return merged_kwargs
 
-
-
-
 def _build_units_y_grid(plot_item) -> pg.GridItem:
     """create a GridItem and add it to the plot
     
@@ -522,7 +483,6 @@ def _build_units_y_grid(plot_item) -> pg.GridItem:
     grid.setPen(pg.mkPen('#888888', width=1))
     grid.setZValue(-100)
     return grid
-
 
 def _build_scatter_plotting_managers(plots_data, spikes_df, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None):
     """ 
@@ -754,7 +714,7 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
         for _active_plot_identifier in ['long_even', 'long_odd', 'short_even', 'short_odd']:
             new_ax = plots.ax[_active_plot_identifier]
             new_ax.setXRange(an_epoch.start, an_epoch.stop)
-            new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
+            # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
             
             # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
 
