@@ -153,8 +153,8 @@ class DirectionalLapsHelpers:
         if debug_print:
             print(f'split_to_directional_laps(...): use_direction_dependent_laps: {use_direction_dependent_laps}')
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         ## After all top-level computations are done, compute the subsets for direction laps
         split_directional_laps_contexts_dict = {} # new
         split_directional_laps_dict = {}
@@ -172,18 +172,7 @@ class DirectionalLapsHelpers:
                 if debug_print:
                     print(f'\tcurr_epoch_split_directional_laps_config_names: {curr_epoch_split_directional_laps_config_names}')
 
-
-                # for `use_global_epoch_only_mode == True` mode:
-                # an_epoch_name, a_sess, a_result = global_epoch_name, global_session, global_results
-                # a_sess, a_result = curr_active_pipeline.filtered_sessions[an_epoch_name], curr_active_pipeline.computation_results[an_epoch_name]['computed_data']
-
                 a_sess = curr_active_pipeline.filtered_sessions[an_epoch_name]
-
-                # curr_epoch_directional_lap_specific_configs, curr_epoch_split_directional_laps_dict, curr_epoch_split_directional_laps_config_names = cls.split_specific_epoch_to_directional_laps(an_epoch_name, a_sess, a_result, curr_active_pipeline, add_created_configs_to_pipeline=add_created_configs_to_pipeline)
-                # split_directional_laps_contexts_dict, split_directional_laps_dict = cls.split_specific_epoch_to_directional_laps(an_epoch_name, a_sess, a_result, curr_active_pipeline, add_created_configs_to_pipeline=add_created_configs_to_pipeline)
-
-                
-
                 # 'build_lap_computation_epochs(...)' based mode:
                 desired_computation_epochs = build_lap_computation_epochs(a_sess, use_direction_dependent_laps=use_direction_dependent_laps)
                 even_lap_specific_epochs, odd_lap_specific_epochs, any_lap_specific_epochs = desired_computation_epochs
@@ -234,12 +223,8 @@ class DirectionalLapsHelpers:
 
                         curr_active_pipeline.filtered_sessions[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_sessions[an_epoch_name]
                         curr_active_pipeline.filtered_epochs[a_split_directional_laps_config_name] = curr_active_pipeline.filtered_epochs[an_epoch_name]
-
-
                         curr_active_pipeline.filtered_contexts[a_split_directional_laps_config_name] = a_context
-
                         curr_active_pipeline.computation_results[a_split_directional_laps_config_name] = None # empty
-
                         active_computation_params = deepcopy(directional_lap_specific_configs[a_context].computation_config)
                         curr_active_pipeline.computation_results[a_split_directional_laps_config_name] = ComputedPipelineStage._build_initial_computationResult(curr_active_pipeline.filtered_sessions[a_split_directional_laps_config_name], active_computation_params)
                         print(f'\t\n\tcomputation_epochs: {curr_active_pipeline.active_configs[a_split_directional_laps_config_name].computation_config.pf_params.computation_epochs}\n\n')
@@ -266,7 +251,6 @@ class DirectionalLapsHelpers:
             #         included_computation_filter_names=split_directional_laps_config_names,
             #         include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=True, debug_print=True)
             # print(f'newly_computed_values: {newly_computed_values}')
-
 
 
         # end if use_direction_dependent_laps
@@ -354,35 +338,11 @@ class DirectionalLapsHelpers:
         ### 2023-10-26 - Extract Directional Laps Outputs and computed items:
         # (long_one_step_decoder_1D, short_one_step_decoder_1D), (long_one_step_decoder_2D, short_one_step_decoder_2D) = compute_short_long_constrained_decoders(curr_active_pipeline, recalculate_anyway=True)
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-        # long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
-        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_pf1D, short_pf1D, global_pf1D = long_results.pf1D, short_results.pf1D, global_results.pf1D
-        # long_pf2D, short_pf2D, global_pf2D = long_results.pf2D, short_results.pf2D, global_results.pf2D
-
-
-        # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         odd_laps_suffix, even_laps_suffix = cls.split_directional_laps_name_parts
 
         long_odd_laps_name, long_even_laps_name = [f'{long_epoch_name}_{a_suffix}' for a_suffix in (odd_laps_suffix, even_laps_suffix)]
         short_odd_laps_name, short_even_laps_name = [f'{short_epoch_name}_{a_suffix}' for a_suffix in (odd_laps_suffix, even_laps_suffix)]
-
-        print(long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name) # ('maze1_odd_laps', 'maze1_even_laps', 'maze2_odd_laps', 'maze2_even_laps')
-
-        # Unpacking for non-direction specific epochs (to get the replays, etc):
-        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_replays, short_replays, global_replays = [a_session.replay for a_session in [long_session, short_session, global_session]]
-
-        # Unpacking for `(long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)`
-        # (long_odd_laps_context, long_even_laps_context, short_odd_laps_context, short_even_laps_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
-        # (long_odd_laps_obj, long_even_laps_obj, short_odd_laps_obj, short_even_laps_obj) = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
-        # (long_odd_laps_session, long_even_laps_session, short_odd_laps_session, short_even_laps_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
-        # (long_odd_laps_results, long_even_laps_results, short_odd_laps_results, short_even_laps_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
-        # (long_odd_laps_computation_config, long_even_laps_computation_config, short_odd_laps_computation_config, short_even_laps_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in (long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name)]
-        # (long_odd_laps_pf1D, long_even_laps_pf1D, short_odd_laps_pf1D, short_even_laps_pf1D) = (long_odd_laps_results.pf1D, long_even_laps_results.pf1D, short_odd_laps_results.pf1D, short_even_laps_results.pf1D)
-        # (long_odd_laps_pf2D, long_even_laps_pf2D, short_odd_laps_pf2D, short_even_laps_pf2D) = (long_odd_laps_results.pf2D, long_even_laps_results.pf2D, short_odd_laps_results.pf2D, short_even_laps_results.pf2D)
+        # print(long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name) # ('maze1_odd_laps', 'maze1_even_laps', 'maze2_odd_laps', 'maze2_even_laps')
 
         # Validate:
         assert not (curr_active_pipeline.computation_results[long_odd_laps_name]['computation_config']['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_even_laps_name]['computation_config']['pf_params'].computation_epochs)
