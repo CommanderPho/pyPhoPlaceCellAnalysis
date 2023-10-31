@@ -8,7 +8,7 @@ from typing import Optional, List, Dict
 from functools import wraps
 
 from PyQt5 import QtGui, QtWidgets, uic
-from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem, QTextBrowser
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
@@ -55,6 +55,10 @@ class LauncherWidget(QWidget):
         return self._curr_active_pipeline_ref
     
 
+    @property
+    def docPanelTextBrowser(self) -> QTextBrowser:
+        return self.ui.textBrowser
+    
     # @property
     # def display_function_items(self) -> Dict[str,DisplayFunctionItem]:
     #     return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self._pipeline_reference.registered_display_function_dict.items()}
