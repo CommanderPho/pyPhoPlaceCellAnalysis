@@ -641,8 +641,15 @@ def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identif
 def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_orders_dict=None, unit_colors_list_dict=None, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None):
     """ 
     
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
+
+    included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
     unit_sort_orders_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (even_long, odd_long, even_short, odd_short)))
-    app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = _plot_multi_sort_raster_browser(spikes_df, unit_sort_orders_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
+    unit_colors_list_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
+
+    app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = _plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
+
+
 
 
     """
@@ -668,16 +675,21 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     plots_data.all_spots_dict = {}
     plots_data.all_scatterplot_tooltips_kwargs_dict = {}
 
-    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
-
+    
+    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=list(unit_sort_orders_dict.values())[0], unit_colors_list=list(unit_colors_list_dict.values())[0])
     # Update the dataframe
     spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
 
+
     # Common Tick Label 
     # override_scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
-    vtick = _build_default_tick(tick_width=0.01, tick_height=1.0)
-    # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItem', pxMode=False, symbol=vtick, size=1, pen={'color': 'w', 'width': 1}, brush=pg.mkBrush(color='w'), hoverable=False)
-    override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItem', pxMode=False, symbol=vtick, size=1, hoverable=False) # , pen=None, brush=None
+    # vtick_box = _build_default_tick(tick_width=0.01, tick_height=1.0)
+    # # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItem', pxMode=False, symbol=vtick, size=1, pen={'color': 'w', 'width': 1}, brush=pg.mkBrush(color='w'), hoverable=False)
+    # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItem', pxMode=False, symbol=vtick_box, size=1, hoverable=False) # , pen=None, brush=None
+
+    vtick_simple_line = _build_default_tick(tick_width=0.0, tick_height=0.9)
+    override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1, hoverable=False) # , pen=None, brush=None
+
     # print(f'override_scatter_plot_kwargs: {override_scatter_plot_kwargs}')
 
     i = 0
@@ -699,6 +711,11 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     for _active_plot_identifier, active_unit_sort_order in unit_sort_orders_dict.items():		
         # new_plots_data = deepcopy(plots_data)
         new_plots_data = plots_data
+
+        if unit_colors_list_dict is not None:
+            unit_colors_list = unit_colors_list_dict.get(_active_plot_identifier, None)
+        else:
+            unit_colors_list = None
         new_plots_data = _build_scatter_plotting_managers(new_plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=active_unit_sort_order, unit_colors_list=unit_colors_list)
         plots_data_dict[_active_plot_identifier] = new_plots_data
         
