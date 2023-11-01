@@ -22,11 +22,11 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
 
 
-__all__ = ['EpochsEditorItem']
+__all__ = ['EpochsEditor']
 
 @define(slots=False)
 class EpochsEditor:
-    """ 
+    """ EpochsEditor to allow user modification of epoch intervals using PyQtGraph and multiple custom linear rect items
 
     """
     pos_df: pd.DataFrame = field()
