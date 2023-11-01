@@ -609,3 +609,95 @@ class RankOrderAnalyses:
         laps_fig, laps_ax = _plot_laps_shuffle_analysis(odd_laps_long_short_z_score_diff_values, suffix_str='_odd')
         laps_fig, laps_ax = _plot_laps_shuffle_analysis(even_laps_long_short_z_score_diff_values, suffix_str='_even')
 
+    def main_ripples_analysis(curr_active_pipeline):
+        
+        ## Shared:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+        global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps) # .trimmed_to_non_overlapping()
+
+        num_shuffles = 600
+
+        # Recover from the saved global result:
+        # Unpacking:
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
+        # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results.__dict__[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_contexts_dict', 'split_directional_laps_config_names', 'computed_base_epoch_names']]
+        long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D = [directional_laps_results.__dict__[k] for k in ['long_odd_shared_aclus_only_one_step_decoder_1D', 'long_even_shared_aclus_only_one_step_decoder_1D', 'short_odd_shared_aclus_only_one_step_decoder_1D', 'short_even_shared_aclus_only_one_step_decoder_1D']]
+
+        long_odd_laps_obj, long_even_laps_obj, short_odd_laps_obj, short_even_laps_obj = list(directional_laps_results.split_directional_laps_dict.values())
+
+        # track_templates: TrackTemplates = TrackTemplates.init_from_shared_aclus_only_decoders(long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D)
+        track_templates: TrackTemplates = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_odd_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D), RL_decoder_pair=(long_even_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D))
+
+
+
+
+        ## 2023-10-24 - Simple long/short (2-template, direction independent) analysis:
+        # shuffle_helper = build_track_templates_for_shuffle(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=1000, bimodal_exclude_aclus=[5, 14, 25, 46, 61, 66, 86, 88, 95])
+
+        # 2023-10-26 - Direction Dependent (4 template) analysis: long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D
+        odd_shuffle_helper = build_track_templates_for_shuffle(long_odd_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        even_shuffle_helper = build_track_templates_for_shuffle(long_even_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        
+
+
+
+        ## Ripple Rank-Order Analysis
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+        spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+
+        global_replays = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
+        if isinstance(global_replays, pd.DataFrame):
+            global_replays = Epoch(global_replays.epochs.get_valid_df())
+
+        ## Replay Epochs:
+        # ripple_evts_epoch_ranked_aclus_stats_dict, (ripple_evts_long_z_score_values, ripple_evts_short_z_score_values, ripple_evts_long_short_z_score_diff_values) = compute_shuffled_rankorder_analyses(active_spikes_df, deepcopy(global_replays), shuffle_helper, rank_alignment='first', debug_print=False)
+        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values) = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), odd_shuffle_helper, rank_alignment='first', debug_print=False)
+        even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values) = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), even_shuffle_helper, rank_alignment='first', debug_print=False)
+
+        ripple_evts_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values), (even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values))]
+        print(f'ripple_evts_paired_tests: {ripple_evts_paired_tests}')
+        # [TtestResult(statistic=3.5572800536164495, pvalue=0.0004179523066872734, df=415),
+        #  TtestResult(statistic=3.809779392137816, pvalue=0.0001601254566506359, df=415)]
+
+        # All plots
+        replay_fig_odd, replay_ax_odd = RankOrderAnalyses._plot_ripple_events_shuffle_analysis(odd_ripple_evts_long_short_z_score_diff_values, global_replays, suffix_str='_odd')
+        replay_fig_odd, replay_ax_odd = RankOrderAnalyses._plot_ripple_events_shuffle_analysis(even_ripple_evts_long_short_z_score_diff_values, global_replays, suffix_str='_even')
+        _display_replay_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(global_replays.labels.astype(float), even_ripple_evts_long_short_z_score_diff_values[1:], odd_ripple_evts_long_short_z_score_diff_values[1:])
+        _display_replay_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(global_replays.labels.astype(float), odd_ripple_evts_long_z_score_values[1:], even_ripple_evts_long_z_score_values[1:], odd_ripple_evts_short_z_score_values[1:], even_ripple_evts_short_z_score_values[1:])
+
+
+    def main_laps_analysis(curr_active_pipeline):
+        
+        ## Shared:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+        global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
+
+        ## 2023-10-24 - Simple long/short (2-template, direction independent) analysis:
+        # shuffle_helper = build_track_templates_for_shuffle(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=1000, bimodal_exclude_aclus=[5, 14, 25, 46, 61, 66, 86, 88, 95])
+
+        # 2023-10-26 - Direction Dependent (4 template) analysis: long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D
+        odd_shuffle_helper = build_track_templates_for_shuffle(long_odd_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        even_shuffle_helper = build_track_templates_for_shuffle(long_even_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+
+
+        ## Laps Epochs:
+        # TODO: CenterOfMass for Laps instead of median spike
+        laps_rank_alignment = 'median'
+        # laps_rank_alignment = 'center_of_mass'
+        odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values) = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), odd_shuffle_helper, rank_alignment=laps_rank_alignment, debug_print=False)
+        even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values) = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), even_shuffle_helper, rank_alignment=laps_rank_alignment, debug_print=False)
+
+        laps_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((odd_laps_long_z_score_values, odd_laps_short_z_score_values), (even_laps_long_z_score_values, even_laps_short_z_score_values))]
+
+
+        ## Plots:
+        laps_fig, laps_ax = RankOrderAnalyses._plot_laps_shuffle_analysis(odd_laps_long_short_z_score_diff_values, suffix_str='_odd')
+        laps_fig, laps_ax = RankOrderAnalyses._plot_laps_shuffle_analysis(even_laps_long_short_z_score_diff_values, suffix_str='_even')
+        _display_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(global_laps.lap_id.astype(float), odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values)
+        # app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D) = _display_z_score_raw_outputs
+        _display_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(global_laps.lap_id.astype(float), even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values)
+        app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _display_z_score_diff_outputs
