@@ -75,7 +75,9 @@ def _debug_plot_directional_template_rasters(spikes_df, active_epochs_df, track_
     odd_spikes_df, odd_neuron_id_to_new_IDX_map = odd_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
     odd_display_outputs = _plot_multi_sort_raster_browser(odd_spikes_df, track_templates.shared_RL_aclus_only_neuron_IDs, unit_sort_orders_dict=odd_unit_sort_orders_dict, unit_colors_list_dict=odd_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_ODD', defer_show=False, active_context=None)
     # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = odd_display_outputs
-    
+    odd_app, odd_win, odd_plots, odd_plots_data, odd_on_update_active_epoch, odd_on_update_active_scatterplot_kwargs = odd_display_outputs
+
+
     # Even:
     even_names = ['long_even', 'short_even']
     even_unit_sort_orders_dict = {k:v for k, v in unit_sort_orders_dict.items() if k in even_names}

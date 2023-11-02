@@ -675,8 +675,8 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     # list(plots.scatter_plots.keys()) # ['long_even', 'long_odd', 'short_even', 'short_odd']
 
     i = 0
-    plots_data_dict = {} # new dict to hold plot data
-    plots_spikes_df_dict = {}
+    plots_data.plots_data_dict = {} # new dict to hold plot data
+    plots_data.plots_spikes_df_dict = {}
 
     for _active_plot_identifier, active_unit_sort_order in unit_sort_orders_dict.items():
         # new_plots_data = deepcopy(plots_data)
@@ -689,17 +689,17 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
 
         
         new_plots_data = _build_scatter_plotting_managers(new_plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=active_unit_sort_order, unit_colors_list=unit_colors_list)
-        plots_data_dict[_active_plot_identifier] = new_plots_data
+        plots_data.plots_data_dict[_active_plot_identifier] = new_plots_data
         
         # Update the dataframe
-        plots_spikes_df_dict[_active_plot_identifier] = deepcopy(spikes_df)
-        plots_spikes_df_dict[_active_plot_identifier] = plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_spikes_df_dict[_active_plot_identifier])
+        plots_data.plots_spikes_df_dict[_active_plot_identifier] = deepcopy(spikes_df)
+        plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
         ## Build the spots for the raster plot:
         # plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
         
-        plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_spikes_df_dict[_active_plot_identifier], plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+        plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.plots_spikes_df_dict[_active_plot_identifier], plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
-        _subfn_build_and_add_scatterplot_row(plots_data_dict[_active_plot_identifier], plots, _active_plot_identifier=_active_plot_identifier, row=(i), col=0, left_label=_active_plot_identifier, scatter_plot_kwargs=override_scatter_plot_kwargs)
+        _subfn_build_and_add_scatterplot_row(plots_data.plots_data_dict[_active_plot_identifier], plots, _active_plot_identifier=_active_plot_identifier, row=(i), col=0, left_label=_active_plot_identifier, scatter_plot_kwargs=override_scatter_plot_kwargs)
         i = i+1
 
         ## Get the scatterplot and update the points:
@@ -707,14 +707,19 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
         a_scatter_plot.addPoints(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {})) # , hoverable=True
         
 
+    main_plot_identifiers_list = list(unit_sort_orders_dict.keys()) # ['long_even', 'long_odd', 'short_even', 'short_odd']
+    
     def on_update_active_scatterplot_kwargs(override_scatter_plot_kwargs):
-        for _active_plot_identifier in ['long_even', 'long_odd', 'short_even', 'short_odd']:
-            new_ax = plots.ax[_active_plot_identifier]
+        """ captures: main_plot_identifiers_list, plots, plots_data """
+        for _active_plot_identifier in main_plot_identifiers_list:
+            # for _active_plot_identifier, a_scatter_plot in plots.scatter_plots.items():
+            # new_ax = plots.ax[_active_plot_identifier]
             a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
             a_scatter_plot.setData(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {}), **override_scatter_plot_kwargs)
 
-    def on_update_active_epoch(an_epoch):
-        for _active_plot_identifier in ['long_even', 'long_odd', 'short_even', 'short_odd']:
+    def on_update_active_epoch(an_epoch_idx, an_epoch):
+        """ captures: main_plot_identifiers_list, plots """
+        for _active_plot_identifier in main_plot_identifiers_list:
             new_ax = plots.ax[_active_plot_identifier]
             new_ax.setXRange(an_epoch.start, an_epoch.stop)
             # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
