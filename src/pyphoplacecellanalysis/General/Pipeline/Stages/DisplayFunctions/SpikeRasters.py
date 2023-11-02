@@ -634,12 +634,15 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
 
     # rebuild_spikes_df_anyway = True # if True, `_prepare_spikes_df_from_filter_epochs` is called to rebuild spikes_df given the filter_epochs_df even if it contains the desired column already.
     # if rebuild_spikes_df_anyway:
-    # 	spikes_df = spikes_df.copy() # don't modify the original dataframe
-    # 	filter_epochs_df = filter_epochs_df.copy()
+    #     spikes_df = spikes_df.copy() # don't modify the original dataframe
+    #     filter_epochs_df = filter_epochs_df.copy()
 
     # if rebuild_spikes_df_anyway or (epoch_id_key_name not in spikes_df.columns):
     # 	# missing epoch_id column in the spikes_df, need to rebuild
     # 	spikes_df = _prepare_spikes_df_from_filter_epochs(spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, epoch_id_key_name=epoch_id_key_name, debug_print=False) # replay_epoch_id
+
+    
+
 
     # ## Create the raster plot for the replay:
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
