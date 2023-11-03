@@ -632,18 +632,6 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     """
     # scatter_plot_kwargs = None
 
-    # rebuild_spikes_df_anyway = True # if True, `_prepare_spikes_df_from_filter_epochs` is called to rebuild spikes_df given the filter_epochs_df even if it contains the desired column already.
-    # if rebuild_spikes_df_anyway:
-    #     spikes_df = spikes_df.copy() # don't modify the original dataframe
-    #     filter_epochs_df = filter_epochs_df.copy()
-
-    # if rebuild_spikes_df_anyway or (epoch_id_key_name not in spikes_df.columns):
-    # 	# missing epoch_id column in the spikes_df, need to rebuild
-    # 	spikes_df = _prepare_spikes_df_from_filter_epochs(spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, epoch_id_key_name=epoch_id_key_name, debug_print=False) # replay_epoch_id
-
-    
-
-
     # ## Create the raster plot for the replay:
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
 
@@ -655,24 +643,9 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     plots_data.all_spots_dict = {}
     plots_data.all_scatterplot_tooltips_kwargs_dict = {}
 
-    # Build the base data that will be copied for each epoch:
-    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=list(unit_sort_orders_dict.values())[0], unit_colors_list=list(unit_colors_list_dict.values())[0])
-    # Update the dataframe
-    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
-
-
-    # Common Tick Label 
-    # override_scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
-    # vtick_box = _build_default_tick(tick_width=0.01, tick_height=1.0)
-    # # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItem', pxMode=False, symbol=vtick, size=1, pen={'color': 'w', 'width': 1}, brush=pg.mkBrush(color='w'), hoverable=False)
-    # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItem', pxMode=False, symbol=vtick_box, size=1, hoverable=False) # , pen=None, brush=None
-
     vtick_simple_line = _build_default_tick(tick_width=0.0, tick_height=0.9)
     override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1, hoverable=False) # , pen=None, brush=None
     # print(f'override_scatter_plot_kwargs: {override_scatter_plot_kwargs}')
-
-    
-    # list(plots.scatter_plots.keys()) # ['long_even', 'long_odd', 'short_even', 'short_odd']
 
     i = 0
     plots_data.plots_data_dict = {} # new dict to hold plot data
@@ -694,7 +667,6 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
         plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
         ## Build the spots for the raster plot:
         # plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
-        
         plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.plots_spikes_df_dict[_active_plot_identifier], plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
         _subfn_build_and_add_scatterplot_row(plots_data.plots_data_dict[_active_plot_identifier], plots, _active_plot_identifier=_active_plot_identifier, row=(i), col=0, left_label=_active_plot_identifier, scatter_plot_kwargs=override_scatter_plot_kwargs)
