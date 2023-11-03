@@ -108,7 +108,6 @@ def _debug_plot_directional_template_rasters(spikes_df, active_epochs_df, track_
     return odd_display_outputs, even_display_outputs
 
 
-
 def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict):
     """ 
         ## Use odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict to plot the active median spike
