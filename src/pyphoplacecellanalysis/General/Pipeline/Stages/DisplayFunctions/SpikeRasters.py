@@ -599,7 +599,7 @@ def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identif
 
 @function_attributes(short_name=None, tags=['plotting','raster', 'sort'], input_requires=[], output_provides=[], uses=['_subfn_build_and_add_scatterplot_row'], used_by=[], creation_date='2023-10-30 22:23', related_items=[])
 def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_orders_dict=None, unit_colors_list_dict=None, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None):
-    """ 
+    """ Plots a neat stack
 
     Basic Plotting:    
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
