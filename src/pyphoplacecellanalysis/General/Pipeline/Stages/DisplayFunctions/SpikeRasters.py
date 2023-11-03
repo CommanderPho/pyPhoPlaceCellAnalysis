@@ -679,17 +679,15 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     plots_data.plots_spikes_df_dict = {}
 
     for _active_plot_identifier, active_unit_sort_order in unit_sort_orders_dict.items():
-        # new_plots_data = deepcopy(plots_data)
-        new_plots_data = plots_data
 
+        plots_data.plots_data_dict[_active_plot_identifier] = RenderPlotsData(_active_plot_identifier)
+    
         if unit_colors_list_dict is not None:
             unit_colors_list = unit_colors_list_dict.get(_active_plot_identifier, None)
         else:
             unit_colors_list = None
 
-        
-        new_plots_data = _build_scatter_plotting_managers(new_plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=active_unit_sort_order, unit_colors_list=unit_colors_list)
-        plots_data.plots_data_dict[_active_plot_identifier] = new_plots_data
+        plots_data.plots_data_dict[_active_plot_identifier] = _build_scatter_plotting_managers(plots_data.plots_data_dict[_active_plot_identifier], spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=active_unit_sort_order, unit_colors_list=unit_colors_list)
         
         # Update the dataframe
         plots_data.plots_spikes_df_dict[_active_plot_identifier] = deepcopy(spikes_df)
