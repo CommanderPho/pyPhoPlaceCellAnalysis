@@ -588,7 +588,7 @@ class RankOrderAnalyses:
 
     @function_attributes(short_name=None, tags=['rank-order', 'laps', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
-    def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300):
+    def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300, laps_rank_alignment='median'):
         
         ## Shared:
         global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles)
@@ -598,7 +598,6 @@ class RankOrderAnalyses:
         global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
 
         # TODO: CenterOfMass for Laps instead of median spike
-        laps_rank_alignment = 'median'
         # laps_rank_alignment = 'center_of_mass'
         odd_outputs = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), odd_shuffle_helper, rank_alignment=laps_rank_alignment, debug_print=False)
         even_outputs = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), even_shuffle_helper, rank_alignment=laps_rank_alignment, debug_print=False)
