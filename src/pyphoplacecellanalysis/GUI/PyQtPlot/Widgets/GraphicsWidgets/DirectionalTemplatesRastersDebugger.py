@@ -52,16 +52,24 @@ def _debug_plot_directional_template_rasters(spikes_df, active_epochs_df, track_
     spikes_df, neuron_id_to_new_IDX_map = spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
 
 
+    # CORRECT: Even: RL, Odd: LR
+    even_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
+    odd_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
+    even_long, even_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list]
+    odd_long, odd_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
 
-    even_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
-    odd_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
-    
+
+    # # INCORRECT: Even: LR, Odd: RL
+    # even_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
+    # odd_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
     # even_long, even_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
     # odd_long, odd_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list]
 
 
-    even_long, even_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
-    odd_long, odd_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list]
+    # even_long, even_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
+    # odd_long, odd_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list]
+
+
     
 
     # even_long, odd_long, even_short, odd_short = [(a_sort-1) for a_sort in track_templates.decoder_pf_peak_ranks_list]    
