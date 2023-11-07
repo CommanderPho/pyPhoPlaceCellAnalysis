@@ -149,6 +149,7 @@ def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_
         # else:
         # 	raise NotImplementedError
 
+
         # EVEN:
         directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
         shared_directional_aclus_only_neuron_IDs = even_neuron_ids
@@ -156,8 +157,11 @@ def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_
         selected_spike_aclus = shared_directional_aclus_only_neuron_IDs[selected_spike_fragile_neuron_IDX].astype('int')
         selected_spike_times = np.squeeze(directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict[active_epoch_idx][:,1]) # (n_cells, 2)
         selected_spike_epoch_idx = np.full_like(selected_spike_fragile_neuron_IDX, active_epoch_idx).astype('int')
-        selected_spike_lap_dir = np.full_like(selected_spike_fragile_neuron_IDX, an_epoch.lap_dir).astype('int')
-        selected_spike_df = pd.DataFrame({'t': selected_spike_times, 'fragile_linear_neuron_IDX': selected_spike_fragile_neuron_IDX, 'aclu': selected_spike_aclus, 'epoch_IDX': selected_spike_epoch_idx, 'lap_dir': selected_spike_lap_dir})
+        
+        selected_spike_df = pd.DataFrame({'t': selected_spike_times, 'fragile_linear_neuron_IDX': selected_spike_fragile_neuron_IDX, 'aclu': selected_spike_aclus, 'epoch_IDX': selected_spike_epoch_idx})
+        if hasattr(an_epoch, 'lap_dir'):
+            selected_spike_lap_dir = np.full_like(selected_spike_fragile_neuron_IDX, an_epoch.lap_dir).astype('int')
+            selected_spike_df['lap_dir'] = selected_spike_lap_dir
         even_selected_spike_df_list.append(selected_spike_df)
         
 
@@ -168,8 +172,11 @@ def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_
         selected_spike_aclus = shared_directional_aclus_only_neuron_IDs[selected_spike_fragile_neuron_IDX].astype('int')
         selected_spike_times = np.squeeze(directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict[active_epoch_idx][:,1]) # (n_cells, 2)
         selected_spike_epoch_idx = np.full_like(selected_spike_fragile_neuron_IDX, active_epoch_idx).astype('int')
-        selected_spike_lap_dir = np.full_like(selected_spike_fragile_neuron_IDX, an_epoch.lap_dir).astype('int')
-        selected_spike_df = pd.DataFrame({'t': selected_spike_times, 'fragile_linear_neuron_IDX': selected_spike_fragile_neuron_IDX, 'aclu': selected_spike_aclus, 'epoch_IDX': selected_spike_epoch_idx, 'lap_dir': selected_spike_lap_dir})
+        selected_spike_df = pd.DataFrame({'t': selected_spike_times, 'fragile_linear_neuron_IDX': selected_spike_fragile_neuron_IDX, 'aclu': selected_spike_aclus, 'epoch_IDX': selected_spike_epoch_idx})
+        if hasattr(an_epoch, 'lap_dir'):
+            selected_spike_lap_dir = np.full_like(selected_spike_fragile_neuron_IDX, an_epoch.lap_dir).astype('int')
+            selected_spike_df['lap_dir'] = selected_spike_lap_dir
+
         odd_selected_spike_df_list.append(selected_spike_df)
 
 
