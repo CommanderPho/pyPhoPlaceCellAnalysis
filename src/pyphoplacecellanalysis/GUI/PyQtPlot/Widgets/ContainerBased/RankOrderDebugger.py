@@ -13,6 +13,7 @@ from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
@@ -31,6 +32,91 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 
 __all__ = ['RankOrderDebugger']
+
+
+@define(slots=False)
+class GenericPyQtGraphContainer:
+    """ GenericPyQtGraphContainer holds related plots, their data, and methods that manipulate them in a straightforward way
+
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderDebugger import GenericPyQtGraphContainer
+
+    """
+    name: str = field(default='plot')
+    params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'))
+    ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'))
+    plots: PyqtgraphRenderPlots = field(default=Factory(PyqtgraphRenderPlots, 'plotter'))
+    plot_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'))
+
+
+
+
+@define(slots=False)
+class GenericPyQtGraphScatterClicker:
+    """ GenericPyQtGraphContainer holds related plots, their data, and methods that manipulate them in a straightforward way
+
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderDebugger import GenericPyQtGraphScatterClicker
+
+    """
+    lastClickedDict: Dict = field(default=Factory(dict))
+
+
+    def on_scatter_plot_clicked(self, plot, evt):
+        """ captures `lastClicked` 
+        plot: <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotDataItem.PlotDataItem object at 0x0000023C7D74C8B0>
+        clicked points <MouseClickEvent (78.6115,-2.04825) button=1>
+
+        """
+        # global lastClicked  # Declare lastClicked as a global variable
+        if plot not in self.lastClickedDict:
+            self.lastClickedDict[plot] = None
+
+        # for p in self.lastClicked:
+        # 	p.resetPen()
+        # print(f'plot: {plot}') # plot: <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotDataItem.PlotDataItem object at 0x0000023C7D74C8B0>
+        # print(f'\tevt: {evt}')	
+        # print("clicked points", evt.pos()) # clicked points <MouseClickEvent (48.2713,1.32425) button=1>
+        # print(f'args: {args}')
+        pt_x, pt_y = evt.pos()
+        idx_x = int(round(pt_x))
+        print(f'\tidx_x: {idx_x}')
+        # pts = plot.pointsAt(evt.pos())
+        # print(f'pts: {pts}')
+        # for p in points:
+        # 	p.setPen(clickedPen)
+        # self.lastClicked = idx_x
+        self.lastClickedDict[plot] = idx_x
+
+
+
+
+# lastClicked = []
+# def _test_scatter_plot_clicked(plot, evt):
+# 	""" captures `lastClicked` 
+# 	plot: <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotDataItem.PlotDataItem object at 0x0000023C7D74C8B0>
+# 	clicked points <MouseClickEvent (78.6115,-2.04825) button=1>
+
+# 	"""
+# 	global lastClicked  # Declare lastClicked as a global variable
+# 	# for p in lastClicked:
+# 	# 	p.resetPen()
+# 	# print(f'plot: {plot}') # plot: <pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.PlotDataItem.PlotDataItem object at 0x0000023C7D74C8B0>
+# 	# print(f'\tevt: {evt}')	
+# 	# print("clicked points", evt.pos()) # clicked points <MouseClickEvent (48.2713,1.32425) button=1>
+# 	# print(f'args: {args}')
+# 	pt_x, pt_y = evt.pos()
+# 	idx_x = int(round(pt_x))
+# 	print(f'\tidx_x: {idx_x}')
+# 	# pts = plot.pointsAt(evt.pos())
+# 	# print(f'pts: {pts}')
+# 	# for p in points:
+# 	# 	p.setPen(clickedPen)
+# 	lastClicked = idx_x
+
+
+
+
+
+
 
 @define(slots=False)
 class RankOrderDebugger:
