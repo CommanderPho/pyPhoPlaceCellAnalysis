@@ -103,7 +103,7 @@ def relative_re_ranking(rank_array: NDArray, filter_indicies: NDArray, debug_che
 def compute_placefield_center_of_masses(tuning_curves):
     return np.squeeze(np.array([ndimage.center_of_mass(x) for x in tuning_curves]))
 
-@define(slots=False, repr=False)
+@define(slots=False, repr=False, eq=False)
 class TrackTemplates:
     """ Holds the four directional templates for direction placefield analysis.
     from PendingNotebookCode import TrackTemplates
@@ -154,9 +154,7 @@ class TrackTemplates:
                     decoder_RL_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method='dense') for a_decoder in (long_RL_decoder, short_RL_decoder)] )
 
 
-
-
-@define()
+@define(slots=False, repr=False, eq=False)
 class ShuffleHelper:
     """ holds the result of shuffling templates. Used for rank-order analyses """
     shared_aclus_only_neuron_IDs = field()
@@ -229,10 +227,7 @@ class ShuffleHelper:
         return cls.init_from_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
     
 
-
-
-
-@define()
+@define(slots=False, repr=False, eq=False)
 class Zscorer:
     original_values: np.array
     mean: float
@@ -334,20 +329,11 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
     ## Loop over the results now to do the actual stats:
     epoch_ranked_aclus_stats_dict = {}
 
-
-    # epoch_neuron_IDX_selected_spikes = np.squeeze(epoch_selected_spikes_fragile_linear_neuron_IDX_dict[:,1])
-    
-
     for epoch_id in list(epoch_ranked_aclus_dict.keys()):
-        # rank_dict = epoch_ranked_aclus_dict[epoch_id]
-        # epoch_aclus = np.array(list(rank_dict.keys()))
-        # epoch_aclu_ranks = np.array(list(rank_dict.values()))
 
         epoch_ranked_fragile_linear_neuron_IDXs_array = epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id]
         epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[:,0])
         epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[:,1])
-        # epoch_neuron_IDX_selected_spikes = np.squeeze(epoch_selected_spikes_fragile_linear_neuron_IDX_dict[:,1])
-        
         
         if debug_print:
             print(f'epoch_id: {epoch_id}')
@@ -360,12 +346,10 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         short_spearmanr_rank_stats_results = []
 
         # The "real" result for this epoch:
-        # active_epoch_aclu_long_ranks = long_pf_peak_ranks[epoch_neuron_IDXs]
         active_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
         real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
         real_long_result_corr_value = (np.abs(real_long_rank_stats.statistic), real_long_rank_stats.pvalue)[0]
         
-        # active_epoch_aclu_short_ranks = short_pf_peak_ranks[epoch_neuron_IDXs]
         active_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
         real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
         real_short_result_corr_value = (np.abs(real_short_rank_stats.statistic), real_short_rank_stats.pvalue)[0]
