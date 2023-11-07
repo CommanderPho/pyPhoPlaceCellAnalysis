@@ -431,6 +431,16 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
 
 
 class RankOrderAnalyses:
+    """ 
+
+    Potential Speedups:
+        Multiprocessing could be used to parallelize:
+            - Basically the four templates:
+                Direction (Odd/Even)
+                    Track (Long/Short)
+
+
+    """
     ## Plot Laps Analysis
     def _plot_laps_shuffle_analysis(laps_long_short_z_score_diff_values, suffix_str=''):
         laps_fig, laps_ax = plt.subplots()
@@ -455,7 +465,7 @@ class RankOrderAnalyses:
         return replay_fig, replay_ax
 
 
-    def _perform_plot_z_score_raw(epoch_idx_list, odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values, variable_name='Lap'):
+    def _perform_plot_z_score_raw(epoch_idx_list, odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index'):
         """ plots the raw z-scores for each of the four templates 
 
         Usage:
@@ -467,7 +477,7 @@ class RankOrderAnalyses:
         win.setWindowTitle(f'Rank Order (Raw) {variable_name} Epoch Debugger')
         label = pg.LabelItem(justify='right')
         win.addItem(label)
-        p1 = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', bottom=f'{variable_name} Index')
+        p1 = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', bottom=f'{variable_name} {x_axis_name_suffix}')
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
@@ -500,7 +510,7 @@ class RankOrderAnalyses:
         short_odd_out_plot_1D = p1.plot(epoch_idx_list, odd_laps_short_z_score_values, pen=None, symbolBrush='teal', symbolPen=symbolPens, symbol='p', name='short_odd') ## setting pen=None disables line drawing
         return app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D)
 
-    def _perform_plot_z_score_diff(epoch_idx_list, even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values, variable_name='Lap'):
+    def _perform_plot_z_score_diff(epoch_idx_list, even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index'):
         """ plots the z-score differences 
         Usage:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values)
@@ -510,7 +520,7 @@ class RankOrderAnalyses:
         win.setWindowTitle(f'Rank Order {variable_name}s Epoch Debugger')
         label = pg.LabelItem(justify='right')
         win.addItem(label)
-        p1 = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} Index')
+        p1 = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} {x_axis_name_suffix}')
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
@@ -560,7 +570,7 @@ class RankOrderAnalyses:
 
     @function_attributes(short_name=None, tags=['rank-order', 'ripples', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
-    def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300):
+    def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first'):
         
         global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles)
 
@@ -573,8 +583,8 @@ class RankOrderAnalyses:
             global_replays = Epoch(global_replays.epochs.get_valid_df())
 
         ## Replay Epochs:
-        odd_outputs = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), odd_shuffle_helper, rank_alignment='first', debug_print=False)
-        even_outputs = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), even_shuffle_helper, rank_alignment='first', debug_print=False)
+        odd_outputs = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
+        even_outputs = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
 
         # Unwrap
         odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values) = odd_outputs
@@ -590,7 +600,7 @@ class RankOrderAnalyses:
         replay_fig_even, replay_ax_even = RankOrderAnalyses._plot_ripple_events_shuffle_analysis(even_ripple_evts_long_short_z_score_diff_values, global_replays, suffix_str='_even')
         _display_replay_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(global_replays.labels.astype(float), even_ripple_evts_long_short_z_score_diff_values[1:], odd_ripple_evts_long_short_z_score_diff_values[1:], variable_name='Ripple')
         _display_replay_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(global_replays.labels.astype(float), odd_ripple_evts_long_z_score_values[1:], even_ripple_evts_long_z_score_values[1:], odd_ripple_evts_short_z_score_values[1:], even_ripple_evts_short_z_score_values[1:], variable_name='Ripple')
-
+        # ["replay_fig_odd", "replay_ax_odd", "replay_fig_even", "replay_ax_even", "_display_replay_z_score_diff_outputs", "_display_replay_z_score_raw_outputs"]
         return (odd_outputs, even_outputs, ripple_evts_paired_tests), (replay_fig_odd, replay_ax_odd,
                 replay_fig_even, replay_ax_even,
                 _display_replay_z_score_diff_outputs,
@@ -599,8 +609,22 @@ class RankOrderAnalyses:
 
     @function_attributes(short_name=None, tags=['rank-order', 'laps', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
-    def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300, laps_rank_alignment='median'):
+    def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='median'):
+        """
         
+        _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=1000, rank_alignment='median')
+        
+        # Unwrap
+        (odd_outputs, even_outputs, laps_paired_tests), (laps_fig_odd, laps_ax_odd,
+                        laps_fig_even, laps_ax_even,
+                        _display_laps_z_score_raw_outputs,
+                        _display_laps_z_score_diff_outputs) = _laps_outputs
+
+        odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values) = odd_outputs
+        even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values) = even_outputs
+
+        
+        """
         ## Shared:
         global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles)
 
@@ -610,8 +634,8 @@ class RankOrderAnalyses:
 
         # TODO: CenterOfMass for Laps instead of median spike
         # laps_rank_alignment = 'center_of_mass'
-        odd_outputs = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), odd_shuffle_helper, rank_alignment=laps_rank_alignment, debug_print=False)
-        even_outputs = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), even_shuffle_helper, rank_alignment=laps_rank_alignment, debug_print=False)
+        odd_outputs = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), odd_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
+        even_outputs = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
 
         # Unwrap
         odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values) = odd_outputs
