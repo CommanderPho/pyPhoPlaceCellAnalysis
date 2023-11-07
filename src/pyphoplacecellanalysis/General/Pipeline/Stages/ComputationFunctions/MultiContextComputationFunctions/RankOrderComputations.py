@@ -556,7 +556,7 @@ class RankOrderAnalyses:
 
     @function_attributes(short_name=None, tags=['rank-order', 'ripples', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
-    def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first'):
+    def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first', enable_plots=False):
         
         global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles)
 
@@ -581,21 +581,26 @@ class RankOrderAnalyses:
         # [TtestResult(statistic=3.5572800536164495, pvalue=0.0004179523066872734, df=415),
         #  TtestResult(statistic=3.809779392137816, pvalue=0.0001601254566506359, df=415)]
 
-        # All plots
-        replay_fig_odd, replay_ax_odd = RankOrderAnalyses._plot_ripple_events_shuffle_analysis(odd_ripple_evts_long_short_z_score_diff_values, global_replays, suffix_str='_odd')
-        replay_fig_even, replay_ax_even = RankOrderAnalyses._plot_ripple_events_shuffle_analysis(even_ripple_evts_long_short_z_score_diff_values, global_replays, suffix_str='_even')
-        _display_replay_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(global_replays.labels.astype(float), even_ripple_evts_long_short_z_score_diff_values[1:], odd_ripple_evts_long_short_z_score_diff_values[1:], variable_name='Ripple')
-        _display_replay_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(global_replays.labels.astype(float), odd_ripple_evts_long_z_score_values[1:], even_ripple_evts_long_z_score_values[1:], odd_ripple_evts_short_z_score_values[1:], even_ripple_evts_short_z_score_values[1:], variable_name='Ripple')
-        # ["replay_fig_odd", "replay_ax_odd", "replay_fig_even", "replay_ax_even", "_display_replay_z_score_diff_outputs", "_display_replay_z_score_raw_outputs"]
-        return (odd_outputs, even_outputs, ripple_evts_paired_tests), (replay_fig_odd, replay_ax_odd,
+        if enable_plots:
+            # All plots
+            replay_fig_odd, replay_ax_odd = RankOrderAnalyses._plot_ripple_events_shuffle_analysis(odd_ripple_evts_long_short_z_score_diff_values, global_replays, suffix_str='_odd')
+            replay_fig_even, replay_ax_even = RankOrderAnalyses._plot_ripple_events_shuffle_analysis(even_ripple_evts_long_short_z_score_diff_values, global_replays, suffix_str='_even')
+            _display_replay_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(global_replays.labels.astype(float), even_ripple_evts_long_short_z_score_diff_values[1:], odd_ripple_evts_long_short_z_score_diff_values[1:], variable_name='Ripple')
+            _display_replay_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(global_replays.labels.astype(float), odd_ripple_evts_long_z_score_values[1:], even_ripple_evts_long_z_score_values[1:], odd_ripple_evts_short_z_score_values[1:], even_ripple_evts_short_z_score_values[1:], variable_name='Ripple')
+            # ["replay_fig_odd", "replay_ax_odd", "replay_fig_even", "replay_ax_even", "_display_replay_z_score_diff_outputs", "_display_replay_z_score_raw_outputs"]
+            _plots_outputs = (replay_fig_odd, replay_ax_odd,
                 replay_fig_even, replay_ax_even,
                 _display_replay_z_score_diff_outputs,
                 _display_replay_z_score_raw_outputs)
+        else:
+            _plots_outputs = None
+
+        return (odd_outputs, even_outputs, ripple_evts_paired_tests), _plots_outputs
     
 
     @function_attributes(short_name=None, tags=['rank-order', 'laps', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
-    def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='median'):
+    def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='median', enable_plots=False):
         """
         
         _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=1000, rank_alignment='median')
@@ -631,14 +636,18 @@ class RankOrderAnalyses:
         print(f'laps_paired_tests: {laps_paired_tests}')
 
         ## All Plots:
-        laps_fig_odd, laps_ax_odd = RankOrderAnalyses._plot_laps_shuffle_analysis(odd_laps_long_short_z_score_diff_values, suffix_str='_odd')
-        laps_fig_even, laps_ax_even = RankOrderAnalyses._plot_laps_shuffle_analysis(even_laps_long_short_z_score_diff_values, suffix_str='_even')
-        _display_laps_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(global_laps.lap_id.astype(float), odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values, variable_name='Lap')
-        # app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D) = _display_z_score_raw_outputs
-        _display_laps_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(global_laps.lap_id.astype(float), even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values, variable_name='Lap')
-        # app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _display_z_score_diff_outputs
-
-        return (odd_outputs, even_outputs, laps_paired_tests), (laps_fig_odd, laps_ax_odd,
+        if enable_plots:
+            laps_fig_odd, laps_ax_odd = RankOrderAnalyses._plot_laps_shuffle_analysis(odd_laps_long_short_z_score_diff_values, suffix_str='_odd')
+            laps_fig_even, laps_ax_even = RankOrderAnalyses._plot_laps_shuffle_analysis(even_laps_long_short_z_score_diff_values, suffix_str='_even')
+            _display_laps_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(global_laps.lap_id.astype(float), odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values, variable_name='Lap')
+            # app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D) = _display_z_score_raw_outputs
+            _display_laps_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(global_laps.lap_id.astype(float), even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values, variable_name='Lap')
+            # app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _display_z_score_diff_outputs
+            _plots_outputs = (laps_fig_odd, laps_ax_odd,
                 laps_fig_even, laps_ax_even,
                 _display_laps_z_score_raw_outputs,
                 _display_laps_z_score_diff_outputs)
+        else:
+            _plots_outputs = None
+
+        return (odd_outputs, even_outputs, laps_paired_tests), _plots_outputs
