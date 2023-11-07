@@ -503,7 +503,7 @@ class RankOrderAnalyses:
         symbolPens = [pg.mkPen('#FFFFFF11') for idx in epoch_idx_list]
         # determine the "correct" items
 
-
+        # symbol='t2' is a left-facing arrow and 't3' is a right-facing one:
         long_even_out_plot_1D = p1.plot(epoch_idx_list, even_laps_long_z_score_values, pen=None, symbolBrush='orange', symbolPen=symbolPens, symbol='t2', name='long_even') ## setting pen=None disables line drawing
         long_odd_out_plot_1D = p1.plot(epoch_idx_list, odd_laps_long_z_score_values, pen=None, symbolBrush='red', symbolPen=symbolPens, symbol='t3', name='long_odd') ## setting pen=None disables line drawing
         short_even_out_plot_1D = p1.plot(epoch_idx_list, even_laps_short_z_score_values, pen=None, symbolBrush='blue', symbolPen=symbolPens, symbol='t2', name='short_even') ## setting pen=None disables line drawing
@@ -542,8 +542,10 @@ class RankOrderAnalyses:
         # epoch_idx_list = deepcopy(global_laps).lap_id # np.arange(len(even_laps_long_short_z_score_diff_values))
         # out_plot_1D = pg.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values[1:], pen=None, symbol='o', title='Rank-Order Long-Short ZScore Diff for Laps over time', left='Long-Short Z-Score Diff', bottom='Lap Index') ## setting pen=None disables line drawing
 
-        even_out_plot_1D = p1.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush='orange', symbolPen='w', symbol='o', name='even') ## setting pen=None disables line drawing
-        odd_out_plot_1D = p1.plot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush='blue', symbolPen='w', symbol='p', name='odd') ## setting pen=None disables line drawing
+
+        # symbol='t2' is a left-facing arrow and 't3' is a right-facing one:
+        even_out_plot_1D = p1.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush='orange', symbolPen='w', symbol='t2', name='even') ## setting pen=None disables line drawing
+        odd_out_plot_1D = p1.plot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush='blue', symbolPen='w', symbol='t3', name='odd') ## setting pen=None disables line drawing
 
         return app, win, p1, (even_out_plot_1D, odd_out_plot_1D)
 
