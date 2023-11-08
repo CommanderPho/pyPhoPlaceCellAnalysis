@@ -28,6 +28,24 @@ __all__ = ['EpochsEditor']
 class EpochsEditor:
     """ EpochsEditor to allow user modification of epoch intervals using PyQtGraph and multiple custom linear rect items
 
+
+    Usage:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import EpochsEditor # perform_plot_laps_diagnoser
+
+        sess = global_session
+
+        # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
+        position_obj = deepcopy(sess.position)
+        position_obj.compute_higher_order_derivatives()
+        pos_df = position_obj.compute_smoothed_position_info(N=20) ## Smooth the velocity curve to apply meaningful logic to it
+        pos_df = position_obj.to_dataframe()
+        # Drop rows with missing data in columns: 't', 'velocity_x_smooth' and 2 other columns. This occurs from smoothing
+        pos_df = pos_df.dropna(subset=['t', 'x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth']).reset_index(drop=True)
+        curr_laps_df = sess.laps.to_dataframe()
+
+        epochs_editor = EpochsEditor.init_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=False)
+
+
     """
     pos_df: pd.DataFrame = field()
     curr_laps_df: pd.DataFrame = field()
@@ -37,6 +55,8 @@ class EpochsEditor:
     changed_laps_df: pd.DataFrame = field(init=False)
 
     _pos_variable_names = ('x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth')
+    # _pos_variable_names = ('x', 'velocity_x', 'acceleration_x')
+
     
 
 
@@ -165,11 +185,45 @@ class EpochsEditor:
 
     @classmethod
     def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None):
+        """ 
+
+        Usage:
+            sess = global_session
+
+            # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
+            position_obj = deepcopy(sess.position)
+            position_obj.compute_higher_order_derivatives()
+            pos_df = position_obj.compute_smoothed_position_info(N=20) ## Smooth the velocity curve to apply meaningful logic to it
+            pos_df = position_obj.to_dataframe()
+            # Drop rows with missing data in columns: 't', 'velocity_x_smooth' and 2 other columns. This occurs from smoothing
+            pos_df = pos_df.dropna(subset=['t', 'x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth']).reset_index(drop=True)
+            curr_laps_df = sess.laps.to_dataframe()
+
+            epochs_editor = EpochsEditor.init_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=False)
+        """
         curr_laps_df = cls.add_visualization_columns(curr_laps_df=curr_laps_df)
-        _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback)        
+        _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback)
         _obj.changed_laps_df = _obj.curr_laps_df.iloc[:0,:].copy() # should be in attrs_post_init
         _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated)
         return _obj
+
+
+
+    @classmethod
+    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None):
+        """ initialize from a session object. Does not modify the session. """
+        # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
+        position_obj = copy.deepcopy(sess.position)
+        position_obj.compute_higher_order_derivatives()
+        pos_df = position_obj.compute_smoothed_position_info(N=20) ## Smooth the velocity curve to apply meaningful logic to it
+        pos_df = position_obj.to_dataframe()
+        # Drop rows with missing data in columns: 't', 'velocity_x_smooth' and 2 other columns. This occurs from smoothing
+        pos_df = pos_df.dropna(subset=['t', 'x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth']).reset_index(drop=True)
+        curr_laps_df = sess.laps.to_dataframe()
+
+        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback)
+    
+
 
 
     # @QtCore.pyqtSlot(object)
