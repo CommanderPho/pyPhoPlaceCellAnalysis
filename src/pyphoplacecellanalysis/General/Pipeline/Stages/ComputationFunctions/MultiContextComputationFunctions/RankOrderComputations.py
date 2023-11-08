@@ -1,6 +1,12 @@
 from copy import deepcopy
 from typing import Any, List, Tuple
-from matplotlib.colors import ListedColormap
+import concurrent.futures
+from functools import partial
+from itertools import repeat
+import multiprocessing
+from multiprocessing import Pool, freeze_support
+
+# from matplotlib.colors import ListedColormap
 from pathlib import Path
 from neuropy.core import Epoch
 import numpy as np
@@ -10,6 +16,7 @@ import pyvistaqt as pvqt # conda install -c conda-forge pyvistaqt
 
 
 from nptyping import NDArray
+import attrs
 from attrs import define, field, Factory, astuple
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import pho_stats_paired_t_test
 from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
@@ -42,65 +49,6 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
-
-
-@define(slots=False, repr=False, eq=False)
-class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
-    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
-    
-    """
-    ranked_aclus_stats_dict = serialized_field()
-    selected_spikes_fragile_linear_neuron_IDX_dict = serialized_field()
-    
-    long_z_score = serialized_field()
-    short_z_score = serialized_field()
-    long_short_z_score_diff = serialized_field()
-    
-    @classmethod
-    def init_from_analysis_output_tuple(cls, a_tuple):
-        """
-        ## Ripple Rank-Order Analysis:
-        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(curr_active_pipeline, num_shuffles=1000, rank_alignment='first')
-
-        # Unwrap:
-        (odd_ripple_outputs, even_ripple_outputs, ripple_evts_paired_tests), ripple_plots_outputs = _ripples_outputs
-
-
-        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values) = odd_ripple_outputs
-        
-        """
-        ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values) = a_tuple
-        return cls(is_global=True, ranked_aclus_stats_dict=ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=selected_spikes_fragile_linear_neuron_IDX_dict, long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values)
-
-    def __iter__(self):
-        """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
-        return iter(astuple(self))
-    
-
-@define(slots=False, repr=False, eq=False)
-class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
-    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
-    
-
-    Usage:    
-    
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer, RankOrderResult
-    
-        odd_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(odd_ripple_outputs)
-        even_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(even_ripple_outputs)
-        curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_rank_order_result, even_ripple=even_ripple_rank_order_result, odd_laps=odd_laps_rank_order_result, even_laps=even_laps_rank_order_result)
-
-    """
-    odd_ripple: RankOrderResult = serialized_field()
-    even_ripple: RankOrderResult = serialized_field()
-    odd_laps: RankOrderResult = serialized_field()
-    even_laps: RankOrderResult = serialized_field()
-    
-
-    def __iter__(self):
-        """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
-        # return iter(astuple(self)) # deep unpacking causes problems
-        return iter(self.__dict__.values())
 
 
 
@@ -321,13 +269,94 @@ class Zscorer:
 # def Zscore(xcritical, mean, stdev):
 #     return (xcritical - mean)/stdev
 
+
+
+@define(slots=False, repr=False, eq=False)
+class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
+    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
+    
+    """
+    ranked_aclus_stats_dict = serialized_field()
+    selected_spikes_fragile_linear_neuron_IDX_dict = serialized_field()
+    
+    long_z_score = serialized_field()
+    short_z_score = serialized_field()
+    long_short_z_score_diff = serialized_field()
+    
+    @classmethod
+    def init_from_analysis_output_tuple(cls, a_tuple):
+        """
+        ## Ripple Rank-Order Analysis:
+        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(curr_active_pipeline, num_shuffles=1000, rank_alignment='first')
+
+        # Unwrap:
+        (odd_ripple_outputs, even_ripple_outputs, ripple_evts_paired_tests), ripple_plots_outputs = _ripples_outputs
+
+
+        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values) = odd_ripple_outputs
+        
+        """
+        ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values) = a_tuple
+        return cls(is_global=True, ranked_aclus_stats_dict=ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=selected_spikes_fragile_linear_neuron_IDX_dict, long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values)
+
+    def __iter__(self):
+        """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
+        return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global))) #  'is_global'
+    
+
+@define(slots=False, repr=False, eq=False)
+class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
+    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
+    
+
+    Usage:    
+    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer, RankOrderResult
+    
+        odd_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(odd_ripple_outputs)
+        even_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(even_ripple_outputs)
+        curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_rank_order_result, even_ripple=even_ripple_rank_order_result, odd_laps=odd_laps_rank_order_result, even_laps=even_laps_rank_order_result)
+
+    """
+    odd_ripple: RankOrderResult = serialized_field()
+    even_ripple: RankOrderResult = serialized_field()
+    odd_laps: RankOrderResult = serialized_field()
+    even_laps: RankOrderResult = serialized_field()
+    
+
+    def __iter__(self):
+        """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
+        # return iter(astuple(self)) # deep unpacking causes problems
+        return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global))) #  'is_global'
+        # return iter(self.__dict__.values())
+
+
+
+
+
 def build_track_templates_for_shuffle(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles: int = 100, bimodal_exclude_aclus = [5, 14, 25, 46, 61, 66, 86, 88, 95]) -> ShuffleHelper:
     return ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
     
 
-@function_attributes(short_name=None, tags=['shuffle', 'rank_order'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
-def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle_helper, rank_alignment: str = 'first', disable_re_ranking:bool=True, debug_print=True):
-    """ 
+def _subfn_rank_order_shuffle(epoch_specific_shuffled_indicies, epoch_neuron_IDX_ranks, long_pf_peak_ranks, short_pf_peak_ranks, disable_re_ranking:bool):
+    """ attempts to parallelize the rank-order computations """
+    ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
+    active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+    long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
+    # long_result = (np.abs(long_rank_stats.statistic), long_rank_stats.pvalue)
+    long_result = (long_rank_stats.statistic, long_rank_stats.pvalue)
+    
+    active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+    short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
+    # short_result = (np.abs(short_rank_stats.statistic), short_rank_stats.pvalue)
+    short_result = (short_rank_stats.statistic, short_rank_stats.pvalue)
+    return long_result, short_result
+
+
+
+@function_attributes(short_name=None, tags=['shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
+def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle_helper, rank_alignment: str = 'first', disable_re_ranking:bool=True, debug_print=True) -> RankOrderResult:
+    """ Extracts the two templates (long/short) from the shuffle_helper in addition to the shuffled_aclus, shuffle_IDXs.
 
         
 
@@ -346,10 +375,6 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
     # Sort by columns: 't_rel_seconds' (ascending), 'aclu' (ascending)
     active_spikes_df = active_spikes_df.sort_values(['t_rel_seconds', 'aclu'])
 
-    # Get all aclus and epoch_idxs used throughout the entire spikes_df:
-    all_aclus = active_spikes_df['aclu'].unique()
-    all_probe_epoch_ids = active_spikes_df['Probe_Epoch_id'].unique()
-
     ## Determine which spikes to use to represent the order:
     selected_spikes = active_spikes_df.groupby(['Probe_Epoch_id', 'aclu'])[active_spikes_df.spikes.time_variable_name]
 
@@ -361,15 +386,14 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         selected_spikes = compute_placefield_center_of_masses(selected_spikes)
     else:
         raise NotImplementedError(f'invalid rank_alignment specified : {rank_alignment}. valid options are [first, median, ...]')
-
     
     # rank the aclu values by their first t value in each Probe_Epoch_id
     ranked_aclus = selected_spikes.groupby('Probe_Epoch_id').rank(method='dense') # resolve ties in ranking by assigning the same rank to each and then incrimenting for the next item
 
+    ## OUTPUT DICTS:
     # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
     epoch_ranked_aclus_dict = {} # this one isn't needed anymore probably, the `epoch_ranked_fragile_linear_neuron_IDX_dict` is easier.
     epoch_ranked_fragile_linear_neuron_IDX_dict = {} # structure is different 
-
     epoch_selected_spikes_fragile_linear_neuron_IDX_dict = {}
 
     for (epoch_id, aclu), rank in zip(ranked_aclus.index, ranked_aclus):
@@ -407,6 +431,7 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
             print(f'\tepoch_neuron_IDX_ranks: {print_array(epoch_neuron_IDX_ranks)}')
             # print(f'\tepoch_neuron_IDX_selected_spikes: {print_array(epoch_neuron_IDX_selected_spikes)}')
 
+        ## EPOCH SPECIFIC:
         long_spearmanr_rank_stats_results = []
         short_spearmanr_rank_stats_results = []
 
@@ -424,23 +449,47 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
             print(f'\tactive_epoch_aclu_short_ranks[{epoch_id}]: {print_array(active_epoch_aclu_short_ranks)}')
             
         ## PERFORM SHUFFLE HERE:
+        # epoch_specific_shuffled_indicies_list = [a_shuffled_IDXs[epoch_neuron_IDXs] for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs))]
+        # # _active_rank_order_shuffle_fn = lambda x: _subfn_rank_order_shuffle(epoch_neuron_IDX_ranks=epoch_neuron_IDX_ranks, long_pf_peak_ranks=long_pf_peak_ranks, short_pf_peak_ranks=short_pf_peak_ranks, epoch_specific_shuffled_indicies=x, disable_re_ranking=disable_re_ranking)
+
+        # with multiprocessing.Pool(processes=6) as pool:
+        #     # results = pool.starmap(_subfn_rank_order_shuffle, product(names, repeat=2))
+        #     # results = pool.starmap(_subfn_rank_order_shuffle, zip(epoch_neuron_IDX_ranks=epoch_neuron_IDX_ranks, long_pf_peak_ranks=long_pf_peak_ranks, short_pf_peak_ranks=short_pf_peak_ranks, epoch_specific_shuffled_indicies=x, disable_re_ranking=disable_re_ranking), repeat(second_arg)))
+        #     results = pool.map(partial(_subfn_rank_order_shuffle, epoch_neuron_IDX_ranks=epoch_neuron_IDX_ranks, long_pf_peak_ranks=long_pf_peak_ranks, short_pf_peak_ranks=short_pf_peak_ranks, disable_re_ranking=disable_re_ranking), epoch_specific_shuffled_indicies_list)
+        # print(f'done with multiprocessing.')
+        
+        # for a_result in results:
+        #     long_result, short_result = a_result
+        #     long_spearmanr_rank_stats_results.append(long_result)
+        #     short_spearmanr_rank_stats_results.append(short_result)
+                    
+        # with concurrent.futures.ProcessPoolExecutor() as executor:
+        #     for number, a_result in zip(epoch_specific_shuffled_indicies_list, executor.map(_active_rank_order_shuffle_fn, epoch_specific_shuffled_indicies_list)):
+        #         # print('%d is prime: %s' % (number, prime))
+        #         long_result, short_result = a_result
+        #         long_spearmanr_rank_stats_results.append(long_result)
+        #         short_spearmanr_rank_stats_results.append(short_result)
+                    
+
         for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs)):
             # long_shared_aclus_only_decoder.pf.ratemap.get_by_id(a_shuffled_aclus)
             epoch_specific_shuffled_indicies = a_shuffled_IDXs[epoch_neuron_IDXs] # get only the subset that is active during this epoch
-            # long_pf_peak_ranks[epoch_specific_shuffled_indicies] # get the shuffled entries from the
-            # short_pf_peak_ranks[epoch_specific_shuffled_indicies]
-
+            
             ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
             active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
             long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-            long_result = (np.abs(long_rank_stats.statistic), long_rank_stats.pvalue)
+            # long_result = (np.abs(long_rank_stats.statistic), long_rank_stats.pvalue)
+            long_result = (long_rank_stats.statistic, long_rank_stats.pvalue)
             long_spearmanr_rank_stats_results.append(long_result)
             
             active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
             short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-            short_result = (np.abs(short_rank_stats.statistic), short_rank_stats.pvalue)
+            # short_result = (np.abs(short_rank_stats.statistic), short_rank_stats.pvalue)
+            short_result = (short_rank_stats.statistic, short_rank_stats.pvalue)
             short_spearmanr_rank_stats_results.append(short_result)
-            
+        ## END for shuffle
+
+
         long_spearmanr_rank_stats_results = np.array(long_spearmanr_rank_stats_results)
         short_spearmanr_rank_stats_results = np.array(short_spearmanr_rank_stats_results)
 
@@ -454,6 +503,10 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
 
         # epoch_ranked_aclus_stats_dict[epoch_id] = (np.array(long_spearmanr_rank_stats_results),  np.array(short_spearmanr_rank_stats_results))
         epoch_ranked_aclus_stats_dict[epoch_id] = (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff)
+
+
+    ## END for epoch_id
+
 
     # 16.9s
     # for epoch_id, epoch_stats in epoch_ranked_aclus_stats_dict.items():
@@ -476,7 +529,9 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
     short_z_score_values = np.array(short_z_score_values)
     long_short_z_score_diff_values = np.array(long_short_z_score_diff_values)
     
-    return epoch_ranked_aclus_stats_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values)
+    # return epoch_ranked_aclus_stats_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values)
+    
+    return RankOrderResult.init_from_analysis_output_tuple((epoch_ranked_aclus_stats_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values)))
 
 
 class RankOrderAnalyses:
@@ -615,8 +670,8 @@ class RankOrderAnalyses:
         # shuffle_helper = build_track_templates_for_shuffle(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=1000, bimodal_exclude_aclus=[5, 14, 25, 46, 61, 66, 86, 88, 95])
 
         # 2023-10-26 - Direction Dependent (4 template) analysis: long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D
-        odd_shuffle_helper = build_track_templates_for_shuffle(long_odd_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
-        even_shuffle_helper = build_track_templates_for_shuffle(long_even_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        odd_shuffle_helper: ShuffleHelper = build_track_templates_for_shuffle(long_odd_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        even_shuffle_helper: ShuffleHelper = build_track_templates_for_shuffle(long_even_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
         
         return global_spikes_df, (odd_shuffle_helper, even_shuffle_helper)
 
@@ -638,9 +693,12 @@ class RankOrderAnalyses:
         odd_outputs = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
         even_outputs = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
 
+
+
+
         # Unwrap
-        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values) = odd_outputs
-        even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values) = even_outputs
+        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = odd_outputs
+        even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values = even_outputs
 
         ripple_evts_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values), (even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values))]
         print(f'ripple_evts_paired_tests: {ripple_evts_paired_tests}')
@@ -695,8 +753,8 @@ class RankOrderAnalyses:
         even_outputs = compute_shuffled_rankorder_analyses(global_spikes_df, deepcopy(global_laps), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
 
         # Unwrap
-        odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values) = odd_outputs
-        even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values) = even_outputs
+        odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values = odd_outputs
+        even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values = even_outputs
         
         laps_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((odd_laps_long_z_score_values, odd_laps_short_z_score_values), (even_laps_long_z_score_values, even_laps_short_z_score_values))]
         print(f'laps_paired_tests: {laps_paired_tests}')
