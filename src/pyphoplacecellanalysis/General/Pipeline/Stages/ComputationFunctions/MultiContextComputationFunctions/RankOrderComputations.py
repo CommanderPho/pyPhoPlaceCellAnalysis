@@ -72,7 +72,10 @@ class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
         ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values) = a_tuple
         return cls(is_global=True, ranked_aclus_stats_dict=ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=selected_spikes_fragile_linear_neuron_IDX_dict, long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values)
 
-
+    def __iter__(self):
+        """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
+        return iter(astuple(self))
+    
 
 @define(slots=False, repr=False, eq=False)
 class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
@@ -93,6 +96,11 @@ class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, Compu
     odd_laps: RankOrderResult = serialized_field()
     even_laps: RankOrderResult = serialized_field()
     
+
+    def __iter__(self):
+        """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
+        return iter(astuple(self))
+
 
 
 
