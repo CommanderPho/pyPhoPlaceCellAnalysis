@@ -99,7 +99,8 @@ class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, Compu
 
     def __iter__(self):
         """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
-        return iter(astuple(self))
+        # return iter(astuple(self)) # deep unpacking causes problems
+        return iter(self.__dict__.values())
 
 
 
