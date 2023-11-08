@@ -18,6 +18,10 @@ import pyvistaqt as pvqt # conda install -c conda-forge pyvistaqt
 from nptyping import NDArray
 import attrs
 from attrs import define, field, Factory, astuple
+
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+
 from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import pho_stats_paired_t_test
 from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
 import scipy.stats
@@ -693,9 +697,6 @@ class RankOrderAnalyses:
         odd_outputs = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
         even_outputs = compute_shuffled_rankorder_analyses(spikes_df, deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
 
-
-
-
         # Unwrap
         odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = odd_outputs
         even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values = even_outputs
@@ -775,3 +776,74 @@ class RankOrderAnalyses:
             _plots_outputs = None
 
         return (odd_outputs, even_outputs, laps_paired_tests), _plots_outputs
+
+
+    @classmethod
+    def validate_has_rank_order_results(cls, curr_active_pipeline, computation_filter_name='maze'):
+        # Unpacking:
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values = rank_order_results.odd_laps
+        even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values = rank_order_results.even_laps
+        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.odd_ripple
+        even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values = rank_order_results.even_ripple
+        return True
+
+
+
+class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
+    """ functions related to directional placefield computations. """
+    _computationGroupName = 'rank_order'
+    _computationPrecidence = 1001
+    _is_global = True
+
+    @function_attributes(short_name='split_to_directional_laps', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
+        validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
+    def perform_rank_order_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, num_shuffles:int=1000, debug_print=False):
+        """ 
+        
+        Requires:
+            ['sess']
+            
+        Provides:
+            global_computation_results.computed_data['RankOrder']
+                ['RankOrder'].odd_ripple
+                ['RankOrder'].even_ripple
+                ['RankOrder'].odd_laps
+                ['RankOrder'].even_laps
+
+        
+        """
+        if include_includelist is not None:
+            print(f'WARN: _split_to_directional_laps(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
+
+
+        ## Ripple Rank-Order Analysis:
+        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
+        (odd_ripple_outputs, even_ripple_outputs, ripple_evts_paired_tests), ripple_plots_outputs = _ripples_outputs
+
+        ## Laps Rank-Order Analysis:
+        # _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
+        _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=num_shuffles, rank_alignment='median')
+        # _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=num_shuffles, rank_alignment='first')
+        (odd_laps_outputs, even_laps_outputs, laps_paired_tests), laps_plots_outputs  = _laps_outputs
+
+
+        # Set the global result:
+        global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_outputs, even_ripple=even_ripple_outputs,
+                                                                                                            odd_laps=odd_laps_outputs, even_laps=even_laps_outputs)
+
+
+        """ Usage:
+        
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+
+        odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values = rank_order_results.odd_laps
+        even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values = rank_order_results.even_laps
+
+        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.odd_ripple
+        even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values = rank_order_results.even_ripple
+
+        """
+        return global_computation_results
+
+
