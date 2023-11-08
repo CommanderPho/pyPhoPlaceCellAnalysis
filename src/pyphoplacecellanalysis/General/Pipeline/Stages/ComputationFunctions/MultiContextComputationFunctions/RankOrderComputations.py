@@ -39,6 +39,62 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRaster
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used in TrackTemplates
 
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
+
+
+@define(slots=False, repr=False, eq=False)
+class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
+    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
+    
+    """
+    ranked_aclus_stats_dict = serialized_field()
+    selected_spikes_fragile_linear_neuron_IDX_dict = serialized_field()
+    
+    long_z_score = serialized_field()
+    short_z_score = serialized_field()
+    long_short_z_score_diff = serialized_field()
+    
+    @classmethod
+    def init_from_analysis_output_tuple(cls, a_tuple):
+        """
+        ## Ripple Rank-Order Analysis:
+        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(curr_active_pipeline, num_shuffles=1000, rank_alignment='first')
+
+        # Unwrap:
+        (odd_ripple_outputs, even_ripple_outputs, ripple_evts_paired_tests), ripple_plots_outputs = _ripples_outputs
+
+
+        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values) = odd_ripple_outputs
+        
+        """
+        ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values) = a_tuple
+        return cls(is_global=True, ranked_aclus_stats_dict=ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=selected_spikes_fragile_linear_neuron_IDX_dict, long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values)
+
+
+
+@define(slots=False, repr=False, eq=False)
+class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
+    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
+    
+
+    Usage:    
+    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer, RankOrderResult
+    
+        odd_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(odd_ripple_outputs)
+        even_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(even_ripple_outputs)
+        curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_rank_order_result, even_ripple=even_ripple_rank_order_result, odd_laps=odd_laps_rank_order_result, even_laps=even_laps_rank_order_result)
+
+    """
+    odd_ripple: RankOrderResult = serialized_field()
+    even_ripple: RankOrderResult = serialized_field()
+    odd_laps: RankOrderResult = serialized_field()
+    even_laps: RankOrderResult = serialized_field()
+    
+
+
 
 # ==================================================================================================================== #
 # 2023-10-20 - Close-to-working Rank Order Strategy:                                                                   #
