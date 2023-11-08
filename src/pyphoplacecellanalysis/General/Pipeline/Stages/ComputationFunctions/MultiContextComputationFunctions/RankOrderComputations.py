@@ -796,9 +796,9 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
     _computationPrecidence = 1001
     _is_global = True
 
-    @function_attributes(short_name='split_to_directional_laps', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
+    @function_attributes(short_name='rank_order_shuffle_analysis', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
-    def perform_rank_order_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, num_shuffles:int=1000, debug_print=False):
+    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, num_shuffles:int=1000, debug_print=False):
         """ 
         
         Requires:
@@ -814,8 +814,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         
         """
         if include_includelist is not None:
-            print(f'WARN: _split_to_directional_laps(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
-
+            print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         ## Ripple Rank-Order Analysis:
         _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
@@ -827,12 +826,9 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         # _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=num_shuffles, rank_alignment='first')
         (odd_laps_outputs, even_laps_outputs, laps_paired_tests), laps_plots_outputs  = _laps_outputs
 
-
         # Set the global result:
         global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_outputs, even_ripple=even_ripple_outputs,
                                                                                                             odd_laps=odd_laps_outputs, even_laps=even_laps_outputs)
-
-
         """ Usage:
         
         rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
