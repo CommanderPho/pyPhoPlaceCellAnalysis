@@ -58,15 +58,15 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=True,
 
 
 
-class {{FunctionBlockName}}GlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
-    """ functions related to {{FunctionBlockName}} computations. """
-    _computationGroupName = 'directional_pfs'
+class {{ComputationGroupName}}GlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
+    """ functions related to {{ComputationGroupName}} computations. """
+    _computationGroupName = '{{ComputationGroupLowercaseShortname}}'
     _computationPrecidence = 1000
     _is_global = True
 
-    @function_attributes(short_name='split_to_directional_laps', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
+    @function_attributes(short_name='{{FunctionLowercaseShortname}}', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
         validate_computation_test=DirectionalLapsHelpers.validate_has_directional_laps, is_global=True)
-    def _split_to_directional_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+    def perform_{{FunctionLowercaseShortname}}(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ 
         
         Requires:
@@ -108,8 +108,6 @@ class {{FunctionBlockName}}GlobalComputationFunctions(AllFunctionEnumeratingMixi
         #     'split_directional_laps_names': split_directional_laps_config_names,
         #     'computed_base_epoch_names': computed_base_epoch_names,
         # })
-
-        ## Needs to call `owning_pipeline_reference.prepare_for_display()` before display functions can be used with new directional results
 
         """ Usage:
         
