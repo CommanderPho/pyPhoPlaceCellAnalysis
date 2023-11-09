@@ -17,7 +17,7 @@ import pyvistaqt as pvqt # conda install -c conda-forge pyvistaqt
 
 from nptyping import NDArray
 import attrs
-from attrs import define, field, Factory, astuple
+from attrs import asdict, define, field, Factory, astuple
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -46,7 +46,7 @@ from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSer
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _build_default_tick, build_scatter_plot_kwargs
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import RasterScatterPlotManager, UnitSortOrderManager, _build_default_tick, _build_scatter_plotting_managers, _prepare_spikes_df_from_filter_epochs, _subfn_build_and_add_scatterplot_row
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
-
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used in TrackTemplates
 
@@ -634,7 +634,7 @@ class RankOrderAnalyses:
         win.setWindowTitle(f'Rank Order {variable_name}s Epoch Debugger')
         label = pg.LabelItem(justify='right')
         win.addItem(label)
-        p1 = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} {x_axis_name_suffix}')
+        p1 = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True)
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
@@ -656,10 +656,26 @@ class RankOrderAnalyses:
         # epoch_idx_list = deepcopy(global_laps).lap_id # np.arange(len(even_laps_long_short_z_score_diff_values))
         # out_plot_1D = pg.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values[1:], pen=None, symbol='o', title='Rank-Order Long-Short ZScore Diff for Laps over time', left='Long-Short Z-Score Diff', bottom='Lap Index') ## setting pen=None disables line drawing
 
+        # 
+        
+        # 'orange'
+        # symbolPen = 'w'
+        symbolPen = None
+        
 
+        # def _tip_fn(x, y, data):
+        #     """ the function required by pg.ScatterPlotItem's `tip` argument to print the tooltip for each spike. """
+        #     # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
+        #     data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in asdict(data).items()])
+        #     print(f'_tip_fn(...): data_string: {data_string}')
+        #     return f"spike: (x={x}, y={y})\n{data_string}"
+
+        # # hover_kwargs = {}
+        # hover_kwargs = dict(hoverable=True, hoverPen=pg.mkPen('w', width=2), tip=_tip_fn)
+        
         # symbol='t2' is a left-facing arrow and 't3' is a right-facing one:
-        even_out_plot_1D = p1.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush='orange', symbolPen='w', symbol='t2', name='even') ## setting pen=None disables line drawing
-        odd_out_plot_1D = p1.plot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush='blue', symbolPen='w', symbol='t3', name='odd') ## setting pen=None disables line drawing
+        even_out_plot_1D = p1.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.even), symbolPen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
+        odd_out_plot_1D = p1.plot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
 
         return app, win, p1, (even_out_plot_1D, odd_out_plot_1D)
 
