@@ -109,7 +109,8 @@ def _debug_plot_directional_template_rasters(spikes_df, active_epochs_df, track_
 
 
 def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict):
-    """ 
+    """ "selected" in this sense means those spikes/spots that were used for the rank-order analysis, such as 'first' for the ripples or 'median' for the laps.
+
         ## Use odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict to plot the active median spike
 
     Usage:
@@ -178,9 +179,6 @@ def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_
             selected_spike_df['lap_dir'] = selected_spike_lap_dir
 
         odd_selected_spike_df_list.append(selected_spike_df)
-
-
-
 
 
     # selected_spike_df = pd.concat(selected_spike_df_list, ignore_index=True)
