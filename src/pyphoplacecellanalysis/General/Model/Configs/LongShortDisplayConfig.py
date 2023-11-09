@@ -126,7 +126,10 @@ class DisplayColorsEnum:
             return fg_color, bg_color, border_color
 
 
-
+    class Epochs:
+        long = '#0b0049' # a dark blue
+        short = '#490000' # a dark red
+        
 
 @define(slots=False, repr=False)
 class DisplayConfig:
