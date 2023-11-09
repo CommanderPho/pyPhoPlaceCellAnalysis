@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 import concurrent.futures
 from functools import partial
 from itertools import repeat
@@ -309,12 +309,12 @@ class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
     TODO: add spikes_df, epochs_df?
     
     """
-    ranked_aclus_stats_dict = serialized_field()
-    selected_spikes_fragile_linear_neuron_IDX_dict = serialized_field()
+    ranked_aclus_stats_dict: Dict[int, Tuple[Zscorer, Zscorer, float]] = serialized_field()
+    selected_spikes_fragile_linear_neuron_IDX_dict: Dict = serialized_field()
     
-    long_z_score = serialized_field()
-    short_z_score = serialized_field()
-    long_short_z_score_diff = serialized_field()
+    long_z_score: NDArray = serialized_field()
+    short_z_score: NDArray = serialized_field()
+    long_short_z_score_diff: NDArray = serialized_field()
     
     @classmethod
     def init_from_analysis_output_tuple(cls, a_tuple):
