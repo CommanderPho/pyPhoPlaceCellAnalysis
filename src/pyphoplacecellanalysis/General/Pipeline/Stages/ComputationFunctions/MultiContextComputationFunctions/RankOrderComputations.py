@@ -267,6 +267,33 @@ class Zscorer:
         return self.z_score_value
 
 
+    def plot_distribution(self):
+        """ plots a standalone figure showing the distribution of the original values and their fisher_z_transformed version in a histogram. """
+        win = pg.GraphicsLayoutWidget(show=True)
+        win.resize(800,350)
+        win.setWindowTitle('Z-Scorer: Histogram')
+        plt1 = win.addPlot()
+        vals = self.original_values
+        fisher_z_transformed_vals = np.arctanh(vals)
+
+        ## compute standard histogram
+        y, x = np.histogram(vals) # , bins=np.linspace(-3, 8, 40)
+        fisher_z_transformed_y, x = np.histogram(fisher_z_transformed_vals, bins=x)
+
+        ## Using stepMode="center" causes the plot to draw two lines for each sample.
+        ## notice that len(x) == len(y)+1
+        plt1.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,50), name='original_values')
+        plt1.plot(x, fisher_z_transformed_y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,255,100,50), name='fisher_z_values')
+
+
+        # ## Now draw all points as a nicely-spaced scatter plot
+        # y = pg.pseudoScatter(vals, spacing=0.15)
+        # #plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5)
+        # plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5, symbolPen=(255,255,255,200), symbolBrush=(0,0,255,150))
+
+        return win, plt1
+    
+
     # def Zscore(self, xcritical: np.array) -> np.array:
     #     return (xcritical - self.mean)/self.std_dev
 
@@ -579,7 +606,7 @@ class RankOrderAnalyses:
         return replay_fig, replay_ax
 
 
-    def _perform_plot_z_score_raw(epoch_idx_list, odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index'):
+    def _perform_plot_z_score_raw(epoch_idx_list, odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
         """ plots the raw z-scores for each of the four templates 
 
         Usage:
@@ -624,7 +651,7 @@ class RankOrderAnalyses:
         short_odd_out_plot_1D = p1.plot(epoch_idx_list, odd_laps_short_z_score_values, pen=None, symbolBrush='teal', symbolPen=symbolPens, symbol='t3', name='short_odd') ## setting pen=None disables line drawing
         return app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D)
 
-    def _perform_plot_z_score_diff(epoch_idx_list, even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index'):
+    def _perform_plot_z_score_diff(epoch_idx_list, even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
         """ plots the z-score differences 
         Usage:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values)
@@ -634,7 +661,7 @@ class RankOrderAnalyses:
         win.setWindowTitle(f'Rank Order {variable_name}s Epoch Debugger')
         label = pg.LabelItem(justify='right')
         win.addItem(label)
-        p1 = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True)
+        p1: pg.PlotItem = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True) # PlotItem
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
@@ -662,7 +689,6 @@ class RankOrderAnalyses:
         # symbolPen = 'w'
         symbolPen = None
         
-
         # def _tip_fn(x, y, data):
         #     """ the function required by pg.ScatterPlotItem's `tip` argument to print the tooltip for each spike. """
         #     # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
@@ -674,9 +700,19 @@ class RankOrderAnalyses:
         # hover_kwargs = dict(hoverable=True, hoverPen=pg.mkPen('w', width=2), tip=_tip_fn)
         
         # symbol='t2' is a left-facing arrow and 't3' is a right-facing one:
-        even_out_plot_1D = p1.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.even), symbolPen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
-        odd_out_plot_1D = p1.plot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
+        # even_out_plot_1D: pg.PlotDataItem = p1.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.even), symbolPen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
+        # odd_out_plot_1D: pg.PlotDataItem = p1.plot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
 
+        # when using pg.ScatterPlotItem(...) compared to p1.plot(...), you must use the non-'symbol' prefixed argument names: {'symbolBrush':'brush', 'symbolPen':'pen'} 
+        even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, even_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.even), pen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+        odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, odd_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.odd), pen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+
+        p1.addItem(even_out_plot_1D)
+        p1.addItem(odd_out_plot_1D)
+        
+        # even_out_plot_1D: pg.PlotDataItem = p1.scatterPlot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.even), symbolPen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
+        # odd_out_plot_1D: pg.PlotDataItem = p1.scatterPlot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
+        
         return app, win, p1, (even_out_plot_1D, odd_out_plot_1D)
 
 
