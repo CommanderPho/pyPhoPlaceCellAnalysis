@@ -279,6 +279,8 @@ class Zscorer:
 class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
     """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
     
+    TODO: add spikes_df, epochs_df?
+    
     """
     ranked_aclus_stats_dict = serialized_field()
     selected_spikes_fragile_linear_neuron_IDX_dict = serialized_field()
@@ -850,5 +852,107 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
         """
         return global_computation_results
+
+
+
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
+
+from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import _debug_plot_directional_template_rasters
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import build_selected_spikes_df
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import add_selected_spikes_df_points_to_scatter_plot
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+
+
+class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
+    """ RankOrderGlobalDisplayFunctions
+    These display functions compare results across several contexts.
+    Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
+    """
+
+    @function_attributes(short_name='rank_order_debugger', tags=['rank-order','debugger','shuffle'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 01:12', related_items=[], is_global=True)
+    def _display_rank_order_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
+                Usage:
+
+                    %matplotlib qt
+                    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+
+                    graphics_output_dict = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx)
+                    fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
+                    
+
+            """
+            reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)
+            # reuse_axs_tuple = None # plot fresh
+            # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
+            # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
+            single_figure = kwargs.pop('single_figure', True)
+            debug_print = kwargs.pop('debug_print', False)
+
+            active_config_name = kwargs.pop('active_config_name', None)
+            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+            
+
+            defer_render = kwargs.pop('defer_render', False) 
+
+
+            # Plot 1D Keywoard args:
+            shared_kwargs = kwargs.pop('shared_kwargs', {})
+            long_kwargs = kwargs.pop('long_kwargs', {})
+            short_kwargs = kwargs.pop('short_kwargs', {})
+
+            shared_kwargs['active_context'] = active_context
+
+            ## Inputs: track_templates, global_replays, owning_pipeline_reference
+            global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df)
+
+            global_ripples_epochs_df = global_replays.to_dataframe()
+            active_epochs_df = global_ripples_epochs_df.copy()
+
+            odd_display_outputs, even_display_outputs = _debug_plot_directional_template_rasters(global_spikes_df, active_epochs_df, track_templates)
+            odd_app, odd_win, odd_plots, odd_plots_data, odd_on_update_active_epoch, odd_on_update_active_scatterplot_kwargs = odd_display_outputs
+            even_app, even_win, even_plots, even_plots_data, even_on_update_active_epoch, even_on_update_active_scatterplot_kwargs = even_display_outputs
+
+            # Build the wrapping window using `DockAreaWrapper`:
+            active_root_main_widget = odd_win.window()
+            root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, even_win, title='Pho Rank-Order Epochs Debugger')
+
+            def on_update_active_epoch(an_epoch_idx, an_epoch):
+                """ captures: odd_on_update_active_epoch, even_on_update_active_epoch, root_dockAreaWindow """
+                odd_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
+                even_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
+                root_dockAreaWindow.setWindowTitle(f'Pho Rank-Order Epochs Debugger: Epoch[{an_epoch_idx}]')
+
+
+            def on_update_epoch_IDX(an_epoch_idx):
+                """ captures on_update_active_epoch, active_epochs_df to extract the epoch time range and call `on_update_active_epoch` """
+                # curr_epoch_spikes = spikes_df[(spikes_df.new_lap_IDX == an_epoch_idx)]
+                # curr_epoch_df = active_epochs_df[(active_epochs_df.lap_id == (an_epoch_idx+1))]
+                # curr_epoch_df = active_epochs_df[(active_epochs_df.label.astype(float) == float(an_epoch_idx))]
+                curr_epoch_df = active_epochs_df[(active_epochs_df.index.astype(float) == float(an_epoch_idx))]
+                curr_epoch = list(curr_epoch_df.itertuples())[0]
+                on_update_active_epoch(an_epoch_idx, curr_epoch)
+
+            ## Build the selected spikes df:
+
+            ## Laps: even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
+            ## Ripples: even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
+
+            (even_selected_spike_df, even_neuron_id_to_new_IDX_map), (odd_selected_spike_df, odd_neuron_id_to_new_IDX_map) = build_selected_spikes_df(track_templates, active_epochs_df, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+
+            ## Add the spikes
+            add_selected_spikes_df_points_to_scatter_plot(plots_data=odd_plots_data, plots=odd_plots, selected_spikes_df=deepcopy(odd_selected_spike_df), _active_plot_identifier = 'long_odd')
+            add_selected_spikes_df_points_to_scatter_plot(plots_data=odd_plots_data, plots=odd_plots, selected_spikes_df=deepcopy(odd_selected_spike_df), _active_plot_identifier = 'short_odd')
+            add_selected_spikes_df_points_to_scatter_plot(plots_data=even_plots_data, plots=even_plots, selected_spikes_df=deepcopy(even_selected_spike_df), _active_plot_identifier = 'long_even')
+            add_selected_spikes_df_points_to_scatter_plot(plots_data=even_plots_data, plots=even_plots, selected_spikes_df=deepcopy(even_selected_spike_df), _active_plot_identifier = 'short_even')
+
+
+            return graphics_output_dict
 
 
