@@ -448,11 +448,11 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         # The "real" result for this epoch:
         active_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
         real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-        real_long_result_corr_value = (np.abs(real_long_rank_stats.statistic), real_long_rank_stats.pvalue)[0]
+        real_long_result_corr_value = (post_process_statistic_value_fn(real_long_rank_stats.statistic), real_long_rank_stats.pvalue)[0]
         
         active_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
         real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-        real_short_result_corr_value = (np.abs(real_short_rank_stats.statistic), real_short_rank_stats.pvalue)[0]
+        real_short_result_corr_value = (post_process_statistic_value_fn(real_short_rank_stats.statistic), real_short_rank_stats.pvalue)[0]
         
         if debug_print:
             print(f'\tactive_epoch_aclu_long_ranks[{epoch_id}]: {print_array(active_epoch_aclu_long_ranks)}')
@@ -488,14 +488,12 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
             ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
             active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
             long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-            # long_result = (np.abs(long_rank_stats.statistic), long_rank_stats.pvalue)
-            long_result = (long_rank_stats.statistic, long_rank_stats.pvalue)
+            long_result = (post_process_statistic_value_fn(long_rank_stats.statistic), long_rank_stats.pvalue)
             long_spearmanr_rank_stats_results.append(long_result)
             
             active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
             short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-            # short_result = (np.abs(short_rank_stats.statistic), short_rank_stats.pvalue)
-            short_result = (short_rank_stats.statistic, short_rank_stats.pvalue)
+            short_result = (post_process_statistic_value_fn(short_rank_stats.statistic), short_rank_stats.pvalue)
             short_spearmanr_rank_stats_results.append(short_result)
         ## END for shuffle
 

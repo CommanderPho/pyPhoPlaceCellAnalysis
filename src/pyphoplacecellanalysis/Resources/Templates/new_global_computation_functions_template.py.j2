@@ -12,56 +12,10 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 ## Begin Script Body
 
-script_file_path = os.path.abspath(__file__)
-script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
-log_file_path = script_file_parent_path.joinpath('log_file.log')
-
-curr_session_context = {{ curr_session_context }}
-curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
-
-curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path) # create logger , file_logging_dir=
-_line_sweep = '=========================='
-## REPLACES THE `print` function within this scope
-_original_print = print
-def new_print(*args, **kwargs):
-    # Call both regular print and logger.info
-    _original_print(*args, **kwargs)
-    curr_task_logger.info(*args)
-
-# Replace the print function within this scope
-# _original_print = print
-print = new_print # should redefine print too?
-
-new_print(f'{_line_sweep} Script {script_file_path} STARTING {_line_sweep}')
-new_print(f'\tsession_context: {curr_session_context}')
-new_print(f'\tsession_basedir: {str(curr_session_basedir)}')    
-new_print('__________________________________________________________________')
-
-# Whether to output figures:
-{% if should_perform_figure_generation_to_file %}
-should_perform_figure_generation_to_file=True
-{% else %}
-should_perform_figure_generation_to_file=False
-{% endif %}
-
-
-{% block result_handler %}
-    
-## Templating mode:
-result_handler = BatchSessionCompletionHandler(force_reload_all=True,
-        session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
-        global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS),
-        should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_generate_all_plots=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_global_recompute=True)
-
-
-{% endblock %}
-
-
-
 class {{ComputationGroupName}}GlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """ functions related to {{ComputationGroupName}} computations. """
     _computationGroupName = '{{ComputationGroupLowercaseShortname}}'
-    _computationPrecidence = 1000
+    _computationPrecidence = 1002
     _is_global = True
 
     @function_attributes(short_name='{{FunctionLowercaseShortname}}', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
