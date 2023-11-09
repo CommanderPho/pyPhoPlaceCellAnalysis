@@ -367,14 +367,18 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
     """
     shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, (long_pf_peak_ranks, short_pf_peak_ranks) = astuple(shuffle_helper)
 
+    # post_process_statistic_value_fn = lambda x: np.abs(x)
+    post_process_statistic_value_fn = lambda x: float(x) # basically NO-OP
 
     active_spikes_df = deepcopy(active_spikes_df).spikes.sliced_by_neuron_id(shared_aclus_only_neuron_IDs)
     active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # NOTE: `active_aclu_to_fragile_linear_neuron_IDX_dict` is actually pretty important here. It's an ordered dict that maps each aclu to a flat neuronIDX!
     # unique_neuron_identities = active_spikes_df.spikes.extract_unique_neuron_identities()
     # [['t_rel_seconds', 'shank', 'cluster', 'aclu', 'qclu', 'traj', 'lap', 'maze_relative_lap', 'flat_spike_idx', 'maze_id', 'fragile_linear_neuron_IDX', 'neuron_type', 'PBE_id']]
+    no_interval_fill_value = -1
     # add the active_epoch's id to each spike in active_spikes_df to make filtering and grouping easier and more efficient:
-    active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t_rel_seconds', no_interval_fill_value=-1)[['t_rel_seconds', 'shank', 'cluster', 'aclu', 'qclu', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'fragile_linear_neuron_IDX', 'neuron_type', 'flat_spike_idx', 'PBE_id', 'Probe_Epoch_id']]
+    active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)[['t_rel_seconds', 'shank', 'cluster', 'aclu', 'qclu', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'fragile_linear_neuron_IDX', 'neuron_type', 'flat_spike_idx', 'PBE_id', 'Probe_Epoch_id']]
     # uses new add_epochs_id_identity
+    active_spikes_df.drop(active_spikes_df.loc[active_spikes_df['Probe_Epoch_id']==no_interval_fill_value].index, inplace=True)
 
     # Sort by columns: 't_rel_seconds' (ascending), 'aclu' (ascending)
     active_spikes_df = active_spikes_df.sort_values(['t_rel_seconds', 'aclu'])
@@ -401,6 +405,8 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
     epoch_selected_spikes_fragile_linear_neuron_IDX_dict = {}
 
     for (epoch_id, aclu), rank in zip(ranked_aclus.index, ranked_aclus):
+        assert (epoch_id != -1), f"should have no -1 entries since we tried to drop them before grouping."
+        # skip the sentinal value (no epoch) entry
         if epoch_id not in epoch_ranked_aclus_dict:
             # Initialize new dicts/arrays for the epoch if needed:
             epoch_ranked_aclus_dict[epoch_id] = {}
@@ -798,7 +804,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
     @function_attributes(short_name='rank_order_shuffle_analysis', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
-    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, num_shuffles:int=1000, debug_print=False):
+    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1000):
         """ 
         
         Requires:
@@ -816,19 +822,24 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         if include_includelist is not None:
             print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
+        print(f'perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
+        ## Laps Rank-Order Analysis:
+        print(f'\tcomputing Laps rank-order shuffles:')
+        # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
+        _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median')
+        # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
+        (odd_laps_outputs, even_laps_outputs, laps_paired_tests), laps_plots_outputs  = _laps_outputs
+
         ## Ripple Rank-Order Analysis:
+        print(f'\tcomputing Ripple rank-order shuffles:')
         _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
         (odd_ripple_outputs, even_ripple_outputs, ripple_evts_paired_tests), ripple_plots_outputs = _ripples_outputs
 
-        ## Laps Rank-Order Analysis:
-        # _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
-        _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=num_shuffles, rank_alignment='median')
-        # _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=num_shuffles, rank_alignment='first')
-        (odd_laps_outputs, even_laps_outputs, laps_paired_tests), laps_plots_outputs  = _laps_outputs
-
         # Set the global result:
+        print(f'\tdone. building global result.')
         global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_outputs, even_ripple=even_ripple_outputs,
                                                                                                             odd_laps=odd_laps_outputs, even_laps=even_laps_outputs)
+
         """ Usage:
         
         rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
