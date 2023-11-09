@@ -476,7 +476,7 @@ class PipelineWithDisplayPipelineStageMixin:
             active_session_configuration_context = self.filtered_contexts[active_session_configuration_name]
 
         else:
-            pass # hope that it's an IdentifyingContext, but well check soon.
+            pass # hope that it's an IdentifyingContext, but we'll check soon.
         
         ## Sets the active_context kwarg that's passed in to the display function:
         assert isinstance(active_session_configuration_context, IdentifyingContext)
@@ -495,17 +495,19 @@ class PipelineWithDisplayPipelineStageMixin:
         else:
             ## Non-global display functions: The expected filtered context:
             if active_session_configuration_name is not None:
-                assert active_session_configuration_context.filter_name == active_session_configuration_name
+                if (active_session_configuration_context.filter_name == active_session_configuration_name):
+                    print(f'WARN: active_session_configuration_context.filter_name != active_session_configuration_name: {active_session_configuration_context.filter_name} != {active_session_configuration_name}. This used to be an assert but to enable directional pfs it was reduced to a warning.')
+                # assert active_session_configuration_context.filter_name == active_session_configuration_name
     
-            # if active_session_configuration_context.has_keys(['lap_dir'])[0]:
-            #     # directional laps version:
-            #     active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
-            # else:
-            #     # typical (non-directional laps) version:
-            #     active_session_configuration_name = active_session_configuration_context.filter_name
+            if active_session_configuration_context.has_keys(['lap_dir'])[0]:
+                # directional laps version:
+                active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
+            else:
+                # typical (non-directional laps) version:
+                active_session_configuration_name = active_session_configuration_context.filter_name
 
-            # typical (non-directional laps) version:
-            active_session_configuration_name = active_session_configuration_context.filter_name
+            # # typical (non-directional laps) version:
+            # active_session_configuration_name = active_session_configuration_context.filter_name
                 
 
             ## Sanity checking:
@@ -514,6 +516,7 @@ class PipelineWithDisplayPipelineStageMixin:
             kwarg_active_config_name = kwargs.pop('active_config_name', None)
             if kwarg_active_config_name is not None:
                 assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
+
 
             curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
             
