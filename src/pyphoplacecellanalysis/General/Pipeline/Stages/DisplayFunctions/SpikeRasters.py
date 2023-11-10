@@ -110,7 +110,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
 
-    @function_attributes(short_name='spike_rasters_window', tags=['display','interactive', 'primary', 'raster', '2D', 'ui', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_window', tags=['display','interactive', 'primary', 'raster', '2D', 'ui', 'pyqtplot'], input_requires=[], output_provides=[], uses=['_build_additional_window_menus'], used_by=[], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_window(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Displays a Spike3DRasterWindowWidget with a configurable set of raster widgets and controls in it.
@@ -893,6 +893,8 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
 # ==================================================================================================================== #
 # Menu Builders                                                                                                        #
 # ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
     active_config_name = active_display_fn_identifying_ctx.filter_name # recover active_config_name from the context
 
@@ -904,9 +906,16 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
     return output_references
 
 
+@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'gui'], input_requires=[], output_provides=[], uses=['_build_additional_spikeRaster2D_menus'], used_by=['_display_spike_rasters_window'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
         assert owning_pipeline_reference is not None
-        active_config_name = active_display_fn_identifying_ctx.filter_name # recover active_config_name from the context
+
+        # recover active_config_name from the context
+        # active_config_name = active_display_fn_identifying_ctx.filter_name # hardcoded bad way that doesn't work for directional pfs
+        # directional-pf compatible way of finding the matching config name:
+        reverse_context_name_lookup_map = {v: k for k, v in owning_pipeline_reference.filtered_contexts.items()} # builds an inverse mapping from a given filtered_context Dict[IdentifyingContext, str] to its string name
+        recovered_filter_context = active_display_fn_identifying_ctx.get_subset(subset_excludelist=['display_fn_name']) # drop the display_fn_name part to get the original filter context
+        active_config_name: str = reverse_context_name_lookup_map[recovered_filter_context]
 
         ## SpikeRaster2D Specific Items:
         output_references = _build_additional_spikeRaster2D_menus(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
