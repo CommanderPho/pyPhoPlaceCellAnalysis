@@ -1154,16 +1154,10 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         new_obj = BayesianPlacemapPositionDecoder(time_bin_size=val_dict.get('time_bin_size', 0.25), pf=val_dict.get('pf', None), spikes_df=val_dict.get('spikes_df', None), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
         return new_obj
 
-    ## Take the default `SerializedAttributesAllowBlockSpecifyingClass.to_dict() implementation`
-    # def to_dict(self):
-    #     return self.__dict__
     
     # ==================================================================================================================== #
     # Methods                                                                                                              #
     # ==================================================================================================================== #
-    
-    # def __init__(self, time_bin_size: float, pf, spikes_df: pd.DataFrame, setup_on_init:bool=True, post_load_on_init:bool=False, debug_print:bool=True):
-    #     super(BayesianPlacemapPositionDecoder, self).__init__(time_bin_size, pf, spikes_df, setup_on_init=setup_on_init, post_load_on_init=post_load_on_init, debug_print=debug_print)
     
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
