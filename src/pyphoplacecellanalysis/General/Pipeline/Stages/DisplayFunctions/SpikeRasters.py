@@ -894,9 +894,20 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
 # Menu Builders                                                                                                        #
 # ==================================================================================================================== #
 
+@function_attributes(short_name=None, tags=['context', 'directional_pf', 'display', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 20:07', related_items=[])
+def _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) -> str:
+    """ recover active_config_name from the context in a way that works for both normal and directional pfs (which include both a .filter_name and .lap_dir value) """
+    # active_config_name = active_display_fn_identifying_ctx.filter_name # hardcoded bad way that doesn't work for directional pfs
+    # directional-pf compatible way of finding the matching config name:
+    reverse_context_name_lookup_map = {v: k for k, v in owning_pipeline_reference.filtered_contexts.items()} # builds an inverse mapping from a given filtered_context Dict[IdentifyingContext, str] to its string name
+    recovered_filter_context = active_display_fn_identifying_ctx.get_subset(subset_excludelist=['display_fn_name']) # drop the display_fn_name part to get the original filter context
+    active_config_name: str = reverse_context_name_lookup_map[recovered_filter_context]
+    return active_config_name
+
+
 @function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
-    active_config_name = active_display_fn_identifying_ctx.filter_name # recover active_config_name from the context
+    active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
     ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
     # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
@@ -909,13 +920,7 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
 @function_attributes(short_name=None, tags=['menu', 'spike_raster', 'gui'], input_requires=[], output_provides=[], uses=['_build_additional_spikeRaster2D_menus'], used_by=['_display_spike_rasters_window'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
         assert owning_pipeline_reference is not None
-
-        # recover active_config_name from the context
-        # active_config_name = active_display_fn_identifying_ctx.filter_name # hardcoded bad way that doesn't work for directional pfs
-        # directional-pf compatible way of finding the matching config name:
-        reverse_context_name_lookup_map = {v: k for k, v in owning_pipeline_reference.filtered_contexts.items()} # builds an inverse mapping from a given filtered_context Dict[IdentifyingContext, str] to its string name
-        recovered_filter_context = active_display_fn_identifying_ctx.get_subset(subset_excludelist=['display_fn_name']) # drop the display_fn_name part to get the original filter context
-        active_config_name: str = reverse_context_name_lookup_map[recovered_filter_context]
+        active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
         ## SpikeRaster2D Specific Items:
         output_references = _build_additional_spikeRaster2D_menus(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
