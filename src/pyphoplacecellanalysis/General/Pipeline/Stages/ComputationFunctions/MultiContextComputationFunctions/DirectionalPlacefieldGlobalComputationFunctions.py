@@ -106,9 +106,36 @@ class DirectionalLapsHelpers:
         # return (computation_filter_name in computed_base_epoch_names)
 
     @classmethod
+    def has_duplicated_memory_references(cls, *args) -> bool:
+        # Check for duplicated memory references in the configs first:
+        memory_ids = [id(a_config) for a_config in args] # YUP, they're different for odd/even but duplicated for long/short
+        has_duplicated_reference: bool = len(np.unique(memory_ids)) < len(memory_ids)
+        return has_duplicated_reference
+
+    @classmethod
+    def deduplicate_memory_references(cls, *args) -> list:
+        """ Ensures that all entries in the args list point to unique memory addresses, deduplicating them with `deepcopy` if needed. 
+
+        Usage:
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
+
+            args = DirectionalLapsHelpers.deduplicate_memory_references(args)
+
+        """
+        has_duplicated_reference: bool = cls.has_duplicated_memory_references(*args)
+        if has_duplicated_reference:
+            de_deuped_args = [deepcopy(v) for v in args]
+            assert not cls.has_duplicated_memory_references(*de_deuped_args), f"duplicate memory references still exist even after de-duplicating with deepcopy!!!"
+            return de_deuped_args
+        else:
+            return args
+    
+
+    @classmethod
     def fix_computation_epochs_if_needed(cls, curr_active_pipeline):
-        #TODO 2023-11-10 21:15: - [ ] Not yet finished!
-        
+        #TODO 2023-11-10 21:15: - [ ] Not yet finished! Does not work due to shared memory issue. Changes to the first two affect the next two
+        was_modified: bool = False
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
@@ -120,6 +147,19 @@ class DirectionalLapsHelpers:
         ## {"even": "RL", "odd": "LR"}
         long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
         
+        (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+
+        # Check for duplicated memory references in the configs first:
+        has_duplicated_reference: bool = cls.has_duplicated_memory_references(long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config)
+        if has_duplicated_reference:
+            long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config = [deepcopy(a_config) for a_config in (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config)]
+            assert not cls.has_duplicated_memory_references(long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config), f"duplicate memory references still exist even after de-duplicating with deepcopy!!!"
+            was_modified = was_modified or True # duplicated references fixed!
+            # re-assign:
+            for an_epoch_name, a_deduplicated_config in zip((long_LR_name, long_RL_name, short_LR_name, short_RL_name), (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config)):
+                curr_active_pipeline.computation_results[an_epoch_name].computation_config = a_deduplicated_config
+            print(f'deduplicated references!')
+
         original_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
         print(f'original_num_epochs: {original_num_epochs}')
         assert np.all(original_num_epochs > 0)
@@ -133,7 +173,9 @@ class DirectionalLapsHelpers:
         
         modified_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
         print(f'modified_num_epochs: {modified_num_epochs}')
-        was_modified: bool = np.any(original_num_epochs != modified_num_epochs)
+        was_modified = was_modified or np.any(original_num_epochs != modified_num_epochs)
+        assert np.all(modified_num_epochs > 0)
+        
         return was_modified
 
 
@@ -200,16 +242,8 @@ class DirectionalLapsHelpers:
 
 
         # Fix the computation epochs to be constrained to the proper long/short intervals:
-        # relys on: long_epoch_obj, short_epoch_obj
-        for an_epoch_name in (long_LR_name, long_RL_name):
-            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop)
-
-        for an_epoch_name in (short_LR_name, short_RL_name):
-            curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop)
-        
         was_modified = cls.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
         
-
         # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
         # long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D  = DirectionalLapsHelpers.build_directional_constrained_decoders(curr_active_pipeline)
 
