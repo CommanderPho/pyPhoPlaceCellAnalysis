@@ -327,7 +327,8 @@ class ZhangReconstructionImplementation:
         if use_flat_computation_mode:
             # Single-cell flat Version:
             posterior = cell_prob # The product has already been accumulating all along
-            posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n
+            posterior /= np.sum(posterior, axis=0) # C(tau, n) = np.sum(posterior, axis=0): normalization condition mentioned in eqn 36 to convert to P_x_given_n.
+            #TODO 2023-11-10 20:03: - [ ] Determine if this is okay for directional placefields concatenated with `PfND.build_merged_directional_placefields(...)`
         else:
             # Full Version:
             posterior = np.prod(cell_prob, axis=2) # note this product removes axis=2 (nCells)
