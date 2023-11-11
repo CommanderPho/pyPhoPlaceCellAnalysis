@@ -600,13 +600,13 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, PeakLocationRepr
         self.F = None
         self.P_x = None
         
-        self._setup_concatenated_F()
+        self._setup_computation_variables()
 
     @post_deserialize
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
-            self._setup_concatenated_F()
+            self._setup_computation_variables()
             # self._setup_time_bin_spike_counts_N_i()
             # self._setup_time_window_centers()
             # self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
@@ -810,15 +810,18 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, PeakLocationRepr
     # ==================================================================================================================== #
     # Private Methods                                                                                                      #
     # ==================================================================================================================== #
-    @function_attributes(short_name='_setup_concatenated_F', tags=['pr'], input_requires=[], output_provides=[], uses=['ZhangReconstructionImplementation.build_concatenated_F'], used_by=[], creation_date='2023-04-06 13:49')
-    def _setup_concatenated_F(self):
-        """ Sets up the computation variables F, P_x, neuron_IDs, neuron_IDXs
+    @function_attributes(short_name='setup_computation_variables', tags=['pr'], input_requires=[], output_provides=[], uses=['self.pf', 'ZhangReconstructionImplementation.build_concatenated_F'], used_by=[], creation_date='2023-04-06 13:49')
+    def _setup_computation_variables(self):
+        """ Uses `self.pf` and sets up the computation variables F, P_x, neuron_IDs, neuron_IDXs
 
             maps: (40, 48, 6)
             np.shape(f_i[i]): (48, 6)
             np.shape(F_i[i]): (288, 1)
             np.shape(F): (288, 40)
             np.shape(P_x): (288, 1)
+            
+        History:
+            Used to be named `_setup_concatenated_F` but renamed because it computes more than that.
         """
         self.neuron_IDXs, self.neuron_IDs, f_i, F_i, self.F, self.P_x = ZhangReconstructionImplementation.build_concatenated_F(self.pf, debug_print=self.debug_print) # fails when `self.pf.ratemap.n_neurons == 0` aka `self.pf.ratemap.ndim == 0`
         if not isinstance(self.neuron_IDs, np.ndarray):
@@ -860,7 +863,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, PeakLocationRepr
 
     @function_attributes(short_name='perform_decode_specific_epochs', tags=['decode','specific_epochs','epoch', 'classmethod'], input_requires=[], output_provides=[], uses=['active_decoder.decode', 'add_epochs_id_identity', 'epochs_spkcount', 'cls.perform_build_marginals'], used_by=[''], creation_date='2022-12-04 00:00')
     @classmethod
-    def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False) -> DecodedFilterEpochsResult:
+    def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size=0.05, debug_print=False) -> DecodedFilterEpochsResult:
         """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
 
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
@@ -1172,7 +1175,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
-            self._setup_concatenated_F()
+            self._setup_computation_variables()
             self._setup_time_bin_spike_counts_N_i()
             # self._setup_time_window_centers()
             self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
@@ -1185,7 +1188,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         self.F = None
         self.P_x = None
         
-        self._setup_concatenated_F()
+        self._setup_computation_variables()
         # Could pre-filter the self.spikes_df by the 
         
         self.time_binning_container = None
