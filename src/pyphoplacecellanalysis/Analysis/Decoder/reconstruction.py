@@ -385,9 +385,19 @@ class Zhang_Two_Step:
 @custom_define(slots=False, repr=False)
 class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
+    
+    This class stores results from decoding from multiple non-contiguous time epochs, each containing many time bins (a variable number according to their length)
+    
+    
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
+        
+        
+    marginal_y:
+        DynamicContainer({'p_x_given_n': array([[0, 0, 0.722646, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.722646, 0.722646, 0.722646, 0.722646, 0, 0, 0.722646, 0.722646, 0.722646, 0, 0, 0, 0, 0.722646, 0, 0, 0, 0],
+        [1, 1, 0.277354, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.277354, 0.277354, 0.277354, 0.277354, 1, 1, 0.277354, 0.277354, 0.277354, 1, 1, 1, 1, 0.277354, 1, 1, 1, 1]]), 'most_likely_positions_1D': array([1.5, 1.5, 0.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 0.5, 1.5, 1.5, 1.5, 1.5])})
+       
     """
     decoding_time_bin_size: float # the time bin_size in seconds
     num_filter_epochs: int # depends on the number of epochs (`n_epochs`)
