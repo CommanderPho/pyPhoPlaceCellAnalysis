@@ -510,15 +510,15 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     self.active_configs[a_select_config_name].computation_config = deepcopy(active_computation_params) #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
                 
 
-                # ensure config is filtered:
-                # 2023-11-10 - Note hardcoded directional lap/pf suffixes used here.
-                a_base_filter_name: str = a_select_config_name.removesuffix('_any').removesuffix('_odd').removesuffix('_even')
-                a_select_epoch = Epoch(a_filtered_session.epochs.to_dataframe().epochs.label_slice(a_base_filter_name))
-                assert a_select_epoch.n_epochs > 0
-                a_filtered_session.epochs = a_select_epoch # replace the epochs object
-                active_computation_params.pf_params.computation_epochs = active_computation_params.pf_params.computation_epochs.time_slice(a_select_epoch.t_start, a_select_epoch.t_stop)
-                # set/update the computation configs:
-                self.active_configs[a_select_config_name].computation_config = deepcopy(active_computation_params)
+                # # ensure config is filtered:
+                # # 2023-11-10 - Note hardcoded directional lap/pf suffixes used here.
+                # a_base_filter_name: str = a_select_config_name.removesuffix('_any').removesuffix('_odd').removesuffix('_even')
+                # a_select_epoch = Epoch(a_filtered_session.epochs.to_dataframe().epochs.label_slice(a_base_filter_name))
+                # assert a_select_epoch.n_epochs > 0
+                # a_filtered_session.epochs = a_select_epoch # replace the epochs object
+                # active_computation_params.pf_params.computation_epochs = active_computation_params.pf_params.computation_epochs.time_slice(a_select_epoch.t_start, a_select_epoch.t_stop)
+                # # set/update the computation configs:
+                # self.active_configs[a_select_config_name].computation_config = deepcopy(active_computation_params)
 
                 if action.name == EvaluationActions.EVALUATE_COMPUTATIONS.name:
                     # active_function = self.perform_registered_computations_single_context
