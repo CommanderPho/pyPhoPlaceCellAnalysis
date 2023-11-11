@@ -213,6 +213,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         print(f'not using direction-dependent laps.')
         lap_direction_suffix_list = ['']
 
+
+    active_session_computation_configs = [deepcopy(a_config) for a_config in active_session_computation_configs]
+    assert len(lap_direction_suffix_list) == len(active_session_computation_configs)
     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
     for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs):
         # We need to filter and then compute with the appropriate config iteratively.
