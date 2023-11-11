@@ -105,6 +105,40 @@ class DirectionalLapsHelpers:
         return (computation_filter_name in split_directional_laps_config_names)
         # return (computation_filter_name in computed_base_epoch_names)
 
+    @classmethod
+    def fix_computation_epochs_if_needed(cls, curr_active_pipeline):
+        #TODO 2023-11-10 21:15: - [ ] Not yet finished!
+        raise NotImplementedError
+    
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
+
+        print(f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}')
+        assert short_epoch_obj.n_epochs > 0
+        assert long_epoch_obj.n_epochs > 0
+
+        ## {"even": "RL", "odd": "LR"}
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        
+        original_num_epochs = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        print(f'original_num_epochs: {original_num_epochs}')
+
+        # Fix the computation epochs to be constrained to the proper long/short intervals:
+        # relys on: long_epoch_obj, short_epoch_obj
+        for an_epoch_name in (long_LR_name, long_RL_name):
+            curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs = curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop)
+
+        for an_epoch_name in (short_LR_name, short_RL_name):
+            curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs = curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop)
+        
+        modified_num_epochs = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+
+        was_modified: bool = np.any(original_num_epochs != modified_num_epochs)
+        return was_modified
+
+
+
 
     @classmethod
     def build_global_directional_result_from_natural_epochs(cls, curr_active_pipeline):
@@ -113,9 +147,20 @@ class DirectionalLapsHelpers:
         Does not update `curr_active_pipeline` or mess with its filters/configs/etc.
 
         """
+        
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
+        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        # long_pf1D, short_pf1D, global_pf1D = long_results.pf1D, short_results.pf1D, global_results.pf1D
+        # long_pf2D, short_pf2D, global_pf2D = long_results.pf2D, short_results.pf2D, global_results.pf2D
+
+
         # Unwrap the naturally produced directional placefields:
         long_odd_name, short_odd_name, global_odd_name, long_even_name, short_even_name, global_even_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-
+        
         # Most popular
         # long_odd_name, long_even_name, short_odd_name, short_even_name, global_any_name
         long_odd_laps_name, long_even_laps_name, short_odd_laps_name, short_even_laps_name = long_odd_name, long_even_name, short_odd_name, short_even_name
@@ -129,10 +174,42 @@ class DirectionalLapsHelpers:
         (long_odd_laps_pf1D, long_even_laps_pf1D, short_odd_laps_pf1D, short_even_laps_pf1D) = (long_odd_laps_results.pf1D, long_even_laps_results.pf1D, short_odd_laps_results.pf1D, short_even_laps_results.pf1D)
         (long_odd_laps_pf2D, long_even_laps_pf2D, short_odd_laps_pf2D, short_even_laps_pf2D) = (long_odd_laps_results.pf2D, long_even_laps_results.pf2D, short_odd_laps_results.pf2D, short_even_laps_results.pf2D)
 
+        #TODO 2023-11-10 21:00: - [ ] Convert above "odd/even" notation to new "LR/RL" versions:
+
+        # Unpack all directional variables:
+        ## {"even": "RL", "odd": "LR"}
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = long_odd_name, short_odd_name, global_odd_name, long_even_name, short_even_name, global_even_name, long_any_name, short_any_name, global_any_name 
+        
+        # # Most popular
+        # # long_LR_name, short_LR_name, long_RL_name, short_RL_name, global_any_name
+        # # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
+        # (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
+        # (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
+        # (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
+        # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+
+
+
         # Validate:
         assert not (curr_active_pipeline.computation_results[long_odd_laps_name]['computation_config']['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_even_laps_name]['computation_config']['pf_params'].computation_epochs)
         assert not (curr_active_pipeline.computation_results[short_odd_laps_name]['computation_config']['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_even_laps_name]['computation_config']['pf_params'].computation_epochs)
 
+
+
+        # Fix the computation epochs to be constrained to the proper long/short intervals:
+        # relys on: long_epoch_obj, short_epoch_obj
+        for an_epoch_name in (long_LR_name, long_RL_name):
+            curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs = curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop)
+
+        for an_epoch_name in (short_LR_name, short_RL_name):
+            curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs = curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop)
+        
+        was_modified = cls.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
+        
 
         # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
         # long_odd_shared_aclus_only_one_step_decoder_1D, long_even_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D, short_even_shared_aclus_only_one_step_decoder_1D  = DirectionalLapsHelpers.build_directional_constrained_decoders(curr_active_pipeline)
