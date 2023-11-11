@@ -317,35 +317,7 @@ class BatchSessionCompletionHandler:
 
         return was_updated
 
-    @classmethod
-    def try_compute_directional_laps_for_global_epoch(cls, curr_active_pipeline, fail_on_exception=True) -> bool:
-        """ 2023-10-24 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
-        prev_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
-
-        try:
-            ## perform the computation:
-            curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline, add_created_configs_to_pipeline=True)
-            # curr_active_pipeline, directional_lap_specific_configs = constrain_to_laps(curr_active_pipeline)
-            # list(directional_lap_specific_configs.keys())
-            post_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
-
-            # was_updated = not np.all(np.isin(['maze1', 'maze2', 'maze', 'maze_odd_laps', 'maze_even_laps'], ['maze1', 'maze2', 'maze']))
-            was_updated = not np.all(np.isin(post_active_config_names, prev_active_config_names))
-
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'.try_compute_directional_laps_for_global_epoch(...) failed with exception: {e}')
-            if fail_on_exception:
-                raise e.exc
-
-            return False
-
-
-        return was_updated
-
-
-
+    
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
     def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
         try:
@@ -591,8 +563,6 @@ class BatchSessionCompletionHandler:
             print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
 
-        # try to compute the directional laps from the global epoch:
-        # was_updated = self.try_compute_directional_laps_for_global_epoch(curr_active_pipeline, fail_on_exception=self.fail_on_exception)
         was_updated = False
 
         # ## Post Compute Validate 2023-05-16:
