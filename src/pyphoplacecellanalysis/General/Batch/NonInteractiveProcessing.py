@@ -221,7 +221,6 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
 
 
-
     for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs): # these should NOT be the same length: lap_direction_suffix_list: ['_odd', '_even', '_any']
         # We need to filter and then compute with the appropriate config iteratively.
         for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
@@ -263,10 +262,8 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         if fail_on_exception:
             raise
 
-
     if not saving_mode.shouldSave:
         print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
-
 
     ## Load pickled global computations:
     # If previously pickled global results were saved, they will typically no longer be relevent if the pipeline was recomputed. We need a system of invalidating/versioning the global results when the other computations they depend on change.
