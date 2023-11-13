@@ -214,10 +214,15 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         lap_direction_suffix_list = ['']
 
 
+    # active_session_computation_configs: this should contain three configs, one for each Epoch
+
     active_session_computation_configs = [deepcopy(a_config) for a_config in active_session_computation_configs]
     assert len(lap_direction_suffix_list) == len(active_session_computation_configs)
     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
-    for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs):
+
+
+
+    for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs): # these should NOT be the same length: lap_direction_suffix_list: ['_odd', '_even', '_any']
         # We need to filter and then compute with the appropriate config iteratively.
         for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
             # TODO: Build a context:
@@ -231,6 +236,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
         ## TODO 2023-01-15 - perform_computations for all configs!!
         #TODO 2023-10-31 14:58: - [ ] This is where the computations are being done multiple times!
+        #TODO 2023-11-13 14:23: - [ ] With this approach, we can't actually properly filter the computation_configs for the relevant sessions ahead of time because they are calculated for a single computation config but across all sessions at once.
         curr_active_pipeline.perform_computations(a_computation_config, computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
 

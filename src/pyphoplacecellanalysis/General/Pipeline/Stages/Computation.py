@@ -22,6 +22,7 @@ from neuropy.utils.result_context import IdentifyingContext
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters, `load_pickled_global_computation_results`
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
 from pyphocorehelpers.print_helpers import format_seconds_human_readable
+from pyphocorehelpers.programming_helpers import MemoryManagement
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
@@ -494,6 +495,14 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         else:
             active_computation_results = self.computation_results
 
+        ## Check for duplicated configs:
+        
+        # MemoryManagement.has_duplicated_memory_references(list(active_computation_results.values()))
+        # MemoryManagement.has_duplicated_memory_references([v.computation_config for v in active_computation_results.values()])
+
+        # MemoryManagement.has_duplicated_memory_references([v.computation_config.pf_params for v in active_computation_results.values()])
+        # MemoryManagement.has_duplicated_memory_references([v.computation_config.pf_params.computation_epochs for v in active_computation_results.values()])
+
         ## Here's where we loop through all possible configs:
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
             if a_select_config_name in enabled_filter_names:
@@ -519,6 +528,10 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 # active_computation_params.pf_params.computation_epochs = active_computation_params.pf_params.computation_epochs.time_slice(a_select_epoch.t_start, a_select_epoch.t_stop)
                 # # set/update the computation configs:
                 # self.active_configs[a_select_config_name].computation_config = deepcopy(active_computation_params)
+
+                # 'maze1_odd', active_computation_params - active_computation_params.is_directional == False?
+
+
 
                 if action.name == EvaluationActions.EVALUATE_COMPUTATIONS.name:
                     # active_function = self.perform_registered_computations_single_context
