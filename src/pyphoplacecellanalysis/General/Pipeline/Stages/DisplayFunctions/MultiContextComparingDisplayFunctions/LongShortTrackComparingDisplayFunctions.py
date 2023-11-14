@@ -111,7 +111,7 @@ def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoc
     return long_epoch_indicator_region_items, short_epoch_indicator_region_items
 
 
-
+# noinspection PyMethodParameters
 class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ LongShortTrackComparingDisplayFunctions
     These display functions compare results across several contexts.
@@ -176,7 +176,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 ## Require placefield presence on either the long or the short
                 neuron_replay_stats_df = neuron_replay_stats_df[np.logical_or(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['has_short_pf'])]
 
-            graphics_output_dict, neuron_df = _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True)
+            graphics_output_dict, neuron_df = PhoJonathanPlotHelpers._make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=True)
             graphics_output_dict['plot_data'] = {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate}
 
             return graphics_output_dict
@@ -223,7 +223,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
 
             use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
-            cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = _build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions=use_filtered_positions) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
+            cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = PhoJonathanPlotHelpers._build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions=use_filtered_positions) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
             time_variable_name = global_results.sess.spikes_df.spikes.time_variable_name
             
             # pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
@@ -280,7 +280,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 optional_cell_info_labels = {}
 
 
-            graphics_output_dict: MatplotlibRenderPlots = _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
+            graphics_output_dict: MatplotlibRenderPlots = PhoJonathanPlotHelpers._make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, time_binned_unit_specific_binned_spike_rate, pf1D_all, aclu_to_idx, rdf, irdf,
                 show_inter_replay_frs=show_inter_replay_frs, n_max_plot_rows=n_max_plot_rows, included_unit_neuron_IDs=included_unit_neuron_IDs, cell_spikes_dfs_dict=cell_spikes_dfs_dict, time_variable_name=time_variable_name, defer_render=defer_render, optional_cell_info_labels=optional_cell_info_labels,
                 use_filtered_positions=use_filtered_positions, **kwargs)
 
@@ -867,699 +867,701 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
 
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['make_fr', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
-def _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
-    """ Draws the time binned firing rates and the replay firing rates for a single cell
 
-        This is the top half of each pho-jonathan-style single cell plot
+class PhoJonathanPlotHelpers:
+    @classmethod
+    @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['make_fr', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
+    def _temp_draw_jonathan_ax(cls, t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
+        """ Draws the time binned firing rates and the replay firing rates for a single cell
 
-        custom_replay_markers:
-            # The colors for each point indicating the percentage of participating cells that belong to which track.
-                - More long_only -> more red
-                - More short_only -> more blue
+            This is the top half of each pho-jonathan-style single cell plot
 
-
-    Black circles are replays where this aclu was not active. They'll all be at y=0 because the cell didn't fire during them.
-    Green circles are replays where this aclu did fire, and their y-height indicates the cell's firing rate during that replay.
-    orange circles are this aclu's inter_replay_frs
-    translucent lilac (purple) curve is this aclu's time-binned firing rate
-    
+            custom_replay_markers:
+                # The colors for each point indicating the percentage of participating cells that belong to which track.
+                    - More long_only -> more red
+                    - More short_only -> more blue
 
 
-    Usage:
+        Black circles are replays where this aclu was not active. They'll all be at y=0 because the cell didn't fire during them.
+        Green circles are replays where this aclu did fire, and their y-height indicates the cell's firing rate during that replay.
+        orange circles are this aclu's inter_replay_frs
+        translucent lilac (purple) curve is this aclu's time-binned firing rate
 
-        index = new_index
-        active_aclu = int(joined_df.index[index])
-        _temp_draw_jonathan_ax(ax[0,1])
 
-        t_split = sess.paradigm[0][0,1]
-        _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=None, ax=ax[0,1], active_aclu=active_aclu)
 
-    Historical:
-        used to take sess: DataSession as first argument and then access `sess.paradigm[0][0,1]` internally. On 2022-11-27 refactored to take this time `t_split` directly and no longer require session
+        Usage:
 
-    TODO:
-        The `colors` argument is only used to plot the irdf (which only happens if `show_inter_replay_frs == True`), and seems uneeded. Could be removed through entire call-tree.
+            index = new_index
+            active_aclu = int(joined_df.index[index])
+            _temp_draw_jonathan_ax(ax[0,1])
 
-    """
-    assert ax is not None
-    if colors is None:
-        colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
+            t_split = sess.paradigm[0][0,1]
+            _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=None, ax=ax[0,1], active_aclu=active_aclu)
 
-    show_replay_neuron_participation_distribution_labels = False
-    # print(f"selected neuron has index: {index} aclu: {active_aclu}")
+        Historical:
+            used to take sess: DataSession as first argument and then access `sess.paradigm[0][0,1]` internally. On 2022-11-27 refactored to take this time `t_split` directly and no longer require session
 
-    # this redraws ax
-    ax.clear()
+        TODO:
+            The `colors` argument is only used to plot the irdf (which only happens if `show_inter_replay_frs == True`), and seems uneeded. Could be removed through entire call-tree.
 
-    plot_replays_kwargs = {}
-    is_aclu_active_in_replay = np.array([active_aclu in replay_active_aclus for replay_active_aclus in rdf.active_aclus]) # .shape (743,)
-    centers = (rdf["start"].values + rdf["end"].values)/2
-    heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
+        """
+        assert ax is not None
+        if colors is None:
+            colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
 
-    if custom_replay_markers is not None:
-        ### New 2022-11-28 Custom Scatter Marker Mode (using `custom_replay_markers`):
-        assert isinstance(custom_replay_markers, list)
-        for replay_idx, curr_out_plot_kwargs in enumerate(custom_replay_markers):
-            # if replay_idx < 5:
-            if is_aclu_active_in_replay[replay_idx]:
-                for i, out_plot_kwarg in enumerate(curr_out_plot_kwargs):
-                    # this should be only iterate through the two separate paths to be plotted
-                    ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg, zorder=7) # , label=f'replay[{replay_idx}]'
-            else:
-                # don't do the fancy custom makers for the inactive (zero firing for this aclu) replay points:
-                plot_replays_kwargs = {
-                    'marker':'o',
-                    's': 3,
-                    'c': 'black'
+        show_replay_neuron_participation_distribution_labels = False
+        # print(f"selected neuron has index: {index} aclu: {active_aclu}")
+
+        # this redraws ax
+        ax.clear()
+
+        plot_replays_kwargs = {}
+        is_aclu_active_in_replay = np.array([active_aclu in replay_active_aclus for replay_active_aclus in rdf.active_aclus]) # .shape (743,)
+        centers = (rdf["start"].values + rdf["end"].values)/2
+        heights = make_fr(rdf)[:, aclu_to_idx[active_aclu]]
+
+        if custom_replay_markers is not None:
+            ### New 2022-11-28 Custom Scatter Marker Mode (using `custom_replay_markers`):
+            assert isinstance(custom_replay_markers, list)
+            for replay_idx, curr_out_plot_kwargs in enumerate(custom_replay_markers):
+                # if replay_idx < 5:
+                if is_aclu_active_in_replay[replay_idx]:
+                    for i, out_plot_kwarg in enumerate(curr_out_plot_kwargs):
+                        # this should be only iterate through the two separate paths to be plotted
+                        ax.plot(centers[replay_idx], heights[replay_idx], markersize=5, **out_plot_kwarg, zorder=7) # , label=f'replay[{replay_idx}]'
+                else:
+                    # don't do the fancy custom makers for the inactive (zero firing for this aclu) replay points:
+                    plot_replays_kwargs = {
+                        'marker':'o',
+                        's': 3,
+                        'c': 'black'
+                    }
+                    ax.scatter(centers, heights, **plot_replays_kwargs, zorder=5) # , label=f'replay[{replay_idx}]'
+                    # pass # don't plot at all
+
+        else:
+            # else no custom replay markers
+            extra_plots_replays_kwargs_list = None
+            if 'neuron_type_distribution_color_RGB' in rdf.columns:
+                ### Single-SCATTER MODE:
+                # direct color mode:
+                # plot_replays_kwargs['c'] = rdf.neuron_type_distribution_color.values.tolist()
+                # plot_replays_kwargs['edgecolors'] = 'black'
+                # plot_replays_kwargs = {
+                #     'marker':'o',
+                #     's': 5,
+                #     'c': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+                #     # 'edgecolors': 'black',
+                #     # 'linewidths': 2.0,
+                #     # 'fillstyle': 'left'
+                # }
+                # scalar colors with colormap mode:
+                # plot_replays_kwargs['cmap'] = 'PiYG' # 'coolwarm' # 'PiYG'
+                # plot_replays_kwargs['edgecolors'] = 'black'
+
+                ### edge indicator mode:
+                plot_replays_kwargs = {'marker':'o',
+                    's': 5,
+                    'c': 'black',
+                    'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+                    'linewidths': 5,
+                    'alpha': 0.5
                 }
-                ax.scatter(centers, heights, **plot_replays_kwargs, zorder=5) # , label=f'replay[{replay_idx}]'
-                # pass # don't plot at all
 
-    else:
-        # else no custom replay markers
-        extra_plots_replays_kwargs_list = None
-        if 'neuron_type_distribution_color_RGB' in rdf.columns:
-            ### Single-SCATTER MODE:
-            # direct color mode:
-            # plot_replays_kwargs['c'] = rdf.neuron_type_distribution_color.values.tolist()
-            # plot_replays_kwargs['edgecolors'] = 'black'
-            # plot_replays_kwargs = {
-            #     'marker':'o',
-            #     's': 5,
-            #     'c': rdf.neuron_type_distribution_color_RGB.values.tolist(),
-            #     # 'edgecolors': 'black',
-            #     # 'linewidths': 2.0,
-            #     # 'fillstyle': 'left'
-            # }
-            # scalar colors with colormap mode:
-            # plot_replays_kwargs['cmap'] = 'PiYG' # 'coolwarm' # 'PiYG'
-            # plot_replays_kwargs['edgecolors'] = 'black'
-
-            ### edge indicator mode:
-            plot_replays_kwargs = {'marker':'o',
-                's': 5,
-                'c': 'black',
-                'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
-                'linewidths': 5,
-                'alpha': 0.5
-            }
-
-            # ### MULTI-SCATTER MODE: this doesn't really work well and wasn't finished.
-            # plot_replays_kwargs = {'marker':'o',
-            #     's': _marker_shared,
-            #     'c': 'black',
-            #     'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
-            #     'linewidths': 5,
-            #     'alpha': 0.1
-            # }
-            # secondary_plot_replays_kwargs = {
-            #     's': _marker_shared+_marker_long_only,
-            #     'c': 'green',
-            #     'alpha': 0.9
-            # }
-            # third_plot_replays_kwargs = {
-            #     's': _marker_shared+_marker_long_only+_marker_short_only,
-            #     'c': 'red',
-            #     'alpha': 0.9
-            # }
-            # extra_plots_replays_kwargs_list = [secondary_plot_replays_kwargs, third_plot_replays_kwargs]
+                # ### MULTI-SCATTER MODE: this doesn't really work well and wasn't finished.
+                # plot_replays_kwargs = {'marker':'o',
+                #     's': _marker_shared,
+                #     'c': 'black',
+                #     'edgecolors': rdf.neuron_type_distribution_color_RGB.values.tolist(),
+                #     'linewidths': 5,
+                #     'alpha': 0.1
+                # }
+                # secondary_plot_replays_kwargs = {
+                #     's': _marker_shared+_marker_long_only,
+                #     'c': 'green',
+                #     'alpha': 0.9
+                # }
+                # third_plot_replays_kwargs = {
+                #     's': _marker_shared+_marker_long_only+_marker_short_only,
+                #     'c': 'red',
+                #     'alpha': 0.9
+                # }
+                # extra_plots_replays_kwargs_list = [secondary_plot_replays_kwargs, third_plot_replays_kwargs]
 
 
-            # NOTE: 'markeredgewidth' was renamed to 'linewidths'
-            # ax.plot(centers, heights, '.', **plot_replays_kwargs)
-            ax.scatter(centers, heights, **plot_replays_kwargs)
-            if extra_plots_replays_kwargs_list is not None:
-                for curr_plot_kwargs in extra_plots_replays_kwargs_list:
-                    ax.scatter(centers, heights, **curr_plot_kwargs, zorder=5) # double stroke style
-                    # for plot command instead of scatter
-                    # curr_plot_kwargs['markersize'] = curr_plot_kwargs.popitem('s', None)
-                    # ax.plot(centers, heights, **curr_plot_kwargs) # double stroke style
+                # NOTE: 'markeredgewidth' was renamed to 'linewidths'
+                # ax.plot(centers, heights, '.', **plot_replays_kwargs)
+                ax.scatter(centers, heights, **plot_replays_kwargs)
+                if extra_plots_replays_kwargs_list is not None:
+                    for curr_plot_kwargs in extra_plots_replays_kwargs_list:
+                        ax.scatter(centers, heights, **curr_plot_kwargs, zorder=5) # double stroke style
+                        # for plot command instead of scatter
+                        # curr_plot_kwargs['markersize'] = curr_plot_kwargs.popitem('s', None)
+                        # ax.plot(centers, heights, **curr_plot_kwargs) # double stroke style
 
 
-    if show_replay_neuron_participation_distribution_labels:
-        n_replays = np.shape(rdf)[0]
-        _percent_long_only = rdf.num_long_only_neuron_participating.values
-        _percent_shared = rdf.num_shared_neuron_participating.values
-        _percent_short_only = rdf.num_short_only_neuron_participating.values
-        # for i, txt in enumerate(n):
-        for i in np.arange(n_replays):
-            if is_aclu_active_in_replay[i]:
-                # only add the text for active replays for this cell (those where it had non-zero firing):
-                txt = f'{_percent_long_only[i]}|{_percent_shared[i]}|{_percent_short_only[i]}'
-                ax.annotate(txt, (centers.to_numpy()[i], heights[i]), fontsize=6)
+        if show_replay_neuron_participation_distribution_labels:
+            n_replays = np.shape(rdf)[0]
+            _percent_long_only = rdf.num_long_only_neuron_participating.values
+            _percent_shared = rdf.num_shared_neuron_participating.values
+            _percent_short_only = rdf.num_short_only_neuron_participating.values
+            # for i, txt in enumerate(n):
+            for i in np.arange(n_replays):
+                if is_aclu_active_in_replay[i]:
+                    # only add the text for active replays for this cell (those where it had non-zero firing):
+                    txt = f'{_percent_long_only[i]}|{_percent_shared[i]}|{_percent_short_only[i]}'
+                    ax.annotate(txt, (centers.to_numpy()[i], heights[i]), fontsize=6)
 
-    if show_inter_replay_frs:
-        # this would show the inter-replay firing times in orange it's frankly distracting
-        centers = (irdf["start"] + irdf["end"])/2
-        heights = make_fr(irdf)[:, aclu_to_idx[active_aclu]]
-        ax.plot(centers, heights, '.', color=colors[1]+"80", zorder=4, label='inter_replay_frs')
+        if show_inter_replay_frs:
+            # this would show the inter-replay firing times in orange it's frankly distracting
+            centers = (irdf["start"] + irdf["end"])/2
+            heights = make_fr(irdf)[:, aclu_to_idx[active_aclu]]
+            ax.plot(centers, heights, '.', color=colors[1]+"80", zorder=4, label='inter_replay_frs')
 
-    if include_horizontal_labels:
-        ax.set_title(f"Replay firing rates for neuron {active_aclu}")
-        ax.set_xlabel("Time of replay (s)")
+        if include_horizontal_labels:
+            ax.set_title(f"Replay firing rates for neuron {active_aclu}")
+            ax.set_xlabel("Time of replay (s)")
 
-    if include_vertical_labels:
-        ax.set_ylabel("Firing Rate (Hz)")
+        if include_vertical_labels:
+            ax.set_ylabel("Firing Rate (Hz)")
 
-    # Pho's firing rate additions:
-    try:
-        t = time_bins
-        v = unit_specific_time_binned_firing_rates[active_aclu].to_numpy() # index directly by ACLU
-        if v is not None:
-            # Plot the continuous firing rates
-            ax.plot(t, v, color='#aaaaff8c', zorder=2, label='time_binned_frs') # this color is a translucent lilac (purple) color)
-    except KeyError:
-        print(f'non-placefield neuron. Skipping.')
-        t, v = None, None
-        pass
+        # Pho's firing rate additions:
+        try:
+            t = time_bins
+            v = unit_specific_time_binned_firing_rates[active_aclu].to_numpy() # index directly by ACLU
+            if v is not None:
+                # Plot the continuous firing rates
+                ax.plot(t, v, color='#aaaaff8c', zorder=2, label='time_binned_frs') # this color is a translucent lilac (purple) color)
+        except KeyError:
+            print(f'non-placefield neuron. Skipping.')
+            t, v = None, None
+            pass
 
 
-    ## Get the track configs for the colors:
-    long_short_display_config_manager = LongShortDisplayConfigManager()
-    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
-    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
-    
-    # Highlight the two epochs with their characteristic colors ['r','b'] - ideally this would be at the very back
-    x_start, x_stop = ax.get_xlim()
-    ax.axvspan(x_start, t_split, color=long_epoch_config['facecolor'], alpha=0.2, zorder=0)
-    ax.axvspan(t_split, x_stop, color=short_epoch_config['facecolor'], alpha=0.2, zorder=0)
+        ## Get the track configs for the colors:
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
 
-    # Draw the vertical epoch splitter line:
-    required_epoch_bar_height = ax.get_ylim()[-1]
-    ax.vlines(t_split, ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25), zorder=25) # divider should be in very front
+        # Highlight the two epochs with their characteristic colors ['r','b'] - ideally this would be at the very back
+        x_start, x_stop = ax.get_xlim()
+        ax.axvspan(x_start, t_split, color=long_epoch_config['facecolor'], alpha=0.2, zorder=0)
+        ax.axvspan(t_split, x_stop, color=short_epoch_config['facecolor'], alpha=0.2, zorder=0)
 
-    if should_render:
-        if fig is None:
-            fig = plt.gcf()
+        # Draw the vertical epoch splitter line:
+        required_epoch_bar_height = ax.get_ylim()[-1]
+        ax.vlines(t_split, ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25), zorder=25) # divider should be in very front
 
-        fig.canvas.draw()
+        if should_render:
+            if fig is None:
+                fig = plt.gcf()
 
-def _temp_draw_jonathan_spikes_on_track(ax, pos_df, single_neuron_spikes):
-    """ this plots where the neuron spiked on the track
+            fig.canvas.draw()
 
-    Usage:
-        single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
-        _temp_draw_jonathan_spikes_on_track(ax[1,1], pos_df, single_neuron_spikes)
-    """
-    ax.clear()
-    ax.plot(pos_df.t, pos_df.x, color=[.75, .75, .75])
+    @classmethod
+    def _temp_draw_jonathan_spikes_on_track(cls, ax, pos_df, single_neuron_spikes):
+        """ this plots where the neuron spiked on the track
 
-    ax.plot(single_neuron_spikes.t_rel_seconds, single_neuron_spikes.x, 'k.', ms=1)
-    ax.set_xlabel("t (s)")
-    ax.set_ylabel("Position")
-    ax.set_title("Animal position on track")
+        Usage:
+            single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
+            _temp_draw_jonathan_spikes_on_track(ax[1,1], pos_df, single_neuron_spikes)
+        """
+        ax.clear()
+        ax.plot(pos_df.t, pos_df.x, color=[.75, .75, .75])
 
-# ==================================================================================================================== #
-def _make_jonathan_interactive_plot(sess, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
+        ax.plot(single_neuron_spikes.t_rel_seconds, single_neuron_spikes.x, 'k.', ms=1)
+        ax.set_xlabel("t (s)")
+        ax.set_ylabel("Position")
+        ax.set_title("Animal position on track")
 
     # ==================================================================================================================== #
-    ## Plotting/Graphics:
-    fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
+    @classmethod
+    def _make_jonathan_interactive_plot(cls, sess, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pos_df, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False):
 
-    graphics_output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
+        # ==================================================================================================================== #
+        ## Plotting/Graphics:
+        fig, ax = plt.subplots(2,2, figsize=(12.11,4.06));
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color'];
 
-    # plotting for ax[0,0] _______________________________________________________________________________________________ #
-    ax[0,0].axis("equal");
+        graphics_output_dict = {'fig': fig, 'axs': ax, 'colors': colors}
 
-    # I initially set the boundaries like this so I would know where to put the single-track cells
-    # I'm sure there's a better way, though
-    ylim = (-58.34521620102153, 104.37547397480944)
-    xlim = (-97.76920925869598, 160.914964866984)
+        # plotting for ax[0,0] _______________________________________________________________________________________________ #
+        ax[0,0].axis("equal");
 
-    # this fills in the nan's in the single-track cells so that they get plotted at the edges
-    # plotting everything in one go makes resizing points later simpler
-    neuron_replay_stats_df.long_pf_peak_x.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
-    neuron_replay_stats_df.short_pf_peak_x.fillna(ylim[0] + 1, inplace=True)
+        # I initially set the boundaries like this so I would know where to put the single-track cells
+        # I'm sure there's a better way, though
+        ylim = (-58.34521620102153, 104.37547397480944)
+        xlim = (-97.76920925869598, 160.914964866984)
 
-    remap_scatter = ax[0,0].scatter(neuron_replay_stats_df.long_pf_peak_x, neuron_replay_stats_df.short_pf_peak_x, s=7, picker=True, c=[colors[c] for c in neuron_replay_stats_df["has_na"]]);
-    ax[0,0].set_ylim(ylim);
-    ax[0,0].set_xlim(xlim);
-    ax[0,0].xaxis.set_tick_params(labelbottom=False)
-    ax[0,0].yaxis.set_tick_params(labelleft=False)
-    ax[0,0].set_xticks([])
-    ax[0,0].set_yticks([])
+        # this fills in the nan's in the single-track cells so that they get plotted at the edges
+        # plotting everything in one go makes resizing points later simpler
+        neuron_replay_stats_df.long_pf_peak_x.fillna(xlim[0] + 1, inplace=True) # xlim[0] + 1 is the extreme edge of the plot
+        neuron_replay_stats_df.short_pf_peak_x.fillna(ylim[0] + 1, inplace=True)
 
-    ax[0,0].set_xlabel("Distance along long track")
-    ax[0,0].set_ylabel("Distance along short track")
-    ax[0,0].set_title("Peak tuning on short vs. long track")
+        remap_scatter = ax[0,0].scatter(neuron_replay_stats_df.long_pf_peak_x, neuron_replay_stats_df.short_pf_peak_x, s=7, picker=True, c=[colors[c] for c in neuron_replay_stats_df["has_na"]]);
+        ax[0,0].set_ylim(ylim);
+        ax[0,0].set_xlim(xlim);
+        ax[0,0].xaxis.set_tick_params(labelbottom=False)
+        ax[0,0].yaxis.set_tick_params(labelleft=False)
+        ax[0,0].set_xticks([])
+        ax[0,0].set_yticks([])
 
-    graphics_output_dict['remap_scatter'] = remap_scatter
+        ax[0,0].set_xlabel("Distance along long track")
+        ax[0,0].set_ylabel("Distance along short track")
+        ax[0,0].set_title("Peak tuning on short vs. long track")
 
-    # plotting for ax[1,0]: ______________________________________________________________________________________________ #
-    diff_scatter = ax[1,0].scatter(neuron_replay_stats_df.non_replay_diff, neuron_replay_stats_df.replay_diff, s=7, picker=True);
-    # ax[1,0].set_xlabel("Firing rate along long track")
-    # ax[1,0].set_ylabel("Firing rate along short track")
-    ax[1,0].set_title("Firing rate on short vs. long track")
+        graphics_output_dict['remap_scatter'] = remap_scatter
 
-    graphics_output_dict['diff_scatter'] = diff_scatter
+        # plotting for ax[1,0]: ______________________________________________________________________________________________ #
+        diff_scatter = ax[1,0].scatter(neuron_replay_stats_df.non_replay_diff, neuron_replay_stats_df.replay_diff, s=7, picker=True);
+        # ax[1,0].set_xlabel("Firing rate along long track")
+        # ax[1,0].set_ylabel("Firing rate along short track")
+        ax[1,0].set_title("Firing rate on short vs. long track")
 
-    #TODO
-    # diff_scatter = ax[1,0].scatter(scaled_participation, d_activity, s=7, picker=True);
+        graphics_output_dict['diff_scatter'] = diff_scatter
 
-    g_index = 0 # this stands for global index
-    # it keeps track of the index of the neuron we have selected
-    # this is the index in the dataframe (if you were using `iloc`), and not the ACLU
+        #TODO
+        # diff_scatter = ax[1,0].scatter(scaled_participation, d_activity, s=7, picker=True);
 
-    # pos_df = sess.position.to_dataframe()
+        g_index = 0 # this stands for global index
+        # it keeps track of the index of the neuron we have selected
+        # this is the index in the dataframe (if you were using `iloc`), and not the ACLU
 
-    def on_index_change(new_index):
-        'This gets called when the selected neuron changes; it updates the graphs'
+        # pos_df = sess.position.to_dataframe()
 
-        index = new_index
-        aclu = int(neuron_replay_stats_df.index[index])
-        print(f"selected neuron has index: {index} aclu: {aclu}")
+        def on_index_change(new_index):
+            """This gets called when the selected neuron changes; it updates the graphs"""
 
-        # this changes the size of the neuron in ax[0,0]
-        remap_scatter.set_sizes([7 if i!= index else 30 for i in range(len(neuron_replay_stats_df))])
+            index = new_index
+            aclu = int(neuron_replay_stats_df.index[index])
+            print(f"selected neuron has index: {index} aclu: {aclu}")
 
-        # this changes the size of the neuron in ax[1,0]
-        diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(neuron_replay_stats_df))])
+            # this changes the size of the neuron in ax[0,0]
+            remap_scatter.set_sizes([7 if i!= index else 30 for i in range(len(neuron_replay_stats_df))])
 
-        ## New ax[0,1] draw method:
-        t_split = sess.paradigm[0][0,1]
-        _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=fig, ax=ax[0,1], active_aclu=aclu, should_render=True)
+            # this changes the size of the neuron in ax[1,0]
+            diff_scatter.set_sizes([7 if i!= index else 30 for i in range(len(neuron_replay_stats_df))])
 
-        # this plots where the neuron spiked on the track
-        single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
-        _temp_draw_jonathan_spikes_on_track(ax[1,1], pos_df, single_neuron_spikes)
+            ## New ax[0,1] draw method:
+            t_split = sess.paradigm[0][0,1]
+            cls._temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=fig, ax=ax[0,1], active_aclu=aclu, should_render=True)
 
-        fig.canvas.draw()
+            # this plots where the neuron spiked on the track
+            single_neuron_spikes = sess.spikes_df[sess.spikes_df.aclu == aclu]
+            cls._temp_draw_jonathan_spikes_on_track(ax[1,1], pos_df, single_neuron_spikes)
+
+            fig.canvas.draw()
 
 
-    def on_keypress(event):
-        global g_index
-        if event.key=='tab':
-            g_index += 1
-            g_index %= len(neuron_replay_stats_df)
-        elif event.key=='b':
-            g_index -= 1
-            g_index %= len(neuron_replay_stats_df)
+        def on_keypress(event):
+            global g_index
+            if event.key=='tab':
+                g_index += 1
+                g_index %= len(neuron_replay_stats_df)
+            elif event.key=='b':
+                g_index -= 1
+                g_index %= len(neuron_replay_stats_df)
+            on_index_change(g_index)
+
+
+        def on_pick(event):
+            on_index_change(int(event.ind[0]))
+
         on_index_change(g_index)
 
-
-    def on_pick(event):
-        on_index_change(int(event.ind[0]))
-
-    on_index_change(g_index)
-
-    graphics_output_dict['on_index_change'] = {'callback': on_index_change, 'g_index': g_index}
+        graphics_output_dict['on_index_change'] = {'callback': on_index_change, 'g_index': g_index}
 
 
-    fig.canvas.mpl_connect('pick_event', on_pick)
-    fig.canvas.mpl_connect('key_press_event', on_keypress)
-    return graphics_output_dict, neuron_replay_stats_df
-# ==================================================================================================================== #
+        fig.canvas.mpl_connect('pick_event', on_pick)
+        fig.canvas.mpl_connect('key_press_event', on_keypress)
+        return graphics_output_dict, neuron_replay_stats_df
+    # ==================================================================================================================== #
+    @classmethod
+    def _build_spikes_df_interpolated_props(cls, global_results, should_interpolate_to_filtered_positions:bool=False):
+        """ Interpolates the spikes_df's spike positions and other properties from the measured positions, etc.
 
-def _build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions:bool=False):
-    """ Interpolates the spikes_df's spike positions and other properties from the measured positions, etc. 
+        IMPORTANT: the position to be used for interpolation for each spike depends on whether we're only using the filtered positions or not.
+            2023-09-22 - as of now, deciding to NOT use filtered positions so the spike dots will render appropriately for the endcaps.
 
-    IMPORTANT: the position to be used for interpolation for each spike depends on whether we're only using the filtered positions or not.
-        2023-09-22 - as of now, deciding to NOT use filtered positions so the spike dots will render appropriately for the endcaps.
+        """
+        # Group by the aclu (cluster indicator) column
+        cell_grouped_spikes_df = global_results.sess.spikes_df.groupby(['aclu'])
+        cell_spikes_dfs = [cell_grouped_spikes_df.get_group(a_neuron_id) for a_neuron_id in global_results.sess.spikes_df.spikes.neuron_ids] # a list of dataframes for each neuron_id
+        aclu_to_fragile_linear_idx_map = {a_neuron_id:i for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}
+        # get position variables usually used within pfND.setup(...) - self.t, self.x, self.y:
+        ndim = global_results.computed_data.pf1D.ndim
+        if should_interpolate_to_filtered_positions:
+            # restrict to only the filtered positions. I think this is usually NOT what we want.
+            pos_df = global_results.computed_data.pf1D.filtered_pos_df
+        else:
+            # pos_df = global_results.computed_data.pf1D.pos_df
+            pos_df = global_results.computed_data.pf1D.position.to_dataframe()
 
-    """
-    # Group by the aclu (cluster indicator) column
-    cell_grouped_spikes_df = global_results.sess.spikes_df.groupby(['aclu'])
-    cell_spikes_dfs = [cell_grouped_spikes_df.get_group(a_neuron_id) for a_neuron_id in global_results.sess.spikes_df.spikes.neuron_ids] # a list of dataframes for each neuron_id
-    aclu_to_fragile_linear_idx_map = {a_neuron_id:i for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}
-    # get position variables usually used within pfND.setup(...) - self.t, self.x, self.y:
-    ndim = global_results.computed_data.pf1D.ndim
-    if should_interpolate_to_filtered_positions:
-        # restrict to only the filtered positions. I think this is usually NOT what we want.
-        pos_df = global_results.computed_data.pf1D.filtered_pos_df
-    else:
-        # pos_df = global_results.computed_data.pf1D.pos_df
-        pos_df = global_results.computed_data.pf1D.position.to_dataframe()
-
-    t = pos_df.t.to_numpy()
-    x = pos_df.x.to_numpy()
-    if (ndim > 1):
-        y = pos_df.y.to_numpy()
-    else:
-        y = None
-
-    # spk_pos, spk_t = [], []
-    # re-interpolate given the updated spks
-    for cell_df in cell_spikes_dfs:
-        cell_spike_times = cell_df[global_results.sess.spikes_df.spikes.time_variable_name].to_numpy()
-        spk_x = np.interp(cell_spike_times, t, x) # TODO: shouldn't we already have interpolated spike times for all spikes in the dataframe?
-
-        # update the dataframe 'x', 'y' properties:
-        cell_df.loc[:, 'x'] = spk_x
+        t = pos_df.t.to_numpy()
+        x = pos_df.x.to_numpy()
         if (ndim > 1):
-            spk_y = np.interp(cell_spike_times, t, y) # TODO: shouldn't we already have interpolated spike times for all spikes in the dataframe?
-            cell_df.loc[:, 'y'] = spk_y
-            # spk_pos.append([spk_x, spk_y])        
-        # else:
-        #     # otherwise only 1D:
-        #     spk_pos.append([spk_x])
-            
-        # spk_t.append(cell_spike_times)
-
-    # spk_pos[0][0].shape # (214,)
-    # returns (spk_t, spk_pos) arrays that can be used to plot spikes
-    # return cell_spikes_dfs_list, aclu_to_fragile_linear_idx_map #, (spk_t, spk_pos)
-    return {a_neuron_id:cell_spikes_dfs[i] for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}, aclu_to_fragile_linear_idx_map # return a dict instead
-
-@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_general_all_spikes'], creation_date='2023-10-03 19:42', related_items=[])
-def _simple_plot_spikes(ax, a_spk_t, a_spk_pos, spikes_color_RGB=(1, 0, 0), spikes_alpha=0.2, **kwargs):
-    spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
-    spike_plot_kwargs = ({'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGBA, 'markeredgecolor':spikes_color_RGBA, 'zorder':10} | kwargs)
-    ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
-    return ax
-
-
-@function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_simple_plot_spikes'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
-def _plot_general_all_spikes(ax_activity_v_time, active_spikes_df, time_variable_name='t', spikes_alpha=0.9, defer_render=True):
-    """ Plots all spikes for a given cell from that cell's complete `active_spikes_df`
-    There are three different classes of spikes: all (black), long (red), short (blue)
-    
-    
-    Usage:
-
-        curr_aclu_axs = axs[-2]
-        ax_activity_v_time = curr_aclu_axs['lap_spikes']
-
-    ## Serving to replace:
-    active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_alpha=spikes_alpha,
-            position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5},
-            spike_plot_kwargs=spike_plot_kwargs, should_include_labels=False
-        ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
-    """
-
-    # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_spikes_df[global_results.sess.spikes_df.spikes.time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0, 0, 0), spikes_alpha=1.0) # all
-    ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0.1, 0.1, 0.1), spikes_alpha=spikes_alpha) # all
-
-    active_long_spikes_df = active_spikes_df[active_spikes_df.is_included_long_pf1D]
-    ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, spikes_color_RGB=(1, 0, 0), spikes_alpha=spikes_alpha, zorder=15)
-
-    active_short_spikes_df = active_spikes_df[active_spikes_df.is_included_short_pf1D]
-    ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, spikes_color_RGB=(0, 0, 1), spikes_alpha=spikes_alpha, zorder=15)
-
-    # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_global_pf1D]
-    # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_global_spikes_df[time_variable_name].values, active_global_spikes_df['x'].values, spikes_color_RGB=(0, 1, 0), spikes_alpha=1.0, zorder=25, markersize=2.5)
-
-    if not defer_render:
-        fig = ax_activity_v_time.get_figure().get_figure() # For SubFigure
-        fig.canvas.draw()
-
-    return ax_activity_v_time
-
-
-@function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
-def _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
-    """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
-    Internally calls `plot_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
-
-    # Arguments:
-        disable_top_row: bool - default False, if True, disables the entire top row (which usually shows the firing rates during replays, the avg binned fr, etc).
-
-    Used by:
-        `_make_pho_jonathan_batch_plots`
-
-    Historical:
-        used to take sess: DataSession as first argument and then access `sess.paradigm[0][0,1]` internally. On 2022-11-27 refactored to take this time `t_split` directly and no longer require session
-
-
-    """
-    # short_title_string = f'{aclu:02d}'
-
-    formatted_cell_label_string = (f"<size:22><weight:bold>{aclu:02d}</></>")
-    
-    ## Optional additional information about the cell to be rendered next to its aclu, like it's firing rate indicies, etc:
-    optional_cell_info_labels_dict = kwargs.get('optional_cell_info_labels', {})
-    optional_cell_info_labels = optional_cell_info_labels_dict.get(aclu, None) # get the single set of optional labels for this aclu
-
-
-    # the index passed into `plot_1D_placecell_validation(...)` must be in terms of the `pf1D_all` ratemap that's provided. the `rdf_aclu_to_idx` does NOT work and will result in indexing errors
-    # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
-
-    # Not sure if this is okay, but it's possible that the aclu isn't in the ratemap, in which case currently we'll just skip plotting?
-    cell_linear_fragile_IDX = pf1D_aclu_to_idx.get(aclu, None)
-    if cell_linear_fragile_IDX is None:
-        print(f'WARNING: aclu {aclu} is not present in the `pf1D_all` ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}') #TODO 2023-07-07 20:55: - [ ] Note this is hit all the time, not sure what it's supposed to warn about
-    else:
-        cell_neuron_extended_ids = pf1D_all.ratemap.neuron_extended_ids[cell_linear_fragile_IDX]
-        # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
-        # subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
-        try:
-            subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>\ntype <size:10><weight:bold>{cell_neuron_extended_ids.neuron_type}</></>'
-        except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'quality'
-            # Older definition that is missing the quality and neuron type:
-            subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>'
-            
-
-        # print(f'\tsubtitle_string: {subtitle_string}')
-        formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
-    
-    if optional_cell_info_labels is not None:
-        if debug_print:
-            print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
-        optional_cell_info_labels_string: str = optional_cell_info_labels # already should be a string
-        # formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{optional_cell_info_labels_string}</>' # single label mode
-        optional_formatted_cell_label_string = f'<size:9>{optional_cell_info_labels_string}</>' # separate single mode
-    else:
-        optional_formatted_cell_label_string = ''
-
-    # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
-    # title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
-    # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
-    # if debug_print:
-    #     print(f'\t{title_string}\n\t{subtitle_string}')
-    from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation
-    
-    # gridspec mode:
-    curr_fig.set_facecolor('0.65') # light grey
-
-    # num_gridspec_columns = 8 # hardcoded
-    # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
-    # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-
-    # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-    # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
-    # curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
-    # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
-    # curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
-
-
-    # # New Gridspec - Both left and right columns:
-    # num_gridspec_columns = 10 # hardcoded
-    # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
-    # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-    # gs_kw['width_ratios'][-2] = 0.2 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-    # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-
-    # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-    # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-2]) # the whole top row except the last element (to match the firing rates below)
-    # curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0]) # the last element of the first row contains the labels that identify the cell
-    # curr_ax_extra_information_labels = curr_fig.add_subplot(gs[0, -2:]) # the last two element of the first row contains the labels that identify the cell
-    # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-2]) # all up to excluding the last element of the row
-    # curr_ax_placefield = curr_fig.add_subplot(gs[1, -2], sharey=curr_ax_lap_spikes) # only the last element of the row
-    
-    if disable_top_row:
-        # num_gridspec_rows = 1
-        # height_ratios=[1]
-        num_gridspec_rows = 2
-        height_ratios=[1,1]
-    else:
-        num_gridspec_rows = 2
-        height_ratios=[1,1]
-
-    # New Gridspec - Both left and right columns:
-    num_gridspec_columns = 9 # hardcoded
-    gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=height_ratios, wspace=0.0, hspace=0.0)
-    # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-    # gs_kw['width_ratios'][1] = 0.0 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-    # gs_kw['width_ratios'][-1] = 0.1 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-
-    gs = curr_fig.add_gridspec(num_gridspec_rows, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-
-    if disable_top_row:
-        ## Currently make the lap spikes row two rows high so I can keep the separate cell_label and extra_information_labels rows
-        curr_ax_firing_rate = None
-        curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
-        curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
-        curr_ax_lap_spikes = curr_fig.add_subplot(gs[:, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
-        # curr_ax_left_placefield = curr_fig.add_subplot(gs[:, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
-        curr_ax_placefield = curr_fig.add_subplot(gs[:, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
-
-    else:
-        curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-1], label=f'ax_firing_rate[{aclu:02d}]') # the whole top row except the last element (to match the firing rates below)
-        curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
-        curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
-        curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
-        # curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
-        curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
-
-    
-    
-
-    text_formatter = FormattedFigureText()
-    text_formatter.left_margin = 0.5
-    text_formatter.top_margin = 0.5
-    # text_formatter.left_margin = 0.025
-    # text_formatter.top_margin = 0.00
-    
-    title_axes_kwargs = dict(ha="center", va="center", xycoords='axes fraction') # , ma="left"
-    # title_axes_kwargs = dict(ha="left", va="bottom", ma="left", xycoords='axes fraction')
-    # Setup the aclu number ("title axis"):
-    # title_axes_kwargs = dict(ha="center", va="center", fontsize=22, color="black")
-    # curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
-    # flexitext version:
-    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, formatted_cell_label_string, ax=curr_ax_cell_label, **title_axes_kwargs)
-    # curr_ax_cell_label.set_facecolor('0.95')
-    extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center")
-
-    # # # `flexitext` version:
-    
-    # plt.title('')
-    # plt.suptitle('')
-    # fig = plt.gcf() # get figure to setup the margins on.
-    # text_formatter.setup_margins(curr_fig)
-    # # flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:crimson, weight:bold>long ($L$)</>|<color:royalblue, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
-    # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
-
-
-    curr_ax_cell_label.axis('off')
-    curr_ax_extra_information_labels.axis('off')
-
-    custom_replay_scatter_markers_plot_kwargs_list = kwargs.pop('custom_replay_scatter_markers_plot_kwargs_list', None)
-    # Whether to plot the orange horizontal indicator lines that show where spikes occur. Slows down plots a lot.
-    should_plot_spike_indicator_points_on_placefield = kwargs.pop('should_plot_spike_indicator_points_on_placefield', False)
-    
-    ## New ax[0,1] draw method:
-    if not disable_top_row:
-        _temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
-                            include_horizontal_labels=False, include_vertical_labels=False, should_render=False, custom_replay_markers=custom_replay_scatter_markers_plot_kwargs_list)
-        # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
-        curr_ax_firing_rate.set_xticklabels([])
-        curr_ax_firing_rate.spines['top'].set_visible(False)
-        curr_ax_firing_rate.spines['right'].set_visible(False)
-        # curr_ax_firing_rate.spines['bottom'].set_visible(False)
-        # curr_ax_firing_rate.spines['left'].set_visible(False)
-        curr_ax_firing_rate.get_xaxis().set_ticks([])
-        # curr_ax_firing_rate.get_yaxis().set_ticks([])
-
-    # this plots where the neuron spiked on the track
-    curr_ax_lap_spikes.set_xticklabels([])
-    curr_ax_lap_spikes.set_yticklabels([])
-    curr_ax_lap_spikes.axis('off')
-
-    curr_ax_placefield.set_xticklabels([])
-    curr_ax_placefield.set_yticklabels([])
-    curr_ax_placefield.sharey(curr_ax_lap_spikes)
-
-    ## I think that `plot_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
-    _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
-            **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield, 
-                'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
-                'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
-
-    # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_1D_placecell_validation` above so the native spikes from that function aren't plotted
-    cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
-    time_variable_name = kwargs.get('time_variable_name', None)
-    if cell_spikes_dfs_dict is not None:
-        assert time_variable_name is not None, f"if cell_spikes_dfs_dict is passed time_variable_name must also be passed"
-        # active_spikes_df = cell_spikes_dfs[cellind]
-        active_spikes_df = cell_spikes_dfs_dict[aclu]
-        curr_ax_lap_spikes = _plot_general_all_spikes(curr_ax_lap_spikes, active_spikes_df, time_variable_name=time_variable_name, defer_render=True)
-
-    if not disable_top_row:
-        t_start, t_end = curr_ax_lap_spikes.get_xlim()
-        curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
-        curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
-
-    return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
-
-
-@function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
-def _make_pho_jonathan_batch_plots(t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, optional_cell_info_labels=None, debug_print=False, defer_render=False, disable_top_row=False, **kwargs) -> MatplotlibRenderPlots:
-    """ Stacked Jonathan-style firing-rate-across-epochs-plot
-    Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
-        n_max_plot_rows: the maximum number of rows to plot
-        disable_top_row: bool - default False, if True, disables the entire top row (which usually shows the firing rates during replays, the avg binned fr, etc).
-
-    # The colors for each point indicating the percentage of participating cells that belong to which track.
-        - More long_only -> more red
-        - More short_only -> more blue
-
-
-    """
-    if included_unit_neuron_IDs is None:
-        n_all_neuron_IDs = np.shape(neuron_replay_stats_df)[0] 
-        n_max_plot_rows = min(n_all_neuron_IDs, n_max_plot_rows) # don't allow more than the possible number of neuronIDs
-        included_unit_neuron_IDs = [int(neuron_replay_stats_df.index[i]) for i in np.arange(n_max_plot_rows)]
-    else:
-        # truncate to n_max_plot_rows if needed:
-        actual_num_unit_neuron_IDs = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows
-        if (actual_num_unit_neuron_IDs < len(included_unit_neuron_IDs)):
-            print(f'WARNING: truncating included_unit_neuron_IDs of length {len(included_unit_neuron_IDs)} to length {actual_num_unit_neuron_IDs} due to n_max_plot_rows: {n_max_plot_rows}...')
-            included_unit_neuron_IDs = included_unit_neuron_IDs[:actual_num_unit_neuron_IDs]
-
-    # the index passed into plot_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
-    _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)} 
-
-    actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows 
-    active_context = kwargs.get('active_context', None)
-
-
-    ## Figure Setup:
-    fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
-    subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
-    ##########################
-
-    rdf, (_percent_long_only, _percent_shared, _percent_short_only, _percent_short_long_diff) = _build_neuron_type_distribution_color(rdf) # for building partially filled scatter plot points.
-    
-
-    # Build custom replay markers:
-    custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, marker_split_mode=marker_split_mode, debug_print=debug_print)
-    kwargs['custom_replay_scatter_markers_plot_kwargs_list'] = custom_replay_scatter_markers_plot_kwargs_list
-
-    # Set 'optional_cell_info_labels' on the kwargs passed to `_plot_pho_jonathan_batch_plot_single_cell`
-    kwargs['optional_cell_info_labels'] = optional_cell_info_labels
-
-    # # Build all spikes interpolated positions/dfs:
-    # cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
-    # cell_grouped_spikes_df, cell_spikes_dfs = _build_spikes_df_interpolated_props(global_results)
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    axs_list = []
-
-    ## IDEA: to change the display order, keep `_temp_aclu_to_fragile_linear_neuron_IDX` the same and just modify the order of aclu values iterated over
-    # _temp_aclu_to_subfig_idx
-
-    for i, aclu in enumerate(included_unit_neuron_IDs):
-
-        is_first_row = (i==0)
-        is_last_row = (i == (n_max_plot_rows-1))
-
-        # aclu = int(neuron_replay_stats_df.index[i])
-        if debug_print:
-            print(f"selected neuron has index: {i} aclu: {aclu}")
-        
-        try:
-            curr_fig = subfigs[i] # TypeError: 'SubFigure' object is not subscriptable
-        except TypeError as e:
-            # TypeError: 'SubFigure' object is not subscriptable ->  # single subfigure, not subscriptable
-            curr_fig = subfigs
-        except Exception as e:
-            # Unhandled exception
-            raise e
-        
-        curr_single_cell_out_dict = _plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, disable_top_row=disable_top_row, **kwargs)
-
-        # output the axes created:
-        axs_list.append(curr_single_cell_out_dict)
-
-    if isinstance(subfigs, FigureBase):
-        subfigs = [subfigs] # wrap it to be a single item list
-
-    # graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
-    graphics_output_dict = MatplotlibRenderPlots(name='make_pho_jonathan_batch_plots', figures=(fig,), subfigs=subfigs, axes=axs_list, plot_data={'colors': colors})
-
-    if not defer_render:
-        fig.show()
-    return graphics_output_dict
+            y = pos_df.y.to_numpy()
+        else:
+            y = None
+
+        # spk_pos, spk_t = [], []
+        # re-interpolate given the updated spks
+        for cell_df in cell_spikes_dfs:
+            cell_spike_times = cell_df[global_results.sess.spikes_df.spikes.time_variable_name].to_numpy()
+            spk_x = np.interp(cell_spike_times, t, x) # TODO: shouldn't we already have interpolated spike times for all spikes in the dataframe?
+
+            # update the dataframe 'x', 'y' properties:
+            cell_df.loc[:, 'x'] = spk_x
+            if (ndim > 1):
+                spk_y = np.interp(cell_spike_times, t, y) # TODO: shouldn't we already have interpolated spike times for all spikes in the dataframe?
+                cell_df.loc[:, 'y'] = spk_y
+                # spk_pos.append([spk_x, spk_y])
+            # else:
+            #     # otherwise only 1D:
+            #     spk_pos.append([spk_x])
+
+            # spk_t.append(cell_spike_times)
+
+        # spk_pos[0][0].shape # (214,)
+        # returns (spk_t, spk_pos) arrays that can be used to plot spikes
+        # return cell_spikes_dfs_list, aclu_to_fragile_linear_idx_map #, (spk_t, spk_pos)
+        return {a_neuron_id:cell_spikes_dfs[i] for i, a_neuron_id in enumerate(global_results.sess.spikes_df.spikes.neuron_ids)}, aclu_to_fragile_linear_idx_map # return a dict instead
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_general_all_spikes'], creation_date='2023-10-03 19:42', related_items=[])
+    def _simple_plot_spikes(cls, ax, a_spk_t, a_spk_pos, spikes_color_RGB=(1, 0, 0), spikes_alpha=0.2, **kwargs):
+        spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
+        spike_plot_kwargs = ({'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGBA, 'markeredgecolor':spikes_color_RGBA, 'zorder':10} | kwargs)
+        ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
+        return ax
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_simple_plot_spikes'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
+    def _plot_general_all_spikes(cls, ax_activity_v_time, active_spikes_df, time_variable_name='t', spikes_alpha=0.9, defer_render=True):
+        """ Plots all spikes for a given cell from that cell's complete `active_spikes_df`
+        There are three different classes of spikes: all (black), long (red), short (blue)
+
+
+        Usage:
+
+            curr_aclu_axs = axs[-2]
+            ax_activity_v_time = curr_aclu_axs['lap_spikes']
+
+        ## Serving to replace:
+        active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_alpha=spikes_alpha,
+                position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5},
+                spike_plot_kwargs=spike_plot_kwargs, should_include_labels=False
+            ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
+        """
+
+        # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_spikes_df[global_results.sess.spikes_df.spikes.time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0, 0, 0), spikes_alpha=1.0) # all
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0.1, 0.1, 0.1), spikes_alpha=spikes_alpha) # all
+
+        active_long_spikes_df = active_spikes_df[active_spikes_df.is_included_long_pf1D]
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, spikes_color_RGB=(1, 0, 0), spikes_alpha=spikes_alpha, zorder=15)
+
+        active_short_spikes_df = active_spikes_df[active_spikes_df.is_included_short_pf1D]
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, spikes_color_RGB=(0, 0, 1), spikes_alpha=spikes_alpha, zorder=15)
+
+        # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_global_pf1D]
+        # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_global_spikes_df[time_variable_name].values, active_global_spikes_df['x'].values, spikes_color_RGB=(0, 1, 0), spikes_alpha=1.0, zorder=25, markersize=2.5)
+
+        if not defer_render:
+            fig = ax_activity_v_time.get_figure().get_figure() # For SubFigure
+            fig.canvas.draw()
+
+        return ax_activity_v_time
+
+    @classmethod
+    @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
+    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
+        """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
+        Internally calls `plot_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
+
+        # Arguments:
+            disable_top_row: bool - default False, if True, disables the entire top row (which usually shows the firing rates during replays, the avg binned fr, etc).
+
+        Used by:
+            `_make_pho_jonathan_batch_plots`
+
+        Historical:
+            used to take sess: DataSession as first argument and then access `sess.paradigm[0][0,1]` internally. On 2022-11-27 refactored to take this time `t_split` directly and no longer require session
+
+
+        """
+        # short_title_string = f'{aclu:02d}'
+
+        formatted_cell_label_string = (f"<size:22><weight:bold>{aclu:02d}</></>")
+
+        ## Optional additional information about the cell to be rendered next to its aclu, like it's firing rate indicies, etc:
+        optional_cell_info_labels_dict = kwargs.get('optional_cell_info_labels', {})
+        optional_cell_info_labels = optional_cell_info_labels_dict.get(aclu, None) # get the single set of optional labels for this aclu
+
+        # the index passed into `plot_1D_placecell_validation(...)` must be in terms of the `pf1D_all` ratemap that's provided. the `rdf_aclu_to_idx` does NOT work and will result in indexing errors
+        # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
+
+        # Not sure if this is okay, but it's possible that the aclu isn't in the ratemap, in which case currently we'll just skip plotting?
+        cell_linear_fragile_IDX = pf1D_aclu_to_idx.get(aclu, None)
+        if cell_linear_fragile_IDX is None:
+            print(f'WARNING: aclu {aclu} is not present in the `pf1D_all` ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}') #TODO 2023-07-07 20:55: - [ ] Note this is hit all the time, not sure what it's supposed to warn about
+        else:
+            cell_neuron_extended_ids = pf1D_all.ratemap.neuron_extended_ids[cell_linear_fragile_IDX]
+            # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
+            # subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
+            try:
+                subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>\ntype <size:10><weight:bold>{cell_neuron_extended_ids.neuron_type}</></>'
+            except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'quality'
+                # Older definition that is missing the quality and neuron type:
+                subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>'
+
+
+            # print(f'\tsubtitle_string: {subtitle_string}')
+            formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
+
+        if optional_cell_info_labels is not None:
+            if debug_print:
+                print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
+            optional_cell_info_labels_string: str = optional_cell_info_labels # already should be a string
+            # formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{optional_cell_info_labels_string}</>' # single label mode
+            optional_formatted_cell_label_string = f'<size:9>{optional_cell_info_labels_string}</>' # separate single mode
+        else:
+            optional_formatted_cell_label_string = ''
+
+        # cell_linear_fragile_IDX = rdf_aclu_to_idx[aclu] # get the cell_linear_fragile_IDX from aclu
+        # title_string = ' '.join(['pf1D', f'Cell {aclu:02d}'])
+        # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
+        # if debug_print:
+        #     print(f'\t{title_string}\n\t{subtitle_string}')
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation
+
+        # gridspec mode:
+        curr_fig.set_facecolor('0.65') # light grey
+
+        # num_gridspec_columns = 8 # hardcoded
+        # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+        # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+        # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+        # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
+        # curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
+        # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
+        # curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
+
+
+        # # New Gridspec - Both left and right columns:
+        # num_gridspec_columns = 10 # hardcoded
+        # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
+        # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+        # gs_kw['width_ratios'][-2] = 0.2 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+        # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+        # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+        # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-2]) # the whole top row except the last element (to match the firing rates below)
+        # curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0]) # the last element of the first row contains the labels that identify the cell
+        # curr_ax_extra_information_labels = curr_fig.add_subplot(gs[0, -2:]) # the last two element of the first row contains the labels that identify the cell
+        # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-2]) # all up to excluding the last element of the row
+        # curr_ax_placefield = curr_fig.add_subplot(gs[1, -2], sharey=curr_ax_lap_spikes) # only the last element of the row
+
+        if disable_top_row:
+            # num_gridspec_rows = 1
+            # height_ratios=[1]
+            num_gridspec_rows = 2
+            height_ratios=[1,1]
+        else:
+            num_gridspec_rows = 2
+            height_ratios=[1,1]
+
+        # New Gridspec - Both left and right columns:
+        num_gridspec_columns = 9 # hardcoded
+        gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=height_ratios, wspace=0.0, hspace=0.0)
+        # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+        # gs_kw['width_ratios'][1] = 0.0 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+        # gs_kw['width_ratios'][-1] = 0.1 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+
+        gs = curr_fig.add_gridspec(num_gridspec_rows, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
+
+        if disable_top_row:
+            ## Currently make the lap spikes row two rows high so I can keep the separate cell_label and extra_information_labels rows
+            curr_ax_firing_rate = None
+            curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
+            curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
+            curr_ax_lap_spikes = curr_fig.add_subplot(gs[:, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
+            # curr_ax_left_placefield = curr_fig.add_subplot(gs[:, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
+            curr_ax_placefield = curr_fig.add_subplot(gs[:, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+
+        else:
+            curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-1], label=f'ax_firing_rate[{aclu:02d}]') # the whole top row except the last element (to match the firing rates below)
+            curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
+            curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
+            curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
+            # curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
+            curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+
+
+        text_formatter = FormattedFigureText()
+        text_formatter.left_margin = 0.5
+        text_formatter.top_margin = 0.5
+        # text_formatter.left_margin = 0.025
+        # text_formatter.top_margin = 0.00
+
+        title_axes_kwargs = dict(ha="center", va="center", xycoords='axes fraction') # , ma="left"
+        # title_axes_kwargs = dict(ha="left", va="bottom", ma="left", xycoords='axes fraction')
+        # Setup the aclu number ("title axis"):
+        # title_axes_kwargs = dict(ha="center", va="center", fontsize=22, color="black")
+        # curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
+        # flexitext version:
+        title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, formatted_cell_label_string, ax=curr_ax_cell_label, **title_axes_kwargs)
+        # curr_ax_cell_label.set_facecolor('0.95')
+        extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center")
+
+        # # # `flexitext` version:
+
+        # plt.title('')
+        # plt.suptitle('')
+        # fig = plt.gcf() # get figure to setup the margins on.
+        # text_formatter.setup_margins(curr_fig)
+        # # flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:crimson, weight:bold>long ($L$)</>|<color:royalblue, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
+        # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+
+        curr_ax_cell_label.axis('off')
+        curr_ax_extra_information_labels.axis('off')
+
+        custom_replay_scatter_markers_plot_kwargs_list = kwargs.pop('custom_replay_scatter_markers_plot_kwargs_list', None)
+        # Whether to plot the orange horizontal indicator lines that show where spikes occur. Slows down plots a lot.
+        should_plot_spike_indicator_points_on_placefield = kwargs.pop('should_plot_spike_indicator_points_on_placefield', False)
+
+        ## New ax[0,1] draw method:
+        if not disable_top_row:
+            cls._temp_draw_jonathan_ax(t_split, time_bins, unit_specific_time_binned_firing_rates, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs=show_inter_replay_frs, colors=colors, fig=curr_fig, ax=curr_ax_firing_rate, active_aclu=aclu,
+                                include_horizontal_labels=False, include_vertical_labels=False, should_render=False, custom_replay_markers=custom_replay_scatter_markers_plot_kwargs_list)
+            # curr_ax_firing_rate includes only bottom and left spines, and only y-axis ticks and labels
+            curr_ax_firing_rate.set_xticklabels([])
+            curr_ax_firing_rate.spines['top'].set_visible(False)
+            curr_ax_firing_rate.spines['right'].set_visible(False)
+            # curr_ax_firing_rate.spines['bottom'].set_visible(False)
+            # curr_ax_firing_rate.spines['left'].set_visible(False)
+            curr_ax_firing_rate.get_xaxis().set_ticks([])
+            # curr_ax_firing_rate.get_yaxis().set_ticks([])
+
+        # this plots where the neuron spiked on the track
+        curr_ax_lap_spikes.set_xticklabels([])
+        curr_ax_lap_spikes.set_yticklabels([])
+        curr_ax_lap_spikes.axis('off')
+
+        curr_ax_placefield.set_xticklabels([])
+        curr_ax_placefield.set_yticklabels([])
+        curr_ax_placefield.sharey(curr_ax_lap_spikes)
+
+        ## I think that `plot_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
+        _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
+                **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
+                    'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
+                    'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
+
+        # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_1D_placecell_validation` above so the native spikes from that function aren't plotted
+        cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
+        time_variable_name = kwargs.get('time_variable_name', None)
+        if cell_spikes_dfs_dict is not None:
+            assert time_variable_name is not None, f"if cell_spikes_dfs_dict is passed time_variable_name must also be passed"
+            # active_spikes_df = cell_spikes_dfs[cellind]
+            active_spikes_df = cell_spikes_dfs_dict[aclu]
+            curr_ax_lap_spikes = cls._plot_general_all_spikes(curr_ax_lap_spikes, active_spikes_df, time_variable_name=time_variable_name, defer_render=True)
+
+        if not disable_top_row:
+            t_start, t_end = curr_ax_lap_spikes.get_xlim()
+            curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
+            curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
+
+        return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
+
+    @classmethod
+    @function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
+    def _make_pho_jonathan_batch_plots(cls, t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, optional_cell_info_labels=None, debug_print=False, defer_render=False, disable_top_row=False, **kwargs) -> MatplotlibRenderPlots:
+        """ Stacked Jonathan-style firing-rate-across-epochs-plot
+        Internally calls `_plot_pho_jonathan_batch_plot_single_cell`
+            n_max_plot_rows: the maximum number of rows to plot
+            disable_top_row: bool - default False, if True, disables the entire top row (which usually shows the firing rates during replays, the avg binned fr, etc).
+
+        # The colors for each point indicating the percentage of participating cells that belong to which track.
+            - More long_only -> more red
+            - More short_only -> more blue
+
+
+        """
+        if included_unit_neuron_IDs is None:
+            n_all_neuron_IDs = np.shape(neuron_replay_stats_df)[0]
+            n_max_plot_rows = min(n_all_neuron_IDs, n_max_plot_rows) # don't allow more than the possible number of neuronIDs
+            included_unit_neuron_IDs = [int(neuron_replay_stats_df.index[i]) for i in np.arange(n_max_plot_rows)]
+        else:
+            # truncate to n_max_plot_rows if needed:
+            actual_num_unit_neuron_IDs = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows
+            if (actual_num_unit_neuron_IDs < len(included_unit_neuron_IDs)):
+                print(f'WARNING: truncating included_unit_neuron_IDs of length {len(included_unit_neuron_IDs)} to length {actual_num_unit_neuron_IDs} due to n_max_plot_rows: {n_max_plot_rows}...')
+                included_unit_neuron_IDs = included_unit_neuron_IDs[:actual_num_unit_neuron_IDs]
+
+        # the index passed into plot_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
+        _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
+
+        actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows
+        active_context = kwargs.get('active_context', None)
+
+
+        ## Figure Setup:
+        fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
+        subfigs = fig.subfigures(actual_num_subfigures, 1, wspace=0.07)
+        ##########################
+
+        rdf, (_percent_long_only, _percent_shared, _percent_short_only, _percent_short_long_diff) = _build_neuron_type_distribution_color(rdf) # for building partially filled scatter plot points.
+
+        # Build custom replay markers:
+        custom_replay_scatter_markers_plot_kwargs_list = build_replays_custom_scatter_markers(rdf, marker_split_mode=marker_split_mode, debug_print=debug_print)
+        kwargs['custom_replay_scatter_markers_plot_kwargs_list'] = custom_replay_scatter_markers_plot_kwargs_list
+
+        # Set 'optional_cell_info_labels' on the kwargs passed to `_plot_pho_jonathan_batch_plot_single_cell`
+        kwargs['optional_cell_info_labels'] = optional_cell_info_labels
+
+        # # Build all spikes interpolated positions/dfs:
+        # cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
+        # cell_grouped_spikes_df, cell_spikes_dfs = _build_spikes_df_interpolated_props(global_results)
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        axs_list = []
+
+        ## IDEA: to change the display order, keep `_temp_aclu_to_fragile_linear_neuron_IDX` the same and just modify the order of aclu values iterated over
+        # _temp_aclu_to_subfig_idx
+
+        for i, aclu in enumerate(included_unit_neuron_IDs):
+
+            is_first_row = (i==0)
+            is_last_row = (i == (n_max_plot_rows-1))
+
+            # aclu = int(neuron_replay_stats_df.index[i])
+            if debug_print:
+                print(f"selected neuron has index: {i} aclu: {aclu}")
+
+            try:
+                curr_fig = subfigs[i] # TypeError: 'SubFigure' object is not subscriptable
+            except TypeError as e:
+                # TypeError: 'SubFigure' object is not subscriptable ->  # single subfigure, not subscriptable
+                curr_fig = subfigs
+            except Exception as e:
+                # Unhandled exception
+                raise e
+
+            curr_single_cell_out_dict = cls._plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, disable_top_row=disable_top_row, **kwargs)
+
+            # output the axes created:
+            axs_list.append(curr_single_cell_out_dict)
+
+        if isinstance(subfigs, FigureBase):
+            subfigs = [subfigs] # wrap it to be a single item list
+
+        # graphics_output_dict = {'fig': fig, 'subfigs': subfigs, 'axs': axs_list, 'colors': colors}
+        graphics_output_dict = MatplotlibRenderPlots(name='make_pho_jonathan_batch_plots', figures=(fig,), subfigs=subfigs, axes=axs_list, plot_data={'colors': colors})
+
+        if not defer_render:
+            fig.show()
+        return graphics_output_dict
 
 
 # ==================================================================================================================== #
