@@ -1,4 +1,6 @@
 import numpy as np
+import attrs
+from attrs import define, field, Factory, asdict, astuple
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -78,6 +80,7 @@ def _build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=No
             local_plots.colorBarItem = None # shared colorbar item
             
     return local_plots, local_plots_data
+
 
 
 @metadata_attributes(short_name=None, tags=['binning', 'image', 'window', 'standalone', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-19 02:28', related_items=[])

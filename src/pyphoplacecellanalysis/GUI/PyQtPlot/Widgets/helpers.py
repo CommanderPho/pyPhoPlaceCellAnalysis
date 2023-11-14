@@ -51,7 +51,7 @@ def inline_mkColor(color, alpha=1.0):
 
 
 
-@function_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 13:44', related_items=[])
+@function_attributes(short_name=None, tags=['pyqtgraph', 'important', 'useful'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 13:44', related_items=[])
 def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_print=False):
     """ ✅WORKS✅ Recovers the row/column indicies for the items of a graphics_layout_widget 
     
