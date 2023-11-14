@@ -134,7 +134,8 @@ def fig_example_handpicked_pho_jonathan_active_set_cells(curr_active_pipeline, s
 
 
 def fig_surprise_results(curr_active_pipeline):
-	""" 
+	""" 2023-09-10 - Plots the flat_jensen_Shannon Distance across all positions over time
+	
 
 	from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_surprise_results
 
@@ -170,8 +171,8 @@ def fig_surprise_results(curr_active_pipeline):
 	active_filter_epochs = curr_active_pipeline.sess.replay
 	active_filter_epoch_obj: Epoch = _helper_prepare_epoch_df_for_draw_epoch_regions(active_filter_epochs) # these are the replays!
 	
-
-	global_results = curr_active_pipeline.computation_results['maze'].computed_data
+	long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+	global_results = curr_active_pipeline.computation_results[global_epoch_name].computed_data
 	active_extended_stats = global_results['extended_stats']
 	active_relative_entropy_results = active_extended_stats['pf_dt_sequential_surprise']
 	post_update_times = active_relative_entropy_results['post_update_times'] # (4152,) = (n_post_update_times,)
