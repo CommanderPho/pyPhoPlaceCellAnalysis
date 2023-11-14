@@ -19,7 +19,7 @@ class PhoMainAppWindowBase(GlobalConnectionManagerAccessingMixin, QtWidgets.QMai
     
     """
     @property
-    def app(self):
+    def app(self) -> QtWidgets.QApplication:
         """The app property."""
         return self._app
     

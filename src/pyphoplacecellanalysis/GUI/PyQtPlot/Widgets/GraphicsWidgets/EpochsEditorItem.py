@@ -47,7 +47,7 @@ class EpochsEditor:
 
 
     """
-    pos_df: pd.DataFrame = field()
+    pos_df: pd.DataFrame = field(repr=False) # disables super excessive dataframe printing
     curr_laps_df: pd.DataFrame = field()
     on_epoch_region_updated_callback: Optional[Callable] = field()
 

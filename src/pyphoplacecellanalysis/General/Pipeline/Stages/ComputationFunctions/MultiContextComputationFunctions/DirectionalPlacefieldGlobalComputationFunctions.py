@@ -430,7 +430,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
             # uses `global_session`
-            epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=True, include_accel=False)
+            epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=False, include_accel=False)
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(epochs_editor.plots.win, None, title='Pho Directional Laps Templates')
 
             # track_templates.long_LR_decoder.pf

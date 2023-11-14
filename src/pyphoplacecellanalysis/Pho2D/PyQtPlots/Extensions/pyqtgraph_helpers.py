@@ -119,7 +119,7 @@ class LayoutScrollability(ExtendedEnum):
         return cls.build_member_value_dict([False, True])
 
 
-def _perform_build_root_graphics_layout_widget_ui(ui:PhoUIContainer, is_scrollable: bool = True):
+def _perform_build_root_graphics_layout_widget_ui(ui:PhoUIContainer, is_scrollable: bool = True) -> PhoUIContainer:
     """ just adds the widgets required to make the main graphics layoutr scrollable
 
     """
@@ -139,7 +139,7 @@ def _perform_build_root_graphics_layout_widget_ui(ui:PhoUIContainer, is_scrollab
     return ui
 
 
-def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
+def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None) -> PhoUIContainer:
     """ Updates or builds the ui properties to display a GraphicsLayoutWidget:
     ## **Non-Scrollable** Version of `build_scrollable_graphics_layout_widget_ui`
     Usage:
@@ -163,7 +163,7 @@ def build_root_graphics_layout_widget_ui(name, window_title=None, ui=None):
     # lw.ci.setBorder((50, 50, 100))
     return ui
 
-def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None):
+def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None) -> PhoUIContainer:
     """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
     ## **Scrollable** Version of `build_root_graphics_layout_widget_ui`
     Usage:
@@ -189,7 +189,7 @@ def build_scrollable_graphics_layout_widget_ui(name, window_title=None, ui=None)
     
     return ui
 
-def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_title=None, ui=None):
+def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_title=None, ui=None) -> PhoUIContainer:
     """ Updates or builds the ui properties to display a GraphicsLayoutWidget with scrollable rows:
     Usage:
     ## Build scrollable UI version:

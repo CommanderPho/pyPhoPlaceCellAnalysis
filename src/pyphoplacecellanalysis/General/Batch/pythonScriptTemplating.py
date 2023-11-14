@@ -26,7 +26,7 @@ from neuropy.utils.result_context import IdentifyingContext
 
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
-def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/generated_slurm_scripts/', use_separate_run_directories:bool=True, create_slurm_scripts:bool=False, **script_generation_kwargs):
+def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/generated_slurm_scripts/', use_separate_run_directories:bool=True, create_slurm_scripts:bool=False, should_perform_figure_generation_to_file:bool=False, **script_generation_kwargs):
 	""" Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
 	output_directory
@@ -59,9 +59,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	# if script_generation_kwargs is None:
 	# 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
 
-	script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=True, should_perform_figure_generation_to_file=False) | script_generation_kwargs # No recomputing at all:
-	script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=False) | script_generation_kwargs
-	script_generation_kwargs = dict(should_force_reload_all=True, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=False) | script_generation_kwargs # Forced Reloading:
+	script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=True, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs # No recomputing at all:
+	script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs
+	script_generation_kwargs = dict(should_force_reload_all=True, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs # Forced Reloading:
 	# script_generation_kwargs
 
 	if included_session_contexts is None:
@@ -70,7 +70,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	# Set up Jinja2 environment
 	template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
 	env = Environment(loader=FileSystemLoader(template_path))
-	python_template = env.get_template('slurm_python_template.py.j2')
+	python_template = env.get_template('python_template.py.j2')
 	# base_python_template = env.get_template('slurm_python_template_base.py.j2')
 	# python_template = env.get_template('slurm_python_template_NoRecompute.py.j2', parent='slurm_python_template_base.py.j2')
 	slurm_template = env.get_template('slurm_template.sh.j2')

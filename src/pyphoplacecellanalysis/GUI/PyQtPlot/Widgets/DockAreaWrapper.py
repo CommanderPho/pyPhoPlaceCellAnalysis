@@ -20,7 +20,7 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
     
     """
     @property
-    def area(self):
+    def area(self) -> DockArea:
         return self.ui.area
 
     def __init__(self, title='PhoDockAreaContainingWindow', *args, **kwargs):
