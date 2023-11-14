@@ -308,7 +308,7 @@ class BatchSessionCompletionHandler:
         print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
 
         ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
-        was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline)
+        # was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline)
 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
