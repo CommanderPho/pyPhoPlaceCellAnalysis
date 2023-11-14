@@ -42,7 +42,7 @@ def _debug_plot_directional_template_rasters(spikes_df, active_epochs_df, track_
         global_laps_epochs_df = global_laps.to_dataframe()
         # app, win, plots, plots_data, (on_update_active_epoch, on_update_active_scatterplot_kwargs) = _debug_plot_directional_template_rasters(global_spikes_df, global_laps_epochs_df, track_templates)
 
-        odd_display_outputs, even_display_outputs = _debug_plot_directional_template_rasters(global_spikes_df, global_laps_epochs_df, track_templates)
+        LR_display_outputs, RL_display_outputs = _debug_plot_directional_template_rasters(global_spikes_df, global_laps_epochs_df, track_templates)
 
     """
     ## spikes_df: get the spikes to plot
@@ -65,73 +65,73 @@ def _debug_plot_directional_template_rasters(spikes_df, active_epochs_df, track_
 
 
     # CORRECT: Even: RL, Odd: LR
-    even_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
-    odd_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
-    even_long, even_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list]
-    odd_long, odd_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
+    RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
+    LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
+    RL_long, RL_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list]
+    LR_long, LR_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
 
 
     neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
     unit_colors_list = neuron_colors_ndarray.copy()
 
-    unit_sort_orders_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (even_long, odd_long, even_short, odd_short)))
-    # unit_colors_list_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
+    unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_long, LR_long, RL_short, LR_short)))
+    # unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
 
     
     ## Do Even/Odd Separately:
     unit_colors_map = dict(zip(included_neuron_ids, neuron_colors_ndarray.copy().T))
-    even_unit_colors_list = np.array([v for k, v in unit_colors_map.items() if k in even_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
-    odd_unit_colors_list = np.array([v for k, v in unit_colors_map.items() if k in odd_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
-    unit_colors_list_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (even_unit_colors_list, odd_unit_colors_list, even_unit_colors_list, odd_unit_colors_list)))
+    RL_unit_colors_list = np.array([v for k, v in unit_colors_map.items() if k in RL_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
+    LR_unit_colors_list = np.array([v for k, v in unit_colors_map.items() if k in LR_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
+    unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_unit_colors_list, LR_unit_colors_list, RL_unit_colors_list, LR_unit_colors_list)))
 
     # THE LOGIC MUST BE WRONG HERE. Slicing and dicing each Epoch separately is NOT OKAY. Spikes must be built before-hand. Loser.
 
     # Even:
-    even_names = ['long_even', 'short_even']
-    even_unit_sort_orders_dict = {k:v for k, v in unit_sort_orders_dict.items() if k in even_names}
-    even_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in even_names}
-    even_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(even_neuron_ids)
-    even_spikes_df, even_neuron_id_to_new_IDX_map = even_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-    even_display_outputs = _plot_multi_sort_raster_browser(even_spikes_df, even_neuron_ids, unit_sort_orders_dict=even_unit_sort_orders_dict, unit_colors_list_dict=even_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_EVEN', defer_show=False, active_context=None)
-    # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = even_display_outputs
+    RL_names = ['long_RL', 'short_RL']
+    RL_unit_sort_orders_dict = {k:v for k, v in unit_sort_orders_dict.items() if k in RL_names}
+    RL_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in RL_names}
+    RL_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(RL_neuron_ids)
+    RL_spikes_df, RL_neuron_id_to_new_IDX_map = RL_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+    RL_display_outputs = _plot_multi_sort_raster_browser(RL_spikes_df, RL_neuron_ids, unit_sort_orders_dict=RL_unit_sort_orders_dict, unit_colors_list_dict=RL_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_RL', defer_show=False, active_context=None)
+    # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = RL_display_outputs
 
     # Odd:
-    odd_names = ['long_odd', 'short_odd']
-    odd_unit_sort_orders_dict = {k:v for k, v in unit_sort_orders_dict.items() if k in odd_names}
-    odd_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in odd_names}
-    odd_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(odd_neuron_ids)
-    odd_spikes_df, odd_neuron_id_to_new_IDX_map = odd_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-    odd_display_outputs = _plot_multi_sort_raster_browser(odd_spikes_df, odd_neuron_ids, unit_sort_orders_dict=odd_unit_sort_orders_dict, unit_colors_list_dict=odd_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_ODD', defer_show=False, active_context=None)
-    # odd_app, odd_win, odd_plots, odd_plots_data, odd_on_update_active_epoch, odd_on_update_active_scatterplot_kwargs = odd_display_outputs
+    LR_names = ['long_LR', 'short_LR']
+    LR_unit_sort_orders_dict = {k:v for k, v in unit_sort_orders_dict.items() if k in LR_names}
+    LR_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in LR_names}
+    LR_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(LR_neuron_ids)
+    LR_spikes_df, LR_neuron_id_to_new_IDX_map = LR_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+    LR_display_outputs = _plot_multi_sort_raster_browser(LR_spikes_df, LR_neuron_ids, unit_sort_orders_dict=LR_unit_sort_orders_dict, unit_colors_list_dict=LR_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_LR', defer_show=False, active_context=None)
+    # LR_app, LR_win, LR_plots, LR_plots_data, LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs = LR_display_outputs
 
     # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = _plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
-    return odd_display_outputs, even_display_outputs
+    return LR_display_outputs, RL_display_outputs
 
 
-def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict):
+def build_selected_spikes_df(track_templates, active_epochs_df, RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict):
     """ "selected" in this sense means those spikes/spots that were used for the rank-order analysis, such as 'first' for the ripples or 'median' for the laps.
 
-        ## Use odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict to plot the active median spike
+        ## Use LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict to plot the active median spike
 
     Usage:
 
 
         active_epochs_df = global_laps_epochs_df.copy()
-        (even_selected_spike_df, even_neuron_id_to_new_IDX_map), (odd_selected_spike_df, odd_neuron_id_to_new_IDX_map) = build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+        (RL_selected_spike_df, RL_neuron_id_to_new_IDX_map), (LR_selected_spike_df, LR_neuron_id_to_new_IDX_map) = build_selected_spikes_df(track_templates, active_epochs_df, RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
 
     """
     # CORRECT: Even: RL, Odd: LR
-    even_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
-    odd_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
+    RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
+    LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
 
     ## WE HAVE TO BUILT OUT selected_spikes_df ahead of time or die trying. Not one epoch at a time.
 
     # Converts the selected spikes information dict (containing the median/first spikes for each epoch) into a spikes_df capable of being rendered on the raster plot.
     # selected_spike_df_list = []
 
-    even_selected_spike_df_list = []
-    odd_selected_spike_df_list = []
+    RL_selected_spike_df_list = []
+    LR_selected_spike_df_list = []
 
     for an_epoch in active_epochs_df.itertuples():
         # print(an_epoch)
@@ -141,19 +141,19 @@ def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_
 
         # if an_epoch.lap_dir == 0:
         # 	# EVEN:
-        # 	directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
-        # 	shared_directional_aclus_only_neuron_IDs = even_neuron_ids
+        # 	directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
+        # 	shared_directional_aclus_only_neuron_IDs = RL_neuron_ids
         # elif an_epoch.lap_dir == 1:
-        # 	# ODD:
-        # 	directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
-        # 	shared_directional_aclus_only_neuron_IDs = odd_neuron_ids
+        # 	# LR:
+        # 	directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
+        # 	shared_directional_aclus_only_neuron_IDs = LR_neuron_ids
         # else:
         # 	raise NotImplementedError
 
 
-        # EVEN:
-        directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
-        shared_directional_aclus_only_neuron_IDs = even_neuron_ids
+        # RL (Even):
+        directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
+        shared_directional_aclus_only_neuron_IDs = RL_neuron_ids
         selected_spike_fragile_neuron_IDX = np.squeeze(directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict[active_epoch_idx][:,0]).astype('int')
         selected_spike_aclus = shared_directional_aclus_only_neuron_IDs[selected_spike_fragile_neuron_IDX].astype('int')
         selected_spike_times = np.squeeze(directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict[active_epoch_idx][:,1]) # (n_cells, 2)
@@ -163,12 +163,12 @@ def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_
         if hasattr(an_epoch, 'lap_dir'):
             selected_spike_lap_dir = np.full_like(selected_spike_fragile_neuron_IDX, an_epoch.lap_dir).astype('int')
             selected_spike_df['lap_dir'] = selected_spike_lap_dir
-        even_selected_spike_df_list.append(selected_spike_df)
+        RL_selected_spike_df_list.append(selected_spike_df)
         
 
-        # ODD:
-        directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
-        shared_directional_aclus_only_neuron_IDs = odd_neuron_ids
+        # LR (Odd):
+        directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
+        shared_directional_aclus_only_neuron_IDs = LR_neuron_ids
         selected_spike_fragile_neuron_IDX = np.squeeze(directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict[active_epoch_idx][:,0]).astype('int')
         selected_spike_aclus = shared_directional_aclus_only_neuron_IDs[selected_spike_fragile_neuron_IDX].astype('int')
         selected_spike_times = np.squeeze(directional_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict[active_epoch_idx][:,1]) # (n_cells, 2)
@@ -178,55 +178,51 @@ def build_selected_spikes_df(track_templates, active_epochs_df, even_laps_epoch_
             selected_spike_lap_dir = np.full_like(selected_spike_fragile_neuron_IDX, an_epoch.lap_dir).astype('int')
             selected_spike_df['lap_dir'] = selected_spike_lap_dir
 
-        odd_selected_spike_df_list.append(selected_spike_df)
+        LR_selected_spike_df_list.append(selected_spike_df)
 
 
     # selected_spike_df = pd.concat(selected_spike_df_list, ignore_index=True)
     # # Sort by columns: 't' (ascending), 'aclu' (ascending), 'epoch_IDX' (ascending)
-    # selected_spike_df = selected_spike_df.sort_values(['t', 'epoch_IDX', 'aclu']).reset_index(drop=True) # someting wong for evens. WRY?: self.y_fragile_linear_neuron_IDX_map[a_cell_IDX]
+    # selected_spike_df = selected_spike_df.sort_values(['t', 'epoch_IDX', 'aclu']).reset_index(drop=True) # someting wong for RLs. WRY?: self.y_fragile_linear_neuron_IDX_map[a_cell_IDX]
 
     # selected_spike_df['t_rel_seconds'] = selected_spike_df['t']
     # selected_spike_df['neuron_type'] = False # stupid workaround
     # selected_spike_df['flat_spike_idx'] = selected_spike_df.index # stupid workaround
 
-    even_selected_spike_df = pd.concat(even_selected_spike_df_list, ignore_index=True)
+    RL_selected_spike_df = pd.concat(RL_selected_spike_df_list, ignore_index=True)
     # Sort by columns: 't' (ascending), 'aclu' (ascending), 'epoch_IDX' (ascending)
-    even_selected_spike_df = even_selected_spike_df.sort_values(['t', 'epoch_IDX', 'aclu']).reset_index(drop=True) # someting wong for evens. WRY?: self.y_fragile_linear_neuron_IDX_map[a_cell_IDX]
+    RL_selected_spike_df = RL_selected_spike_df.sort_values(['t', 'epoch_IDX', 'aclu']).reset_index(drop=True) # someting wong for RLs. WRY?: self.y_fragile_linear_neuron_IDX_map[a_cell_IDX]
 
-    even_selected_spike_df['t_rel_seconds'] = even_selected_spike_df['t']
-    even_selected_spike_df['neuron_type'] = False # stupid workaround
-    even_selected_spike_df['flat_spike_idx'] = even_selected_spike_df.index # stupid workaround
+    RL_selected_spike_df['t_rel_seconds'] = RL_selected_spike_df['t']
+    RL_selected_spike_df['neuron_type'] = False # stupid workaround
+    RL_selected_spike_df['flat_spike_idx'] = RL_selected_spike_df.index # stupid workaround
 
-    odd_selected_spike_df = pd.concat(odd_selected_spike_df_list, ignore_index=True)
+    LR_selected_spike_df = pd.concat(LR_selected_spike_df_list, ignore_index=True)
     # Sort by columns: 't' (ascending), 'aclu' (ascending), 'epoch_IDX' (ascending)
-    odd_selected_spike_df = odd_selected_spike_df.sort_values(['t', 'epoch_IDX', 'aclu']).reset_index(drop=True) # someting wong for evens. WRY?: self.y_fragile_linear_neuron_IDX_map[a_cell_IDX]
+    LR_selected_spike_df = LR_selected_spike_df.sort_values(['t', 'epoch_IDX', 'aclu']).reset_index(drop=True) # someting wong for RLs. WRY?: self.y_fragile_linear_neuron_IDX_map[a_cell_IDX]
 
-    odd_selected_spike_df['t_rel_seconds'] = odd_selected_spike_df['t']
-    odd_selected_spike_df['neuron_type'] = False # stupid workaround
-    odd_selected_spike_df['flat_spike_idx'] = odd_selected_spike_df.index # stupid workaround
+    LR_selected_spike_df['t_rel_seconds'] = LR_selected_spike_df['t']
+    LR_selected_spike_df['neuron_type'] = False # stupid workaround
+    LR_selected_spike_df['flat_spike_idx'] = LR_selected_spike_df.index # stupid workaround
     
+    # Need to split into RL/LR versions:
+    # RL_selected_spike_df, RL_neuron_id_to_new_IDX_map = deepcopy(selected_spike_df[selected_spike_df.lap_dir == 0]).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+    # LR_selected_spike_df, LR_neuron_id_to_new_IDX_map = deepcopy(selected_spike_df[selected_spike_df.lap_dir == 1]).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
 
+    RL_selected_spike_df, RL_neuron_id_to_new_IDX_map = deepcopy(RL_selected_spike_df).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+    LR_selected_spike_df, LR_neuron_id_to_new_IDX_map = deepcopy(LR_selected_spike_df).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
     
+    return (RL_selected_spike_df, RL_neuron_id_to_new_IDX_map), (LR_selected_spike_df, LR_neuron_id_to_new_IDX_map)
 
 
-    # Need to split into even/odd versions:
-    # even_selected_spike_df, even_neuron_id_to_new_IDX_map = deepcopy(selected_spike_df[selected_spike_df.lap_dir == 0]).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-    # odd_selected_spike_df, odd_neuron_id_to_new_IDX_map = deepcopy(selected_spike_df[selected_spike_df.lap_dir == 1]).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-
-    even_selected_spike_df, even_neuron_id_to_new_IDX_map = deepcopy(even_selected_spike_df).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-    odd_selected_spike_df, odd_neuron_id_to_new_IDX_map = deepcopy(odd_selected_spike_df).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-    
-    return (even_selected_spike_df, even_neuron_id_to_new_IDX_map), (odd_selected_spike_df, odd_neuron_id_to_new_IDX_map)
-
-
-def add_selected_spikes_df_points_to_scatter_plot(plots_data, plots, selected_spikes_df, _active_plot_identifier = 'long_even'):
+def add_selected_spikes_df_points_to_scatter_plot(plots_data, plots, selected_spikes_df, _active_plot_identifier = 'long_RL'):
     """ Called after above `build_selected_spikes_df`
 
     Usage:
-        add_selected_spikes_df_points_to_scatter_plot(plots_data=odd_plots_data, plots=odd_plots, selected_spikes_df=deepcopy(odd_selected_spike_df), _active_plot_identifier = 'long_odd')
-        add_selected_spikes_df_points_to_scatter_plot(plots_data=odd_plots_data, plots=odd_plots, selected_spikes_df=deepcopy(odd_selected_spike_df), _active_plot_identifier = 'short_odd')
-        add_selected_spikes_df_points_to_scatter_plot(plots_data=even_plots_data, plots=even_plots, selected_spikes_df=deepcopy(even_selected_spike_df), _active_plot_identifier = 'long_even')
-        add_selected_spikes_df_points_to_scatter_plot(plots_data=even_plots_data, plots=even_plots, selected_spikes_df=deepcopy(even_selected_spike_df), _active_plot_identifier = 'short_even')
+        add_selected_spikes_df_points_to_scatter_plot(plots_data=LR_plots_data, plots=LR_plots, selected_spikes_df=deepcopy(LR_selected_spike_df), _active_plot_identifier = 'long_LR')
+        add_selected_spikes_df_points_to_scatter_plot(plots_data=LR_plots_data, plots=LR_plots, selected_spikes_df=deepcopy(LR_selected_spike_df), _active_plot_identifier = 'short_LR')
+        add_selected_spikes_df_points_to_scatter_plot(plots_data=RL_plots_data, plots=RL_plots, selected_spikes_df=deepcopy(RL_selected_spike_df), _active_plot_identifier = 'long_RL')
+        add_selected_spikes_df_points_to_scatter_plot(plots_data=RL_plots_data, plots=RL_plots, selected_spikes_df=deepcopy(RL_selected_spike_df), _active_plot_identifier = 'short_RL')
 
     """
     ## Initialize global selected spikes stuff:
