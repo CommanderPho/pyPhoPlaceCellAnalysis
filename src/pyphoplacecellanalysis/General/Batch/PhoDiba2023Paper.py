@@ -529,7 +529,7 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
 
 
 @function_attributes(short_name=None, tags=['FINAL', 'publication', 'figure', 'combined'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 14:33', related_items=[])
-def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figure=True, should_plot_pf1d_compare=True, should_plot_example_rasters=True, should_plot_stacked_epoch_slices=True, should_plot_pho_jonathan_figures=True, show_only_refined_cells=True):
+def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figure=True, should_plot_pf1d_compare=True, should_plot_example_rasters=False, should_plot_stacked_epoch_slices=False, should_plot_pho_jonathan_figures=True, show_only_refined_cells=True):
     """ 
     
     show_only_refined_cells: bool - added 2023-09-28 to output LxC and SxC values "refined" by their firing rate index.
