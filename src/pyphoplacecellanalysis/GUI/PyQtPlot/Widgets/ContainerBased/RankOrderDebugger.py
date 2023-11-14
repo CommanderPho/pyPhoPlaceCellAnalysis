@@ -121,6 +121,8 @@ class GenericPyQtGraphScatterClicker:
 @define(slots=False)
 class RankOrderDebugger:
     """ RankOrderDebugger displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderDebugger import RankOrderDebugger
+
 
     """
     global_spikes_df: pd.DataFrame = field()
