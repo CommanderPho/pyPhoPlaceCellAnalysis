@@ -3,6 +3,8 @@ import logging
 import pathlib
 from pathlib import Path
 from typing import List, Dict, Optional, Union, Callable
+import datetime
+from datetime import time, datetime
 import numpy as np
 import pandas as pd
 import tables as tb
@@ -23,7 +25,7 @@ from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass # used in build_concrete_session_folders
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for build_concrete_session_folders
 
-from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field
+from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
 from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
 
@@ -266,6 +268,10 @@ class BatchRun(HDF_SerializationMixin):
         PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
+    # Record the start time
+    start_time: Optional[time] = non_serialized_field(default=Factory(time.time)) # ()
+    
+
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
     _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
     
@@ -336,6 +342,8 @@ class BatchRun(HDF_SerializationMixin):
     def execute_all(self, use_multiprocessing=True, num_processes=None, included_session_contexts: Optional[List[IdentifyingContext]]=None, session_inclusion_filter:Optional[Callable]=None, **kwargs):
         """ calls `run_specific_batch(...)` for each session context to actually execute the session's run. """
         allow_processing_previously_completed: bool = kwargs.pop('allow_processing_previously_completed', False)
+        # record the start timestamp:
+        self.start_time = datetime.now()
         
         # filter for inclusion here instead of in the loop:  
         if included_session_contexts is not None:
