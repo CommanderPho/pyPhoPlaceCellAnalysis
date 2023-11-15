@@ -3,8 +3,8 @@ import logging
 import pathlib
 from pathlib import Path
 from typing import List, Dict, Optional, Union, Callable
-import datetime
-from datetime import time, datetime
+# import datetime
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import tables as tb
@@ -269,7 +269,7 @@ class BatchRun(HDF_SerializationMixin):
     enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
     # Record the start time
-    start_time: Optional[time] = non_serialized_field(default=Factory(time.time)) # ()
+    start_time: Optional[datetime] = non_serialized_field(default=None) # ()
     
 
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
