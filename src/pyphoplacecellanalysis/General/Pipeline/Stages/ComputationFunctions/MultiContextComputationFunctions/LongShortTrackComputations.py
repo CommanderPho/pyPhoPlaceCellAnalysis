@@ -2745,7 +2745,7 @@ def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, ke
 class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ class to handle spike rate computations
 
-    from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
 
     """
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 10ms
@@ -2774,7 +2774,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         """ full instantaneous computations for both Long and Short epochs:
 
         Can access via:
-            from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
 
             _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
             _out_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())

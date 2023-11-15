@@ -22,7 +22,7 @@ from attrs import asdict, define, field, Factory, astuple
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
-from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import pho_stats_paired_t_test
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_paired_t_test
 from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
 import scipy.stats
 from scipy import ndimage

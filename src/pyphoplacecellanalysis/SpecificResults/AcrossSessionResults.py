@@ -65,7 +65,7 @@ from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import Mat
 
 
 """
-from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
 
 """
 
@@ -370,8 +370,9 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
 
-
-
+from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
+from neuropy.utils.result_context import IdentifyingContext
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_perform_diagonal_line_binomial_test, pho_stats_bar_graph_t_tests
 
 class AcrossSessionsResults:
     """ 
@@ -506,9 +507,60 @@ class AcrossSessionsResults:
 
 
 
+    @classmethod
+    def post_compute_all_sessions_processing(cls, across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list):
+        ## Load the saved across-session results:
+        # inst_fr_output_filename = 'long_short_inst_firing_rate_result_handlers_2023-07-12.pkl'
+        # inst_fr_output_filename = 'across_session_result_long_short_inst_firing_rate.pkl'
+        # inst_fr_output_filename='across_session_result_long_short_inst_firing_rate_2023-07-21.pkl'
+        # inst_fr_output_filename=f'across_session_result_handler_{BATCH_DATE_TO_USE}.pkl'
+        # inst_fr_output_filename='across_session_result_long_short_inst_firing_rate_2023-08-09_Test.pkl'
+        # inst_fr_output_filename='across_session_result_long_short_inst_firing_rate_2023-10-04-GL.pkl'
+        # inst_fr_output_filename='across_session_result_long_short_recomputed_inst_firing_rate_2023-10-04-GL-Recomp.pkl'
+        inst_fr_output_filename = 'across_session_result_long_short_recomputed_inst_firing_rate_2023-10-07.pkl'
+        across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(
+            global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
+        # across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path)
+        num_sessions = len(across_sessions_instantaneous_fr_dict)
+        print(f'num_sessions: {num_sessions}')
 
+        ## Load all across-session tables from the pickles:
+        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(
+            override_output_parent_path=global_data_root_parent_path,
+            output_path_suffix=f'2023-10-07')  # output_path_suffix=f'2023-10-04-GL-Recomp'
+        num_sessions = len(neuron_replay_stats_table.session_uid.unique().to_numpy())
+        print(f'num_sessions: {num_sessions}')
 
+        annotation_man = UserAnnotationsManager()
 
+        LxC_uids = []
+        SxC_uids = []
+
+        for a_ctxt in included_session_contexts:
+            session_uid = a_ctxt.get_description(separator="|", include_property_names=False)
+            session_uid
+            session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[a_ctxt].get(
+                'session_cell_exclusivity', None)
+            LxC_uids.extend([f"{session_uid}|{aclu}" for aclu in session_cell_exclusivity.LxC])
+            SxC_uids.extend([f"{session_uid}|{aclu}" for aclu in session_cell_exclusivity.SxC])
+
+        # [a_ctxt.get_description(separator="|", include_property_names=False) for a_ctxt in included_session_contexts]
+
+        long_short_fr_indicies_analysis_table['XxC_status'] = 'Shared'
+        long_short_fr_indicies_analysis_table.loc[
+            np.isin(long_short_fr_indicies_analysis_table.neuron_uid, LxC_uids), 'XxC_status'] = 'LxC'
+        long_short_fr_indicies_analysis_table.loc[
+            np.isin(long_short_fr_indicies_analysis_table.neuron_uid, SxC_uids), 'XxC_status'] = 'SxC'
+        ## 2023-10-11 - Get the long peak location
+        long_short_fr_indicies_analysis_table['long_pf_peak_x'] = neuron_replay_stats_table['long_pf_peak_x']
+        long_short_fr_indicies_analysis_table.to_csv('output/2023-10-07_long_short_fr_indicies_analysis_table.csv')
+
+        binom_test_chance_result = pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table)
+        print(f'binom_test_chance_result: {binom_test_chance_result}')
+
+        LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(across_session_inst_fr_computation)
+
+        #TODO 2023-11-15 11:20: - [ ] Not yet finished
 
 
 
@@ -660,7 +712,7 @@ class H5FileAggregator:
     """ a class for loading and either building external links to or consolidating multiple .h5 files
     
     Usage:
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5FileAggregator
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import H5FileAggregator
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in session_identifiers] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_identities_table_keys = [f"{session_group_key}/neuron_identities/table" for session_group_key in session_group_keys]
         a_loader = H5FileAggregator.init_from_file_lists(file_list=included_h5_paths, table_key_list=neuron_identities_table_keys)
@@ -703,7 +755,7 @@ class H5FileAggregator:
         Loads .h5 files and consolidates into a master table
         
         Usage:
-            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5FileReference, H5ExternalLinkBuilder
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import H5FileReference, H5ExternalLinkBuilder
 
             session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
             session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
@@ -745,7 +797,7 @@ class H5FileAggregator:
         """ Creates (or overwrites) a new .h5 file at `destination_file_path` containing external links to existing files in self.file_list
         
         Usage:
-            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5FileReference, H5ExternalLinkBuilder
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import H5FileReference, H5ExternalLinkBuilder
 
             session_short_names: List[str] = [a_ctxt.get_description(separator='_') for a_ctxt in included_session_contexts] # 'kdiba.gor01.one.2006-6-08_14-26-15'
             session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
@@ -837,7 +889,7 @@ def save_filelist_to_text_file(output_paths, filelist_path: Path):
 def build_output_filelists(filelist_save_parent_path: Path, included_session_basedirs: List[Path], BATCH_DATE_TO_USE:str, source_computer_name:str='GreatLakes', dest_computer_name:str='LabWorkstation'):
     """ 
     Usage:
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import build_output_filelists
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import build_output_filelists
         
         output_filelist_transfer_dict = build_output_filelists(filelist_save_parent_path=global_data_root_parent_path, included_session_basedirs=included_session_basedirs, BATCH_DATE_TO_USE=BATCH_DATE_TO_USE, dest_computer_name='LabWorkstation')
         
@@ -891,7 +943,7 @@ def build_output_filelists(filelist_save_parent_path: Path, included_session_bas
 
 def copy_files_in_filelist_to_dest(filelist_text_file='fileList_GreatLakes_HDF5_2023-09-29-GL.txt', target_directory='/path/to/target/directory'):
     """ 
-    from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import copy_files_in_filelist_to_dest
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import copy_files_in_filelist_to_dest
     
     copy_files_in_filelist_to_dest(filelist_text_file="/nfs/turbo/umms-kdiba/Data/fileList_GreatLakes_HDF5_2023-09-29-GL.txt", target_directory=Path('output/extracted_hdf5_files/').resolve())
     
@@ -1052,7 +1104,7 @@ class AcrossSessionTables:
         """Save converted back to .h5 file, .csv file, and several others
         
         Usage:
-            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables
 
             AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths)
             included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
@@ -1103,7 +1155,7 @@ class AcrossSessionTables:
         """Save converted back to .h5 file, .csv file, and several others
         
         Usage:
-            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables
  
             neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(override_output_parent_path=global_data_root_parent_path, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
             
@@ -1225,8 +1277,8 @@ class AcrossSessionsVisualizations:
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3. 
 
         Usage:
-            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
-            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsVisualizations
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
 
             neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=True)
             matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
@@ -1280,8 +1332,8 @@ class AcrossSessionsVisualizations:
         
         
         Usage:
-            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionTables
-            from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsVisualizations
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionTables
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
             
             neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_all_known_tables(included_session_contexts, included_h5_paths, should_restore_native_column_types=True)
             matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
