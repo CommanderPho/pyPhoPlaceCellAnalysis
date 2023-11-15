@@ -508,7 +508,7 @@ class AcrossSessionsResults:
 
 
     @classmethod
-    def post_compute_all_sessions_processing(cls, BATCH_DATE_TO_USE: str):
+    def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, BATCH_DATE_TO_USE: str):
         ## Load the saved across-session results:
         # inst_fr_output_filename = 'long_short_inst_firing_rate_result_handlers_2023-07-12.pkl'
         # inst_fr_output_filename = 'across_session_result_long_short_inst_firing_rate.pkl'
@@ -530,14 +530,17 @@ class AcrossSessionsResults:
         num_sessions = len(neuron_replay_stats_table.session_uid.unique().to_numpy())
         print(f'num_sessions: {num_sessions}')
 
+
+        # Does its own additions to `long_short_fr_indicies_analysis_table` table based on the user labeled LxC/SxCs
         annotation_man = UserAnnotationsManager()
+        # Hardcoded included_session_contexts:
+        included_session_contexts = annotation_man.get_hardcoded_good_sessions()
         
         LxC_uids = []
         SxC_uids = []
 
         for a_ctxt in included_session_contexts:
             session_uid = a_ctxt.get_description(separator="|", include_property_names=False)
-            session_uid
             session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[a_ctxt].get('session_cell_exclusivity', None)
             LxC_uids.extend([f"{session_uid}|{aclu}" for aclu in session_cell_exclusivity.LxC])
             SxC_uids.extend([f"{session_uid}|{aclu}" for aclu in session_cell_exclusivity.SxC])
@@ -565,21 +568,19 @@ class AcrossSessionsResults:
 
         LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(across_session_inst_fr_computation)
 
-        #TODO 2023-11-15 11:20: - [ ] Not yet finished
-
 
         ## Plotting:
+        graphics_output_dict = {}
         ## Hacks the `PaperFigureTwo` and `InstantaneousSpikeRateGroupsComputation`
         global_multi_session_context, _out_aggregate_fig_2 = AcrossSessionsVisualizations.across_sessions_bar_graphs(across_session_inst_fr_computation, num_sessions, enable_tiny_point_labels=False, enable_hover_labels=False)
 
         matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-        graphics_output_dict = AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions, save_figure=True)
+        graphics_output_dict |= AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions, save_figure=True)
 
+        graphics_output_dict |= AcrossSessionsVisualizations.across_sessions_long_and_short_firing_rate_replays_v_laps_figure(neuron_replay_stats_table=neuron_replay_stats_table, num_sessions=num_sessions, save_figure=True)
 
-        # %%
-        matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-        graphics_output_dict = AcrossSessionsVisualizations.across_sessions_long_and_short_firing_rate_replays_v_laps_figure(neuron_replay_stats_table=neuron_replay_stats_table, num_sessions=num_sessions, save_figure=True)
-
+        return graphics_output_dict
+    
 
     # ==================================================================================================================== #
     # Old (Pre 2023-07-30 Rewrite)                                                                                         #
