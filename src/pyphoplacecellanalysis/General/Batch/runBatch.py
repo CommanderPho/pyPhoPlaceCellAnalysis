@@ -1,5 +1,4 @@
 import sys
-import datetime
 import logging
 import pathlib
 from pathlib import Path
@@ -36,12 +35,10 @@ from attrs import Factory
 
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
 from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
 from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import generate_batch_single_session_scripts
 
-from pyphocorehelpers.Filesystem.path_helpers import discover_data_files, generate_copydict, copy_movedict, copy_file
-
-
+from pyphocorehelpers.Filesystem.path_helpers import copy_movedict
 
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 

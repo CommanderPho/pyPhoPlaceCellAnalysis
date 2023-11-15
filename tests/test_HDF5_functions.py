@@ -5,7 +5,7 @@ from attrs import define, field, Factory
 import tables as tb
 from typing import List, Dict
 
-from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import H5FileReference, H5ExternalLinkBuilder
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import H5FileReference, H5ExternalLinkBuilder
 
 #TODO 2023-08-23 10:41: - [ ] Skeleton of tests written by ChatGPT, write tests
 

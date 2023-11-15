@@ -56,7 +56,7 @@ from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata, get
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
-from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations, PaperFigureTwo # for `BatchSessionCompletionHandler`
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo # for `BatchSessionCompletionHandler`
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation # for `BatchSessionCompletionHandler`, `AcrossSessionsAggregator`
 from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
