@@ -508,7 +508,7 @@ class AcrossSessionsResults:
 
 
     @classmethod
-    def post_compute_all_sessions_processing(cls, across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list):
+    def post_compute_all_sessions_processing(cls, BATCH_DATE_TO_USE: str):
         ## Load the saved across-session results:
         # inst_fr_output_filename = 'long_short_inst_firing_rate_result_handlers_2023-07-12.pkl'
         # inst_fr_output_filename = 'across_session_result_long_short_inst_firing_rate.pkl'
@@ -517,44 +517,49 @@ class AcrossSessionsResults:
         # inst_fr_output_filename='across_session_result_long_short_inst_firing_rate_2023-08-09_Test.pkl'
         # inst_fr_output_filename='across_session_result_long_short_inst_firing_rate_2023-10-04-GL.pkl'
         # inst_fr_output_filename='across_session_result_long_short_recomputed_inst_firing_rate_2023-10-04-GL-Recomp.pkl'
-        inst_fr_output_filename = 'across_session_result_long_short_recomputed_inst_firing_rate_2023-10-07.pkl'
-        across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(
-            global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
+        ## Load the saved across-session results:
+        inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl'
+        across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
         # across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path)
         num_sessions = len(across_sessions_instantaneous_fr_dict)
         print(f'num_sessions: {num_sessions}')
 
         ## Load all across-session tables from the pickles:
-        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(
-            override_output_parent_path=global_data_root_parent_path,
-            output_path_suffix=f'2023-10-07')  # output_path_suffix=f'2023-10-04-GL-Recomp'
+        output_path_suffix: str = f'{BATCH_DATE_TO_USE}'
+        neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(override_output_parent_path=global_data_root_parent_path, output_path_suffix=output_path_suffix) # output_path_suffix=f'2023-10-04-GL-Recomp'
         num_sessions = len(neuron_replay_stats_table.session_uid.unique().to_numpy())
         print(f'num_sessions: {num_sessions}')
 
         annotation_man = UserAnnotationsManager()
-
+        
         LxC_uids = []
         SxC_uids = []
 
         for a_ctxt in included_session_contexts:
             session_uid = a_ctxt.get_description(separator="|", include_property_names=False)
             session_uid
-            session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[a_ctxt].get(
-                'session_cell_exclusivity', None)
+            session_cell_exclusivity: SessionCellExclusivityRecord = annotation_man.annotations[a_ctxt].get('session_cell_exclusivity', None)
             LxC_uids.extend([f"{session_uid}|{aclu}" for aclu in session_cell_exclusivity.LxC])
             SxC_uids.extend([f"{session_uid}|{aclu}" for aclu in session_cell_exclusivity.SxC])
 
         # [a_ctxt.get_description(separator="|", include_property_names=False) for a_ctxt in included_session_contexts]
 
         long_short_fr_indicies_analysis_table['XxC_status'] = 'Shared'
-        long_short_fr_indicies_analysis_table.loc[
-            np.isin(long_short_fr_indicies_analysis_table.neuron_uid, LxC_uids), 'XxC_status'] = 'LxC'
-        long_short_fr_indicies_analysis_table.loc[
-            np.isin(long_short_fr_indicies_analysis_table.neuron_uid, SxC_uids), 'XxC_status'] = 'SxC'
+        long_short_fr_indicies_analysis_table.loc[np.isin(long_short_fr_indicies_analysis_table.neuron_uid, LxC_uids), 'XxC_status'] = 'LxC'
+        long_short_fr_indicies_analysis_table.loc[np.isin(long_short_fr_indicies_analysis_table.neuron_uid, SxC_uids), 'XxC_status'] = 'SxC'
+
         ## 2023-10-11 - Get the long peak location
         long_short_fr_indicies_analysis_table['long_pf_peak_x'] = neuron_replay_stats_table['long_pf_peak_x']
-        long_short_fr_indicies_analysis_table.to_csv('output/2023-10-07_long_short_fr_indicies_analysis_table.csv')
+        # long_short_fr_indicies_analysis_table
 
+        # long_short_fr_indicies_analysis_table_filename = 'output/2023-10-07_long_short_fr_indicies_analysis_table.csv'
+        long_short_fr_indicies_analysis_table_filename: str = 'output/{BATCH_DATE_TO_USE}_long_short_fr_indicies_analysis_table.csv'
+        long_short_fr_indicies_analysis_table.to_csv(long_short_fr_indicies_analysis_table_filename)
+        print(f'saved: {long_short_fr_indicies_analysis_table_filename}')
+
+
+
+        ## Stats testing:
         binom_test_chance_result = pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table)
         print(f'binom_test_chance_result: {binom_test_chance_result}')
 
@@ -562,6 +567,18 @@ class AcrossSessionsResults:
 
         #TODO 2023-11-15 11:20: - [ ] Not yet finished
 
+
+        ## Plotting:
+        ## Hacks the `PaperFigureTwo` and `InstantaneousSpikeRateGroupsComputation`
+        global_multi_session_context, _out_aggregate_fig_2 = AcrossSessionsVisualizations.across_sessions_bar_graphs(across_session_inst_fr_computation, num_sessions, enable_tiny_point_labels=False, enable_hover_labels=False)
+
+        matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+        graphics_output_dict = AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions, save_figure=True)
+
+
+        # %%
+        matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+        graphics_output_dict = AcrossSessionsVisualizations.across_sessions_long_and_short_firing_rate_replays_v_laps_figure(neuron_replay_stats_table=neuron_replay_stats_table, num_sessions=num_sessions, save_figure=True)
 
 
     # ==================================================================================================================== #
