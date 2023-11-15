@@ -374,6 +374,11 @@ from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExc
 from neuropy.utils.result_context import IdentifyingContext
 from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_perform_diagonal_line_binomial_test, pho_stats_bar_graph_t_tests
 
+
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureOutputLocation, ContextToPathMode, FileOutputManager # used in post_compute_all_sessions_processing
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo # used in post_compute_all_sessions_processing
+
+
 class AcrossSessionsResults:
     """ 
 
@@ -437,10 +442,6 @@ class AcrossSessionsResults:
         #     exper_name  = StringCol(32)
         #     session_name  = StringCol(32)
     
-
-
-
-
 
     # ==================================================================================================================== #
     # NeuronIdentityTable                                                                                                  #
@@ -508,15 +509,11 @@ class AcrossSessionsResults:
 
 
     @classmethod
-    def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, BATCH_DATE_TO_USE: str):
-        ## Load the saved across-session results:
-        # inst_fr_output_filename = 'long_short_inst_firing_rate_result_handlers_2023-07-12.pkl'
-        # inst_fr_output_filename = 'across_session_result_long_short_inst_firing_rate.pkl'
-        # inst_fr_output_filename='across_session_result_long_short_inst_firing_rate_2023-07-21.pkl'
-        # inst_fr_output_filename=f'across_session_result_handler_{BATCH_DATE_TO_USE}.pkl'
-        # inst_fr_output_filename='across_session_result_long_short_inst_firing_rate_2023-08-09_Test.pkl'
-        # inst_fr_output_filename='across_session_result_long_short_inst_firing_rate_2023-10-04-GL.pkl'
-        # inst_fr_output_filename='across_session_result_long_short_recomputed_inst_firing_rate_2023-10-04-GL-Recomp.pkl'
+    def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, BATCH_DATE_TO_USE: str, plotting_enabled:bool):
+        """ 2023-11-15 - called after batch computing all of the sessions and building the required output files. Loads them, processes them, and then plots them! 
+        
+        """
+        # 2023-10-04 - Load Saved across-sessions-data and testing Batch-computed inst_firing_rates:
         ## Load the saved across-session results:
         inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl'
         across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
@@ -562,7 +559,7 @@ class AcrossSessionsResults:
 
 
 
-        ## Stats testing:
+        # 2023-10-10 - Statistics for `across_sessions_bar_graphs`, analysing `across_session_inst_fr_computation` 
         binom_test_chance_result = pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table)
         print(f'binom_test_chance_result: {binom_test_chance_result}')
 
@@ -571,13 +568,24 @@ class AcrossSessionsResults:
 
         ## Plotting:
         graphics_output_dict = {}
-        ## Hacks the `PaperFigureTwo` and `InstantaneousSpikeRateGroupsComputation`
-        global_multi_session_context, _out_aggregate_fig_2 = AcrossSessionsVisualizations.across_sessions_bar_graphs(across_session_inst_fr_computation, num_sessions, enable_tiny_point_labels=False, enable_hover_labels=False)
+        if plotting_enabled:
+            matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            
+            long_short_fr_indicies_analysis_table.plot.scatter(x='long_pf_peak_x', y='x_frs_index', title='Pf Peak position vs. LapsFRI', ylabel='Lap FRI')
+            long_short_fr_indicies_analysis_table.plot.scatter(x='long_pf_peak_x', y='y_frs_index', title='Pf Peak position vs. ReplayFRI', ylabel='Replay FRI')
 
-        matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-        graphics_output_dict |= AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions, save_figure=True)
+            ## 2023-10-04 - Run `AcrossSessionsVisualizations` corresponding to the PhoDibaPaper2023 figures for all sessions
+            ## Hacks the `PaperFigureTwo` and `InstantaneousSpikeRateGroupsComputation`
+            global_multi_session_context, _out_aggregate_fig_2 = AcrossSessionsVisualizations.across_sessions_bar_graphs(across_session_inst_fr_computation, num_sessions, enable_tiny_point_labels=False, enable_hover_labels=False)
 
-        graphics_output_dict |= AcrossSessionsVisualizations.across_sessions_long_and_short_firing_rate_replays_v_laps_figure(neuron_replay_stats_table=neuron_replay_stats_table, num_sessions=num_sessions, save_figure=True)
+            graphics_output_dict |= AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure(long_short_fr_indicies_analysis_results=long_short_fr_indicies_analysis_table, num_sessions=num_sessions, save_figure=True)
+
+            graphics_output_dict |= AcrossSessionsVisualizations.across_sessions_long_and_short_firing_rate_replays_v_laps_figure(neuron_replay_stats_table=neuron_replay_stats_table, num_sessions=num_sessions, save_figure=True)
+
+
+            # ## Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions.
+            # global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
+
 
         return graphics_output_dict
     
@@ -1256,7 +1264,7 @@ class AcrossSessionsVisualizations:
         
 
     @classmethod
-    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, **kwargs):
+    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], num_sessions:int, save_figure=True, instantaneous_time_bin_size_seconds=0.003, **kwargs):
         """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
         Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions."""
 
@@ -1268,7 +1276,7 @@ class AcrossSessionsVisualizations:
         # To correctly aggregate results across sessions, it only makes sense to combine entries at the `.cell_agg_inst_fr_list` variable and lower (as the number of cells can be added across sessions, treated as unique for each session).
 
         ## Display the aggregate across sessions:
-        _out_aggregate_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # WARNING: we didn't save this info
+        _out_aggregate_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # WARNING: we didn't save this info
         _out_aggregate_fig_2.computation_result = across_session_inst_fr_computation
         _out_aggregate_fig_2.active_identifying_session_ctx = across_session_inst_fr_computation.active_identifying_session_ctx
         # Set callback, the only self-specific property
