@@ -135,7 +135,7 @@ class DirectionalLapsHelpers:
     
 
     @classmethod
-    def fix_computation_epochs_if_needed(cls, curr_active_pipeline):
+    def fix_computation_epochs_if_needed(cls, curr_active_pipeline, debug_print=False):
         """2023-11-10 - WORKING NOW - decouples the configs and constrains the computation_epochs to the relevant long/short periods. Will need recomputations if was_modified """
         #TODO 2023-11-10 23:32: - [ ] WORKING NOW!
         # 2023-11-10 21:15: - [X] Not yet finished! Does not work due to shared memory issue. Changes to the first two affect the next two
@@ -144,8 +144,8 @@ class DirectionalLapsHelpers:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
-
-        print(f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}')
+        if debug_print:
+            print(f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}')
         assert short_epoch_obj.n_epochs > 0
         assert long_epoch_obj.n_epochs > 0
 
@@ -166,7 +166,8 @@ class DirectionalLapsHelpers:
             print(f'deduplicated references!')
 
         original_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
-        print(f'original_num_epochs: {original_num_epochs}')
+        if debug_print:
+            print(f'original_num_epochs: {original_num_epochs}')
         assert np.all(original_num_epochs > 0)
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         # relys on: long_epoch_obj, short_epoch_obj
@@ -177,7 +178,8 @@ class DirectionalLapsHelpers:
             curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop))
         
         modified_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
-        print(f'modified_num_epochs: {modified_num_epochs}')
+        if debug_print:
+            print(f'modified_num_epochs: {modified_num_epochs}')
         was_modified = was_modified or np.any(original_num_epochs != modified_num_epochs)
         assert np.all(modified_num_epochs > 0)
         
@@ -187,7 +189,7 @@ class DirectionalLapsHelpers:
 
 
     @classmethod
-    def build_global_directional_result_from_natural_epochs(cls, curr_active_pipeline):
+    def build_global_directional_result_from_natural_epochs(cls, curr_active_pipeline, progress_print=False):
         """ 2023-10-31 - 4pm 
 
         Does not update `curr_active_pipeline` or mess with its filters/configs/etc.
@@ -264,13 +266,15 @@ class DirectionalLapsHelpers:
         odd_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_odd_laps_one_step_decoder_1D, short_odd_laps_one_step_decoder_1D)]
         odd_shared_aclus = np.array(list(set.intersection(*map(set,odd_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
         odd_n_neurons = len(odd_shared_aclus)
-        print(f'odd_n_neurons: {odd_n_neurons}, odd_shared_aclus: {odd_shared_aclus}')
+        if progress_print:
+            print(f'odd_n_neurons: {odd_n_neurons}, odd_shared_aclus: {odd_shared_aclus}')
 
         ## Even Laps:
         even_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_even_laps_one_step_decoder_1D, short_even_laps_one_step_decoder_1D)]
         even_shared_aclus = np.array(list(set.intersection(*map(set,even_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
         even_n_neurons = len(even_shared_aclus)
-        print(f'even_n_neurons: {even_n_neurons}, even_shared_aclus: {even_shared_aclus}')
+        if progress_print:
+            print(f'even_n_neurons: {even_n_neurons}, even_shared_aclus: {even_shared_aclus}')
 
         # Direction Separate shared_aclus decoders: Odd set is limited to odd_shared_aclus and even set is limited to even_shared_aclus:
         long_odd_shared_aclus_only_one_step_decoder_1D, short_odd_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(odd_shared_aclus) for a_decoder in (long_odd_laps_one_step_decoder_1D, short_odd_laps_one_step_decoder_1D)]
