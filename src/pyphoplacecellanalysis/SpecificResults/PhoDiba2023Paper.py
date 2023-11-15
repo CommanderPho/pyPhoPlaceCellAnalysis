@@ -809,6 +809,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
         active_context = kwargs.get('active_context', None)
         assert active_context is not None
+        
+        var_name:str = 'Laps'
+        active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
 
         x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
@@ -831,7 +834,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     def fig_2_Replay_FR_matplotlib(cls, Fig2_Replay_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
         active_context = kwargs.get('active_context', None)
         assert active_context is not None
-
+        
+        var_name:str = 'Replay'
+        active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
+        
         x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
         assert len(Fig2_Replay_FR) == 4
         all_data_points = np.array([v.values for v in Fig2_Replay_FR])
