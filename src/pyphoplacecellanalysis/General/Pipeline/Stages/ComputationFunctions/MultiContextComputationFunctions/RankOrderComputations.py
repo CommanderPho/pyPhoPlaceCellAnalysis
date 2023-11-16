@@ -682,7 +682,8 @@ class RankOrderAnalyses:
             num_missing_points: int = n_y_points - n_x_points
             print(f'WARNING: trimming y-data to [{num_missing_points}:]')
             even_laps_long_short_z_score_diff_values = even_laps_long_short_z_score_diff_values[num_missing_points:]
-            odd_laps_long_short_z_score_diff_values = odd_laps_long_short_z_score_diff_values[num_missing_points:]
+            if odd_laps_long_short_z_score_diff_values is not None:
+                odd_laps_long_short_z_score_diff_values = odd_laps_long_short_z_score_diff_values[num_missing_points:]
 
         # laps_fig, laps_ax = plt.subplots()
         # laps_ax.scatter(np.arange(len(laps_long_short_z_score_diff_values)), laps_long_short_z_score_diff_values, label=f'laps{suffix_str}')
@@ -715,11 +716,21 @@ class RankOrderAnalyses:
         # odd_out_plot_1D: pg.PlotDataItem = p1.plot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
 
         # when using pg.ScatterPlotItem(...) compared to p1.plot(...), you must use the non-'symbol' prefixed argument names: {'symbolBrush':'brush', 'symbolPen':'pen'} 
-        even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, even_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.even), pen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
-        odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, odd_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.odd), pen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+
+        if odd_laps_long_short_z_score_diff_values is not None:
+            first_plot_name = 'even'
+        else:
+            first_plot_name = 'best'
+
+        even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, even_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.even), pen=symbolPen, symbol='t2', name=first_plot_name, hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+        if odd_laps_long_short_z_score_diff_values is not None:
+            odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, odd_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.odd), pen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+        else:
+            odd_out_plot_1D = None
 
         p1.addItem(even_out_plot_1D)
-        p1.addItem(odd_out_plot_1D)
+        if odd_laps_long_short_z_score_diff_values is not None:
+            p1.addItem(odd_out_plot_1D)
         
         # even_out_plot_1D: pg.PlotDataItem = p1.scatterPlot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.even), symbolPen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
         # odd_out_plot_1D: pg.PlotDataItem = p1.scatterPlot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
@@ -936,16 +947,8 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
 
     @function_attributes(short_name='rank_order_debugger', tags=['rank-order','debugger','shuffle'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 01:12', related_items=[], is_global=True)
     def _display_rank_order_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
-            """ Displays a figure for comparing the 1D placefields across-epochs (between the short and long tracks). By default renders the second track's placefield flipped over the x-axis and hatched. 
-                Usage:
-
-                    %matplotlib qt
-                    active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
-
-                    graphics_output_dict = curr_active_pipeline.display('_display_short_long_pf1D_comparison', active_identifying_session_ctx)
-                    fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
-                    
-
+            """ 
+            
             """
             reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)
             # reuse_axs_tuple = None # plot fresh
