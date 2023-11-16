@@ -251,16 +251,16 @@ class Zscorer:
     std_dev: float
     n_values: int
 
-    real_value: float = None
-    z_score_value: float = None # z-score values
+    real_value: float = field(default=None)
+    real_p_value: float = field(default=None)
+    z_score_value: float = field(default=None) # z-score values
 
 
     @classmethod
-    def init_from_values(cls, stats_corr_values: np.array, real_value=None):
-        _obj = cls(original_values=stats_corr_values, mean=np.mean(stats_corr_values), std_dev=np.std(stats_corr_values), n_values=len(stats_corr_values), real_value=real_value, z_score_value=None)
+    def init_from_values(cls, stats_corr_values: np.array, real_value=None, real_p_value=None):
+        _obj = cls(original_values=stats_corr_values, mean=np.mean(stats_corr_values), std_dev=np.std(stats_corr_values), n_values=len(stats_corr_values), real_value=real_value, real_p_value=real_p_value, z_score_value=None)
         _obj.z_score_value = _obj.Zscore(real_value)
         return _obj
-
 
     def Zscore(self, xcritical):
         self.z_score_value = (xcritical - self.mean)/self.std_dev
@@ -284,7 +284,6 @@ class Zscorer:
         ## notice that len(x) == len(y)+1
         plt1.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,50), name='original_values')
         plt1.plot(x, fisher_z_transformed_y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,255,100,50), name='fisher_z_values')
-
 
         # ## Now draw all points as a nicely-spaced scatter plot
         # y = pg.pseudoScatter(vals, spacing=0.15)
@@ -390,8 +389,6 @@ def _subfn_rank_order_shuffle(epoch_specific_shuffled_indicies, epoch_neuron_IDX
 @function_attributes(short_name=None, tags=['shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
 def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle_helper, rank_alignment: str = 'first', disable_re_ranking:bool=True, debug_print=True) -> RankOrderResult:
     """ Extracts the two templates (long/short) from the shuffle_helper in addition to the shuffled_aclus, shuffle_IDXs.
-
-        
 
     """
     shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, (long_pf_peak_ranks, short_pf_peak_ranks) = astuple(shuffle_helper)
@@ -533,8 +530,8 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         long_stats_corr_values = long_spearmanr_rank_stats_results[:,0]
         short_stats_corr_values = short_spearmanr_rank_stats_results[:,0]
 
-        long_stats_z_scorer = Zscorer.init_from_values(long_stats_corr_values, real_long_result_corr_value)
-        short_stats_z_scorer = Zscorer.init_from_values(short_stats_corr_values, real_short_result_corr_value)
+        long_stats_z_scorer = Zscorer.init_from_values(long_stats_corr_values, real_long_result_corr_value, real_long_rank_stats.pvalue)
+        short_stats_z_scorer = Zscorer.init_from_values(short_stats_corr_values, real_short_result_corr_value, real_short_rank_stats.pvalue)
 
         long_short_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value
 
