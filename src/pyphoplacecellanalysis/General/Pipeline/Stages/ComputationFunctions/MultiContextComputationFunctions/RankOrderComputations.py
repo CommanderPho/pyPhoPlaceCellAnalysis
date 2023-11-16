@@ -1039,7 +1039,11 @@ DirectionalRankOrderResult = namedtuple('DirectionalRankOrderResult', ['active_e
                                                                        'long_best_dir_z_score_values', 
                                                            'short_best_dir_z_score_values', 
                                                            'long_short_best_dir_z_score_diff_values', 
-                                                           'directional_likelihoods_tuple'])
+                                                           'directional_likelihoods_tuple', "masked_z_score_values_list"])
+
+import numpy.ma as ma
+
+
 
 
 def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003):
@@ -1047,6 +1051,10 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import most_likely_directional_rank_order_shuffling
     
     """
+    # ODD: 0, EVEN: 1
+    _ODD_INDEX = 0
+    _EVEN_INDEX = 1
+    
     # Unpack all directional variables:
     ## {"even": "RL", "odd": "LR"}
     long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
@@ -1118,6 +1126,27 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
         # return long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies
 
 
+    def _build_masked_z_score_values_list(result_tuple):
+        # Use the relative likelihoods to determine which points to use:
+        long_best_direction_indicies = result_tuple.directional_likelihoods_tuple.long_best_direction_indices
+        short_best_direction_indicies = result_tuple.directional_likelihoods_tuple.short_best_direction_indices
+
+        # # ODD: 0, EVEN: 1
+        # _ODD_INDEX = 0
+        # _EVEN_INDEX = 1
+
+        long_odd_mask = (long_best_direction_indicies == _ODD_INDEX) # [:, long_best_direction_indicies] = True
+        long_even_mask = (long_best_direction_indicies == _EVEN_INDEX)
+
+        short_odd_mask = (short_best_direction_indicies == _ODD_INDEX) # [:, long_best_direction_indicies] = True
+        short_even_mask = (short_best_direction_indicies == _EVEN_INDEX)
+
+        # preferred order, but not the current standard: (long_odd_mask, long_even_mask, short_odd_mask, short_even_mask)
+        # current standard order: (long_odd_mask, short_odd_mask, long_even_mask, short_even_mask)
+        masked_z_score_values_list = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values), (long_odd_mask, short_odd_mask, long_even_mask, short_even_mask))]
+        return masked_z_score_values_list
+
+
     ## Replays:
     global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
     active_epochs = global_replays.copy()
@@ -1136,9 +1165,15 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
     ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
     # print(f'np.shape(ripple_evts_long_short_best_dir_z_score_diff_values): {np.shape(ripple_evts_long_short_best_dir_z_score_diff_values)}')
 
+    # preferred order, but not the current standard: (long_odd_mask, long_even_mask, short_odd_mask, short_even_mask)
+    # current standard order: (long_odd_mask, short_odd_mask, long_even_mask, short_even_mask)
+    ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values),
+                                                                                                        ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
+    
     # outputs: ripple_evts_long_short_best_dir_z_score_diff_values
     ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
-                                                                                long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple)
+                                                                                long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple,
+                                                                                masked_z_score_values_list=ripple_masked_z_score_values_list)
 
 
     ## Laps:
@@ -1155,9 +1190,12 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
     # print(f'np.shape(laps_long_best_dir_z_score_values): {np.shape(laps_long_best_dir_z_score_values)}')
     laps_long_short_best_dir_z_score_diff_values = laps_long_best_dir_z_score_values - laps_short_best_dir_z_score_values
     # print(f'np.shape(laps_long_short_best_dir_z_score_diff_values): {np.shape(laps_long_short_best_dir_z_score_diff_values)}')
+    laps_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values),
+                                                                                                        ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
 
     laps_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(global_laps, long_best_dir_z_score_values=laps_long_best_dir_z_score_values, short_best_dir_z_score_values=laps_short_best_dir_z_score_values,
-                                                                                long_short_best_dir_z_score_diff_values=laps_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=laps_directional_likelihoods_tuple)
+                                                                                long_short_best_dir_z_score_diff_values=laps_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=laps_directional_likelihoods_tuple, 
+                                                                                masked_z_score_values_list=laps_masked_z_score_values_list)
 
     # return long_relative_direction_likelihoods, short_relative_direction_likelihoods, (ripple_evts_long_best_dir_z_score_values, ripple_evts_short_best_dir_z_score_values, ripple_evts_long_short_best_dir_z_score_diff_values)
 
