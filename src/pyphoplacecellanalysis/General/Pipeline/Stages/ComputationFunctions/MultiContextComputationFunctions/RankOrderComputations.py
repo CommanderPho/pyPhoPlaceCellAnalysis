@@ -1,4 +1,4 @@
-from analyses.placefields import PfND
+
 from copy import deepcopy
 from typing import Any, Dict, List, Tuple
 import concurrent.futures
@@ -10,6 +10,7 @@ from multiprocessing import Pool, freeze_support
 # from matplotlib.colors import ListedColormap
 from pathlib import Path
 from neuropy.core import Epoch
+from neuropy.analyses.placefields import PfND
 import numpy as np
 import pandas as pd
 import pyvista as pv
@@ -54,7 +55,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
-from utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
 
 
@@ -1025,8 +1026,27 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
 # ==================================================================================================================== #
 # 2023-11-16 - Long/Short Most-likely LR/RL decoder                                                                    #
 # ==================================================================================================================== #
+from collections import namedtuple
+
+# Define the namedtuple
+DirectionalRankOrderLikelihoods = namedtuple('DirectionalRankOrderLikelihoods', ['long_relative_direction_likelihoods', 
+                                                           'short_relative_direction_likelihoods', 
+                                                           'long_best_direction_indices', 
+                                                           'short_best_direction_indices'])
+
+
+DirectionalRankOrderResult = namedtuple('DirectionalRankOrderResult', ['active_epochs', 
+                                                                       'long_best_dir_z_score_values', 
+                                                           'short_best_dir_z_score_values', 
+                                                           'long_short_best_dir_z_score_diff_values', 
+                                                           'directional_likelihoods_tuple'])
+
 
 def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003):
+    """ 
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import most_likely_directional_rank_order_shuffling
+    
+    """
     # Unpack all directional variables:
     ## {"even": "RL", "odd": "LR"}
     long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
@@ -1089,15 +1109,20 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
         long_best_direction_indicies = np.argmax(long_relative_direction_likelihoods, axis=1)
         short_best_direction_indicies = np.argmax(short_relative_direction_likelihoods, axis=1)
 
-        return long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies
+        # Creating an instance of the namedtuple
+        return DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=long_relative_direction_likelihoods,
+                                            short_relative_direction_likelihoods=short_relative_direction_likelihoods,
+                                            long_best_direction_indices=long_best_direction_indicies,
+                                            short_best_direction_indices=short_best_direction_indicies)
+
+        # return long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies
 
 
     ## Replays:
     global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-
     active_epochs = global_replays.copy()
-    long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = _compute_best(active_epochs)
-
+    ripple_directional_likelihoods_tuple = _compute_best(active_epochs)
+    long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
     # now do the shuffle:
     # Old-style (Odd/Even) naming:
     odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.odd_ripple # LR_ripple_rank_order_result # rank_order_results.odd_ripple
@@ -1107,28 +1132,33 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
     # Using NumPy advanced indexing to select from array_a or array_b:
     ripple_evts_long_best_dir_z_score_values = np.where(~long_best_direction_indicies, odd_ripple_evts_long_z_score_values, even_ripple_evts_long_z_score_values)
     ripple_evts_short_best_dir_z_score_values = np.where(~short_best_direction_indicies, odd_ripple_evts_short_z_score_values, even_ripple_evts_short_z_score_values)
-    print(f'np.shape(ripple_evts_long_best_dir_z_score_values): {np.shape(ripple_evts_long_best_dir_z_score_values)}')
+    # print(f'np.shape(ripple_evts_long_best_dir_z_score_values): {np.shape(ripple_evts_long_best_dir_z_score_values)}')
     ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
-    print(f'np.shape(ripple_evts_long_short_best_dir_z_score_diff_values): {np.shape(ripple_evts_long_short_best_dir_z_score_diff_values)}')
+    # print(f'np.shape(ripple_evts_long_short_best_dir_z_score_diff_values): {np.shape(ripple_evts_long_short_best_dir_z_score_diff_values)}')
 
     # outputs: ripple_evts_long_short_best_dir_z_score_diff_values
+    ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
+                                                                                long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple)
 
 
     ## Laps:
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
-    active_epochs = global_laps.copy()
-    long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = _compute_best(active_epochs)
-
+    laps_directional_likelihoods_tuple = _compute_best(global_laps)
+    long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = laps_directional_likelihoods_tuple
     odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values = rank_order_results.odd_laps # LR_laps_rank_order_result
     even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values = rank_order_results.even_laps
 
     # Using NumPy advanced indexing to select from array_a or array_b:
-    ripple_evts_long_best_dir_z_score_values = np.where(~long_best_direction_indicies, odd_ripple_evts_long_z_score_values, even_ripple_evts_long_z_score_values)
-    ripple_evts_short_best_dir_z_score_values = np.where(~short_best_direction_indicies, odd_ripple_evts_short_z_score_values, even_ripple_evts_short_z_score_values)
-    print(f'np.shape(ripple_evts_long_best_dir_z_score_values): {np.shape(ripple_evts_long_best_dir_z_score_values)}')
-    ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
-    print(f'np.shape(ripple_evts_long_short_best_dir_z_score_diff_values): {np.shape(ripple_evts_long_short_best_dir_z_score_diff_values)}')
+    laps_long_best_dir_z_score_values = np.where(~long_best_direction_indicies, odd_laps_long_z_score_values, even_laps_long_z_score_values)
+    laps_short_best_dir_z_score_values = np.where(~short_best_direction_indicies, odd_laps_short_z_score_values, even_laps_short_z_score_values)
+    # print(f'np.shape(laps_long_best_dir_z_score_values): {np.shape(laps_long_best_dir_z_score_values)}')
+    laps_long_short_best_dir_z_score_diff_values = laps_long_best_dir_z_score_values - laps_short_best_dir_z_score_values
+    # print(f'np.shape(laps_long_short_best_dir_z_score_diff_values): {np.shape(laps_long_short_best_dir_z_score_diff_values)}')
 
+    laps_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(global_laps, long_best_dir_z_score_values=laps_long_best_dir_z_score_values, short_best_dir_z_score_values=laps_short_best_dir_z_score_values,
+                                                                                long_short_best_dir_z_score_diff_values=laps_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=laps_directional_likelihoods_tuple)
 
-    return long_relative_direction_likelihoods, short_relative_direction_likelihoods, (ripple_evts_long_best_dir_z_score_values, ripple_evts_short_best_dir_z_score_values, ripple_evts_long_short_best_dir_z_score_diff_values)
+    # return long_relative_direction_likelihoods, short_relative_direction_likelihoods, (ripple_evts_long_best_dir_z_score_values, ripple_evts_short_best_dir_z_score_values, ripple_evts_long_short_best_dir_z_score_diff_values)
+
+    return ripple_result_tuple, laps_result_tuple
