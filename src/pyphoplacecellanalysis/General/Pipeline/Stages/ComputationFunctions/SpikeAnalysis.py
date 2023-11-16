@@ -176,6 +176,8 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
             unit_specific_inst_spike_rate_values_df, unit_specific_inst_spike_rate_signal, _unit_split_spiketrains = SpikeRateTrends.compute_instantaneous_time_firing_rates(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel,
                                                                                                                                                                             t_start=epoch_start, t_stop=epoch_end, included_neuron_ids=included_neuron_ids)
+            
+            # times accessible via `unit_specific_inst_spike_rate_signal.times`
             epoch_inst_fr_df_list.append(unit_specific_inst_spike_rate_values_df)
             epoch_inst_fr_signal_list.append(unit_specific_inst_spike_rate_signal)
 
