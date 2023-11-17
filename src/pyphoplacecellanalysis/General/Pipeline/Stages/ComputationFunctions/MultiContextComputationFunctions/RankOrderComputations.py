@@ -1228,6 +1228,8 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
                                             long_best_direction_indices=long_best_direction_indicies,
                                             short_best_direction_indices=short_best_direction_indicies)
 
+
+    # a "precise shift" that allows me to reduce the DPI for precision when I need it. Maybe with that side button. Liek when I"m trying to hit precise targets. It would be cool if it magnitified the cursor area too!
    
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
