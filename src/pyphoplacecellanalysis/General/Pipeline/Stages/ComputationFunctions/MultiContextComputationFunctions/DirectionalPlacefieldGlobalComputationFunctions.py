@@ -4,6 +4,7 @@ from attrs import define, field, Factory, asdict, astuple
 from functools import wraps
 from copy import deepcopy
 from typing import List, Dict, Optional
+from pathlib import Path
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.function_helpers import function_attributes
@@ -370,6 +371,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
+import pyqtgraph as pg
+import pyqtgraph.exporters
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
 
 
 
@@ -471,4 +475,66 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # Outputs: root_dockAreaWindow, app, epochs_editor, _out_pf1D_heatmaps, _out_dock_widgets
             graphics_output_dict = {'win': root_dockAreaWindow, 'app': app,  'ui': (epochs_editor, _out_dock_widgets), 'plots': _out_pf1D_heatmaps}
 
+
+            # Saving/Exporting to file ___________________________________________________________________________________________ #
+            #TODO 2023-11-16 22:16: - [ ] Figure out how to save
+                    
+            def save_figure(): # export_file_base_path: Path = Path(f'output').resolve()
+                """ captures: epochs_editor, _out_pf1D_heatmaps 
+                
+                TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
+                
+                """
+                ## Get main laps plotter:
+                # print_keys_if_possible('_out', _out, max_depth=4)
+                # plots = _out['plots']
+
+                ## Already have: epochs_editor, _out_pf1D_heatmaps
+                # epochs_editor = _out['ui'][0]
+                # epochs_editor
+
+                # print(list(plots.keys()))
+                # pg.GraphicsLayoutWidget 
+                main_graphics_layout_widget = epochs_editor.plots.win
+                export_file_path = Path(f'output/2023-11-16_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
+                export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
+
+                # _out_pf1D_heatmaps = _out['plots']
+                for a_decoder_name, a_decoder_heatmap_tuple in _out_pf1D_heatmaps.items():
+                    a_win, a_img = a_decoder_heatmap_tuple
+                    # create an exporter instance, as an argument give it the item you wish to export
+                    exporter = pg.exporters.ImageExporter(a_win.plotItem)
+                    # exporter = pg.exporters.SVGExporter(a_win.plotItem)
+                    # set export parameters if needed
+                    # exporter.parameters()['width'] = 300   # (note this also affects height parameter)
+
+                    # save to file
+                    export_file_path = Path(f'output/2023-11-16_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
+                    
+                    exporter.export(export_file_path) # '.png'
+                    print(f'exporting to {export_file_path}')
+                    # .scene()
+
+
+            #TODO 2023-11-16 22:23: - [ ] The other display functions using matplotlib do things like this: 
+            # final_context = active_context
+            # graphics_output_dict['context'] = final_context
+            # graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate,
+            #     'time_variable_name':time_variable_name, 'fignum':curr_fig_num}
+
+            # def _perform_write_to_file_callback():
+            #     ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+            #     return owning_pipeline_reference.output_figure(final_context, graphics_output_dict.figures[0])
+            
+            # if save_figure:
+            #     active_out_figure_paths = _perform_write_to_file_callback()
+            # else:
+            #     active_out_figure_paths = []
+
+            # graphics_output_dict['saved_figures'] = active_out_figure_paths
+            
+
+
+
+            
             return graphics_output_dict
