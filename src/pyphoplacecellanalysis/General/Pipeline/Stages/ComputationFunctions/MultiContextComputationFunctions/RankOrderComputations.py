@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple
 import concurrent.futures
 from functools import partial
 from itertools import repeat
+from collections import namedtuple
 import multiprocessing
 from multiprocessing import Pool, freeze_support
 
@@ -12,11 +13,10 @@ from pathlib import Path
 from neuropy.core import Epoch
 from neuropy.analyses.placefields import PfND
 import numpy as np
+import numpy.ma as ma # used in `most_likely_directional_rank_order_shuffling`
 import pandas as pd
 import pyvista as pv
 import pyvistaqt as pvqt # conda install -c conda-forge pyvistaqt
-
-
 from nptyping import NDArray
 import attrs
 from attrs import asdict, define, field, Factory, astuple
@@ -32,7 +32,7 @@ from neuropy.utils.misc import build_shuffled_ids # used in _SHELL_analyze_leave
 from neuropy.utils.mixins.print_helpers import print_array
 import matplotlib.pyplot as plt
 
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 # from pyphoplacecellanalysis.PhoPositionalData.analysis.interactive_placeCell_config import print_subsession_neuron_differences
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for display_all_pf_2D_pyqtgraph_binned_image_rendering
@@ -40,7 +40,6 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 ## Laps Stuff:
 from neuropy.core.epoch import NamedTimerange
-
 
 from scipy import stats # _recover_samples_per_sec_from_laps_df
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -56,8 +55,6 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResu
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
-
-
 
 
 # ==================================================================================================================== #
@@ -938,7 +935,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemp
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import build_selected_spikes_df
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import add_selected_spikes_df_points_to_scatter_plot
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
-
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions # used in `plot_z_score_diff_and_raw`
 
 class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ RankOrderGlobalDisplayFunctions
@@ -1023,10 +1020,117 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             return graphics_output_dict
 
 
+
+# def plot_z_score_diff_and_raw(x_values: np.ndarray, long_short_best_dir_z_score_diff_values: np.ndarray, masked_z_score_values_list: List[np.ma.core.MaskedArray], variable_name: str, x_axis_name_suffix: str, point_data_values: np.ndarray, long_epoch=None, short_epoch=None) -> Tuple:
+# 	"""
+# 	Plots the z-score diff and raw plots for either ripple or lap data.
+
+# 	Args:
+# 	- x_values (np.ndarray): array of x-axis values
+# 	- long_short_best_dir_z_score_diff_values (np.ndarray): array of z-score diff values
+# 	- masked_z_score_values_list (List[np.ma.core.MaskedArray]): list of masked arrays of z-score values
+# 	- variable_name (str): name of the variable being plotted (e.g. "Ripple" or "Lap")
+# 	- x_axis_name_suffix (str): suffix for the x-axis name (e.g. "Index" or "Mid-time (Sec)")
+# 	- point_data_values (np.ndarray): array of point data values
+# 	- long_epoch (optional): epoch object for the long epoch
+# 	- short_epoch (optional): epoch object for the short epoch
+
+# 	Returns:
+# 	- Tuple: tuple containing the plot objects
+# 	"""
+#     result_tuple
+# 	# Plot z-score diff
+# 	display_replay_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(x_values, result_tuple.long_short_best_dir_z_score_diff_values, None, variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix, point_data_values=point_data_values)
+# 	app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = display_replay_z_score_diff_outputs # unwrap
+
+# 	# Plot z-score raw
+# 	display_replay_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(x_values, *result_tuple.masked_z_score_values_list, variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix, point_data_values=point_data_values)
+# 	raw_app, raw_win, raw_p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D) = display_replay_z_score_raw_outputs
+
+# 	# Add long/short epoch indicator regions
+# 	if long_epoch is not None and short_epoch is not None:
+# 		long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(p1, long_epoch, short_epoch)
+# 		long_epoch_indicator_region_items_raw, short_epoch_indicator_region_items_raw = _helper_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
+# 	else:
+# 		long_epoch_indicator_region_items, short_epoch_indicator_region_items = None, None
+# 		long_epoch_indicator_region_items_raw, short_epoch_indicator_region_items_raw = None, None
+
+# 	# Return plot objects
+# 	return (app, win, p1, (even_out_plot_1D, odd_out_plot_1D), long_epoch_indicator_region_items, short_epoch_indicator_region_items), (raw_app, raw_win, raw_p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D), long_epoch_indicator_region_items_raw, short_epoch_indicator_region_items_raw)
+
+
+@function_attributes(short_name=None, tags=['rank-order', 'inst_fr', 'epoch', 'lap', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-16 18:42', related_items=['most_likely_directional_rank_order_shuffling'])
+def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tuple, analysis_type):
+    """
+    Generalized function to perform analysis and plot for either ripples or laps.
+
+    Args:
+    - curr_active_pipeline: The current active pipeline object.
+    - result_tuple: The result tuple specific to ripples or laps.
+    - analysis_type: A string, either 'Ripple' or 'Lap', to specify the type of analysis.
+    
+
+    Usage:    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import most_likely_directional_rank_order_shuffling
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_rank_order_epoch_inst_fr_result_tuples
+        
+        ## Main Compute inst-fr-based rank-order shuffling:
+        ripple_result_tuple, laps_result_tuple = most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003)
+        
+        # Plot the Ripple results:
+        ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, ripple_result_tuple, 'Ripple')
+
+        # Plot the Lap results:
+        lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, laps_result_tuple, 'Lap')
+
+    """
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
+    short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
+
+    # global_spikes_df, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=1000)
+    # spikes_df = deepcopy(global_spikes_df)
+
+    if analysis_type == 'Ripple':
+        global_events = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
+    elif analysis_type == 'Lap':
+        global_events = deepcopy(result_tuple.active_epochs)
+    else:
+        raise ValueError("Invalid analysis type. Choose 'Ripple' or 'Lap'.")
+
+    if isinstance(global_events, pd.DataFrame):
+        global_events = Epoch(global_events.epochs.get_valid_df())
+
+    epoch_identifiers = np.arange(global_events.n_epochs)
+    x_values = global_events.midtimes
+    x_axis_name_suffix = 'Mid-time (Sec)'
+
+    _display_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(
+        x_values, result_tuple.long_short_best_dir_z_score_diff_values, None, 
+        variable_name=analysis_type, x_axis_name_suffix=x_axis_name_suffix, 
+        point_data_values=epoch_identifiers
+    )
+    _display_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(
+        x_values, *result_tuple.masked_z_score_values_list, 
+        variable_name=analysis_type, x_axis_name_suffix=x_axis_name_suffix, 
+        point_data_values=epoch_identifiers
+    )
+
+    app, win, diff_p1, out_plot_1D = _display_z_score_diff_outputs
+    long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(diff_p1, long_epoch, short_epoch)
+    raw_app, raw_win, raw_p1, raw_out_plot_1D = _display_z_score_raw_outputs
+    long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
+
+    active_connections_dict = {}  # for holding connections
+    return app, win, diff_p1, out_plot_1D, raw_app, raw_win, raw_p1, raw_out_plot_1D
+
+
+
 # ==================================================================================================================== #
 # 2023-11-16 - Long/Short Most-likely LR/RL decoder                                                                    #
 # ==================================================================================================================== #
-from collections import namedtuple
+
 
 # Define the namedtuple
 DirectionalRankOrderLikelihoods = namedtuple('DirectionalRankOrderLikelihoods', ['long_relative_direction_likelihoods', 
@@ -1041,14 +1145,16 @@ DirectionalRankOrderResult = namedtuple('DirectionalRankOrderResult', ['active_e
                                                            'long_short_best_dir_z_score_diff_values', 
                                                            'directional_likelihoods_tuple', "masked_z_score_values_list"])
 
-import numpy.ma as ma
 
-
-
-
+@function_attributes(short_name=None, tags=['rank-order', 'shuffle', 'inst_fr', 'epoch', 'lap', 'replay', 'computation'], input_requires=[], output_provides=[], uses=['DirectionalRankOrderLikelihoods', 'DirectionalRankOrderResult'], used_by=[], creation_date='2023-11-16 18:43', related_items=['plot_rank_order_epoch_inst_fr_result_tuples'])
 def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003):
     """ 
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import most_likely_directional_rank_order_shuffling
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import most_likely_directional_rank_order_shuffling
+
+        ## Main
+        ripple_result_tuple, laps_result_tuple = most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003)
     
     """
     # ODD: 0, EVEN: 1
