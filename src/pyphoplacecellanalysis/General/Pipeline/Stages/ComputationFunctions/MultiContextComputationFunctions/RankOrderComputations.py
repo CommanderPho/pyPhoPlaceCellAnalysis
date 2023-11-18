@@ -931,11 +931,10 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import _debug_plot_directional_template_rasters
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import build_selected_spikes_df
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import add_selected_spikes_df_points_to_scatter_plot
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderDebugger import RankOrderDebugger
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions # used in `plot_z_score_diff_and_raw`
+
 
 class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ RankOrderGlobalDisplayFunctions
@@ -979,46 +978,17 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             global_ripples_epochs_df = global_replays.to_dataframe()
             active_epochs_df = global_ripples_epochs_df.copy()
 
-            odd_display_outputs, even_display_outputs = _debug_plot_directional_template_rasters(global_spikes_df, active_epochs_df, track_templates)
-            odd_app, odd_win, odd_plots, odd_plots_data, odd_on_update_active_epoch, odd_on_update_active_scatterplot_kwargs = odd_display_outputs
-            even_app, even_win, even_plots, even_plots_data, even_on_update_active_epoch, even_on_update_active_scatterplot_kwargs = even_display_outputs
+            rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
 
-            # Build the wrapping window using `DockAreaWrapper`:
-            active_root_main_widget = odd_win.window()
-            root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, even_win, title='Pho Rank-Order Epochs Debugger')
+            #TODO 2023-11-17 19:57: - [ ] Find other expansions of this kinda and replace it
+            LR_laps_epoch_ranked_aclus_stats_dict, LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_laps_long_z_score_values, LR_laps_short_z_score_values, LR_laps_long_short_z_score_diff_values = rank_order_results.odd_laps
+            RL_laps_epoch_ranked_aclus_stats_dict, RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, RL_laps_long_z_score_values, RL_laps_short_z_score_values, RL_laps_long_short_z_score_diff_values = rank_order_results.even_laps
 
-            def on_update_active_epoch(an_epoch_idx, an_epoch):
-                """ captures: odd_on_update_active_epoch, even_on_update_active_epoch, root_dockAreaWindow """
-                odd_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
-                even_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
-                root_dockAreaWindow.setWindowTitle(f'Pho Rank-Order Epochs Debugger: Epoch[{an_epoch_idx}]')
+            LR_ripple_evts_epoch_ranked_aclus_stats_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_long_z_score_values, LR_ripple_evts_short_z_score_values, LR_ripple_evts_long_short_z_score_diff_values = rank_order_results.odd_ripple
+            RL_ripple_evts_epoch_ranked_aclus_stats_dict, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, RL_ripple_evts_long_z_score_values, RL_ripple_evts_short_z_score_values, RL_ripple_evts_long_short_z_score_diff_values = rank_order_results.even_ripple
 
-
-            def on_update_epoch_IDX(an_epoch_idx):
-                """ captures on_update_active_epoch, active_epochs_df to extract the epoch time range and call `on_update_active_epoch` """
-                # curr_epoch_spikes = spikes_df[(spikes_df.new_lap_IDX == an_epoch_idx)]
-                # curr_epoch_df = active_epochs_df[(active_epochs_df.lap_id == (an_epoch_idx+1))]
-                # curr_epoch_df = active_epochs_df[(active_epochs_df.label.astype(float) == float(an_epoch_idx))]
-                curr_epoch_df = active_epochs_df[(active_epochs_df.index.astype(float) == float(an_epoch_idx))]
-                curr_epoch = list(curr_epoch_df.itertuples())[0]
-                on_update_active_epoch(an_epoch_idx, curr_epoch)
-
-            ## Build the selected spikes df:
-
-            ## Laps: even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
-            ## Ripples: even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict
-
-            (even_selected_spike_df, even_neuron_id_to_new_IDX_map), (odd_selected_spike_df, odd_neuron_id_to_new_IDX_map) = build_selected_spikes_df(track_templates, active_epochs_df, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
-
-            ## Add the spikes
-            add_selected_spikes_df_points_to_scatter_plot(plots_data=odd_plots_data, plots=odd_plots, selected_spikes_df=deepcopy(odd_selected_spike_df), _active_plot_identifier = 'long_odd')
-            add_selected_spikes_df_points_to_scatter_plot(plots_data=odd_plots_data, plots=odd_plots, selected_spikes_df=deepcopy(odd_selected_spike_df), _active_plot_identifier = 'short_odd')
-            add_selected_spikes_df_points_to_scatter_plot(plots_data=even_plots_data, plots=even_plots, selected_spikes_df=deepcopy(even_selected_spike_df), _active_plot_identifier = 'long_even')
-            add_selected_spikes_df_points_to_scatter_plot(plots_data=even_plots_data, plots=even_plots, selected_spikes_df=deepcopy(even_selected_spike_df), _active_plot_identifier = 'short_even')
-
-
-            return graphics_output_dict
-
+            return RankOrderDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+            
 
 
 # def plot_z_score_diff_and_raw(x_values: np.ndarray, long_short_best_dir_z_score_diff_values: np.ndarray, masked_z_score_values_list: List[np.ma.core.MaskedArray], variable_name: str, x_axis_name_suffix: str, point_data_values: np.ndarray, long_epoch=None, short_epoch=None) -> Tuple:

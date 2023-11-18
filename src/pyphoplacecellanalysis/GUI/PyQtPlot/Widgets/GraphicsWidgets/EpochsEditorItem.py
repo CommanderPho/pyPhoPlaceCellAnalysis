@@ -5,6 +5,7 @@ from collections import OrderedDict
 import copy
 from typing import Optional, Dict, List, Tuple, Callable
 from attrs import define, field, Factory
+from neuropy.core.user_annotations import function_attributes, metadata_attributes
 import numpy as np
 import pandas as pd
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -24,11 +25,14 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 __all__ = ['EpochsEditor']
 
+@metadata_attributes(short_name=None, tags=['useful', 'gui', 'utility', 'epochs', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 19:25', related_items=[])
 @define(slots=False)
 class EpochsEditor:
     """ EpochsEditor to allow user modification of epoch intervals using PyQtGraph and multiple custom linear rect items
 
-
+    It was used to display the laps for the entire session and allow the user to tweak their start/end times and then save the changes manually.
+    
+    
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import EpochsEditor # perform_plot_laps_diagnoser
 
