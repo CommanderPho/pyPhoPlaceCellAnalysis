@@ -386,7 +386,7 @@ class AssigningEpochs:
         """
         ## First filter by only those user-included replays (in the future this won't be done)
 
-        # from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import TrackAssignmentDecision, TrackAssignmentState, AssigningEpochs
+        # from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import TrackAssignmentDecision, TrackAssignmentState, AssigningEpochs
         (epochs_df_L, epochs_df_S), (filter_epoch_spikes_df_L, filter_epoch_spikes_df_S), (good_example_epoch_indicies_L, good_example_epoch_indicies_S), (short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset), new_all_aclus_sort_indicies, assigning_epochs_obj = PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline)
 
         ## Initialize to unassigned
@@ -529,7 +529,7 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
 
 
 @function_attributes(short_name=None, tags=['FINAL', 'publication', 'figure', 'combined'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-21 14:33', related_items=[])
-def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figure=True, should_plot_pf1d_compare=True, should_plot_example_rasters=True, should_plot_stacked_epoch_slices=True, should_plot_pho_jonathan_figures=True, show_only_refined_cells=True):
+def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figure=True, should_plot_pf1d_compare=True, should_plot_example_rasters=False, should_plot_stacked_epoch_slices=False, should_plot_pho_jonathan_figures=True, show_only_refined_cells=True):
     """ 
     
     show_only_refined_cells: bool - added 2023-09-28 to output LxC and SxC values "refined" by their firing rate index.
@@ -707,7 +707,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         """ full instantaneous computations for both Long and Short epochs:
         
         Can access via:
-            from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import PaperFigureTwo
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo
 
             _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # 10ms
             _out_fig_2.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
@@ -809,6 +809,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
         active_context = kwargs.get('active_context', None)
         assert active_context is not None
+        
+        var_name:str = 'Laps'
+        active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
 
         x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
@@ -831,7 +834,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     def fig_2_Replay_FR_matplotlib(cls, Fig2_Replay_FR, defer_show=False, **kwargs) -> MatplotlibRenderPlots:
         active_context = kwargs.get('active_context', None)
         assert active_context is not None
-
+        
+        var_name:str = 'Replay'
+        active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
+        
         x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
         assert len(Fig2_Replay_FR) == 4
         all_data_points = np.array([v.values for v in Fig2_Replay_FR])
@@ -1025,7 +1031,7 @@ def pho_stats_paired_t_test(values1, values2):
 
     degrees of freedom (dof): n -1
 
-    from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import pho_stats_paired_t_test
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_paired_t_test
 
 
     """
@@ -1070,7 +1076,7 @@ def build_derived_epochs_dicts(owning_pipeline_reference):
 	""" builds three dictionaries containing all of the Epoch objects for {global, long, short}. Contains epochs that don't normally exist on the session object
 	
 	Usage:
-    	from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import build_derived_epochs_dicts
+    	from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import build_derived_epochs_dicts
     	all_epochs, long_only_all_epochs, short_only_all_epochs = build_derived_epochs_dicts(curr_active_pipeline)
 	
 	"""	
@@ -1099,7 +1105,7 @@ def build_derived_epochs_dicts(owning_pipeline_reference):
 def add_extra_spike_rate_trends(curr_active_pipeline) -> InstantaneousSpikeRateGroupsComputation:
 	""" independent of all other FR computations. Builds inst spike rate groups for the PBEs. 
 	
-    from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import add_extra_spike_rate_trends
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import add_extra_spike_rate_trends
 
 
 	"""
@@ -1153,7 +1159,7 @@ def add_extra_spike_rate_trends(curr_active_pipeline) -> InstantaneousSpikeRateG
 def main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots:bool=True, save_figures_only:bool=False, save_figure=True):
     """ main run function to generate all figures
     
-        from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
         main_complete_figure_generations(curr_active_pipeline)
         
     

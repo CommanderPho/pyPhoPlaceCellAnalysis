@@ -1,6 +1,7 @@
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 import numpy as np
 
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
 from pyphoplacecellanalysis.General.Model.LiveWindowedData import LiveWindowedData
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource, SpikesDataframeDatasource
@@ -119,7 +120,7 @@ class SpikesDataframeWindow(LiveWindowedData):
         self.dataSource.source_data_changed_signal.connect(self.on_general_datasource_changed)
         # self.window_changed_signal.connect(self.on_window_changed)
         
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_general_datasource_changed(self, datasource):
         """ emit our own custom signal when the general datasource update method returns """
         self.spike_dataframe_changed_signal.emit()

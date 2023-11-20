@@ -1,0 +1,72 @@
+import numpy as np
+import pandas as pd
+from attrs import define, field, Factory, asdict, astuple
+from functools import wraps
+from copy import deepcopy
+from typing import List, Dict, Optional
+
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphocorehelpers.function_helpers import function_attributes
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+
+## Begin Script Body
+
+class {{ComputationGroupName}}GlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
+    """ functions related to {{ComputationGroupName}} computations. """
+    _computationGroupName = '{{ComputationGroupLowercaseShortname}}'
+    _computationPrecidence = 1002
+    _is_global = True
+
+    @function_attributes(short_name='{{FunctionLowercaseShortname}}', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
+        validate_computation_test=DirectionalLapsHelpers.validate_has_directional_laps, is_global=True)
+    def perform_{{FunctionLowercaseShortname}}(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+        """ 
+        
+        Requires:
+            ['sess']
+            
+        Provides:
+            global_computation_results.computed_data['DirectionalLaps']
+                ['DirectionalLaps']['directional_lap_specific_configs']
+                ['DirectionalLaps']['split_directional_laps_dict']
+                ['DirectionalLaps']['split_directional_laps_contexts_dict']
+                ['DirectionalLaps']['split_directional_laps_names']
+                ['DirectionalLaps']['computed_base_epoch_names']
+
+        
+        """
+        if include_includelist is not None:
+            print(f'WARN: _split_to_directional_laps(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
+
+        # if include_includelist is None:
+            # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            # include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+            # include_includelist = [global_epoch_name] # ['maze'] # only for maze
+            # include_includelist = [long_epoch_name, short_epoch_name] # ['maze1', 'maze2'] # only for maze
+        
+        ## Adds ['*_even_laps', '*_odd_laps'] pseduofilters
+
+        # owning_pipeline_reference, directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names = DirectionalLapsHelpers.split_to_directional_laps(owning_pipeline_reference, include_includelist=include_includelist, add_created_configs_to_pipeline=True)
+        # curr_active_pipeline, directional_lap_specific_configs = constrain_to_laps(curr_active_pipeline)
+        # list(directional_lap_specific_configs.keys())
+
+        # Set the global result:
+        global_computation_results.computed_data['DirectionalLaps'] = DirectionalLapsHelpers.build_global_directional_result_from_natural_epochs(owning_pipeline_reference)
+
+
+        # global_computation_results.computed_data['DirectionalLaps'] = DynamicParameters.init_from_dict({
+        #     'directional_lap_specific_configs': directional_lap_specific_configs,
+        #     'split_directional_laps_dict': split_directional_laps_dict,
+        #     'split_directional_laps_contexts_dict': split_directional_laps_contexts_dict,
+        #     'split_directional_laps_names': split_directional_laps_config_names,
+        #     'computed_base_epoch_names': computed_base_epoch_names,
+        # })
+
+        """ Usage:
+        
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_contexts_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
+
+        """
+        return global_computation_results

@@ -65,10 +65,71 @@ class DisplayColorsEnum:
     
     """
     class Laps:
-        even = '#5522de' # a yellowish-green
-        odd = '#aadd21'# a purplish-royal-blue
+        even = '#5522de' # a purplish-royal-blue 
+        odd = '#aadd21' # a yellowish-green
 
 
+        @classmethod
+        def get_even_dock_colors(cls, orientation, is_dim):
+            """ used for CustomDockDisplayConfig for even laps
+            
+            Usage:
+                from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+                
+                even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_even_dock_colors)
+            
+            
+            """
+            # DisplayColorsEnum.Laps.even
+            # Common to all:
+            if is_dim:
+                fg_color = '#aaa' # Grey
+            else:
+                fg_color = '#fff' # White
+                
+            # a purplish-royal-blue 
+            if is_dim:
+                bg_color = '#9579e2' 
+                border_color = '#7764aa' 
+            else:
+                bg_color = '#5522de' 
+                border_color = '#360bac' 
+
+            return fg_color, bg_color, border_color
+
+
+        @classmethod
+        def get_odd_dock_colors(cls, orientation, is_dim):
+            """ used for CustomDockDisplayConfig for odd laps
+            
+            Usage:
+                from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+                
+                odd_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_odd_dock_colors)
+            
+            """
+            # DisplayColorsEnum.Laps.odd
+            # Common to all:
+            if is_dim:
+                fg_color = '#aaa' # Grey
+            else:
+                fg_color = '#fff' # White
+                
+            # a purplish-royal-blue 
+            if is_dim:
+                bg_color = '#c1db7a' 
+                border_color = '#b0b89b' 
+            else:
+                bg_color = '#aadd21' # a yellowish-green
+                border_color = '#88aa2a' 
+
+            return fg_color, bg_color, border_color
+
+
+    class Epochs:
+        long = '#0b0049' # a dark blue
+        short = '#490000' # a dark red
+        
 
 @define(slots=False, repr=False)
 class DisplayConfig:

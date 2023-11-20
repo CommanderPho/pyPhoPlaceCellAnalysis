@@ -162,7 +162,7 @@ class ComputedResult:
 
             
     """
-    is_global: bool = False
+    is_global: bool = field(default=False)
 
 
 

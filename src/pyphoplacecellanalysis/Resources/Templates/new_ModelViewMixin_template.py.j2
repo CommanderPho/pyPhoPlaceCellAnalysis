@@ -1,0 +1,48 @@
+import numpy as np
+from attrs import define, field, Factory, asdict, astuple
+from copy import deepcopy
+from typing import List, Dict, Optional
+from pyphocorehelpers.function_helpers import function_attributes
+
+## Begin Script Body
+
+from qtpy import QtCore
+
+class {{MixinClassName}}:
+    """ custom mixin class """
+    
+    @QtCore.Slot()
+    def {{MixinClassName}}_on_init(self):
+        """ perform any parameters setting/checking during init """
+        pass
+
+    @QtCore.Slot()
+    def {{MixinClassName}}_on_setup(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        pass
+
+
+    @QtCore.Slot()
+    def {{MixinClassName}}_on_buildUI(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        pass
+
+    @QtCore.Slot()
+    def {{MixinClassName}}_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released """
+        pass
+
+    @QtCore.Slot(float, float)
+    def {{MixinClassName}}_on_window_update(self, new_start=None, new_end=None):
+        """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        pass
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.Slot(object)
+    def {{MixinClassName}}_on_window_update_rate_limited(self, evt):
+        self.{{MixinClassName}}_on_window_update(*evt)
+        
+

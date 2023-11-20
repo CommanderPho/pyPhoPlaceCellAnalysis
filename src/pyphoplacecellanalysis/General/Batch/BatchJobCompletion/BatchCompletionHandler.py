@@ -12,9 +12,9 @@ from attr import define, field, Factory
 from neuropy.core import Epoch
 from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 from pyphocorehelpers.print_helpers import CapturedException
-from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
-from pyphoplacecellanalysis.General.Batch.PhoDiba2023Paper import main_complete_figure_generations
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import LongShortPipelineTests, JonathanFiringRateAnalysisResult, InstantaneousSpikeRateGroupsComputation
 from neuropy.utils.dynamic_container import DynamicContainer
@@ -164,10 +164,14 @@ class BatchSessionCompletionHandler:
     extended_computations_include_includelist: list = field(default=['pf_computation', 'pfdt_computation', 'firing_rate_trends',
                                                                     # 'pf_dt_sequential_surprise',
                                                                     'extended_stats',
-                                        'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping',
+                                        'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',
                                         # 'ratemap_peaks_prominence2d',
                                         #  'long_short_inst_spike_rate_groups',
-                                        'long_short_endcap_analysis']) # do only specified
+                                        'long_short_endcap_analysis',
+                                        # 'spike_burst_detection',
+                                        'split_to_directional_laps',
+                                        'rank_order_shuffle_analysis',
+                                    ]) # do only specified
 
     force_global_recompute: bool = field(default=False)
 
@@ -304,7 +308,7 @@ class BatchSessionCompletionHandler:
         print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
 
         ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
-        was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline)
+        # was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline)
 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
@@ -317,35 +321,7 @@ class BatchSessionCompletionHandler:
 
         return was_updated
 
-    @classmethod
-    def try_compute_directional_laps_for_global_epoch(cls, curr_active_pipeline, fail_on_exception=True) -> bool:
-        """ 2023-10-24 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
-        prev_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
-
-        try:
-            ## perform the computation:
-            curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline, add_created_configs_to_pipeline=True)
-            # curr_active_pipeline, directional_lap_specific_configs = constrain_to_laps(curr_active_pipeline)
-            # list(directional_lap_specific_configs.keys())
-            post_active_config_names = deepcopy(curr_active_pipeline.active_config_names)
-
-            # was_updated = not np.all(np.isin(['maze1', 'maze2', 'maze', 'maze_odd_laps', 'maze_even_laps'], ['maze1', 'maze2', 'maze']))
-            was_updated = not np.all(np.isin(post_active_config_names, prev_active_config_names))
-
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'.try_compute_directional_laps_for_global_epoch(...) failed with exception: {e}')
-            if fail_on_exception:
-                raise e.exc
-
-            return False
-
-
-        return was_updated
-
-
-
+    
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
     def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
         try:
@@ -591,8 +567,7 @@ class BatchSessionCompletionHandler:
             print(f'short_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
 
-        # try to compute the directional laps from the global epoch:
-        was_updated = self.try_compute_directional_laps_for_global_epoch(curr_active_pipeline, fail_on_exception=self.fail_on_exception)
+        was_updated = False
 
         # ## Post Compute Validate 2023-05-16:
         try:
@@ -663,9 +638,8 @@ class BatchSessionCompletionHandler:
 
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-            _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+            _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.003) # 3ms, 10ms
             _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-
             _out_inst_fr_comps = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
 
             if not self.use_multiprocessing:

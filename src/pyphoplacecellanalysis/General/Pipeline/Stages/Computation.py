@@ -15,12 +15,14 @@ from attrs import define, field, Factory
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
+from neuropy.core.epoch import Epoch
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
 from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters, `load_pickled_global_computation_results`
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
 from pyphocorehelpers.print_helpers import format_seconds_human_readable
+from pyphocorehelpers.programming_helpers import MemoryManagement
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilterablePipelineStage
@@ -493,6 +495,14 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         else:
             active_computation_results = self.computation_results
 
+        ## Check for duplicated configs:
+        
+        # MemoryManagement.has_duplicated_memory_references(list(active_computation_results.values()))
+        # MemoryManagement.has_duplicated_memory_references([v.computation_config for v in active_computation_results.values()])
+
+        # MemoryManagement.has_duplicated_memory_references([v.computation_config.pf_params for v in active_computation_results.values()])
+        # MemoryManagement.has_duplicated_memory_references([v.computation_config.pf_params.computation_epochs for v in active_computation_results.values()])
+
         ## Here's where we loop through all possible configs:
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
             if a_select_config_name in enabled_filter_names:
@@ -502,18 +512,44 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     progress_logger_callback(f'Performing perform_action_for_all_contexts with action {action} on filtered_session with filter named "{a_select_config_name}"...')
                 
                 # TODO 2023-01-15 - ASSUMES 1:1 correspondence between self.filtered_sessions's config names and computation_configs:
+                computation_parameters_need_update: bool = True
                 if active_computation_params is None:
-                    active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
+                    curr_active_computation_params = deepcopy(self.active_configs[a_select_config_name].computation_config) # get the previously set computation configs
                 else:
-                    # set/update the computation configs:
-                    self.active_configs[a_select_config_name].computation_config = deepcopy(active_computation_params) #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+                    # Make sure to duplicate an guarnateed independent copy first:
+                    curr_active_computation_params = deepcopy(active_computation_params)
+
+                   
                 
+
+                # # ensure config is filtered:
+                # # 2023-11-10 - Note hardcoded directional lap/pf suffixes used here.
+                # a_base_filter_name: str = a_select_config_name.removesuffix('_any').removesuffix('_odd').removesuffix('_even')
+                # a_select_epoch = Epoch(a_filtered_session.epochs.to_dataframe().epochs.label_slice(a_base_filter_name))
+                # assert a_select_epoch.n_epochs > 0
+                # a_filtered_session.epochs = a_select_epoch # replace the epochs object
+                # active_computation_params.pf_params.computation_epochs = active_computation_params.pf_params.computation_epochs.time_slice(a_select_epoch.t_start, a_select_epoch.t_stop)
+                # # set/update the computation configs:
+                # self.active_configs[a_select_config_name].computation_config = deepcopy(active_computation_params)
+
+                # 'maze1_odd', active_computation_params - active_computation_params.is_directional == False?
+
+                # `a_filtered_session` seems to be working. a_filtered_session.laps is correctly filtered.
+                # for maze2: a_filtered_session.t_start, a_filtered_session.t_stop
+                curr_active_computation_params.pf_params.computation_epochs = curr_active_computation_params.pf_params.computation_epochs.time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
+                print(f'curr_active_computation_params.pf_params.computation_epochs: {curr_active_computation_params.pf_params.computation_epochs}')
+
+
+                if computation_parameters_need_update:
+                    # set/update the computation configs:
+                    self.active_configs[a_select_config_name].computation_config = deepcopy(curr_active_computation_params) #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+
                 if action.name == EvaluationActions.EVALUATE_COMPUTATIONS.name:
                     # active_function = self.perform_registered_computations_single_context
                     skip_computations_for_this_result = False
                     if overwrite_extant_results or (active_computation_results.get(a_select_config_name, None) is None):
                         # If we're supposed to overwrite the previous result OR the previous result is already empty/not yet calculated, initialize a new one:
-                        active_computation_results[a_select_config_name] = ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+                        active_computation_results[a_select_config_name] = ComputedPipelineStage._build_initial_computationResult(a_filtered_session, curr_active_computation_params) # returns a computation result. This stores the computation config used to compute it.
                         skip_computations_for_this_result = False # need to compute the result
                     else:
                         # Otherwise it already exists and is not None, so don't overwrite it:
@@ -523,7 +559,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                         
                         print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and active_computation_results[{a_select_config_name}] already exists and is non-None')
                         print('\t TODO: this will prevent recomputation even when the excludelist/includelist or computation function definitions change. Rework so that this is smarter.')
-                        # active_computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
+                        # active_computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, curr_active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
                         skip_computations_for_this_result = True
 
                     if not skip_computations_for_this_result:
@@ -683,6 +719,13 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             [type]: [description]
         """
         # only requires that active_session has the .spikes_df and .position  properties
+
+        #TODO 2023-11-13 14:43: - [ ] This should require the computation_config.pf_params.computation_epochs is limited to .t_start, .t_stop of `active_session`:
+
+        # active_session.t_start, active_session.t_stop
+        # if hasattr(computation_config, 'pf_params')
+        # computation_config.pf_params.computation_epochs
+
         output_result = ComputationResult(active_session, computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters(), computation_times=DynamicParameters()) # Note that this active_session should be correctly filtered
         
         return output_result

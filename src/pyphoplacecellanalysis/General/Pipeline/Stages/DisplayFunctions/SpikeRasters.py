@@ -110,7 +110,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
 
-    @function_attributes(short_name='spike_rasters_window', tags=['display','interactive', 'primary', 'raster', '2D', 'ui', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_window', tags=['display','interactive', 'primary', 'raster', '2D', 'ui', 'pyqtplot'], input_requires=[], output_provides=[], uses=['_build_additional_window_menus'], used_by=[], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_window(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Displays a Spike3DRasterWindowWidget with a configurable set of raster widgets and controls in it.
@@ -597,9 +597,9 @@ def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identif
     return plots.scatter_plots[_active_plot_identifier], plots.ax[_active_plot_identifier], plots.grid[_active_plot_identifier]
 
 
-@function_attributes(short_name=None, tags=['plotting','raster', 'sort'], input_requires=[], output_provides=[], uses=['_subfn_build_and_add_scatterplot_row'], used_by=[], creation_date='2023-10-30 22:23', related_items=[])
+@function_attributes(short_name=None, tags=['plotting','raster', 'sort'], input_requires=[], output_provides=[], uses=['_subfn_build_and_add_scatterplot_row', '_build_scatter_plotting_managers'], used_by=[], creation_date='2023-10-30 22:23', related_items=[])
 def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_orders_dict=None, unit_colors_list_dict=None, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None):
-    """ 
+    """ Plots a neat stack
 
     Basic Plotting:    
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
@@ -632,15 +632,6 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     """
     # scatter_plot_kwargs = None
 
-    # rebuild_spikes_df_anyway = True # if True, `_prepare_spikes_df_from_filter_epochs` is called to rebuild spikes_df given the filter_epochs_df even if it contains the desired column already.
-    # if rebuild_spikes_df_anyway:
-    # 	spikes_df = spikes_df.copy() # don't modify the original dataframe
-    # 	filter_epochs_df = filter_epochs_df.copy()
-
-    # if rebuild_spikes_df_anyway or (epoch_id_key_name not in spikes_df.columns):
-    # 	# missing epoch_id column in the spikes_df, need to rebuild
-    # 	spikes_df = _prepare_spikes_df_from_filter_epochs(spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, epoch_id_key_name=epoch_id_key_name, debug_print=False) # replay_epoch_id
-
     # ## Create the raster plot for the replay:
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
 
@@ -652,51 +643,33 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     plots_data.all_spots_dict = {}
     plots_data.all_scatterplot_tooltips_kwargs_dict = {}
 
-    # Build the base data that will be copied for each epoch:
-    plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=list(unit_sort_orders_dict.values())[0], unit_colors_list=list(unit_colors_list_dict.values())[0])
-    # Update the dataframe
-    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
-
-
-    # Common Tick Label 
-    # override_scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
-    # vtick_box = _build_default_tick(tick_width=0.01, tick_height=1.0)
-    # # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItem', pxMode=False, symbol=vtick, size=1, pen={'color': 'w', 'width': 1}, brush=pg.mkBrush(color='w'), hoverable=False)
-    # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItem', pxMode=False, symbol=vtick_box, size=1, hoverable=False) # , pen=None, brush=None
-
     vtick_simple_line = _build_default_tick(tick_width=0.0, tick_height=0.9)
     override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1, hoverable=False) # , pen=None, brush=None
     # print(f'override_scatter_plot_kwargs: {override_scatter_plot_kwargs}')
 
-    
-    # list(plots.scatter_plots.keys()) # ['long_even', 'long_odd', 'short_even', 'short_odd']
-
     i = 0
-    plots_data_dict = {} # new dict to hold plot data
-    plots_spikes_df_dict = {}
+    plots_data.plots_data_dict = {} # new dict to hold plot data
+    plots_data.plots_spikes_df_dict = {}
 
     for _active_plot_identifier, active_unit_sort_order in unit_sort_orders_dict.items():
-        # new_plots_data = deepcopy(plots_data)
-        new_plots_data = plots_data
 
+        plots_data.plots_data_dict[_active_plot_identifier] = RenderPlotsData(_active_plot_identifier)
+    
         if unit_colors_list_dict is not None:
             unit_colors_list = unit_colors_list_dict.get(_active_plot_identifier, None)
         else:
             unit_colors_list = None
 
-        
-        new_plots_data = _build_scatter_plotting_managers(new_plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=active_unit_sort_order, unit_colors_list=unit_colors_list)
-        plots_data_dict[_active_plot_identifier] = new_plots_data
+        plots_data.plots_data_dict[_active_plot_identifier] = _build_scatter_plotting_managers(plots_data.plots_data_dict[_active_plot_identifier], spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=active_unit_sort_order, unit_colors_list=unit_colors_list)
         
         # Update the dataframe
-        plots_spikes_df_dict[_active_plot_identifier] = deepcopy(spikes_df)
-        plots_spikes_df_dict[_active_plot_identifier] = plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_spikes_df_dict[_active_plot_identifier])
+        plots_data.plots_spikes_df_dict[_active_plot_identifier] = deepcopy(spikes_df)
+        plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
         ## Build the spots for the raster plot:
         # plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
-        
-        plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_spikes_df_dict[_active_plot_identifier], plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+        plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.plots_spikes_df_dict[_active_plot_identifier], plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
-        _subfn_build_and_add_scatterplot_row(plots_data_dict[_active_plot_identifier], plots, _active_plot_identifier=_active_plot_identifier, row=(i), col=0, left_label=_active_plot_identifier, scatter_plot_kwargs=override_scatter_plot_kwargs)
+        _subfn_build_and_add_scatterplot_row(plots_data.plots_data_dict[_active_plot_identifier], plots, _active_plot_identifier=_active_plot_identifier, row=(i), col=0, left_label=_active_plot_identifier, scatter_plot_kwargs=override_scatter_plot_kwargs)
         i = i+1
 
         ## Get the scatterplot and update the points:
@@ -704,14 +677,19 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
         a_scatter_plot.addPoints(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {})) # , hoverable=True
         
 
+    main_plot_identifiers_list = list(unit_sort_orders_dict.keys()) # ['long_even', 'long_odd', 'short_even', 'short_odd']
+    
     def on_update_active_scatterplot_kwargs(override_scatter_plot_kwargs):
-        for _active_plot_identifier in ['long_even', 'long_odd', 'short_even', 'short_odd']:
-            new_ax = plots.ax[_active_plot_identifier]
+        """ captures: main_plot_identifiers_list, plots, plots_data """
+        for _active_plot_identifier in main_plot_identifiers_list:
+            # for _active_plot_identifier, a_scatter_plot in plots.scatter_plots.items():
+            # new_ax = plots.ax[_active_plot_identifier]
             a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
             a_scatter_plot.setData(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {}), **override_scatter_plot_kwargs)
 
-    def on_update_active_epoch(an_epoch):
-        for _active_plot_identifier in ['long_even', 'long_odd', 'short_even', 'short_odd']:
+    def on_update_active_epoch(an_epoch_idx, an_epoch):
+        """ captures: main_plot_identifiers_list, plots """
+        for _active_plot_identifier in main_plot_identifiers_list:
             new_ax = plots.ax[_active_plot_identifier]
             new_ax.setXRange(an_epoch.start, an_epoch.stop)
             # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
@@ -915,8 +893,21 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
 # ==================================================================================================================== #
 # Menu Builders                                                                                                        #
 # ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['context', 'directional_pf', 'display', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 20:07', related_items=[])
+def _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) -> str:
+    """ recover active_config_name from the context in a way that works for both normal and directional pfs (which include both a .filter_name and .lap_dir value) """
+    # active_config_name = active_display_fn_identifying_ctx.filter_name # hardcoded bad way that doesn't work for directional pfs
+    # directional-pf compatible way of finding the matching config name:
+    reverse_context_name_lookup_map = {v: k for k, v in owning_pipeline_reference.filtered_contexts.items()} # builds an inverse mapping from a given filtered_context Dict[IdentifyingContext, str] to its string name
+    recovered_filter_context = active_display_fn_identifying_ctx.get_subset(subset_excludelist=['display_fn_name']) # drop the display_fn_name part to get the original filter context
+    active_config_name: str = reverse_context_name_lookup_map[recovered_filter_context]
+    return active_config_name
+
+
+@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
-    active_config_name = active_display_fn_identifying_ctx.filter_name # recover active_config_name from the context
+    active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
     ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
     # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
@@ -926,9 +917,10 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
     return output_references
 
 
+@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'gui'], input_requires=[], output_provides=[], uses=['_build_additional_spikeRaster2D_menus'], used_by=['_display_spike_rasters_window'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
         assert owning_pipeline_reference is not None
-        active_config_name = active_display_fn_identifying_ctx.filter_name # recover active_config_name from the context
+        active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
         ## SpikeRaster2D Specific Items:
         output_references = _build_additional_spikeRaster2D_menus(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)

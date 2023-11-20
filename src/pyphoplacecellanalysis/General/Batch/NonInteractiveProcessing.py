@@ -213,8 +213,15 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         print(f'not using direction-dependent laps.')
         lap_direction_suffix_list = ['']
 
+
+    # active_session_computation_configs: this should contain three configs, one for each Epoch
+
+    active_session_computation_configs = [deepcopy(a_config) for a_config in active_session_computation_configs]
+    assert len(lap_direction_suffix_list) == len(active_session_computation_configs)
     updated_active_session_pseudo_filter_configs = {} # empty list, woot!
-    for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs):
+
+
+    for a_computation_suffix_name, a_computation_config in zip(lap_direction_suffix_list, active_session_computation_configs): # these should NOT be the same length: lap_direction_suffix_list: ['_odd', '_even', '_any']
         # We need to filter and then compute with the appropriate config iteratively.
         for a_filter_config_name, a_filter_config_fn in active_session_filter_configurations.items():
             # TODO: Build a context:
@@ -227,6 +234,8 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         curr_active_pipeline.filter_sessions(updated_active_session_pseudo_filter_configs, changed_filters_ignore_list=['maze1','maze2','maze'], debug_print=False)
 
         ## TODO 2023-01-15 - perform_computations for all configs!!
+        #TODO 2023-10-31 14:58: - [ ] This is where the computations are being done multiple times!
+        #TODO 2023-11-13 14:23: - [ ] With this approach, we can't actually properly filter the computation_configs for the relevant sessions ahead of time because they are calculated for a single computation config but across all sessions at once.
         curr_active_pipeline.perform_computations(a_computation_config, computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
 
@@ -253,10 +262,8 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
         if fail_on_exception:
             raise
 
-
     if not saving_mode.shouldSave:
         print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
-
 
     ## Load pickled global computations:
     # If previously pickled global results were saved, they will typically no longer be relevent if the pipeline was recomputed. We need a system of invalidating/versioning the global results when the other computations they depend on change.
@@ -288,7 +295,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     newly_computed_values = []
 
     non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
-    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis', 'split_to_directional_laps'] # , 'long_short_rate_remapping'
+    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis', 'split_to_directional_laps', 'rank_order_shuffle_analysis'] # , 'long_short_rate_remapping'
 
     # 'firing_rate_trends', 'pf_dt_sequential_surprise'
     # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'

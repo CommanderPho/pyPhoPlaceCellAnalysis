@@ -1,4 +1,6 @@
 import numpy as np
+import attrs
+from attrs import define, field, Factory, asdict, astuple
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -11,9 +13,7 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 # For scrollable BasicBinnedImageRenderingWindow
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import _perform_build_root_graphics_layout_widget_ui
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, _perform_build_root_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 
 
 def _add_bin_ticks(plot_item, xbins=None, ybins=None):
@@ -80,6 +80,7 @@ def _build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=No
             local_plots.colorBarItem = None # shared colorbar item
             
     return local_plots, local_plots_data
+
 
 
 @metadata_attributes(short_name=None, tags=['binning', 'image', 'window', 'standalone', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-19 02:28', related_items=[])

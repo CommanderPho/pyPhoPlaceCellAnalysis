@@ -2,6 +2,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 import numpy as np
 import pandas as pd
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+
 
 """ Windowing Class Features:
 
@@ -74,12 +76,12 @@ class TimeWindow(SimplePrintable, PrettyPrintable, QtCore.QObject):
         self.animationThread = None
         # self.window_changed_signal.connect(self.on_window_changed)
             
-    @QtCore.pyqtSlot(float)
+    @pyqtExceptionPrintingSlot(float)
     def update_window_start(self, new_value):
         self.active_window_start_time = new_value
 
 
-    @QtCore.pyqtSlot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def update_window_start_end(self, new_start, new_end):
         prev_duration = self.window_duration
         proposed_new_duration = new_end - new_start
@@ -97,11 +99,11 @@ class TimeWindow(SimplePrintable, PrettyPrintable, QtCore.QObject):
     ##################################################
     ## For use with pg.SignalProxy
     # using signal proxy turns original arguments into a tuple
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def update_window_start_rate_limited(self, evt):
         self.update_window_start(*evt)
     
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def update_window_start_end_rate_limited(self, evt):
         self.update_window_start_end(*evt)
         

@@ -9,6 +9,11 @@ from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDi
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
 
+""" 
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+
+"""
 
 class CustomDockDisplayConfig(DockDisplayConfig):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc.
@@ -180,7 +185,7 @@ class DynamicDockDisplayAreaContentMixin:
         self.displayDockArea: a pg.Dock(...) object containing dynamically created Docks/Widgets for display of display nodes.
         
     Known Usages:
-        PhoDockAreaContainingWindow **ONLY** right now 
+        PhoDockAreaContainingWindow, NestedDockAreaWidget, Spike2DRaster
     
     """
     

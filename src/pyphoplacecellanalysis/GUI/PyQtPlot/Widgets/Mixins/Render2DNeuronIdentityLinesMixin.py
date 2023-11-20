@@ -1,6 +1,9 @@
 import numpy as np
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 
+@metadata_attributes(short_name=None, tags=['matplotlib', 'lines'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-14 10:37', related_items=[])
 class Render2DNeuronIdentityLinesMixin:
     """ renders the horizontal lines separating the neurons on the 2D raster plots 
     

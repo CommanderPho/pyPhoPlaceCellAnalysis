@@ -38,11 +38,43 @@ class CustomLinearRegionItem(LinearRegionItem):
     TODO:
         - [ ] I'd like to add a "minimum-width" property that prevents the user from resizing the window to a sliver so small that they're no longer able to grab it. Instead even if they were resizing once the window reaches its minumum width it stops resizing and starts sliding/translating instead.
             - I suppose this would alter the `swapMode` property too: maybe "push" already nearly does what I want this feature to do?
+ 
+
+    
+    ======================= ====================================================
+    **Signals**
+    sigRegionChangeFinished Emitted when the user stops dragging the ROI (or
+                            one of its handles) or if the ROI is changed
+                            programatically.
+    sigRegionChangeStarted  Emitted when the user starts dragging the ROI (or
+                            one of its handles).
+    sigRegionChanged        Emitted any time the position of the ROI changes,
+                            including while it is being dragged by the user.
+    sigHoverEvent           Emitted when the mouse hovers over the ROI.
+    sigClicked              Emitted when the user clicks on the ROI.
+                            Note that clicking is disabled by default to prevent
+                            stealing clicks from objects behind the ROI. To 
+                            enable clicking, call 
+                            roi.setAcceptedMouseButtons(QtCore.Qt.MouseButton.LeftButton). 
+                            See QtWidgets.QGraphicsItem documentation for more 
+                            details.
+    sigRemoveRequested      Emitted when the user selects 'remove' from the 
+                            ROI's context menu (if available).
+    ======================= ====================================================
+    
+    sigRegionChangeFinished = QtCore.Signal(object)
+    sigRegionChangeStarted = QtCore.Signal(object)
+    sigRegionChanged = QtCore.Signal(object)
+    sigHoverEvent = QtCore.Signal(object)
+    sigClicked = QtCore.Signal(object, object)
+    sigRemoveRequested = QtCore.Signal(object)
+    
+            
     """
     
 
     def __init__(self, values=(0, 1), orientation='vertical', brush=None, pen=None, hoverBrush=None, hoverPen=None, movable=True, bounds=None, span=(0, 1), swapMode='sort', clipItem=None,
-                 regionAreaMouseInteractionCriteria: MouseInteractionCriteria=None, endLinesMouseInteractionCriteria: MouseInteractionCriteria=None):
+                 regionAreaMouseInteractionCriteria: MouseInteractionCriteria=None, endLinesMouseInteractionCriteria: MouseInteractionCriteria=None, custom_bound_data=None):
         """Create a new LinearRegionItem.
         
         ==============  =====================================================================
@@ -86,6 +118,8 @@ class CustomLinearRegionItem(LinearRegionItem):
         
         # Call parent __init__ function:
         LinearRegionItem.__init__(self, values=values, orientation=orientation, brush=brush, pen=pen, hoverBrush=hoverBrush, hoverPen=hoverPen, movable=movable, bounds=bounds, span=span, swapMode=swapMode, clipItem=clipItem)
+        
+        self._custom_bound_data = custom_bound_data
         
         ## Setup the mouse action critiera for the background rectangle (excluding the two end-position lines, which are set below):
         if regionAreaMouseInteractionCriteria is None:
@@ -176,7 +210,17 @@ class CustomLinearRegionItem(LinearRegionItem):
     def custom_mouse_click_criteria_fn(self, value):
         self._custom_area_mouse_action_criteria.click = value
         
+
+    @property
+    def custom_bound_data(self):
+        """ custom_bound_data is an object of any type containing user data that can be used to identify the purpose of the region, such as an epoch_id: int or a more complex structure."""
+        return self._custom_bound_data
+    @custom_bound_data.setter
+    def custom_bound_data(self, value):
+        self._custom_bound_data = value
+        
     
+
     def _setup_rebuild_with_custom_lines(self, values, lineKwds):
         """ rebuilds using CustomInfiniteLine items for self.lines instead of the simple InfiniteLine used in the base class"""
         ## Remove old lines:

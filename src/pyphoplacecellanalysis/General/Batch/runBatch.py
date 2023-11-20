@@ -1,9 +1,10 @@
 import sys
-import datetime
 import logging
 import pathlib
 from pathlib import Path
 from typing import List, Dict, Optional, Union, Callable
+# import datetime
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import tables as tb
@@ -24,7 +25,7 @@ from neuropy.utils.result_context import IdentifyingContext
 from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass # used in build_concrete_session_folders
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for build_concrete_session_folders
 
-from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field
+from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
 from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
 
@@ -36,12 +37,10 @@ from attrs import Factory
 
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
 from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
 from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import generate_batch_single_session_scripts
 
-from pyphocorehelpers.Filesystem.path_helpers import discover_data_files, generate_copydict, copy_movedict, copy_file
-
-
+from pyphocorehelpers.Filesystem.path_helpers import copy_movedict
 
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
@@ -269,6 +268,10 @@ class BatchRun(HDF_SerializationMixin):
         PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
+    # Record the start time
+    start_time: Optional[datetime] = non_serialized_field(default=None) # ()
+    
+
     ## TODO: could keep session-specific kwargs to be passed to run_specific_batch(...) as a member variable if needed
     _context_column_names = ['format_name', 'animal', 'exper_name', 'session_name']
     
@@ -339,6 +342,8 @@ class BatchRun(HDF_SerializationMixin):
     def execute_all(self, use_multiprocessing=True, num_processes=None, included_session_contexts: Optional[List[IdentifyingContext]]=None, session_inclusion_filter:Optional[Callable]=None, **kwargs):
         """ calls `run_specific_batch(...)` for each session context to actually execute the session's run. """
         allow_processing_previously_completed: bool = kwargs.pop('allow_processing_previously_completed', False)
+        # record the start timestamp:
+        self.start_time = datetime.now()
         
         # filter for inclusion here instead of in the loop:  
         if included_session_contexts is not None:

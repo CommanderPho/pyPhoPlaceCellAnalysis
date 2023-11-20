@@ -725,7 +725,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def _export_global_computations_to_hdf(self, file_path, key: str, **kwargs):
         """ exports the self.global_computation_results to HDF file specified by file_path, key. """
-        from pyphoplacecellanalysis.General.Batch.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult        
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import ExpectedVsObservedResult

@@ -1,3 +1,4 @@
+from typing import Tuple
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -19,7 +20,7 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
     
     """
     @property
-    def area(self):
+    def area(self) -> DockArea:
         return self.ui.area
 
     def __init__(self, title='PhoDockAreaContainingWindow', *args, **kwargs):
@@ -112,7 +113,7 @@ class DockAreaWrapper(object):
     """
 
     @classmethod
-    def _build_default_dockAreaWindow(cls, title='_test_PhoDockAreaWidgetApp', defer_show=False):
+    def _build_default_dockAreaWindow(cls, title='_test_PhoDockAreaWidgetApp', defer_show=False) -> Tuple[PhoDockAreaContainingWindow, QtWidgets.QApplication]:
         """ builds a simple PhoDockAreaContainingWindow """
         win = PhoDockAreaContainingWindow(title=title)
         win.setWindowTitle(f'{title}: dockAreaWindow')
@@ -126,7 +127,7 @@ class DockAreaWrapper(object):
     
         
     @classmethod
-    def wrap_with_dockAreaWindow(cls, main_window, auxilary_controls_window, title='_test_PhoDockAreaWidgetApp'):
+    def wrap_with_dockAreaWindow(cls, main_window, auxilary_controls_window, title='_test_PhoDockAreaWidgetApp') -> Tuple[PhoDockAreaContainingWindow, QtWidgets.QApplication]:
         """ Combine The Separate Windows into a common DockArea window:
         
         
@@ -145,25 +146,31 @@ class DockAreaWrapper(object):
         main_win_geom = main_window.window().geometry() # get the QTCore PyRect object
         main_x, main_y, main_width, main_height = main_win_geom.getRect() # Note: dx & dy refer to width and height
         
-        second_win_geom = auxilary_controls_window.window().geometry()
-        secondary_x, secondary_y, secondary_width, secondary_height = second_win_geom.getRect() # Note: dx & dy refer to width and height
-        
-        combined_width = max(main_width, secondary_width)
-        combined_height = main_height + secondary_height
-        # main_window.size()[0]
-        # win.resize(1000,500)
-        win.resize(combined_width, combined_height)
+        if auxilary_controls_window is not None:
+            second_win_geom = auxilary_controls_window.window().geometry()
+            secondary_x, secondary_y, secondary_width, secondary_height = second_win_geom.getRect() # Note: dx & dy refer to width and height
+            
+            combined_width = max(main_width, secondary_width)
+            combined_height = main_height + secondary_height
+            # main_window.size()[0]
+            # win.resize(1000,500)
+            win.resize(combined_width, combined_height)
         
         
         # Build Using 
         display_config2 = CustomDockDisplayConfig(showCloseButton=False)
         _, dDisplayItem2 = win.add_display_dock("Dock2 - Content", dockSize=(main_width, main_height), widget=main_window, dockAddLocationOpts=['bottom'], display_config=display_config2)
-        display_config1 = CustomDockDisplayConfig(showCloseButton=False)
-        _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), widget=auxilary_controls_window, dockAddLocationOpts=['top', dDisplayItem2], display_config=display_config1)
+        
+        if auxilary_controls_window is not None:
+            display_config1 = CustomDockDisplayConfig(showCloseButton=False)
+            _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), widget=auxilary_controls_window, dockAddLocationOpts=['top', dDisplayItem2], display_config=display_config1)
+
         # _, dDisplayItem1 = win.add_display_dock("Dock1 - Controls", dockSize=(secondary_width, secondary_height), widget=auxilary_controls_window, dockAddLocationOpts=['bottom'])
         win.show()
 
-        win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2
+        if auxilary_controls_window is not None:
+            win.area.moveDock(dDisplayItem1, 'top', dDisplayItem2)     ## move d4 to top edge of d2
+    
         # dDisplayItem1.hideTitleBar()
         # dDisplayItem2.hideTitleBar()
         
