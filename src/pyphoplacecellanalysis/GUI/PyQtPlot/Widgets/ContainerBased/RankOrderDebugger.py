@@ -70,6 +70,11 @@ class RankOrderDebugger:
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderDebugger import RankOrderDebugger
 
     _out = RankOrderDebugger.init_rank_order_debugger(global_spikes_df, active_epochs_dfe, track_templates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+    
+    
+    Updating Display Epoch:
+        The `self.on_update_epoch_IDX(an_epoch_idx=0)` can be used to control which Epoch is displayed, and is synchronized across all four sorts.
+    
     """
     global_spikes_df: pd.DataFrame = field(repr=False)
     active_epochs_df: pd.DataFrame = field(repr=False)
@@ -80,6 +85,10 @@ class RankOrderDebugger:
     plots: RenderPlots = field(init=False)
     plots_data: RenderPlotsData = field(init=False)
 
+    @property
+    def n_epochs(self) -> int:
+        return np.shape(self.active_epochs_df)[0]
+    
 
     @classmethod
     def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict):
@@ -124,8 +133,9 @@ class RankOrderDebugger:
 
 
     def on_update_epoch_IDX(self, an_epoch_idx: int):
-        """ captures on_update_active_epoch, active_epochs_df to extract the epoch time range and call `on_update_active_epoch` """
-        # curr_epoch_spikes = spikes_df[(spikes_df.new_lap_IDX == an_epoch_idx)]
+        """ Calls self.on_update_epoch_IDX(...)
+        
+        captures on_update_active_epoch, active_epochs_df to extract the epoch time range and call `on_update_active_epoch` """
         a_df_idx = self.active_epochs_df.index.to_numpy()[an_epoch_idx]
         curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == (a_df_idx+1))]
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.lap_id == (an_epoch_idx+1))]
