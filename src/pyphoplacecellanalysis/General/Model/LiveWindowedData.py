@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
 
@@ -59,7 +61,7 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
         self._time_window_changed_connection = time_window.window_changed_signal.connect(self.on_window_changed)
         
     
-    @QtCore.pyqtSlot(float, float, float)
+    @pyqtExceptionPrintingSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
         # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
@@ -67,7 +69,7 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
         data_value = self.dataSource.get_updated_data_window(start_t, end_t) # can return any value so long as it's an object
         self.windowed_data_window_duration_changed_signal.emit(start_t, end_t, duration, data_value)
         
-    @QtCore.pyqtSlot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         # if self.enable_debug_print:
@@ -77,15 +79,12 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
         data_value = self.dataSource.get_updated_data_window(start_t, end_t) # can return any value so long as it's an object
         self.windowed_data_window_updated_signal.emit(start_t, end_t, data_value)
         
-        
-        
-        
     ## Called to update its internal TimeWindow
-    @QtCore.pyqtSlot(float)
+    @pyqtExceptionPrintingSlot(float)
     def update_window_start(self, new_value):
         self.timeWindow.update_window_start(new_value)
 
-    @QtCore.pyqtSlot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def update_window_start_end(self, new_start, new_end):
         self.timeWindow.update_window_start_end(new_start, new_end)
         
@@ -93,11 +92,11 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
     ##################################################
     ## For use with pg.SignalProxy
     # using signal proxy turns original arguments into a tuple
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def update_window_start_rate_limited(self, evt):
         self.update_window_start(*evt)
         
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def update_window_start_end_rate_limited(self, evt):
         self.update_window_start_end(*evt)
 
