@@ -120,57 +120,6 @@ def relative_re_ranking(rank_array: NDArray, filter_indicies: NDArray, debug_che
 def compute_placefield_center_of_masses(tuning_curves):
     return np.squeeze(np.array([ndimage.center_of_mass(x) for x in tuning_curves]))
 
-@define(slots=False, repr=False, eq=False)
-class TrackTemplates:
-    """ Holds the four directional templates for direction placefield analysis.
-    from PendingNotebookCode import TrackTemplates
-    
-    History:
-        Based off of `ShuffleHelper` on 2023-10-27
-        TODO: eliminate functional overlap with `ShuffleHelper`
-        TODO: should be moved into `DirectionalPlacefieldGlobalComputation` instead of RankOrder
-        
-    """
-    long_LR_decoder: BasePositionDecoder = field()
-    long_RL_decoder: BasePositionDecoder = field()
-    short_LR_decoder: BasePositionDecoder = field()
-    short_RL_decoder: BasePositionDecoder = field()
-    
-    # ## Computed properties
-    shared_LR_aclus_only_neuron_IDs: NDArray = field()
-    is_good_LR_aclus: NDArray = field()
-    
-    shared_RL_aclus_only_neuron_IDs: NDArray = field()
-    is_good_RL_aclus: NDArray = field()
-
-    ## Computed properties
-    decoder_LR_pf_peak_ranks_list: List = field()
-    decoder_RL_pf_peak_ranks_list: List = field()
-
-
-    @classmethod
-    def init_from_paired_decoders(cls, LR_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], RL_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder]) -> "ShuffleHelper":
-        """ 2023-10-31 - Extract from pairs
-        
-        """        
-        long_LR_decoder, short_LR_decoder = LR_decoder_pair
-        long_RL_decoder, short_RL_decoder = RL_decoder_pair
-            
-        shared_LR_aclus_only_neuron_IDs = deepcopy(long_LR_decoder.neuron_IDs)
-        shared_RL_aclus_only_neuron_IDs = deepcopy(long_RL_decoder.neuron_IDs)
-
-    
-        # is_good_aclus = np.logical_not(np.isin(shared_aclus_only_neuron_IDs, bimodal_exclude_aclus))
-        # shared_aclus_only_neuron_IDs = shared_aclus_only_neuron_IDs[is_good_aclus]
-
-        ## 2023-10-11 - Get the long/short peak locations
-        # decoder_peak_coms_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[is_good_aclus] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-        ## Compute the ranks:
-        # decoder_pf_peak_ranks_list = [scipy.stats.rankdata(a_peaks_com, method='dense') for a_peaks_com in decoder_peak_coms_list]
-        
-        return cls(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, None, shared_RL_aclus_only_neuron_IDs, None,
-                    decoder_LR_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method='dense') for a_decoder in (long_LR_decoder, short_LR_decoder)],
-                    decoder_RL_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method='dense') for a_decoder in (long_RL_decoder, short_RL_decoder)] )
 
 
 @define(slots=False, repr=False, eq=False)
@@ -372,19 +321,19 @@ def build_track_templates_for_shuffle(long_shared_aclus_only_decoder, short_shar
     return ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
     
 
-def _subfn_rank_order_shuffle(epoch_specific_shuffled_indicies, epoch_neuron_IDX_ranks, long_pf_peak_ranks, short_pf_peak_ranks, disable_re_ranking:bool):
-    """ attempts to parallelize the rank-order computations """
-    ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
-    active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-    long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-    # long_result = (np.abs(long_rank_stats.statistic), long_rank_stats.pvalue)
-    long_result = (long_rank_stats.statistic, long_rank_stats.pvalue)
+# def _subfn_rank_order_shuffle(epoch_specific_shuffled_indicies, epoch_neuron_IDX_ranks, long_pf_peak_ranks, short_pf_peak_ranks, disable_re_ranking:bool):
+#     """ attempts to parallelize the rank-order computations """
+#     ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
+#     active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+#     long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
+#     # long_result = (np.abs(long_rank_stats.statistic), long_rank_stats.pvalue)
+#     long_result = (long_rank_stats.statistic, long_rank_stats.pvalue)
     
-    active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-    short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-    # short_result = (np.abs(short_rank_stats.statistic), short_rank_stats.pvalue)
-    short_result = (short_rank_stats.statistic, short_rank_stats.pvalue)
-    return long_result, short_result
+#     active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+#     short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
+#     # short_result = (np.abs(short_rank_stats.statistic), short_rank_stats.pvalue)
+#     short_result = (short_rank_stats.statistic, short_rank_stats.pvalue)
+#     return long_result, short_result
 
 
 
@@ -464,10 +413,8 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         
         if debug_print:
             print(f'epoch_id: {epoch_id}')
-            # print(f'\tepoch_ranked_fragile_linear_neuron_IDXs_array:\n{epoch_ranked_fragile_linear_neuron_IDXs_array}')
             print(f'\tepoch_neuron_IDXs: {print_array(epoch_neuron_IDXs)}')
             print(f'\tepoch_neuron_IDX_ranks: {print_array(epoch_neuron_IDX_ranks)}')
-            # print(f'\tepoch_neuron_IDX_selected_spikes: {print_array(epoch_neuron_IDX_selected_spikes)}')
 
         ## EPOCH SPECIFIC:
         long_spearmanr_rank_stats_results = []
@@ -487,28 +434,6 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
             print(f'\tactive_epoch_aclu_short_ranks[{epoch_id}]: {print_array(active_epoch_aclu_short_ranks)}')
             
         ## PERFORM SHUFFLE HERE:
-        # epoch_specific_shuffled_indicies_list = [a_shuffled_IDXs[epoch_neuron_IDXs] for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs))]
-        # # _active_rank_order_shuffle_fn = lambda x: _subfn_rank_order_shuffle(epoch_neuron_IDX_ranks=epoch_neuron_IDX_ranks, long_pf_peak_ranks=long_pf_peak_ranks, short_pf_peak_ranks=short_pf_peak_ranks, epoch_specific_shuffled_indicies=x, disable_re_ranking=disable_re_ranking)
-
-        # with multiprocessing.Pool(processes=6) as pool:
-        #     # results = pool.starmap(_subfn_rank_order_shuffle, product(names, repeat=2))
-        #     # results = pool.starmap(_subfn_rank_order_shuffle, zip(epoch_neuron_IDX_ranks=epoch_neuron_IDX_ranks, long_pf_peak_ranks=long_pf_peak_ranks, short_pf_peak_ranks=short_pf_peak_ranks, epoch_specific_shuffled_indicies=x, disable_re_ranking=disable_re_ranking), repeat(second_arg)))
-        #     results = pool.map(partial(_subfn_rank_order_shuffle, epoch_neuron_IDX_ranks=epoch_neuron_IDX_ranks, long_pf_peak_ranks=long_pf_peak_ranks, short_pf_peak_ranks=short_pf_peak_ranks, disable_re_ranking=disable_re_ranking), epoch_specific_shuffled_indicies_list)
-        # print(f'done with multiprocessing.')
-        
-        # for a_result in results:
-        #     long_result, short_result = a_result
-        #     long_spearmanr_rank_stats_results.append(long_result)
-        #     short_spearmanr_rank_stats_results.append(short_result)
-                    
-        # with concurrent.futures.ProcessPoolExecutor() as executor:
-        #     for number, a_result in zip(epoch_specific_shuffled_indicies_list, executor.map(_active_rank_order_shuffle_fn, epoch_specific_shuffled_indicies_list)):
-        #         # print('%d is prime: %s' % (number, prime))
-        #         long_result, short_result = a_result
-        #         long_spearmanr_rank_stats_results.append(long_result)
-        #         short_spearmanr_rank_stats_results.append(short_result)
-                    
-
         for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs)):
             # long_shared_aclus_only_decoder.pf.ratemap.get_by_id(a_shuffled_aclus)
             epoch_specific_shuffled_indicies = a_shuffled_IDXs[epoch_neuron_IDXs] # get only the subset that is active during this epoch
@@ -525,7 +450,6 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
             short_spearmanr_rank_stats_results.append(short_result)
         ## END for shuffle
 
-
         long_spearmanr_rank_stats_results = np.array(long_spearmanr_rank_stats_results)
         short_spearmanr_rank_stats_results = np.array(short_spearmanr_rank_stats_results)
 
@@ -537,17 +461,10 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
 
         long_short_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value
 
-        # epoch_ranked_aclus_stats_dict[epoch_id] = (np.array(long_spearmanr_rank_stats_results),  np.array(short_spearmanr_rank_stats_results))
         epoch_ranked_aclus_stats_dict[epoch_id] = (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff)
 
 
     ## END for epoch_id
-
-
-    # 16.9s
-    # for epoch_id, epoch_stats in epoch_ranked_aclus_stats_dict.items():
-    #     long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff = epoch_stats
-    #     paired_test = pho_stats_paired_t_test(long_stats_z_scorer.z_score_values, short_stats_z_scorer.z_score_values) # this doesn't seem to work well
 
     # Extract the results:
     long_z_score_values = []
@@ -564,9 +481,7 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
     long_z_score_values = np.array(long_z_score_values)
     short_z_score_values = np.array(short_z_score_values)
     long_short_z_score_diff_values = np.array(long_short_z_score_diff_values)
-    
-    # return epoch_ranked_aclus_stats_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values)
-    
+        
     return RankOrderResult.init_from_analysis_output_tuple((epoch_ranked_aclus_stats_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values)))
 
 
