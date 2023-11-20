@@ -128,6 +128,8 @@ class TrackTemplates:
     History:
         Based off of `ShuffleHelper` on 2023-10-27
         TODO: eliminate functional overlap with `ShuffleHelper`
+        TODO: should be moved into `DirectionalPlacefieldGlobalComputation` instead of RankOrder
+        
     """
     long_LR_decoder: BasePositionDecoder = field()
     long_RL_decoder: BasePositionDecoder = field()
