@@ -1103,6 +1103,9 @@ class PipelineWithComputedPipelineStageMixin:
         if debug_print:
             print(f'perform_drop_computed_result(computed_data_keys_to_drop: {computed_data_keys_to_drop}, config_names_includelist: {config_names_includelist})')
 
+        if isinstance(computed_data_keys_to_drop, str):
+            computed_data_keys_to_drop = [computed_data_keys_to_drop] # wrap in a list
+
         if config_names_includelist is None:
             # if no includelist specified, get all computed keys:
             config_names_includelist = self.active_completed_computation_result_names # ['maze1_PYR', 'maze2_PYR', 'maze_PYR']
@@ -1112,7 +1115,7 @@ class PipelineWithComputedPipelineStageMixin:
             if a_config_name in config_names_includelist:            
                 # remove the results from this config
                 for a_key_to_drop in computed_data_keys_to_drop:
-                    a_result_to_drop = curr_computed_results.pop(a_key_to_drop, None)
+                    a_result_to_drop = curr_computed_results.pop(a_key_to_drop, None) # AttributeError: 'ComputationResult' object has no attribute 'pop'
                     ## TODO: Should we drop from curr_computed_results.accumulated_errors in addition to curr_computed_results.computed_data? Probably fine not to.
                     if a_result_to_drop is not None:
                         # Successfully dropped

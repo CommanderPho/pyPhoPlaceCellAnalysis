@@ -24,7 +24,8 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import TrackTemplates, RankOrderAnalyses, ShuffleHelper, Zscorer
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses, ShuffleHelper, Zscorer
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
@@ -85,6 +86,9 @@ class RankOrderDebugger:
     plots: RenderPlots = field(init=False)
     plots_data: RenderPlotsData = field(init=False)
 
+    active_epoch_IDX: int = field(default=0, repr=True)
+
+
     @property
     def n_epochs(self) -> int:
         return np.shape(self.active_epochs_df)[0]
@@ -141,7 +145,42 @@ class RankOrderDebugger:
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.lap_id == (an_epoch_idx+1))]
         curr_epoch = list(curr_epoch_df.itertuples())[0]
         self.on_update_active_epoch(an_epoch_idx, curr_epoch)
-                    
+
+
+    def get_ipywidget(self):
+        """ Displays a slider that allows the user to select the epoch_IDX instead of having to type it and call it manually
+
+        """
+        import ipywidgets as widgets
+        # 2023-11-17: Displays a slider that allows the user to select the epoch_IDX instead of having to type it and call it manually
+        # https://ipywidgets.readthedocs.io/en/latest/examples/Widget%20Events.html#throttling
+
+        self.active_epoch_IDX = 0
+        # Define the update function
+        def update_function(change):
+            global active_epoch_IDX
+            new_value = change['new']
+            active_epoch_IDX = new_value
+            # Add your update logic here
+            print(f"Slider value updated to: {new_value}")
+            self.on_update_epoch_IDX(new_value) # call the update
+            print(f'n_unique_cells_participating_in_replay[{active_epoch_IDX}]: {n_unique_cells_participating_in_replay[active_epoch_IDX]}')
+            selected_epoch_df = global_replays.to_dataframe()[global_replays.to_dataframe().index == active_epoch_IDX] # should only contain one entry, the selected epoch.
+            curr_epoch = list(selected_epoch_df.itertuples())[0] # extract the interval of interest as a namedtuple object
+            print(f"curr_epoch: {curr_epoch}")
+
+            
+        # Create a slider widget
+        slider = widgets.IntSlider(value=0, min=0, max=np.shape(self.active_epochs_df)[0], step=1, description='Test Slider')
+
+        # Link the update function to value changes in the slider
+        slider.observe(update_function, names='value')
+
+        # self.ui.slider = slider
+        return slider
+    
+        # Display the slider
+        # display(slider)
 
 
     @function_attributes(short_name=None, tags=['directional', 'templates', 'debugger', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_plot_multi_sort_raster_browser'], used_by=[], creation_date='2023-11-02 14:06', related_items=[])
