@@ -317,33 +317,33 @@ class DirectionalLapsHelpers:
 
         # ## Version 2023-10-30 - All four templates with same shared_aclus version:
         # # Prune to the shared aclus in both epochs (short/long):
-        # active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
-        # # Find only the common aclus amongst all four templates:
-        # shared_aclus = np.array(list(set.intersection(*map(set,active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
-        # n_neurons = len(shared_aclus)
-        # print(f'n_neurons: {n_neurons}, shared_aclus: {shared_aclus}')
-        # # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
-        # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
+        active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
+        # Find only the common aclus amongst all four templates:
+        shared_aclus = np.array(list(set.intersection(*map(set,active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
+        n_neurons = len(shared_aclus)
+        print(f'n_neurons: {n_neurons}, shared_aclus: {shared_aclus}')
+        # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
+        long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
 
-        ## Version 2023-10-31 - 4pm - Two sets of templates for (Odd/Even) shared aclus:
-        # Kamran says LR and RL sets should be shared
-        ## Odd Laps:
-        LR_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
-        LR_shared_aclus = np.array(list(set.intersection(*map(set,LR_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
-        LR_n_neurons = len(LR_shared_aclus)
-        if progress_print:
-            print(f'LR_n_neurons: {LR_n_neurons}, LR_shared_aclus: {LR_shared_aclus}')
+        # ## Version 2023-10-31 - 4pm - Two sets of templates for (Odd/Even) shared aclus:
+        # # Kamran says LR and RL sets should be shared
+        # ## Odd Laps:
+        # LR_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
+        # LR_shared_aclus = np.array(list(set.intersection(*map(set,LR_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
+        # LR_n_neurons = len(LR_shared_aclus)
+        # if progress_print:
+        #     print(f'LR_n_neurons: {LR_n_neurons}, LR_shared_aclus: {LR_shared_aclus}')
 
-        ## Even Laps:
-        RL_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
-        RL_shared_aclus = np.array(list(set.intersection(*map(set,RL_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
-        RL_n_neurons = len(RL_shared_aclus)
-        if progress_print:
-            print(f'RL_n_neurons: {RL_n_neurons}, RL_shared_aclus: {RL_shared_aclus}')
+        # ## Even Laps:
+        # RL_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
+        # RL_shared_aclus = np.array(list(set.intersection(*map(set,RL_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
+        # RL_n_neurons = len(RL_shared_aclus)
+        # if progress_print:
+        #     print(f'RL_n_neurons: {RL_n_neurons}, RL_shared_aclus: {RL_shared_aclus}')
 
-        # Direction Separate shared_aclus decoders: Odd set is limited to LR_shared_aclus and RL set is limited to RL_shared_aclus:
-        long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(LR_shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
-        long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(RL_shared_aclus) for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
+        # # Direction Separate shared_aclus decoders: Odd set is limited to LR_shared_aclus and RL set is limited to RL_shared_aclus:
+        # long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(LR_shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
+        # long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(RL_shared_aclus) for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
 
         # ## Encode/Decode from global result:
         # # Unpacking:
@@ -489,9 +489,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             if fignum is not None:
                 print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
             
-
             defer_render = kwargs.pop('defer_render', False) 
-
 
             # Recover from the saved global result:
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
@@ -505,11 +503,28 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=False, include_accel=False)
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(epochs_editor.plots.win, None, title='Pho Directional Laps Templates')
             
+            def _get_decoder_sort_IDXs(a_decoder):
+                return np.argsort(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses)
+
             def _get_decoder_sorted_pfs(a_decoder):
                 ratemap = a_decoder.pf.ratemap
                 CoM_sort_indicies = np.argsort(ratemap.peak_tuning_curve_center_of_masses) # get the indicies to sort the placefields by their center-of-mass (CoM) location
                 # CoM_sort_indicies.shape # (n_neurons,)
                 return ratemap.pdf_normalized_tuning_curves[CoM_sort_indicies, :]
+
+            def sorting_decoder(decoder, shared_sort_neuron_IDs, shared_sort_IDX):
+                neuron_IDs = decoder.neuron_IDs
+                shared_sort_IDX_list = list(shared_sort_neuron_IDs)  # Contains neuron IDs in the order of shared_sort_IDX
+                # Handle neuron IDs present in both the shared sort and the decoder
+                shared_neuron_sort = {neuron_id: shared_sort_IDX_list.index(neuron_id) for neuron_id in neuron_IDs if neuron_id in shared_sort_neuron_IDs}
+                # Handle neuron IDs not present in the shared sort
+                unique_neuron_sort = {neuron_id: i + len(shared_sort_IDX) for i, neuron_id in enumerate(neuron_IDs) if neuron_id not in shared_sort_neuron_IDs}
+                # Combine both sorts
+                sort_index_map = {**shared_neuron_sort, **unique_neuron_sort}
+                # Get indices for sorting
+                sorted_neuron_IDs_indices = sorted(range(len(neuron_IDs)), key=lambda x: sort_index_map[neuron_IDs[x]])
+                # Sort the pdf_normalized_tuning_curves
+                return decoder.pf.ratemap.pdf_normalized_tuning_curves[sorted_neuron_IDs_indices, :]
 
             decoders_dict = {'long_LR': track_templates.long_LR_decoder,
                 'long_RL': track_templates.long_RL_decoder,
@@ -517,10 +532,16 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 'short_RL': track_templates.short_RL_decoder,
             }
 
+            # Get the primary sort which will be compared against:
+            shared_sort_neuron_IDs = deepcopy(track_templates.long_LR_decoder.neuron_IDs)
+            shared_sort_IDX = _get_decoder_sort_IDXs(track_templates.long_LR_decoder)
+
+
             ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
             _out_pf1D_heatmaps = {}
             for a_decoder_name, a_decoder in decoders_dict.items():
-                _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True)
+                _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorting_decoder(a_decoder, shared_sort_neuron_IDs, shared_sort_IDX), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True)
+                # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True)
 
             even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_even_dock_colors)
             odd_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_odd_dock_colors)
