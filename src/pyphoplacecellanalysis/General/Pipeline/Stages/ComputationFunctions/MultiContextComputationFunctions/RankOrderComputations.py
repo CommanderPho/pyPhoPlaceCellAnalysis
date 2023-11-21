@@ -496,30 +496,6 @@ class RankOrderAnalyses:
 
 
     """
-    ## Plot Laps Analysis
-    def _plot_laps_shuffle_analysis(laps_long_short_z_score_diff_values, suffix_str=''):
-        laps_fig, laps_ax = plt.subplots()
-        laps_ax.scatter(np.arange(len(laps_long_short_z_score_diff_values)), laps_long_short_z_score_diff_values, label=f'laps{suffix_str}')
-        plt.title(f'Rank-Order Long-Short ZScore Diff for Laps over time ({suffix_str})')
-        plt.ylabel(f'Long-Short Z-Score Diff ({suffix_str})')
-        plt.xlabel('Lap Index')
-        return laps_fig, laps_ax
-
-    ## Plot Ripple-Events Analysis
-    def _plot_ripple_events_shuffle_analysis(ripple_evts_long_short_z_score_diff_values, global_replays, suffix_str=''):
-        replay_fig, replay_ax = plt.subplots()
-        # replay_ax.scatter(np.arange(len(ripple_evts_long_z_score_values)), ripple_evts_long_z_score_values, label='ripple-events')
-
-        # Plot with actual times:
-        replays_midpoint_times = global_replays.starts + ((global_replays.stops - global_replays.starts)/2.0)
-        replay_ax.scatter(replays_midpoint_times, ripple_evts_long_short_z_score_diff_values[1:], label=f'ripple-events{suffix_str}')
-        plt.title(f'Rank-Order Long-Short ZScore Diff for Ripple-Events over time ({suffix_str})')
-        plt.ylabel(f'Long-Short Z-Score Diff ({suffix_str})')
-        # plt.xlabel('Ripple Event Index')
-        plt.xlabel('Ripple Event Mid-time (t)')
-        return replay_fig, replay_ax
-
-
     def _perform_plot_z_score_raw(epoch_idx_list, odd_long_z_score_values, odd_short_z_score_values, even_long_z_score_values, even_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
         """ plots the raw z-scores for each of the four templates 
 
