@@ -357,11 +357,18 @@ class DirectionalLapsHelpers:
         directional_laps_result.split_directional_laps_dict = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)}  # split_directional_laps_dict
         directional_laps_result.split_directional_laps_contexts_dict = {a_name:curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # split_directional_laps_contexts_dict
         directional_laps_result.split_directional_laps_config_names = [long_LR_name, long_RL_name, short_LR_name, short_RL_name] # split_directional_laps_config_names
-        
-        directional_laps_result.long_LR_one_step_decoder_1D = long_LR_shared_aclus_only_one_step_decoder_1D
-        directional_laps_result.long_RL_one_step_decoder_1D = long_RL_shared_aclus_only_one_step_decoder_1D
-        directional_laps_result.short_LR_one_step_decoder_1D = short_LR_shared_aclus_only_one_step_decoder_1D
-        directional_laps_result.short_RL_one_step_decoder_1D = short_RL_shared_aclus_only_one_step_decoder_1D
+
+        # use the constrained epochs:
+        directional_laps_result.long_LR_one_step_decoder_1D = long_LR_laps_one_step_decoder_1D
+        directional_laps_result.long_RL_one_step_decoder_1D = long_RL_laps_one_step_decoder_1D
+        directional_laps_result.short_LR_one_step_decoder_1D = short_LR_laps_one_step_decoder_1D
+        directional_laps_result.short_RL_one_step_decoder_1D = short_RL_laps_one_step_decoder_1D
+
+        # # use the constrained epochs:
+        # directional_laps_result.long_LR_one_step_decoder_1D = long_LR_shared_aclus_only_one_step_decoder_1D
+        # directional_laps_result.long_RL_one_step_decoder_1D = long_RL_shared_aclus_only_one_step_decoder_1D
+        # directional_laps_result.short_LR_one_step_decoder_1D = short_LR_shared_aclus_only_one_step_decoder_1D
+        # directional_laps_result.short_RL_one_step_decoder_1D = short_RL_shared_aclus_only_one_step_decoder_1D
 
         # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names
         directional_laps_result.long_LR_shared_aclus_only_one_step_decoder_1D = long_LR_shared_aclus_only_one_step_decoder_1D
@@ -538,25 +545,30 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 """ captures: epochs_editor, _out_pf1D_heatmaps 
                 
                 TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
-                
+                import pyqtgraph as pg
+                import pyqtgraph.exporters
+                from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
                 """
                 ## Get main laps plotter:
                 # print_keys_if_possible('_out', _out, max_depth=4)
                 # plots = _out['plots']
 
                 ## Already have: epochs_editor, _out_pf1D_heatmaps
-                # epochs_editor = _out['ui'][0]
-                # epochs_editor
+                epochs_editor = graphics_output_dict['ui'][0]
 
+                shared_output_file_prefix = f'output/2023-11-20'
                 # print(list(plots.keys()))
                 # pg.GraphicsLayoutWidget 
                 main_graphics_layout_widget = epochs_editor.plots.win
-                export_file_path = Path(f'output/2023-11-16_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
+                export_file_path = Path(f'{shared_output_file_prefix}_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
                 export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
 
-                # _out_pf1D_heatmaps = _out['plots']
+                _out_pf1D_heatmaps = graphics_output_dict['plots']
                 for a_decoder_name, a_decoder_heatmap_tuple in _out_pf1D_heatmaps.items():
                     a_win, a_img = a_decoder_heatmap_tuple
+                    # a_win.export_image(f'{a_decoder_name}_heatmap.png')
+                    print(f'a_win: {type(a_win)}')
+
                     # create an exporter instance, as an argument give it the item you wish to export
                     exporter = pg.exporters.ImageExporter(a_win.plotItem)
                     # exporter = pg.exporters.SVGExporter(a_win.plotItem)
@@ -564,9 +576,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     # exporter.parameters()['width'] = 300   # (note this also affects height parameter)
 
                     # save to file
-                    export_file_path = Path(f'output/2023-11-16_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
+                    export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
                     
-                    exporter.export(export_file_path) # '.png'
+                    exporter.export(str(export_file_path)) # '.png'
                     print(f'exporting to {export_file_path}')
                     # .scene()
 
