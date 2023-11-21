@@ -340,11 +340,19 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
 
     """
     shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, (long_pf_peak_ranks, short_pf_peak_ranks) = astuple(shuffle_helper)
+    
+
+    # want the aclus as well, not just the `long_pf_peak_ranks`
+
+    long_pf_peak_ranks
+
+
 
     # post_process_statistic_value_fn = lambda x: np.abs(x)
     post_process_statistic_value_fn = lambda x: float(x) # basically NO-OP
 
-    active_spikes_df = deepcopy(active_spikes_df).spikes.sliced_by_neuron_id(shared_aclus_only_neuron_IDs)
+    active_spikes_df = deepcopy(active_spikes_df)
+    # active_spikes_df = deepcopy(active_spikes_df).spikes.sliced_by_neuron_id(shared_aclus_only_neuron_IDs) # we don't want this I don't think.    
     active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # NOTE: `active_aclu_to_fragile_linear_neuron_IDX_dict` is actually pretty important here. It's an ordered dict that maps each aclu to a flat neuronIDX!
     # unique_neuron_identities = active_spikes_df.spikes.extract_unique_neuron_identities()
     # [['t_rel_seconds', 'shank', 'cluster', 'aclu', 'qclu', 'traj', 'lap', 'maze_relative_lap', 'flat_spike_idx', 'maze_id', 'fragile_linear_neuron_IDX', 'neuron_type', 'PBE_id']]
@@ -404,6 +412,9 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
 
     for epoch_id in list(epoch_ranked_aclus_dict.keys()):
 
+
+        epoch_active_aclus = np.array(list(epoch_ranked_aclus_dict[epoch_id].keys())) # get the actual aclus instead of the indicies here.
+        
         epoch_ranked_fragile_linear_neuron_IDXs_array = epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id]
         epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[:,0])
         epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[:,1])
@@ -650,9 +661,8 @@ class RankOrderAnalyses:
         ### non-shared_aclus_only
         odd_shuffle_helper: ShuffleHelper = build_track_templates_for_shuffle(long_LR_one_step_decoder_1D, short_LR_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
         even_shuffle_helper: ShuffleHelper = build_track_templates_for_shuffle(long_RL_one_step_decoder_1D, short_RL_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
-        ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
         # ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
-
+        # ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
         return global_spikes_df, (odd_shuffle_helper, even_shuffle_helper)
 
     @function_attributes(short_name=None, tags=['rank-order', 'ripples', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
