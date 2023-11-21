@@ -1011,7 +1011,7 @@ DirectionalRankOrderResult = namedtuple('DirectionalRankOrderResult', ['active_e
 
 @function_attributes(short_name=None, tags=['rank-order', 'shuffle', 'inst_fr', 'epoch', 'lap', 'replay', 'computation'], input_requires=[], output_provides=[], uses=['DirectionalRankOrderLikelihoods', 'DirectionalRankOrderResult'], used_by=[], creation_date='2023-11-16 18:43', related_items=['plot_rank_order_epoch_inst_fr_result_tuples'])
 def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003):
-    """ 
+    """ A version of the rank-order shufffling for a set of epochs that tries to use the most-likely direction as the one to decode with.
 
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import most_likely_directional_rank_order_shuffling
@@ -1019,6 +1019,11 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
         ## Main
         ripple_result_tuple, laps_result_tuple = most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003)
     
+        
+    Reference:
+        {"even": "RL", "odd": "LR"}
+        [LR, RL], {'LR': 0, 'RL': 1}
+        odd (LR) = 0, even (RL) = 1
     """
     # ODD: 0, EVEN: 1
     _ODD_INDEX = 0
@@ -1042,6 +1047,8 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
     # (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
     # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
 
+
+    ## Extract the rank_order_results:
     rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
 
     # # Use the four epochs to make to a pseudo-y:
@@ -1052,23 +1059,27 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
     ## Combine the non-directional PDFs and renormalize to get the directional PDF:
     # Inputs: long_LR_pf1D, long_RL_pf1D
     long_directional_decoder_names = ['long_LR', 'long_RL']
-    long_directional_pf1D = PfND.build_merged_directional_placefields(deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), debug_print=False)
+    long_directional_pf1D: PfND = PfND.build_merged_directional_placefields(deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), debug_print=False)
     long_directional_pf1D_Decoder = BasePositionDecoder(long_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
 
     # Inputs: short_LR_pf1D, short_RL_pf1D
     short_directional_decoder_names = ['short_LR', 'short_RL']
-    short_directional_pf1D = PfND.build_merged_directional_placefields(deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D), debug_print=False)
+    short_directional_pf1D = PfND.build_merged_directional_placefields(deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D), debug_print=False) # [LR, RL], {'LR': 0, 'RL': 1}
     short_directional_pf1D_Decoder = BasePositionDecoder(short_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
     # takes 6.3 seconds
 
+    ## validation of PfNDs:
+    # short_directional_pf1D.plot_ratemaps_2D()
+
     # Decode using specific directional_decoders:
-    global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=1000)
-    spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    spikes_df = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df)
+    # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
 
     def _compute_best(active_epochs):
         """ captures: long_directional_pf1D_Decoder, short_directional_pf1D_Decoder, spikes_df, decoding_time_bin_size """
-        long_directional_decoding_result: DecodedFilterEpochsResult = long_directional_pf1D_Decoder.decode_specific_epochs(spikes_df, active_epochs, decoding_time_bin_size=decoding_time_bin_size)
-        short_directional_decoding_result: DecodedFilterEpochsResult = short_directional_pf1D_Decoder.decode_specific_epochs(spikes_df, active_epochs, decoding_time_bin_size=decoding_time_bin_size)
+        long_directional_decoding_result: DecodedFilterEpochsResult = long_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(spikes_df), active_epochs, decoding_time_bin_size=decoding_time_bin_size)
+        short_directional_decoding_result: DecodedFilterEpochsResult = short_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(spikes_df), active_epochs, decoding_time_bin_size=decoding_time_bin_size)
         # all_directional_decoding_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df, active_epochs, decoding_time_bin_size=decoding_time_bin_size)
 
         # sum across timebins to get total likelihood for each of the two directions
@@ -1092,8 +1103,7 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
                                             short_best_direction_indices=short_best_direction_indicies)
 
 
-    # a "precise shift" that allows me to reduce the DPI for precision when I need it. Maybe with that side button. Liek when I"m trying to hit precise targets. It would be cool if it magnitified the cursor area too!
-   
+
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     ## Replays:
@@ -1116,6 +1126,7 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
 
     # preferred order, but not the current standard: (long_odd_mask, long_even_mask, short_odd_mask, short_even_mask)
     # current standard order: (long_odd_mask, short_odd_mask, long_even_mask, short_even_mask)
+    #TODO 2023-11-20 22:02: - [ ] ERROR: CORRECTNESS FAULT: I think the two lists zipped over below are out of order.
     ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values),
                                                                                                         ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
     
@@ -1139,6 +1150,7 @@ def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_
     # print(f'np.shape(laps_long_best_dir_z_score_values): {np.shape(laps_long_best_dir_z_score_values)}')
     laps_long_short_best_dir_z_score_diff_values = laps_long_best_dir_z_score_values - laps_short_best_dir_z_score_values
     # print(f'np.shape(laps_long_short_best_dir_z_score_diff_values): {np.shape(laps_long_short_best_dir_z_score_diff_values)}')
+    #TODO 2023-11-20 22:02: - [ ] ERROR: CORRECTNESS FAULT: I think the two lists zipped over below are out of order.
     laps_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values),
                                                                                                         ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
 
