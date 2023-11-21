@@ -579,7 +579,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # self.spikes_window.update_window_start(min_t)
         
         # Here is the main problem: The duration and window end-time aren't being updated
-        self.spikes_window.update_window_start_end(new_start=min_t, new_end=max_t)
+        self.spikes_window.update_window_start_end(min_t, max_t)
         
         
         # Update 3D Curves if we have them: TODO: figure out where this goes!
