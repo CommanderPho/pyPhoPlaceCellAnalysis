@@ -340,13 +340,7 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
 
     """
     shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, (long_pf_peak_ranks, short_pf_peak_ranks) = astuple(shuffle_helper)
-    
-
-    # want the aclus as well, not just the `long_pf_peak_ranks`
-
-    long_pf_peak_ranks
-
-
+    #TODO 2023-11-21 05:42: - [ ] todo_description want the aclus as well, not just the `long_pf_peak_ranks`
 
     # post_process_statistic_value_fn = lambda x: np.abs(x)
     post_process_statistic_value_fn = lambda x: float(x) # basically NO-OP
@@ -400,7 +394,7 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         neuron_IDX = active_aclu_to_fragile_linear_neuron_IDX_dict[aclu] # ordered dict that maps each aclu to a flat neuronIDX!
         epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id].append((neuron_IDX, int(rank))) # note we are adding indicies, not aclus
         
-        a_value: float = selected_spikes.groupby(['Probe_Epoch_id', 'aclu']).get_group((epoch_id, aclu)).values[0] # extracts the single float item
+        a_value: float = selected_spikes.groupby(['Probe_Epoch_id', 'aclu']).get_group((epoch_id, aclu)).values[0] # extracts the single float item, this line seems to be very slow?
         epoch_selected_spikes_fragile_linear_neuron_IDX_dict[epoch_id].append((neuron_IDX, a_value))
         
     # Convert all to np.ndarrays post-hoc:
@@ -412,8 +406,8 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
 
     for epoch_id in list(epoch_ranked_aclus_dict.keys()):
 
-
-        epoch_active_aclus = np.array(list(epoch_ranked_aclus_dict[epoch_id].keys())) # get the actual aclus instead of the indicies here.
+        ## TODO: might need to get the specific aclus that are active in the epoch and limit to the intersection of those and the current decoder:
+        # epoch_active_aclus = np.array(list(epoch_ranked_aclus_dict[epoch_id].keys())) # get the actual aclus instead of the indicies here.
         
         epoch_ranked_fragile_linear_neuron_IDXs_array = epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id]
         epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[:,0])
