@@ -221,11 +221,12 @@ class RankOrderDebugger:
 
 
         # CORRECT: Even: RL, Odd: LR
-        RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
-        LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
-        RL_long, RL_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list]
+        RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy() # (69, )
+        LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy() # (64, )
+        RL_long, RL_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list] # nope, different sizes: (62,), (69,)
         LR_long, LR_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
 
+        assert np.shape(RL_long) == np.shape(RL_short), f"{np.shape(RL_long)} != {np.shape(RL_short)}"
 
         neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
         unit_colors_list = neuron_colors_ndarray.copy()
