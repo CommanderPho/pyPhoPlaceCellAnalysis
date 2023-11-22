@@ -10,10 +10,11 @@ from multiprocessing import Pool, freeze_support
 
 # from matplotlib.colors import ListedColormap
 from pathlib import Path
-from neuropy.core import Epoch
-from neuropy.analyses.placefields import PfND
 import numpy as np
 import numpy.ma as ma # used in `most_likely_directional_rank_order_shuffling`
+from neuropy.core import Epoch
+from neuropy.analyses.placefields import PfND
+from neuropy.utils.misc import safe_pandas_get_group
 import pandas as pd
 import pyvista as pv
 import pyvistaqt as pvqt # conda install -c conda-forge pyvistaqt
@@ -125,8 +126,8 @@ def compute_placefield_center_of_masses(tuning_curves):
 @define(slots=False, repr=False, eq=False)
 class ShuffleHelper:
     """ holds the result of shuffling templates. Used for rank-order analyses """
-    shared_aclus_only_neuron_IDs = field()
-    is_good_aclus = field()
+    shared_aclus_only_neuron_IDs: NDArray = field()
+    is_good_aclus: NDArray = field()
     shuffled_aclus = field()
     shuffle_IDX = field()
     
@@ -181,8 +182,6 @@ class ShuffleHelper:
         
         # return shared_aclus_only_neuron_IDs, is_good_aclus, long_pf_peak_ranks, short_pf_peak_ranks, shuffled_aclus, shuffle_IDXs
         return cls(shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, decoder_pf_peak_ranks_list=decoder_pf_peak_ranks_list)
-
-
 
     @classmethod
     def init_from_long_short_shared_aclus_only_decoders(cls, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles: int = 100, bimodal_exclude_aclus = [5, 14, 25, 46, 61, 66, 86, 88, 95]) -> "ShuffleHelper":
@@ -331,184 +330,6 @@ def build_track_templates_for_shuffle(long_shared_aclus_only_decoder, short_shar
 #     return long_result, short_result
 
 
-
-@function_attributes(short_name=None, tags=['shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
-def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle_helper, rank_alignment: str = 'first', disable_re_ranking:bool=True, debug_print=True) -> RankOrderResult:
-    """ Extracts the two templates (long/short) from the shuffle_helper in addition to the shuffled_aclus, shuffle_IDXs.
-
-    """
-    shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, (long_pf_peak_ranks, short_pf_peak_ranks) = astuple(shuffle_helper)
-    #TODO 2023-11-21 05:42: - [ ] todo_description want the aclus as well, not just the `long_pf_peak_ranks`
-
-    # post_process_statistic_value_fn = lambda x: np.abs(x)
-    post_process_statistic_value_fn = lambda x: float(x) # basically NO-OP
-
-    active_spikes_df = deepcopy(active_spikes_df)
-    # active_spikes_df = deepcopy(active_spikes_df).spikes.sliced_by_neuron_id(shared_aclus_only_neuron_IDs) # we don't want this I don't think. #TODO 2023-11-21 20:16: - [ ] Commenting this back in will fix the over indexing errors! They're occcuring because the `active_aclu_to_fragile_linear_neuron_IDX_dict` built from the spikes_df includes all of the neurons (like 108 of them) compared to 37 or so in the filtered lists.
-    active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # NOTE: `active_aclu_to_fragile_linear_neuron_IDX_dict` is actually pretty important here. It's an ordered dict that maps each aclu to a flat neuronIDX!
-    # unique_neuron_identities = active_spikes_df.spikes.extract_unique_neuron_identities()
-    # [['t_rel_seconds', 'shank', 'cluster', 'aclu', 'qclu', 'traj', 'lap', 'maze_relative_lap', 'flat_spike_idx', 'maze_id', 'fragile_linear_neuron_IDX', 'neuron_type', 'PBE_id']]
-    no_interval_fill_value = -1
-    # add the active_epoch's id to each spike in active_spikes_df to make filtering and grouping easier and more efficient:
-    active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)[['t_rel_seconds', 'shank', 'cluster', 'aclu', 'qclu', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'fragile_linear_neuron_IDX', 'neuron_type', 'flat_spike_idx', 'PBE_id', 'Probe_Epoch_id']]
-    # uses new add_epochs_id_identity
-    active_spikes_df.drop(active_spikes_df.loc[active_spikes_df['Probe_Epoch_id']==no_interval_fill_value].index, inplace=True)
-
-    # Sort by columns: 't_rel_seconds' (ascending), 'aclu' (ascending)
-    active_spikes_df = active_spikes_df.sort_values(['t_rel_seconds', 'aclu'])
-
-    ## Determine which spikes to use to represent the order:
-    selected_spikes = active_spikes_df.groupby(['Probe_Epoch_id', 'aclu'])[active_spikes_df.spikes.time_variable_name]
-
-    if rank_alignment == 'first':
-        selected_spikes = selected_spikes.first() # first spike times only
-    elif rank_alignment == 'median':
-        selected_spikes = selected_spikes.median() # median spike times only
-    elif rank_alignment == 'center_of_mass':
-        selected_spikes = compute_placefield_center_of_masses(selected_spikes)
-    else:
-        raise NotImplementedError(f'invalid rank_alignment specified : {rank_alignment}. valid options are [first, median, ...]')
-    
-    # rank the aclu values by their first t value in each Probe_Epoch_id
-    ranked_aclus = selected_spikes.groupby('Probe_Epoch_id').rank(method='dense') # resolve ties in ranking by assigning the same rank to each and then incrimenting for the next item
-
-    ## OUTPUT DICTS:
-    # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
-    epoch_ranked_aclus_dict = {} # this one isn't needed anymore probably, the `epoch_ranked_fragile_linear_neuron_IDX_dict` is easier.
-    epoch_ranked_fragile_linear_neuron_IDX_dict = {} # structure is different 
-    epoch_selected_spikes_fragile_linear_neuron_IDX_dict = {}
-
-    grouped = selected_spikes.groupby(['Probe_Epoch_id', 'aclu'])
-    
-    for (epoch_id, aclu), rank in zip(ranked_aclus.index, ranked_aclus):
-        assert (epoch_id != -1), f"should have no -1 entries since we tried to drop them before grouping."
-        # skip the sentinal value (no epoch) entry
-        if epoch_id not in epoch_ranked_aclus_dict:
-            # Initialize new dicts/arrays for the epoch if needed:
-            epoch_ranked_aclus_dict[epoch_id] = {}
-            epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id] = []
-            epoch_selected_spikes_fragile_linear_neuron_IDX_dict[epoch_id] = []
-            
-        ## Add the rank to the dict/array
-        epoch_ranked_aclus_dict[epoch_id][aclu] = int(rank)        
-        neuron_IDX = active_aclu_to_fragile_linear_neuron_IDX_dict[aclu] # ordered dict that maps each aclu to a flat neuronIDX!
-        epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id].append((neuron_IDX, int(rank))) # note we are adding indicies, not aclus
-        
-        a_value: float = grouped.get_group((epoch_id, aclu)).values[0] # extracts the single float item, this line seems to be very slow?
-        epoch_selected_spikes_fragile_linear_neuron_IDX_dict[epoch_id].append((neuron_IDX, a_value))
-        
-    # Convert all to np.ndarrays post-hoc:
-    epoch_ranked_fragile_linear_neuron_IDX_dict = {epoch_id:np.array(epoch_ranked_fragile_linear_neuron_IDXs) for epoch_id, epoch_ranked_fragile_linear_neuron_IDXs in epoch_ranked_fragile_linear_neuron_IDX_dict.items()}
-    # selected:
-    epoch_selected_spikes_fragile_linear_neuron_IDX_dict = {epoch_id:np.array(epoch_ranked_fragile_linear_neuron_IDXs) for epoch_id, epoch_ranked_fragile_linear_neuron_IDXs in epoch_selected_spikes_fragile_linear_neuron_IDX_dict.items()}
-
-    ## Loop over the results now to do the actual stats:
-    epoch_ranked_aclus_stats_dict = {}
-
-    for epoch_id in list(epoch_ranked_aclus_dict.keys()):
-        
-        ## TODO: might need to get the specific aclus that are active in the epoch and limit to the intersection of those and the current decoder:
-        epoch_active_aclus = np.array(list(epoch_ranked_aclus_dict[epoch_id].keys())) # get the actual aclus instead of the indicies here.
-        ## 2. Now get the template aclus to filter the epoch_active_aclus by (note there are way more `epoch_active_aclus` (like 81) than template ones.
-        # shared_aclus_only_neuron_IDs # (for now). In the future the `template_aclus` might be template-specific instead of shared:
-        template_aclus = deepcopy(shared_aclus_only_neuron_IDs)
-        is_epoch_aclu_included_in_template = np.isin(epoch_active_aclus, template_aclus) # a bool array indicating whether each aclu active in the epoch (spikes_df) is included in the template.
-
-        actually_included_epoch_aclus = epoch_active_aclus[is_epoch_aclu_included_in_template] # note this must be strictly smaller than the template aclus, AND strictly less than the epoch_active_aclus.
-
-        # 4. Final step is getting the actual indicies into the template aclus (the template-relative neuronIDXs):
-        _template_aclu_list = list(template_aclus) # convert to a temporary basic python list so that `.index(aclu)` works in the next line.
-        template_epoch_neuron_IDXs = np.array([_template_aclu_list.index(aclu) for aclu in actually_included_epoch_aclus]) # should be the appropriate neuronIDXs in the template-relative array
-
-        # epoch_ranked_fragile_linear_neuron_IDXs_array = epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id]
-        # epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[:,0])
-        # epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[:,1])
-        epoch_ranked_fragile_linear_neuron_IDXs_array = epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id]
-        # epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,0])
-        _DEP_epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,0]) # BAD NOT USED.
-        epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,1]) # the ranks just for this epoch, just for this template
-        
-        # Note that now (after boolean slicing), both `epoch_neuron_IDXs` and `epoch_neuron_IDX_ranks` can be LESS than the `shared_aclus_only_neuron_IDs`. They are indexed?
-        # Instead of `epoch_neuron_IDXs`, use `template_epoch_neuron_IDXs` to the get neuron_IDXs relative to this template:`
-        assert np.size(template_epoch_neuron_IDXs) == np.size(epoch_neuron_IDX_ranks), f"{np.size(epoch_neuron_IDX_ranks)} and len(template_epoch_neuron_IDXs): {np.size(template_epoch_neuron_IDXs)}"
-        #TODO 2023-11-21 20:49: - [ ] HERE IS WHERE I LEFT OFF. I now have filtered neuron_IDXs corresponding to the ranks for this epoch, but now I DON'T think they correspond to the template neuron_IDXs!!
-        if debug_print:
-            print(f'epoch_id: {epoch_id}')
-            # print(f'\tepoch_neuron_IDXs: {print_array(epoch_neuron_IDXs)}')
-            print(f'\t_DEP_epoch_neuron_IDXs: {print_array(_DEP_epoch_neuron_IDXs)}')
-            print(f'\ttemplate_epoch_neuron_IDXs: {print_array(template_epoch_neuron_IDXs)}')
-            print(f'\tepoch_neuron_IDX_ranks: {print_array(epoch_neuron_IDX_ranks)}')
- 
-        #TODO 2023-11-22 08:35: - [ ] keep da' indicies we actually use for this template/epoch. They're needed in the RankOrderDebugger.
-
-
-        ## EPOCH SPECIFIC:
-        long_spearmanr_rank_stats_results = []
-        short_spearmanr_rank_stats_results = []
-
-        # The "real" result for this epoch:
-        active_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking) # encountering np.shape(epoch_neuron_IDXs): (41,) but np.shape(long_pf_peak_ranks): (34,)
-        real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-        real_long_result_corr_value = (post_process_statistic_value_fn(real_long_rank_stats.statistic), real_long_rank_stats.pvalue)[0]
-        
-        active_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
-        real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-        real_short_result_corr_value = (post_process_statistic_value_fn(real_short_rank_stats.statistic), real_short_rank_stats.pvalue)[0]
-        
-        if debug_print:
-            print(f'\tactive_epoch_aclu_long_ranks[{epoch_id}]: {print_array(active_epoch_aclu_long_ranks)}')
-            print(f'\tactive_epoch_aclu_short_ranks[{epoch_id}]: {print_array(active_epoch_aclu_short_ranks)}')
-            
-        ## PERFORM SHUFFLE HERE:
-        for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs)):
-            # long_shared_aclus_only_decoder.pf.ratemap.get_by_id(a_shuffled_aclus)
-            epoch_specific_shuffled_indicies = a_shuffled_IDXs[template_epoch_neuron_IDXs] # get only the subset that is active during this epoch
-            
-            ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
-            active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-            long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-            long_result = (post_process_statistic_value_fn(long_rank_stats.statistic), long_rank_stats.pvalue)
-            long_spearmanr_rank_stats_results.append(long_result)
-            
-            active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-            short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-            short_result = (post_process_statistic_value_fn(short_rank_stats.statistic), short_rank_stats.pvalue)
-            short_spearmanr_rank_stats_results.append(short_result)
-        ## END for shuffle
-
-        long_spearmanr_rank_stats_results = np.array(long_spearmanr_rank_stats_results)
-        short_spearmanr_rank_stats_results = np.array(short_spearmanr_rank_stats_results)
-
-        long_stats_corr_values = long_spearmanr_rank_stats_results[:,0]
-        short_stats_corr_values = short_spearmanr_rank_stats_results[:,0]
-
-        long_stats_z_scorer = Zscorer.init_from_values(long_stats_corr_values, real_long_result_corr_value, real_long_rank_stats.pvalue)
-        short_stats_z_scorer = Zscorer.init_from_values(short_stats_corr_values, real_short_result_corr_value, real_short_rank_stats.pvalue)
-
-        long_short_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value
-
-        epoch_ranked_aclus_stats_dict[epoch_id] = (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff)
-
-
-    ## END for epoch_id
-
-    # Extract the results:
-    long_z_score_values = []
-    short_z_score_values = []
-    long_short_z_score_diff_values = []
-
-    for epoch_id, epoch_stats in epoch_ranked_aclus_stats_dict.items():
-        long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff = epoch_stats
-        # paired_test = pho_stats_paired_t_test(long_stats_z_scorer.z_score_values, short_stats_z_scorer.z_score_values) # this doesn't seem to work well
-        long_z_score_values.append(long_stats_z_scorer.z_score_value)
-        short_z_score_values.append(short_stats_z_scorer.z_score_value)
-        long_short_z_score_diff_values.append(long_short_z_diff)
-
-    long_z_score_values = np.array(long_z_score_values)
-    short_z_score_values = np.array(short_z_score_values)
-    long_short_z_score_diff_values = np.array(long_short_z_score_diff_values)
-        
-    return RankOrderResult.init_from_analysis_output_tuple((epoch_ranked_aclus_stats_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values)))
 
 
 class RankOrderAnalyses:
@@ -687,6 +508,225 @@ class RankOrderAnalyses:
 
 
 
+    @classmethod
+    @function_attributes(short_name=None, tags=['subfn', 'preprocess', 'spikes_df'], input_requires=[], output_provides=[], uses=[], used_by=['compute_shuffled_rankorder_analyses'], creation_date='2023-11-22 11:04', related_items=[])
+    def preprocess_spikes_df(cls, active_spikes_df: pd.DataFrame, active_epochs, shuffle_helper: ShuffleHelper, no_interval_fill_value=-1):
+        """Preprocesses the active spikes DataFrame by extracting shuffle helper data, deep copying, and adding epoch IDs."""
+        # Extract data from shuffle helper
+        shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, (long_pf_peak_ranks, short_pf_peak_ranks) = astuple(shuffle_helper)
+        # Deep copy and preprocess active spikes DataFrame
+        active_spikes_df = deepcopy(active_spikes_df)
+        active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
+        # Add epoch IDs to the spikes DataFrame
+        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
+        active_spikes_df.drop(active_spikes_df.loc[active_spikes_df['Probe_Epoch_id'] == no_interval_fill_value].index, inplace=True)
+        # Sort by columns: 't_rel_seconds' (ascending), 'aclu' (ascending)
+        active_spikes_df = active_spikes_df.sort_values(['t_rel_seconds', 'aclu'])
+
+        return shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, long_pf_peak_ranks, short_pf_peak_ranks, active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict
+
+
+    @classmethod
+    def select_and_rank_spikes(cls, active_spikes_df: pd.DataFrame, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment: str):
+        """Selects and ranks spikes based on rank_alignment, and organizes them into structured dictionaries.
+        
+        epoch_ranked_aclus_dict: Dict[int, Dict[int, float]]: a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
+        epoch_ranked_fragile_linear_neuron_IDX_dict: Dict[int, NDArray]: 
+        epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray]: 
+        
+        """
+        # Determine which spikes to use to represent the order
+        selected_spikes = active_spikes_df.groupby(['Probe_Epoch_id', 'aclu'])[active_spikes_df.spikes.time_variable_name]
+
+        if rank_alignment == 'first':
+            selected_spikes = selected_spikes.first()  # first spike times only
+        elif rank_alignment == 'median':
+            selected_spikes = selected_spikes.median()  # median spike times only
+        elif rank_alignment == 'center_of_mass':
+            selected_spikes = compute_placefield_center_of_masses(selected_spikes)
+        else:
+            raise NotImplementedError(f'Invalid rank_alignment specified: {rank_alignment}. Valid options are [first, median, center_of_mass].')
+        
+        # Rank the aclu values by their first t value in each Probe_Epoch_id
+        ranked_aclus = selected_spikes.groupby('Probe_Epoch_id').rank(method='dense')  # Resolve ties in ranking
+
+        # Create structured dictionaries
+        epoch_ranked_aclus_dict: Dict[int, Dict[int, float]] = {} # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
+        epoch_ranked_fragile_linear_neuron_IDX_dict: Dict[int, NDArray] = {}
+        epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray] = {}
+
+        grouped = selected_spikes.groupby(['Probe_Epoch_id', 'aclu'])
+        for (epoch_id, aclu), rank in zip(ranked_aclus.index, ranked_aclus):
+            if epoch_id not in epoch_ranked_aclus_dict:
+                # Initialize new dicts/arrays for the epoch if needed:
+                epoch_ranked_aclus_dict[epoch_id] = {}
+                epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id] = []
+                epoch_selected_spikes_fragile_linear_neuron_IDX_dict[epoch_id] = []
+
+            ## Add the rank to the dict/array
+            epoch_ranked_aclus_dict[epoch_id][aclu] = float(rank)
+            neuron_IDX = active_aclu_to_fragile_linear_neuron_IDX_dict[aclu] # ordered dict that maps each aclu to a flat neuronIDX!
+            epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id].append((neuron_IDX, float(rank)))
+            a_value: float = float(grouped.get_group((epoch_id, aclu)).values[0]) # extracts the single float item
+            epoch_selected_spikes_fragile_linear_neuron_IDX_dict[epoch_id].append((neuron_IDX, a_value)) # note we are adding indicies, not aclus
+        
+        # Convert to np.ndarrays
+        epoch_ranked_fragile_linear_neuron_IDX_dict = {epoch_id: np.array(vals) for epoch_id, vals in epoch_ranked_fragile_linear_neuron_IDX_dict.items()}
+        epoch_selected_spikes_fragile_linear_neuron_IDX_dict = {epoch_id: np.array(vals) for epoch_id, vals in epoch_selected_spikes_fragile_linear_neuron_IDX_dict.items()} # selected:
+
+        return epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict
+
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['cls.preprocess_spikes_df', 'cls.select_and_rank_spikes'], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
+    def compute_shuffled_rankorder_analyses(cls, active_spikes_df: pd.DataFrame, active_epochs, shuffle_helper: ShuffleHelper, rank_alignment: str = 'first', disable_re_ranking:bool=True, debug_print=True) -> RankOrderResult:
+        """ Extracts the two templates (long/short) from the shuffle_helper in addition to the shuffled_aclus, shuffle_IDXs.
+
+        """
+        # post_process_statistic_value_fn = lambda x: np.abs(x)
+        post_process_statistic_value_fn = lambda x: float(x) # basically NO-OP
+        
+        # Preprocess the spikes DataFrame
+        (shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, long_pf_peak_ranks, short_pf_peak_ranks, active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict) = cls.preprocess_spikes_df(active_spikes_df, active_epochs, shuffle_helper)
+        
+        #TODO 2023-11-21 05:42: - [ ] todo_description want the aclus as well, not just the `long_pf_peak_ranks`
+
+        # Select and rank spikes
+        epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict = cls.select_and_rank_spikes(active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment)
+    
+    
+        ## OUTPUT DICTS:
+        # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
+        output_dict = {}
+
+        template_epoch_neuron_IDXs
+        
+
+
+        ## Loop over the results now to do the actual stats:
+        epoch_ranked_aclus_stats_dict = {}
+
+        for epoch_id in list(epoch_ranked_aclus_dict.keys()):
+
+            ## TODO: might need to get the specific aclus that are active in the epoch and limit to the intersection of those and the current decoder:
+            epoch_spikes_active_aclus = np.array(list(epoch_ranked_aclus_dict[epoch_id].keys())) # get the actual aclus instead of the indicies here.
+            epoch_spikes_active_ranks = np.array(list(epoch_ranked_aclus_dict[epoch_id].values()))
+            ## 2. Now get the template aclus to filter the epoch_active_aclus by (note there are way more `epoch_active_aclus` (like 81) than template ones.
+            # shared_aclus_only_neuron_IDs # (for now). In the future the `template_aclus` might be template-specific instead of shared:
+            template_aclus: NDArray = shared_aclus_only_neuron_IDs
+            is_epoch_aclu_included_in_template: NDArray[bool] = np.isin(epoch_spikes_active_aclus, template_aclus) # a bool array indicating whether each aclu active in the epoch (spikes_df) is included in the template.
+
+            # Chop the template down to the active spikes AND chop the active spikes down to the template:
+            actually_included_epoch_aclus = epoch_spikes_active_aclus[is_epoch_aclu_included_in_template] # note this must be strictly smaller than the template aclus, AND strictly less than the epoch_active_aclus.
+            actually_included_epoch_ranks = epoch_spikes_active_ranks[is_epoch_aclu_included_in_template]
+
+            #TODO 2023-11-22 11:30: - [ ] Does chopping the template down vs. leaving those entries in there change the spearman?
+
+            # long_pf_peak_ranks, short_pf_peak_ranks
+            assert np.shape(long_pf_peak_ranks) == np.shape(shared_aclus_only_neuron_IDs)
+            assert np.shape(short_pf_peak_ranks) == np.shape(shared_aclus_only_neuron_IDs)
+
+            
+            epoch_active_long_pf_peak_ranks = np.array(long_pf_peak_ranks)[is_epoch_aclu_included_in_template]
+            epoch_active_short_pf_peak_ranks = np.array(short_pf_peak_ranks)[is_epoch_aclu_included_in_template]
+            #TODO 2023-11-22 11:35: - [ ] Is there the possibility that the template doesn't have spikes that are present in the epoch? I think so in general.
+            assert np.shape(epoch_active_short_pf_peak_ranks) == np.shape(actually_included_epoch_ranks), f"np.shape(epoch_active_short_pf_peak_ranks): {np.shape(epoch_active_short_pf_peak_ranks)}, np.shape(actually_included_epoch_ranks): {np.shape(actually_included_epoch_ranks)}\n\tTODO 2023-11-22 11:35: - [ ] Is there the possibility that the template doesn't have spikes that are present in the epoch? I think so in general." # 
+            assert np.shape(epoch_active_short_pf_peak_ranks) == np.shape(epoch_active_long_pf_peak_ranks)
+
+
+            # NEW 2023-11-22 - So now have: actually_included_epoch_aclus, actually_included_epoch_ranks, (epoch_active_long_pf_peak_ranks, epoch_active_short_pf_peak_ranks)
+
+            # 4. Final step is getting the actual indicies into the template aclus (the template-relative neuronIDXs):
+            _template_aclu_list = list(template_aclus) # convert to a temporary basic python list so that `.index(aclu)` works in the next line.
+            template_epoch_neuron_IDXs: NDArray[int] = np.array([_template_aclu_list.index(aclu) for aclu in actually_included_epoch_aclus]) # should be the appropriate neuronIDXs in the template-relative array
+
+            epoch_ranked_fragile_linear_neuron_IDXs_array = epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id]
+            epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,1]) # the ranks just for this epoch, just for this template
+            
+            # Note that now (after boolean slicing), both `epoch_neuron_IDXs` and `epoch_neuron_IDX_ranks` can be LESS than the `shared_aclus_only_neuron_IDs`. They are indexed?
+            # Instead of `epoch_neuron_IDXs`, use `template_epoch_neuron_IDXs` to the get neuron_IDXs relative to this template:`
+            assert np.size(template_epoch_neuron_IDXs) == np.size(epoch_neuron_IDX_ranks), f"{np.size(epoch_neuron_IDX_ranks)} and len(template_epoch_neuron_IDXs): {np.size(template_epoch_neuron_IDXs)}"
+            #TODO 2023-11-21 20:49: - [ ] HERE IS WHERE I LEFT OFF. I now have filtered neuron_IDXs corresponding to the ranks for this epoch, but now I DON'T think they correspond to the template neuron_IDXs!!
+            if debug_print:
+                print(f'epoch_id: {epoch_id}')
+                # print(f'\tepoch_neuron_IDXs: {print_array(epoch_neuron_IDXs)}')
+                # print(f'\t_DEP_epoch_neuron_IDXs: {print_array(_DEP_epoch_neuron_IDXs)}')
+                print(f'\ttemplate_epoch_neuron_IDXs: {print_array(template_epoch_neuron_IDXs)}')
+                print(f'\tepoch_neuron_IDX_ranks: {print_array(epoch_neuron_IDX_ranks)}')
+    
+            #TODO 2023-11-22 08:35: - [ ] keep da' indicies we actually use for this template/epoch. They're needed in the RankOrderDebugger.
+            output_dict[epoch_id] = (template_epoch_neuron_IDXs, epoch_neuron_IDX_ranks) # might need multiple for each templates if they aren't clipped to shared.
+
+            ## EPOCH SPECIFIC:
+            long_spearmanr_rank_stats_results = []
+            short_spearmanr_rank_stats_results = []
+
+            # The "real" result for this epoch:
+            active_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking) # encountering np.shape(epoch_neuron_IDXs): (41,) but np.shape(long_pf_peak_ranks): (34,)
+            real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
+            real_long_result_corr_value = (post_process_statistic_value_fn(real_long_rank_stats.statistic), real_long_rank_stats.pvalue)[0]
+            
+            active_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
+            real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
+            real_short_result_corr_value = (post_process_statistic_value_fn(real_short_rank_stats.statistic), real_short_rank_stats.pvalue)[0]
+            
+            if debug_print:
+                print(f'\tactive_epoch_aclu_long_ranks[{epoch_id}]: {print_array(active_epoch_aclu_long_ranks)}')
+                print(f'\tactive_epoch_aclu_short_ranks[{epoch_id}]: {print_array(active_epoch_aclu_short_ranks)}')
+                
+            ## PERFORM SHUFFLE HERE:
+            for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs)):
+                # long_shared_aclus_only_decoder.pf.ratemap.get_by_id(a_shuffled_aclus)
+                epoch_specific_shuffled_indicies = a_shuffled_IDXs[template_epoch_neuron_IDXs] # get only the subset that is active during this epoch
+                
+                ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
+                active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
+                long_result = (post_process_statistic_value_fn(long_rank_stats.statistic), long_rank_stats.pvalue)
+                long_spearmanr_rank_stats_results.append(long_result)
+                
+                active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
+                short_result = (post_process_statistic_value_fn(short_rank_stats.statistic), short_rank_stats.pvalue)
+                short_spearmanr_rank_stats_results.append(short_result)
+            ## END for shuffle
+
+            long_spearmanr_rank_stats_results = np.array(long_spearmanr_rank_stats_results)
+            short_spearmanr_rank_stats_results = np.array(short_spearmanr_rank_stats_results)
+
+            long_stats_corr_values = long_spearmanr_rank_stats_results[:,0]
+            short_stats_corr_values = short_spearmanr_rank_stats_results[:,0]
+
+            long_stats_z_scorer = Zscorer.init_from_values(long_stats_corr_values, real_long_result_corr_value, real_long_rank_stats.pvalue)
+            short_stats_z_scorer = Zscorer.init_from_values(short_stats_corr_values, real_short_result_corr_value, real_short_rank_stats.pvalue)
+
+            long_short_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value
+
+            epoch_ranked_aclus_stats_dict[epoch_id] = (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff)
+
+
+        ## END for epoch_id
+
+        # Extract the results:
+        long_z_score_values = []
+        short_z_score_values = []
+        long_short_z_score_diff_values = []
+
+        for epoch_id, epoch_stats in epoch_ranked_aclus_stats_dict.items():
+            long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff = epoch_stats
+            # paired_test = pho_stats_paired_t_test(long_stats_z_scorer.z_score_values, short_stats_z_scorer.z_score_values) # this doesn't seem to work well
+            long_z_score_values.append(long_stats_z_scorer.z_score_value)
+            short_z_score_values.append(short_stats_z_scorer.z_score_value)
+            long_short_z_score_diff_values.append(long_short_z_diff)
+
+        long_z_score_values = np.array(long_z_score_values)
+        short_z_score_values = np.array(short_z_score_values)
+        long_short_z_score_diff_values = np.array(long_short_z_score_diff_values)
+            
+        return RankOrderResult.init_from_analysis_output_tuple((epoch_ranked_aclus_stats_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values)))
+
+
     @function_attributes(short_name=None, tags=['rank-order', 'ripples', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
     def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first', enable_plots=False):
@@ -702,8 +742,8 @@ class RankOrderAnalyses:
             global_replays = Epoch(global_replays.epochs.get_valid_df())
 
         ## Replay Epochs:
-        odd_outputs = compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
-        even_outputs = compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
+        odd_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
+        even_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
 
         # Unwrap
         odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = odd_outputs
@@ -758,8 +798,8 @@ class RankOrderAnalyses:
 
         # TODO: CenterOfMass for Laps instead of median spike
         # laps_rank_alignment = 'center_of_mass'
-        odd_outputs = compute_shuffled_rankorder_analyses(deepcopy(global_spikes_df), deepcopy(global_laps), odd_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
-        even_outputs = compute_shuffled_rankorder_analyses(deepcopy(global_spikes_df), deepcopy(global_laps), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
+        odd_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(global_spikes_df), deepcopy(global_laps), odd_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
+        even_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(global_spikes_df), deepcopy(global_laps), even_shuffle_helper, rank_alignment=rank_alignment, debug_print=False)
 
         # Unwrap
         odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values = odd_outputs
