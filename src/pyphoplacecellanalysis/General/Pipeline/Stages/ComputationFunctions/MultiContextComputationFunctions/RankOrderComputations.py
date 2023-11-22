@@ -130,13 +130,13 @@ def compute_placefield_center_of_masses(tuning_curves):
 class ShuffleHelper:
     """ holds the result of shuffling templates. Used for rank-order analyses """
     shared_aclus_only_neuron_IDs: NDArray = field()
-    is_good_aclus: NDArray = field()
+    is_good_aclus: NDArray = field(repr=False)
     
-    num_shuffles: int = field() # default=1000
-    shuffled_aclus = field()
-    shuffle_IDX = field()
+    num_shuffles: int = field(repr=True) # default=1000
+    shuffled_aclus = field(repr=False)
+    shuffle_IDX = field(repr=False)
     
-    decoder_pf_peak_ranks_list = field()
+    decoder_pf_peak_ranks_list = field(repr=True)
     
 
     @property
@@ -207,18 +207,18 @@ class ShuffleHelper:
 
 @define(slots=False, repr=False, eq=False)
 class Zscorer:
-    original_values: np.array
-    mean: float
-    std_dev: float
-    n_values: int
+    original_values: NDArray = field(repr=False)
+    mean: float = field(repr=True)
+    std_dev: float = field(repr=True)
+    n_values: int = field(repr=True)
 
-    real_value: float = field(default=None)
-    real_p_value: float = field(default=None)
-    z_score_value: float = field(default=None) # z-score values
+    real_value: float = field(default=None, repr=True)
+    real_p_value: float = field(default=None, repr=True)
+    z_score_value: float = field(default=None, repr=True) # z-score values
 
 
     @classmethod
-    def init_from_values(cls, stats_corr_values: np.array, real_value=None, real_p_value=None):
+    def init_from_values(cls, stats_corr_values: NDArray, real_value=None, real_p_value=None):
         _obj = cls(original_values=stats_corr_values, mean=np.mean(stats_corr_values), std_dev=np.std(stats_corr_values), n_values=len(stats_corr_values), real_value=real_value, real_p_value=real_p_value, z_score_value=None)
         _obj.z_score_value = _obj.Zscore(real_value)
         return _obj
@@ -302,6 +302,22 @@ class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
         return iter(astuple(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global, self.__attrs_attrs__.spikes_df, self.__attrs_attrs__.epochs_df, self.__attrs_attrs__.selected_spikes_df)))) #  'is_global'
     
 
+# Define the namedtuples for most-likely computations:
+DirectionalRankOrderLikelihoods = namedtuple('DirectionalRankOrderLikelihoods', ['long_relative_direction_likelihoods', 
+                                                           'short_relative_direction_likelihoods', 
+                                                           'long_best_direction_indices', 
+                                                           'short_best_direction_indices'])
+
+
+DirectionalRankOrderResult = namedtuple('DirectionalRankOrderResult', ['active_epochs', 
+                                                                       'long_best_dir_z_score_values', 
+                                                           'short_best_dir_z_score_values', 
+                                                           'long_short_best_dir_z_score_diff_values', 
+                                                           'directional_likelihoods_tuple', "masked_z_score_values_list"])
+
+
+
+
 @define(slots=False, repr=False, eq=False)
 class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
     """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
@@ -316,16 +332,18 @@ class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, Compu
         curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_rank_order_result, even_ripple=even_ripple_rank_order_result, odd_laps=odd_laps_rank_order_result, even_laps=even_laps_rank_order_result)
 
     """
-    LR_ripple: RankOrderResult = serialized_field()
-    RL_ripple: RankOrderResult = serialized_field()
-    LR_laps: RankOrderResult = serialized_field()
-    RL_laps: RankOrderResult = serialized_field()
+    LR_ripple: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
+    RL_ripple: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
+    LR_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
+    RL_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
     
+    ripple_most_likely_result_tuple: Optional[DirectionalRankOrderResult] = serialized_field(default=None, repr=False)
+    laps_most_likely_result_tuple: Optional[DirectionalRankOrderResult] = serialized_field(default=None, repr=False)
 
     def __iter__(self):
         """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
         # return iter(astuple(self)) # deep unpacking causes problems
-        return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global))) #  'is_global'
+        return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global, self.__attrs_attrs__.ripple_most_likely_result_tuple, self.__attrs_attrs__.laps_most_likely_result_tuple))) #  'is_global'
         # return iter(self.__dict__.values())
 
 
@@ -349,6 +367,12 @@ def build_track_templates_for_shuffle(long_shared_aclus_only_decoder, short_shar
 #     # short_result = (np.abs(short_rank_stats.statistic), short_rank_stats.pvalue)
 #     short_result = (short_rank_stats.statistic, short_rank_stats.pvalue)
 #     return long_result, short_result
+
+
+# ==================================================================================================================== #
+# 2023-11-16 - Long/Short Most-likely LR/RL decoder                                                                    #
+# ==================================================================================================================== #
+
 
 
 
@@ -783,6 +807,158 @@ class RankOrderAnalyses:
                                spikes_df=active_spikes_df, epochs_df=active_epochs, selected_spikes_df=selected_spikes_only_df)
     
 
+    @classmethod
+    @function_attributes(short_name=None, tags=['rank-order', 'shuffle', 'inst_fr', 'epoch', 'lap', 'replay', 'computation'], input_requires=[], output_provides=[], uses=['DirectionalRankOrderLikelihoods', 'DirectionalRankOrderResult'], used_by=[], creation_date='2023-11-16 18:43', related_items=['plot_rank_order_epoch_inst_fr_result_tuples'])
+    def most_likely_directional_rank_order_shuffling(cls, curr_active_pipeline, decoding_time_bin_size=0.003) -> Tuple[DirectionalRankOrderResult, DirectionalRankOrderResult]:
+        """ A version of the rank-order shufffling for a set of epochs that tries to use the most-likely direction as the one to decode with.
+
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
+
+            ## Main
+            ripple_result_tuple, laps_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003)
+        
+            
+        Reference:
+            {"even": "RL", "odd": "LR"}
+            [LR, RL], {'LR': 0, 'RL': 1}
+            odd (LR) = 0, even (RL) = 1
+        """
+        # ODD: 0, EVEN: 1
+        _ODD_INDEX = 0
+        _EVEN_INDEX = 1
+        
+        # Unpack all directional variables:
+        ## {"even": "RL", "odd": "LR"}
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        global_epoch_name = global_any_name
+
+        # Most popular
+        # long_LR_name, short_LR_name, long_RL_name, short_RL_name, global_any_name
+
+        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
+        # (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
+        (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
+        # (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
+        # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+
+
+        ## Extract the rank_order_results:
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+
+        # # Use the four epochs to make to a pseudo-y:
+        # all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        # all_directional_pf1D = PfND.build_merged_directional_placefields(deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D), debug_print=False)
+        # all_directional_pf1D_Decoder = BasePositionDecoder(all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+
+        ## Combine the non-directional PDFs and renormalize to get the directional PDF:
+        # Inputs: long_LR_pf1D, long_RL_pf1D
+        long_directional_decoder_names = ['long_LR', 'long_RL']
+        long_directional_pf1D: PfND = PfND.build_merged_directional_placefields(deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), debug_print=False)
+        long_directional_pf1D_Decoder = BasePositionDecoder(long_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+
+        # Inputs: short_LR_pf1D, short_RL_pf1D
+        short_directional_decoder_names = ['short_LR', 'short_RL']
+        short_directional_pf1D = PfND.build_merged_directional_placefields(deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D), debug_print=False) # [LR, RL], {'LR': 0, 'RL': 1}
+        short_directional_pf1D_Decoder = BasePositionDecoder(short_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+        # takes 6.3 seconds
+
+        ## validation of PfNDs:
+        # short_directional_pf1D.plot_ratemaps_2D()
+
+        # Decode using specific directional_decoders:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        spikes_df = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df)
+        # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+
+        def _compute_best(active_epochs):
+            """ captures: long_directional_pf1D_Decoder, short_directional_pf1D_Decoder, spikes_df, decoding_time_bin_size """
+            long_directional_decoding_result: DecodedFilterEpochsResult = long_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(spikes_df), active_epochs, decoding_time_bin_size=decoding_time_bin_size)
+            short_directional_decoding_result: DecodedFilterEpochsResult = short_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(spikes_df), active_epochs, decoding_time_bin_size=decoding_time_bin_size)
+            # all_directional_decoding_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df, active_epochs, decoding_time_bin_size=decoding_time_bin_size)
+
+            # sum across timebins to get total likelihood for each of the two directions
+            long_relative_direction_likelihoods = np.vstack([(np.sum(long_directional_decoding_result.marginal_y_list[epoch_idx].p_x_given_n, axis=1)/long_directional_decoding_result.time_bin_containers[epoch_idx].num_bins) for epoch_idx in np.arange(long_directional_decoding_result.num_filter_epochs)]) # should get 2 values
+            short_relative_direction_likelihoods = np.vstack([(np.sum(short_directional_decoding_result.marginal_y_list[epoch_idx].p_x_given_n, axis=1)/short_directional_decoding_result.time_bin_containers[epoch_idx].num_bins) for epoch_idx in np.arange(short_directional_decoding_result.num_filter_epochs)]) # should get 2 values
+            # display(long_relative_direction_likelihoods.shape) # (n_epochs, 2)
+
+            # np.all(np.sum(long_relative_direction_likelihoods, axis=1) == 1)
+            # np.sum(long_relative_direction_likelihoods, axis=1) # not sure why some NaN values are getting in there -- actually I do, it's because there aren't spikes in that epoch
+            long_is_good_epoch = np.isfinite(np.sum(long_relative_direction_likelihoods, axis=1))
+            short_is_good_epoch = np.isfinite(np.sum(short_relative_direction_likelihoods, axis=1))
+
+            # Use the relative likelihoods to determine which points to use:
+            long_best_direction_indicies = np.argmax(long_relative_direction_likelihoods, axis=1)
+            short_best_direction_indicies = np.argmax(short_relative_direction_likelihoods, axis=1)
+
+            # Creating an instance of the namedtuple
+            return DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=long_relative_direction_likelihoods,
+                                                short_relative_direction_likelihoods=short_relative_direction_likelihoods,
+                                                long_best_direction_indices=long_best_direction_indicies,
+                                                short_best_direction_indices=short_best_direction_indicies)
+
+
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        ## Replays:
+        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
+        active_epochs = global_replays.copy()
+        ripple_directional_likelihoods_tuple = _compute_best(active_epochs)
+        long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
+        # now do the shuffle:
+        # Old-style (Odd/Even) naming:
+        # odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, rank_order_results.LR_ripple.short_z_score, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.LR_ripple # LR_ripple_rank_order_result # rank_order_results.odd_ripple
+        # even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.RL_ripple.long_z_score, rank_order_results.RL_ripple.short_z_score, even_ripple_evts_long_short_z_score_diff_values = rank_order_results.RL_ripple # RL_ripple_rank_order_result # rank_order_results.even_ripple
+
+        ## 2023-11-16 - Finally, get the raw z-score values for the best direction at each epoch and then take the long - short difference of those to get `ripple_evts_long_short_best_dir_z_score_diff_values`:
+        # Using NumPy advanced indexing to select from array_a or array_b:
+        ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_ripple.long_z_score, rank_order_results.RL_ripple.long_z_score)
+        ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.short_z_score)
+        # print(f'np.shape(ripple_evts_long_best_dir_z_score_values): {np.shape(ripple_evts_long_best_dir_z_score_values)}')
+        ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
+        # print(f'np.shape(ripple_evts_long_short_best_dir_z_score_diff_values): {np.shape(ripple_evts_long_short_best_dir_z_score_diff_values)}')
+
+        # preferred order, but not the current standard: (long_odd_mask, long_even_mask, short_odd_mask, short_even_mask)
+        # current standard order: (long_odd_mask, short_odd_mask, long_even_mask, short_even_mask)
+        #TODO 2023-11-20 22:02: - [ ] ERROR: CORRECTNESS FAULT: I think the two lists zipped over below are out of order.
+        ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((rank_order_results.LR_ripple.long_z_score, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.long_z_score, rank_order_results.RL_ripple.short_z_score),
+                                                                                                            ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
+        
+        # outputs: ripple_evts_long_short_best_dir_z_score_diff_values
+        ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
+                                                                                    long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple,
+                                                                                    masked_z_score_values_list=ripple_masked_z_score_values_list)
+
+
+        ## Laps:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
+        laps_directional_likelihoods_tuple = _compute_best(global_laps)
+        long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = laps_directional_likelihoods_tuple
+        # odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, rank_order_results.LR_laps.short_z_score, odd_laps_long_short_z_score_diff_values = rank_order_results.LR_laps # LR_laps_rank_order_result
+        # even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.RL_laps.long_z_score, rank_order_results.RL_laps.short_z_score, even_laps_long_short_z_score_diff_values = rank_order_results.RL_laps
+
+        # Using NumPy advanced indexing to select from array_a or array_b:
+        laps_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_laps.long_z_score, rank_order_results.RL_laps.long_z_score)
+        laps_short_best_dir_z_score_values = np.where(short_best_direction_indicies, rank_order_results.LR_laps.short_z_score, rank_order_results.RL_laps.short_z_score)
+        # print(f'np.shape(laps_long_best_dir_z_score_values): {np.shape(laps_long_best_dir_z_score_values)}')
+        laps_long_short_best_dir_z_score_diff_values = laps_long_best_dir_z_score_values - laps_short_best_dir_z_score_values
+        # print(f'np.shape(laps_long_short_best_dir_z_score_diff_values): {np.shape(laps_long_short_best_dir_z_score_diff_values)}')
+        #TODO 2023-11-20 22:02: - [ ] ERROR: CORRECTNESS FAULT: I think the two lists zipped over below are out of order.
+        laps_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((rank_order_results.LR_laps.long_z_score, rank_order_results.LR_laps.short_z_score, rank_order_results.RL_laps.long_z_score, rank_order_results.RL_laps.short_z_score),
+                                                                                                            ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
+
+        laps_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(global_laps, long_best_dir_z_score_values=laps_long_best_dir_z_score_values, short_best_dir_z_score_values=laps_short_best_dir_z_score_values,
+                                                                                    long_short_best_dir_z_score_diff_values=laps_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=laps_directional_likelihoods_tuple, 
+                                                                                    masked_z_score_values_list=laps_masked_z_score_values_list)
+
+        return ripple_result_tuple, laps_result_tuple
+
 
     @function_attributes(short_name=None, tags=['rank-order', 'ripples', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
@@ -881,22 +1057,32 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         print(f'perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
+        
+
+        if not hasattr(global_computation_results.computed_data, 'RankOrder'):
+            # initialize
+            global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=None, RL_ripple=None, LR_laps=None, RL_laps=None)
+        
+
         ## Laps Rank-Order Analysis:
         print(f'\tcomputing Laps rank-order shuffles:')
         # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
         _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median')
         # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
         (LR_laps_outputs, RL_laps_outputs, laps_paired_tests)  = _laps_outputs
+        global_computation_results.computed_data['RankOrder'].LR_laps = LR_laps_outputs
+        global_computation_results.computed_data['RankOrder'].RL_laps = RL_laps_outputs
 
         ## Ripple Rank-Order Analysis:
         print(f'\tcomputing Ripple rank-order shuffles:')
         _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
         (LR_ripple_outputs, RL_ripple_outputs, ripple_evts_paired_tests) = _ripples_outputs
+        global_computation_results.computed_data['RankOrder'].LR_ripple = LR_ripple_outputs
+        global_computation_results.computed_data['RankOrder'].RL_ripple = RL_ripple_outputs
 
         # Set the global result:
         print(f'\tdone. building global result.')
-        global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=LR_ripple_outputs, RL_ripple=RL_ripple_outputs,
-                                                                                                            LR_laps=LR_laps_outputs, RL_laps=RL_laps_outputs)
+        global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference, decoding_time_bin_size=0.01) # 10ms bins
 
         """ Usage:
         
@@ -1083,172 +1269,3 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
 
 
 
-# ==================================================================================================================== #
-# 2023-11-16 - Long/Short Most-likely LR/RL decoder                                                                    #
-# ==================================================================================================================== #
-
-
-# Define the namedtuple
-DirectionalRankOrderLikelihoods = namedtuple('DirectionalRankOrderLikelihoods', ['long_relative_direction_likelihoods', 
-                                                           'short_relative_direction_likelihoods', 
-                                                           'long_best_direction_indices', 
-                                                           'short_best_direction_indices'])
-
-
-DirectionalRankOrderResult = namedtuple('DirectionalRankOrderResult', ['active_epochs', 
-                                                                       'long_best_dir_z_score_values', 
-                                                           'short_best_dir_z_score_values', 
-                                                           'long_short_best_dir_z_score_diff_values', 
-                                                           'directional_likelihoods_tuple', "masked_z_score_values_list"])
-
-
-@function_attributes(short_name=None, tags=['rank-order', 'shuffle', 'inst_fr', 'epoch', 'lap', 'replay', 'computation'], input_requires=[], output_provides=[], uses=['DirectionalRankOrderLikelihoods', 'DirectionalRankOrderResult'], used_by=[], creation_date='2023-11-16 18:43', related_items=['plot_rank_order_epoch_inst_fr_result_tuples'])
-def most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003):
-    """ A version of the rank-order shufffling for a set of epochs that tries to use the most-likely direction as the one to decode with.
-
-    Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import most_likely_directional_rank_order_shuffling
-
-        ## Main
-        ripple_result_tuple, laps_result_tuple = most_likely_directional_rank_order_shuffling(curr_active_pipeline, decoding_time_bin_size=0.003)
-    
-        
-    Reference:
-        {"even": "RL", "odd": "LR"}
-        [LR, RL], {'LR': 0, 'RL': 1}
-        odd (LR) = 0, even (RL) = 1
-    """
-    # ODD: 0, EVEN: 1
-    _ODD_INDEX = 0
-    _EVEN_INDEX = 1
-    
-    # Unpack all directional variables:
-    ## {"even": "RL", "odd": "LR"}
-    long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-    global_epoch_name = global_any_name
-
-    # Most popular
-    # long_LR_name, short_LR_name, long_RL_name, short_RL_name, global_any_name
-
-    # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-    # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-    # long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
-    # (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
-    (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-    # (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-    (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
-    # (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
-    # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
-
-
-    ## Extract the rank_order_results:
-    rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-
-    # # Use the four epochs to make to a pseudo-y:
-    # all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-    # all_directional_pf1D = PfND.build_merged_directional_placefields(deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D), debug_print=False)
-    # all_directional_pf1D_Decoder = BasePositionDecoder(all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
-
-    ## Combine the non-directional PDFs and renormalize to get the directional PDF:
-    # Inputs: long_LR_pf1D, long_RL_pf1D
-    long_directional_decoder_names = ['long_LR', 'long_RL']
-    long_directional_pf1D: PfND = PfND.build_merged_directional_placefields(deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), debug_print=False)
-    long_directional_pf1D_Decoder = BasePositionDecoder(long_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
-
-    # Inputs: short_LR_pf1D, short_RL_pf1D
-    short_directional_decoder_names = ['short_LR', 'short_RL']
-    short_directional_pf1D = PfND.build_merged_directional_placefields(deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D), debug_print=False) # [LR, RL], {'LR': 0, 'RL': 1}
-    short_directional_pf1D_Decoder = BasePositionDecoder(short_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
-    # takes 6.3 seconds
-
-    ## validation of PfNDs:
-    # short_directional_pf1D.plot_ratemaps_2D()
-
-    # Decode using specific directional_decoders:
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    spikes_df = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df)
-    # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
-
-    def _compute_best(active_epochs):
-        """ captures: long_directional_pf1D_Decoder, short_directional_pf1D_Decoder, spikes_df, decoding_time_bin_size """
-        long_directional_decoding_result: DecodedFilterEpochsResult = long_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(spikes_df), active_epochs, decoding_time_bin_size=decoding_time_bin_size)
-        short_directional_decoding_result: DecodedFilterEpochsResult = short_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(spikes_df), active_epochs, decoding_time_bin_size=decoding_time_bin_size)
-        # all_directional_decoding_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df, active_epochs, decoding_time_bin_size=decoding_time_bin_size)
-
-        # sum across timebins to get total likelihood for each of the two directions
-        long_relative_direction_likelihoods = np.vstack([(np.sum(long_directional_decoding_result.marginal_y_list[epoch_idx].p_x_given_n, axis=1)/long_directional_decoding_result.time_bin_containers[epoch_idx].num_bins) for epoch_idx in np.arange(long_directional_decoding_result.num_filter_epochs)]) # should get 2 values
-        short_relative_direction_likelihoods = np.vstack([(np.sum(short_directional_decoding_result.marginal_y_list[epoch_idx].p_x_given_n, axis=1)/short_directional_decoding_result.time_bin_containers[epoch_idx].num_bins) for epoch_idx in np.arange(short_directional_decoding_result.num_filter_epochs)]) # should get 2 values
-        # display(long_relative_direction_likelihoods.shape) # (n_epochs, 2)
-
-        # np.all(np.sum(long_relative_direction_likelihoods, axis=1) == 1)
-        # np.sum(long_relative_direction_likelihoods, axis=1) # not sure why some NaN values are getting in there -- actually I do, it's because there aren't spikes in that epoch
-        long_is_good_epoch = np.isfinite(np.sum(long_relative_direction_likelihoods, axis=1))
-        short_is_good_epoch = np.isfinite(np.sum(short_relative_direction_likelihoods, axis=1))
-
-        # Use the relative likelihoods to determine which points to use:
-        long_best_direction_indicies = np.argmax(long_relative_direction_likelihoods, axis=1)
-        short_best_direction_indicies = np.argmax(short_relative_direction_likelihoods, axis=1)
-
-        # Creating an instance of the namedtuple
-        return DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=long_relative_direction_likelihoods,
-                                            short_relative_direction_likelihoods=short_relative_direction_likelihoods,
-                                            long_best_direction_indices=long_best_direction_indicies,
-                                            short_best_direction_indices=short_best_direction_indicies)
-
-
-
-
-    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-    ## Replays:
-    global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-    active_epochs = global_replays.copy()
-    ripple_directional_likelihoods_tuple = _compute_best(active_epochs)
-    long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
-    # now do the shuffle:
-    # Old-style (Odd/Even) naming:
-    # odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, rank_order_results.LR_ripple.short_z_score, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.LR_ripple # LR_ripple_rank_order_result # rank_order_results.odd_ripple
-    # even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.RL_ripple.long_z_score, rank_order_results.RL_ripple.short_z_score, even_ripple_evts_long_short_z_score_diff_values = rank_order_results.RL_ripple # RL_ripple_rank_order_result # rank_order_results.even_ripple
-
-    ## 2023-11-16 - Finally, get the raw z-score values for the best direction at each epoch and then take the long - short difference of those to get `ripple_evts_long_short_best_dir_z_score_diff_values`:
-    # Using NumPy advanced indexing to select from array_a or array_b:
-    ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_ripple.long_z_score, rank_order_results.RL_ripple.long_z_score)
-    ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.short_z_score)
-    # print(f'np.shape(ripple_evts_long_best_dir_z_score_values): {np.shape(ripple_evts_long_best_dir_z_score_values)}')
-    ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
-    # print(f'np.shape(ripple_evts_long_short_best_dir_z_score_diff_values): {np.shape(ripple_evts_long_short_best_dir_z_score_diff_values)}')
-
-    # preferred order, but not the current standard: (long_odd_mask, long_even_mask, short_odd_mask, short_even_mask)
-    # current standard order: (long_odd_mask, short_odd_mask, long_even_mask, short_even_mask)
-    #TODO 2023-11-20 22:02: - [ ] ERROR: CORRECTNESS FAULT: I think the two lists zipped over below are out of order.
-    ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((rank_order_results.LR_ripple.long_z_score, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.long_z_score, rank_order_results.RL_ripple.short_z_score),
-                                                                                                        ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
-    
-    # outputs: ripple_evts_long_short_best_dir_z_score_diff_values
-    ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
-                                                                                long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple,
-                                                                                masked_z_score_values_list=ripple_masked_z_score_values_list)
-
-
-    ## Laps:
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
-    laps_directional_likelihoods_tuple = _compute_best(global_laps)
-    long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = laps_directional_likelihoods_tuple
-    # odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, rank_order_results.LR_laps.short_z_score, odd_laps_long_short_z_score_diff_values = rank_order_results.LR_laps # LR_laps_rank_order_result
-    # even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.RL_laps.long_z_score, rank_order_results.RL_laps.short_z_score, even_laps_long_short_z_score_diff_values = rank_order_results.RL_laps
-
-    # Using NumPy advanced indexing to select from array_a or array_b:
-    laps_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_laps.long_z_score, rank_order_results.RL_laps.long_z_score)
-    laps_short_best_dir_z_score_values = np.where(short_best_direction_indicies, rank_order_results.LR_laps.short_z_score, rank_order_results.RL_laps.short_z_score)
-    # print(f'np.shape(laps_long_best_dir_z_score_values): {np.shape(laps_long_best_dir_z_score_values)}')
-    laps_long_short_best_dir_z_score_diff_values = laps_long_best_dir_z_score_values - laps_short_best_dir_z_score_values
-    # print(f'np.shape(laps_long_short_best_dir_z_score_diff_values): {np.shape(laps_long_short_best_dir_z_score_diff_values)}')
-    #TODO 2023-11-20 22:02: - [ ] ERROR: CORRECTNESS FAULT: I think the two lists zipped over below are out of order.
-    laps_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((rank_order_results.LR_laps.long_z_score, rank_order_results.LR_laps.short_z_score, rank_order_results.RL_laps.long_z_score, rank_order_results.RL_laps.short_z_score),
-                                                                                                        ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
-
-    laps_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(global_laps, long_best_dir_z_score_values=laps_long_best_dir_z_score_values, short_best_dir_z_score_values=laps_short_best_dir_z_score_values,
-                                                                                long_short_best_dir_z_score_diff_values=laps_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=laps_directional_likelihoods_tuple, 
-                                                                                masked_z_score_values_list=laps_masked_z_score_values_list)
-
-    return ripple_result_tuple, laps_result_tuple
