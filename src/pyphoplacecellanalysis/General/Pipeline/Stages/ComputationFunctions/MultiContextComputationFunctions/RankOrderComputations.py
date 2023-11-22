@@ -431,7 +431,7 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         
         # Note that now (after boolean slicing), both `epoch_neuron_IDXs` and `epoch_neuron_IDX_ranks` can be LESS than the `shared_aclus_only_neuron_IDs`. They are indexed?
         # Instead of `epoch_neuron_IDXs`, use `template_epoch_neuron_IDXs` to the get neuron_IDXs relative to this template:`
-        assert len(template_epoch_neuron_IDXs) == len(epoch_neuron_IDX_ranks), f"{len(epoch_neuron_IDX_ranks)} and len(template_epoch_neuron_IDXs): {len(template_epoch_neuron_IDXs)}"
+        assert np.size(template_epoch_neuron_IDXs) == np.size(epoch_neuron_IDX_ranks), f"{np.size(epoch_neuron_IDX_ranks)} and len(template_epoch_neuron_IDXs): {np.size(template_epoch_neuron_IDXs)}"
         #TODO 2023-11-21 20:49: - [ ] HERE IS WHERE I LEFT OFF. I now have filtered neuron_IDXs corresponding to the ranks for this epoch, but now I DON'T think they correspond to the template neuron_IDXs!!
         if debug_print:
             print(f'epoch_id: {epoch_id}')
