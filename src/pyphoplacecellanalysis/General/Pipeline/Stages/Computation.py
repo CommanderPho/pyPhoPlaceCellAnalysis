@@ -1235,6 +1235,73 @@ class PipelineWithComputedPipelineStageMixin:
         saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
         return global_computation_results_pickle_path
 
+
+    def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, debug_print:bool=True):
+        """Save out the `global_computation_results` which are not currently saved with the pipeline
+        Usage:
+            split_save_folder, split_save_paths, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
+        """
+        'global_computation_results.pkl'
+        ## Case 1. `override_global_pickle_path` is provided:
+        if override_global_pickle_path is not None:
+            ## override_global_pickle_path is provided:
+            if not isinstance(override_global_pickle_path, Path):
+                override_global_pickle_path = Path(override_global_pickle_path).resolve()
+            # Case 1a: `override_global_pickle_path` is a complete file path
+            if not override_global_pickle_path.is_dir():
+                # a full filepath, just use that directly
+                global_computation_results_pickle_path = override_global_pickle_path.resolve()
+            else:
+                # default case, assumed to be a directory and we'll use the normal filename.
+                active_global_pickle_filename: str = (override_global_pickle_filename or self.global_computation_results_pickle_path or "global_computation_results.pkl")
+                global_computation_results_pickle_path = override_global_pickle_path.joinpath(active_global_pickle_filename).resolve()
+
+        else:
+            # No override path provided
+            if override_global_pickle_filename is None:
+                # no filename provided either, use default global pickle path:
+                global_computation_results_pickle_path = self.global_computation_results_pickle_path
+            else:
+                # Otherwise use default output path but specified override_global_pickle_filename:
+                global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+
+        if debug_print:
+            print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
+        
+        ## In split save, we save each result separately in a folder
+        split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
+        split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+        if debug_print:
+            print(f'split_save_folder: {split_save_folder}')
+        # make if doesn't exist
+        split_save_folder.mkdir(exist_ok=True)
+        
+        computed_data = self.global_computation_results.computed_data
+        split_save_paths = {}
+        failed_keys = []
+        for k, v in computed_data.items():
+            curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
+            if debug_print:
+                print(f'curr_split_result_pickle_path: {curr_split_result_pickle_path}')
+            was_save_success = False
+            try:
+                ## try get as dict
+                v_dict = v.__dict__ #__getstate__()
+                saveData(curr_split_result_pickle_path, (v_dict))
+                was_save_success = True
+            except KeyError as e:
+                print(f'{k} encountered {e} while trying to save {k}. Skipping')
+                pass
+            if was_save_success:
+                split_save_paths[k] = curr_split_result_pickle_path
+            else:
+                failed_keys.append(k)
+                
+        if len(failed_keys) > 0:
+            print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
+        return split_save_folder, split_save_paths, failed_keys
+        
+
     def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
         Usage:
@@ -1251,3 +1318,49 @@ class PipelineWithComputedPipelineStageMixin:
         loaded_global_computation_results = ComputationResult(**loaded_global_computation_dict)
 
         self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
+
+
+    def load_split_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, debug_print=True):
+        """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+        Reciprocal: `save_split_global_computation_results`
+        Usage:
+            curr_active_pipeline.load_pickled_global_computation_results()
+        """
+        if override_global_computation_results_pickle_path is None:
+            # Use the default if no override is provided.
+            global_computation_results_pickle_path = self.global_computation_results_pickle_path
+        else:
+            global_computation_results_pickle_path = override_global_computation_results_pickle_path
+        
+        if not isinstance(global_computation_results_pickle_path, Path):
+            global_computation_results_pickle_path = Path(global_computation_results_pickle_path).resolve()
+            
+        if not global_computation_results_pickle_path.is_dir():	
+            split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
+            split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+        else:
+            split_save_folder: Path = global_computation_results_pickle_path.resolve()
+            
+        if debug_print:
+            print(f'split_save_folder: {split_save_folder}')
+            
+        assert split_save_folder.exists()
+        assert split_save_folder.is_dir()
+        
+        for p in split_save_folder.rglob('Split_*.pkl'):
+            # If not already in the 'output/' subfolder, move it there.
+            print(f'p: {p}')
+            # curr_output_dir = p.parent.joinpath('output')
+            # curr_output_dir.mkdir(exist_ok=True)
+            # # print(f'curr_output_dir: {curr_output_dir}')
+            # new_path = p.replace(curr_output_dir.joinpath(p.name))
+            # print(f'\t new_path: {new_path}')
+            # correctly_placed_output_files.append(p)
+
+
+        # Actually do the loading:
+        # loaded_global_computation_dict = loadData(global_computation_results_pickle_path)
+        # loaded_global_computation_results = ComputationResult(**loaded_global_computation_dict)
+        # self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
+
+
