@@ -526,7 +526,7 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    def common_analysis_helper(cls, curr_active_pipeline, num_shuffles:int=300):
+    def common_analysis_helper(cls, curr_active_pipeline, num_shuffles:int=300, minimum_inclusion_fr_Hz:float=5.0):
         ## Shared:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -534,19 +534,26 @@ class RankOrderAnalyses:
 
         # Recover from the saved global result:
         directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
-        long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders()
-        
+
+        # ## OLD method, directly get the decoders from `directional_laps_results` using `.get_decoders(...)` or `.get_shared_aclus_only_decoders(...)`:
+        # long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
+        # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders()
+
+        # NEW 2023-11-22 method: Get the templates (which can be filtered by frate first) and the from those get the decoders):        
+        # shared_aclus_only_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        shared_aclus_only_templates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = shared_aclus_only_templates.get_decoders()
+
         ## 2023-10-24 - Simple long/short (2-template, direction independent) analysis:
-        # shuffle_helper = build_track_templates_for_shuffle(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=1000, bimodal_exclude_aclus=[5, 14, 25, 46, 61, 66, 86, 88, 95])
+        # shuffle_helper = ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=1000, bimodal_exclude_aclus=[5, 14, 25, 46, 61, 66, 86, 88, 95])
 
         # 2023-10-26 - Direction Dependent (4 template) analysis: long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D
-        odd_shuffle_helper: ShuffleHelper = build_track_templates_for_shuffle(long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
-        even_shuffle_helper: ShuffleHelper = build_track_templates_for_shuffle(long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        odd_shuffle_helper: ShuffleHelper = ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        even_shuffle_helper: ShuffleHelper = ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
 
         # ### non-shared_aclus_only
-        # odd_shuffle_helper: ShuffleHelper = build_track_templates_for_shuffle(long_LR_one_step_decoder_1D, short_LR_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
-        # even_shuffle_helper: ShuffleHelper = build_track_templates_for_shuffle(long_RL_one_step_decoder_1D, short_RL_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        # odd_shuffle_helper: ShuffleHelper = ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_LR_one_step_decoder_1D, short_LR_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
+        # even_shuffle_helper: ShuffleHelper = ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_RL_one_step_decoder_1D, short_RL_one_step_decoder_1D, num_shuffles=num_shuffles, bimodal_exclude_aclus=[])
         # ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
         # ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
         return global_spikes_df, (odd_shuffle_helper, even_shuffle_helper)
@@ -962,9 +969,9 @@ class RankOrderAnalyses:
 
     @function_attributes(short_name=None, tags=['rank-order', 'ripples', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
-    def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first'):
+    def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first', minimum_inclusion_fr_Hz:float=5.0):
         
-        global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles)
+        global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
 
         ## Ripple Rank-Order Analysis: needs `global_spikes_df`
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -988,7 +995,7 @@ class RankOrderAnalyses:
 
     @function_attributes(short_name=None, tags=['rank-order', 'laps', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
-    def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='median'):
+    def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='median', minimum_inclusion_fr_Hz:float=5.0):
         """
         
         _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=1000, rank_alignment='median')
@@ -1002,7 +1009,7 @@ class RankOrderAnalyses:
         
         """
         ## Shared:
-        global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles)
+        global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
 
         ## Laps Epochs: Needs `global_spikes_df`
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -1038,7 +1045,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
     @function_attributes(short_name='rank_order_shuffle_analysis', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
-    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500):
+    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0):
         """ 
         
         Requires:
@@ -1067,7 +1074,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         ## Laps Rank-Order Analysis:
         print(f'\tcomputing Laps rank-order shuffles:')
         # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
-        _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median')
+        _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
         # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
         (LR_laps_outputs, RL_laps_outputs, laps_paired_tests)  = _laps_outputs
         global_computation_results.computed_data['RankOrder'].LR_laps = LR_laps_outputs
@@ -1075,7 +1082,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
         ## Ripple Rank-Order Analysis:
         print(f'\tcomputing Ripple rank-order shuffles:')
-        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
+        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
         (LR_ripple_outputs, RL_ripple_outputs, ripple_evts_paired_tests) = _ripples_outputs
         global_computation_results.computed_data['RankOrder'].LR_ripple = LR_ripple_outputs
         global_computation_results.computed_data['RankOrder'].RL_ripple = RL_ripple_outputs
