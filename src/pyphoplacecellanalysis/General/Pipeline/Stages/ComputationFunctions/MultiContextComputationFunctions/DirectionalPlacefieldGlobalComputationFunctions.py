@@ -139,9 +139,6 @@ class TrackTemplates:
         return filtered_decoder_list, filtered_direction_shared_aclus_list, is_aclu_included_list, individual_decoder_filtered_aclus_list
 
 
-
-
-
 @define(slots=False, repr=False)
 class DirectionalLapsResult(ComputedResult):
     """ a container for holding information regarding the computation of directional laps.
@@ -209,6 +206,23 @@ class DirectionalLapsResult(ComputedResult):
         else:
             return _obj.filtered_by_frate(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
         
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # if 'identity' not in state:
+        #     print(f'unpickling from old NeuropyPipelineStage')
+        #     state['identity'] = None
+        #     state['identity'] = type(self).get_stage_identity()
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        super(DirectionalLapsResult, self).__init__() # from
+
+
 
             
     # 
