@@ -335,7 +335,8 @@ class SpikeRasterBottomFrameControlsMixin:
     """ renders the UI controls for the Spike3DRaster_Vedo class 
         Follows Conventions outlined in ModelViewMixin Conventions.md
         
-        Currently Unused after being removed from Spike3DRaster_Vedo
+        Used in `Spike3DRasterWindowWidget`
+        
     """
     
     @QtCore.pyqtSlot()
@@ -409,9 +410,18 @@ class SpikeRasterBottomFrameControlsMixin:
     @QtCore.pyqtSlot(float, float)
     def SpikeRasterBottomFrameControlsMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
-        # TODO: NOT CALLED
+        # Called the Implementor's update_window(...) function
+        #TODO 2023-11-21 18:49: - [ ] Doesn't work :[
+        # need to block signals:
+        # doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
+        # doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
+        # if new_start is not None:
+        #     self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(new_start)
+        # if new_end is not None:
+        #     self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(new_end)
+        # doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
+        # doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
         pass
-    
     
     # ## Update Functions:
     # @QtCore.pyqtSlot(bool)
