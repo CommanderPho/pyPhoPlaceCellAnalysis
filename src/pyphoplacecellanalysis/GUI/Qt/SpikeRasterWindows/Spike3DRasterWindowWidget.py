@@ -753,6 +753,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, end_t)
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
     
@@ -770,6 +771,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, end_t)
+        
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
     
