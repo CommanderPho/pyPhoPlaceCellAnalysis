@@ -260,6 +260,10 @@ class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
     short_z_score: NDArray = serialized_field()
     long_short_z_score_diff: NDArray = serialized_field()
     
+    spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
+    epochs_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
+
+
     @classmethod
     def init_from_analysis_output_tuple(cls, a_tuple):
         """
@@ -600,10 +604,6 @@ class RankOrderAnalyses:
         # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
         output_dict = {}
 
-        template_epoch_neuron_IDXs
-        
-
-
         ## Loop over the results now to do the actual stats:
         epoch_ranked_aclus_stats_dict = {}
 
@@ -626,7 +626,6 @@ class RankOrderAnalyses:
             # long_pf_peak_ranks, short_pf_peak_ranks
             assert np.shape(long_pf_peak_ranks) == np.shape(shared_aclus_only_neuron_IDs)
             assert np.shape(short_pf_peak_ranks) == np.shape(shared_aclus_only_neuron_IDs)
-
             
             epoch_active_long_pf_peak_ranks = np.array(long_pf_peak_ranks)[is_epoch_aclu_included_in_template]
             epoch_active_short_pf_peak_ranks = np.array(short_pf_peak_ranks)[is_epoch_aclu_included_in_template]
@@ -663,13 +662,19 @@ class RankOrderAnalyses:
             short_spearmanr_rank_stats_results = []
 
             # The "real" result for this epoch:
-            active_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking) # encountering np.shape(epoch_neuron_IDXs): (41,) but np.shape(long_pf_peak_ranks): (34,)
-            real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-            real_long_result_corr_value = (post_process_statistic_value_fn(real_long_rank_stats.statistic), real_long_rank_stats.pvalue)[0]
+            # active_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking) # encountering np.shape(epoch_neuron_IDXs): (41,) but np.shape(long_pf_peak_ranks): (34,)
+            # real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
+            # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
+            active_epoch_aclu_long_ranks = relative_re_ranking(epoch_active_long_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking) 
+            real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, actually_included_epoch_ranks)
+            real_long_result_corr_value = post_process_statistic_value_fn(real_long_rank_stats.statistic)
             
-            active_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
-            real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-            real_short_result_corr_value = (post_process_statistic_value_fn(real_short_rank_stats.statistic), real_short_rank_stats.pvalue)[0]
+            # active_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
+            # real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
+            # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
+            active_epoch_aclu_short_ranks = relative_re_ranking(epoch_active_short_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
+            real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, actually_included_epoch_ranks)
+            real_short_result_corr_value = post_process_statistic_value_fn(real_short_rank_stats.statistic)
             
             if debug_print:
                 print(f'\tactive_epoch_aclu_long_ranks[{epoch_id}]: {print_array(active_epoch_aclu_long_ranks)}')
@@ -679,15 +684,25 @@ class RankOrderAnalyses:
             for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs)):
                 # long_shared_aclus_only_decoder.pf.ratemap.get_by_id(a_shuffled_aclus)
                 epoch_specific_shuffled_indicies = a_shuffled_IDXs[template_epoch_neuron_IDXs] # get only the subset that is active during this epoch
-                
+
+                #TODO 2023-11-22 12:50: - [ ] Are the sizes corect since `a_shuffled_IDXs` doesn't know the size of the template?
+
                 ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
-                active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-                long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
+                # active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                # long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
+                # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
+                active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(epoch_active_long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, actually_included_epoch_ranks)
+                assert np.shape(active_shuffle_epoch_aclu_long_ranks) == np.shape(actually_included_epoch_ranks)
                 long_result = (post_process_statistic_value_fn(long_rank_stats.statistic), long_rank_stats.pvalue)
                 long_spearmanr_rank_stats_results.append(long_result)
                 
-                active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-                short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
+                # active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                # short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
+                # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
+                active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(epoch_active_short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, actually_included_epoch_ranks)
+                assert np.shape(active_shuffle_epoch_aclu_short_ranks) == np.shape(actually_included_epoch_ranks)
                 short_result = (post_process_statistic_value_fn(short_rank_stats.statistic), short_rank_stats.pvalue)
                 short_spearmanr_rank_stats_results.append(short_result)
             ## END for shuffle
@@ -723,8 +738,10 @@ class RankOrderAnalyses:
         long_z_score_values = np.array(long_z_score_values)
         short_z_score_values = np.array(short_z_score_values)
         long_short_z_score_diff_values = np.array(long_short_z_score_diff_values)
-            
-        return RankOrderResult.init_from_analysis_output_tuple((epoch_ranked_aclus_stats_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (long_z_score_values, short_z_score_values, long_short_z_score_diff_values)))
+        
+        return RankOrderResult(is_global=True, ranked_aclus_stats_dict=epoch_ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=epoch_selected_spikes_fragile_linear_neuron_IDX_dict, long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values,
+                               spikes_df=active_spikes_df, epochs_df=active_epochs)
+    
 
 
     @function_attributes(short_name=None, tags=['rank-order', 'ripples', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
