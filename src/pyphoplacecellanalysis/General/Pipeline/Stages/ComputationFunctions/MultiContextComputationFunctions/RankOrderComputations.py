@@ -615,7 +615,10 @@ class RankOrderAnalyses:
             ## 2. Now get the template aclus to filter the epoch_active_aclus by (note there are way more `epoch_active_aclus` (like 81) than template ones.
             # shared_aclus_only_neuron_IDs # (for now). In the future the `template_aclus` might be template-specific instead of shared:
             template_aclus: NDArray = shared_aclus_only_neuron_IDs
-            is_epoch_aclu_included_in_template: NDArray[bool] = np.isin(epoch_spikes_active_aclus, template_aclus) # a bool array indicating whether each aclu active in the epoch (spikes_df) is included in the template.
+            is_epoch_aclu_included_in_template: NDArray[np.bool_] = np.isin(epoch_spikes_active_aclus, template_aclus) # a bool array indicating whether each aclu active in the epoch (spikes_df) is included in the template.
+
+
+            # BEGIN 2023-11-22 NEW Implementation: _______________________________________________________________________________ #
 
             # Chop the template down to the active spikes AND chop the active spikes down to the template:
             actually_included_epoch_aclus = epoch_spikes_active_aclus[is_epoch_aclu_included_in_template] # note this must be strictly smaller than the template aclus, AND strictly less than the epoch_active_aclus.
@@ -627,14 +630,19 @@ class RankOrderAnalyses:
             assert np.shape(long_pf_peak_ranks) == np.shape(shared_aclus_only_neuron_IDs)
             assert np.shape(short_pf_peak_ranks) == np.shape(shared_aclus_only_neuron_IDs)
             
-            epoch_active_long_pf_peak_ranks = np.array(long_pf_peak_ranks)[is_epoch_aclu_included_in_template]
-            epoch_active_short_pf_peak_ranks = np.array(short_pf_peak_ranks)[is_epoch_aclu_included_in_template]
+            # Chop the other direction:
+            is_template_aclu_actually_active_in_epoch: NDArray = np.isin(template_aclus, epoch_spikes_active_aclus) # a bool array indicating whether each aclu in the template is active in  in the epoch (spikes_df). Used for indexing into the template peak_ranks (`long_pf_peak_ranks`, `short_pf_peak_ranks`)
+            
+            epoch_active_long_pf_peak_ranks = np.array(long_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch]
+            epoch_active_short_pf_peak_ranks = np.array(short_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch]
             #TODO 2023-11-22 11:35: - [ ] Is there the possibility that the template doesn't have spikes that are present in the epoch? I think so in general.
             assert np.shape(epoch_active_short_pf_peak_ranks) == np.shape(actually_included_epoch_ranks), f"np.shape(epoch_active_short_pf_peak_ranks): {np.shape(epoch_active_short_pf_peak_ranks)}, np.shape(actually_included_epoch_ranks): {np.shape(actually_included_epoch_ranks)}\n\tTODO 2023-11-22 11:35: - [ ] Is there the possibility that the template doesn't have spikes that are present in the epoch? I think so in general." # 
             assert np.shape(epoch_active_short_pf_peak_ranks) == np.shape(epoch_active_long_pf_peak_ranks)
-
-
             # NEW 2023-11-22 - So now have: actually_included_epoch_aclus, actually_included_epoch_ranks, (epoch_active_long_pf_peak_ranks, epoch_active_short_pf_peak_ranks)
+
+            # END NEW:
+
+
 
             # 4. Final step is getting the actual indicies into the template aclus (the template-relative neuronIDXs):
             _template_aclu_list = list(template_aclus) # convert to a temporary basic python list so that `.index(aclu)` works in the next line.
