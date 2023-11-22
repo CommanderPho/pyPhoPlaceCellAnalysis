@@ -1,6 +1,6 @@
 
 from copy import deepcopy
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import concurrent.futures
 from functools import partial
 from itertools import repeat
@@ -91,12 +91,15 @@ z
 
 
 @function_attributes(short_name=None, tags=['rank_order', 'shuffle', 'renormalize'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-23 13:05', related_items=[])
-def relative_re_ranking(rank_array: NDArray, filter_indicies: NDArray, debug_checking=False, disable_re_ranking: bool=False) -> NDArray:
+def relative_re_ranking(rank_array: NDArray, filter_indicies: Optional[NDArray], debug_checking=False, disable_re_ranking: bool=False) -> NDArray:
     """ Re-index the rank_array once filtered flat to extract the global ranks. 
         
     Idea: During each ripple event epoch, only a subset of all cells are active. As a result, we need to extract valid ranks from the epoch's subset so they can be compared directly to the ranks within that epoch.
 
     """
+    if filter_indicies is None:
+        filter_indicies = np.arange(len(rank_array)) # all entries in rank_array
+        
     if disable_re_ranking:
         # Disable any re-ranking, just return the original ranks
         return rank_array[filter_indicies]
@@ -158,6 +161,13 @@ class ShuffleHelper:
     def _compute_ranks_template(cls, a_decoder):
         """ computes the rank template from a decoder such as `long_shared_aclus_only_decoder` """
         return scipy.stats.rankdata(compute_placefield_center_of_masses(a_decoder.pf.ratemap.pdf_normalized_tuning_curves), method='dense')
+
+    def generate_shuffle(self, shared_aclus_only_neuron_IDs: NDArray, num_shuffles: int = 1000, seed:int=1337) -> Tuple[NDArray, NDArray]:
+        """ 
+        shuffled_aclus, shuffle_IDXs = shuffle_helper.generate_shuffle(shared_aclus_only_neuron_IDs)
+        """
+        return build_shuffled_ids(shared_aclus_only_neuron_IDs, num_shuffles=num_shuffles, seed=seed)
+        
 
     @classmethod
     def init_from_shared_aclus_only_decoders(cls, *decoder_args, num_shuffles: int = 100, bimodal_exclude_aclus=[]) -> "ShuffleHelper":
@@ -631,18 +641,17 @@ class RankOrderAnalyses:
             assert np.shape(short_pf_peak_ranks) == np.shape(shared_aclus_only_neuron_IDs)
             
             # Chop the other direction:
-            is_template_aclu_actually_active_in_epoch: NDArray = np.isin(template_aclus, epoch_spikes_active_aclus) # a bool array indicating whether each aclu in the template is active in  in the epoch (spikes_df). Used for indexing into the template peak_ranks (`long_pf_peak_ranks`, `short_pf_peak_ranks`)
-            
+            is_template_aclu_actually_active_in_epoch: NDArray = np.isin(template_aclus, actually_included_epoch_aclus) # a bool array indicating whether each aclu in the template is active in  in the epoch (spikes_df). Used for indexing into the template peak_ranks (`long_pf_peak_ranks`, `short_pf_peak_ranks`)
+            actually_included_template_aclus: NDArray = np.array(template_aclus)[is_template_aclu_actually_active_in_epoch] ## `actually_included_template_aclus`: the final aclus for this template actually active in this epoch
+
             epoch_active_long_pf_peak_ranks = np.array(long_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch]
             epoch_active_short_pf_peak_ranks = np.array(short_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch]
             #TODO 2023-11-22 11:35: - [ ] Is there the possibility that the template doesn't have spikes that are present in the epoch? I think so in general.
             assert np.shape(epoch_active_short_pf_peak_ranks) == np.shape(actually_included_epoch_ranks), f"np.shape(epoch_active_short_pf_peak_ranks): {np.shape(epoch_active_short_pf_peak_ranks)}, np.shape(actually_included_epoch_ranks): {np.shape(actually_included_epoch_ranks)}\n\tTODO 2023-11-22 11:35: - [ ] Is there the possibility that the template doesn't have spikes that are present in the epoch? I think so in general." # 
             assert np.shape(epoch_active_short_pf_peak_ranks) == np.shape(epoch_active_long_pf_peak_ranks)
-            # NEW 2023-11-22 - So now have: actually_included_epoch_aclus, actually_included_epoch_ranks, (epoch_active_long_pf_peak_ranks, epoch_active_short_pf_peak_ranks)
+            # NEW 2023-11-22 - So now have: actually_included_epoch_aclus, actually_included_epoch_ranks, (actually_included_template_aclus, epoch_active_long_pf_peak_ranks, epoch_active_short_pf_peak_ranks)
 
             # END NEW:
-
-
 
             # 4. Final step is getting the actual indicies into the template aclus (the template-relative neuronIDXs):
             _template_aclu_list = list(template_aclus) # convert to a temporary basic python list so that `.index(aclu)` works in the next line.
@@ -651,6 +660,9 @@ class RankOrderAnalyses:
             epoch_ranked_fragile_linear_neuron_IDXs_array = epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id]
             epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,1]) # the ranks just for this epoch, just for this template
             
+
+            # FINAL NOTE: `actually_included_template_aclus`, `template_epoch_neuron_IDXs` contain the actual IDX and aclus for this template active during this epoch
+  
             # Note that now (after boolean slicing), both `epoch_neuron_IDXs` and `epoch_neuron_IDX_ranks` can be LESS than the `shared_aclus_only_neuron_IDs`. They are indexed?
             # Instead of `epoch_neuron_IDXs`, use `template_epoch_neuron_IDXs` to the get neuron_IDXs relative to this template:`
             assert np.size(template_epoch_neuron_IDXs) == np.size(epoch_neuron_IDX_ranks), f"{np.size(epoch_neuron_IDX_ranks)} and len(template_epoch_neuron_IDXs): {np.size(template_epoch_neuron_IDXs)}"
@@ -658,12 +670,11 @@ class RankOrderAnalyses:
             if debug_print:
                 print(f'epoch_id: {epoch_id}')
                 # print(f'\tepoch_neuron_IDXs: {print_array(epoch_neuron_IDXs)}')
-                # print(f'\t_DEP_epoch_neuron_IDXs: {print_array(_DEP_epoch_neuron_IDXs)}')
                 print(f'\ttemplate_epoch_neuron_IDXs: {print_array(template_epoch_neuron_IDXs)}')
                 print(f'\tepoch_neuron_IDX_ranks: {print_array(epoch_neuron_IDX_ranks)}')
     
             #TODO 2023-11-22 08:35: - [ ] keep da' indicies we actually use for this template/epoch. They're needed in the RankOrderDebugger.
-            output_dict[epoch_id] = (template_epoch_neuron_IDXs, epoch_neuron_IDX_ranks) # might need multiple for each templates if they aren't clipped to shared.
+            output_dict[epoch_id] = (template_epoch_neuron_IDXs, actually_included_template_aclus, epoch_neuron_IDX_ranks) # might need multiple for each templates if they aren't clipped to shared.
 
             ## EPOCH SPECIFIC:
             long_spearmanr_rank_stats_results = []
@@ -673,14 +684,14 @@ class RankOrderAnalyses:
             # active_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking) # encountering np.shape(epoch_neuron_IDXs): (41,) but np.shape(long_pf_peak_ranks): (34,)
             # real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
             # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
-            active_epoch_aclu_long_ranks = relative_re_ranking(epoch_active_long_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking) 
+            active_epoch_aclu_long_ranks = relative_re_ranking(epoch_active_long_pf_peak_ranks, None, disable_re_ranking=disable_re_ranking) 
             real_long_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_long_ranks, actually_included_epoch_ranks)
             real_long_result_corr_value = post_process_statistic_value_fn(real_long_rank_stats.statistic)
             
             # active_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
             # real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
             # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
-            active_epoch_aclu_short_ranks = relative_re_ranking(epoch_active_short_pf_peak_ranks, template_epoch_neuron_IDXs, disable_re_ranking=disable_re_ranking)
+            active_epoch_aclu_short_ranks = relative_re_ranking(epoch_active_short_pf_peak_ranks, None, disable_re_ranking=disable_re_ranking)
             real_short_rank_stats = scipy.stats.spearmanr(active_epoch_aclu_short_ranks, actually_included_epoch_ranks)
             real_short_result_corr_value = post_process_statistic_value_fn(real_short_rank_stats.statistic)
             
@@ -689,11 +700,18 @@ class RankOrderAnalyses:
                 print(f'\tactive_epoch_aclu_short_ranks[{epoch_id}]: {print_array(active_epoch_aclu_short_ranks)}')
                 
             ## PERFORM SHUFFLE HERE:
-            for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs)):
+            # On-the-fly shuffling mode using shuffle_helper:
+            epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = shuffle_helper.generate_shuffle(actually_included_template_aclus) # TODO: peformance, might be slower than pre-shuffling method. Wait, with a fixed seed are all the shuffles the same????
+                
+            # for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs)):
+            for i, (epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies) in enumerate(zip(epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies)):
+
                 # long_shared_aclus_only_decoder.pf.ratemap.get_by_id(a_shuffled_aclus)
-                epoch_specific_shuffled_indicies = a_shuffled_IDXs[template_epoch_neuron_IDXs] # get only the subset that is active during this epoch
+                # epoch_specific_shuffled_indicies = a_shuffled_IDXs[template_epoch_neuron_IDXs] # get only the subset that is active during this epoch
 
                 #TODO 2023-11-22 12:50: - [ ] Are the sizes corect since `a_shuffled_IDXs` doesn't know the size of the template?
+
+
 
                 ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
                 # active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
