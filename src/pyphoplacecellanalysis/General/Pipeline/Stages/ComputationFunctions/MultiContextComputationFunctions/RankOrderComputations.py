@@ -399,13 +399,14 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         
     # Convert all to np.ndarrays post-hoc:
     epoch_ranked_fragile_linear_neuron_IDX_dict = {epoch_id:np.array(epoch_ranked_fragile_linear_neuron_IDXs) for epoch_id, epoch_ranked_fragile_linear_neuron_IDXs in epoch_ranked_fragile_linear_neuron_IDX_dict.items()}
+    # selected:
     epoch_selected_spikes_fragile_linear_neuron_IDX_dict = {epoch_id:np.array(epoch_ranked_fragile_linear_neuron_IDXs) for epoch_id, epoch_ranked_fragile_linear_neuron_IDXs in epoch_selected_spikes_fragile_linear_neuron_IDX_dict.items()}
 
     ## Loop over the results now to do the actual stats:
     epoch_ranked_aclus_stats_dict = {}
 
     for epoch_id in list(epoch_ranked_aclus_dict.keys()):
-
+        
         ## TODO: might need to get the specific aclus that are active in the epoch and limit to the intersection of those and the current decoder:
         epoch_active_aclus = np.array(list(epoch_ranked_aclus_dict[epoch_id].keys())) # get the actual aclus instead of the indicies here.
         ## 2. Now get the template aclus to filter the epoch_active_aclus by (note there are way more `epoch_active_aclus` (like 81) than template ones.
@@ -416,7 +417,6 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         actually_included_epoch_aclus = epoch_active_aclus[is_epoch_aclu_included_in_template] # note this must be strictly smaller than the template aclus, AND strictly less than the epoch_active_aclus.
 
         # 4. Final step is getting the actual indicies into the template aclus (the template-relative neuronIDXs):
-        
         _template_aclu_list = list(template_aclus) # convert to a temporary basic python list so that `.index(aclu)` works in the next line.
         template_epoch_neuron_IDXs = np.array([_template_aclu_list.index(aclu) for aclu in actually_included_epoch_aclus]) # should be the appropriate neuronIDXs in the template-relative array
 
@@ -425,9 +425,8 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
         # epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[:,1])
         epoch_ranked_fragile_linear_neuron_IDXs_array = epoch_ranked_fragile_linear_neuron_IDX_dict[epoch_id]
         # epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,0])
-        _DEP_epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,0])
-
-        epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,1])
+        _DEP_epoch_neuron_IDXs = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,0]) # BAD NOT USED.
+        epoch_neuron_IDX_ranks = np.squeeze(epoch_ranked_fragile_linear_neuron_IDXs_array[is_epoch_aclu_included_in_template,1]) # the ranks just for this epoch, just for this template
         
         # Note that now (after boolean slicing), both `epoch_neuron_IDXs` and `epoch_neuron_IDX_ranks` can be LESS than the `shared_aclus_only_neuron_IDs`. They are indexed?
         # Instead of `epoch_neuron_IDXs`, use `template_epoch_neuron_IDXs` to the get neuron_IDXs relative to this template:`
@@ -439,6 +438,9 @@ def compute_shuffled_rankorder_analyses(active_spikes_df, active_epochs, shuffle
             print(f'\t_DEP_epoch_neuron_IDXs: {print_array(_DEP_epoch_neuron_IDXs)}')
             print(f'\ttemplate_epoch_neuron_IDXs: {print_array(template_epoch_neuron_IDXs)}')
             print(f'\tepoch_neuron_IDX_ranks: {print_array(epoch_neuron_IDX_ranks)}')
+ 
+        #TODO 2023-11-22 08:35: - [ ] keep da' indicies we actually use for this template/epoch. They're needed in the RankOrderDebugger.
+
 
         ## EPOCH SPECIFIC:
         long_spearmanr_rank_stats_results = []

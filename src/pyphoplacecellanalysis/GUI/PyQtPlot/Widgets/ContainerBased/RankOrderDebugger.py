@@ -282,7 +282,7 @@ class RankOrderDebugger:
         RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
         LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
 
-        ## WE HAVE TO BUILT OUT selected_spikes_df ahead of time or die trying. Not one epoch at a time.
+        ## WE HAVE TO BUILD OUT selected_spikes_df ahead of time or die trying. Not one epoch at a time.
 
         # Converts the selected spikes information dict (containing the median/first spikes for each epoch) into a spikes_df capable of being rendered on the raster plot.
         # selected_spike_df_list = []
