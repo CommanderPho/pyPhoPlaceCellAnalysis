@@ -1054,6 +1054,36 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, PeakLocationRepr
         revised_most_likely_positions = np_ffill_1D(revised_most_likely_positions.T).T
         return revised_most_likely_positions
 
+    @function_attributes(short_name=None, tags=['filter', 'firing_rate', 'frate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-22 19:48', related_items=[])
+    def filtered_by_frate(self, minimum_inclusion_fr_Hz: float = 5.0, debug_print=True):
+        """ Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
+        minimum_inclusion_fr_Hz: float = 5.0
+        modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
+        
+        """
+        return BasePositionDecoder.perform_filter_by_frate(self, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=debug_print)
+
+    @classmethod
+    def perform_filter_by_frate(cls, a_decoder, minimum_inclusion_fr_Hz: float = 5.0, debug_print=True):
+        """ Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
+        minimum_inclusion_fr_Hz: float = 5.0
+        modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
+        
+        Usage:
+            minimum_inclusion_fr_Hz: float = 5.0
+            filtered_decoder_list = [filtered_by_frate(a_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True) for a_decoder in (track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)]
+
+        """
+        a_pf: PfND = a_decoder.pf # neuropy.analyses.placefields.PfND
+        a_ratemap = a_pf.ratemap
+        original_neuron_ids = deepcopy(a_ratemap.neuron_ids)
+        is_aclu_included = (a_ratemap.tuning_curve_unsmoothed_peak_firing_rates >= minimum_inclusion_fr_Hz)
+        included_aclus = np.array(a_ratemap.neuron_ids)[is_aclu_included]
+        if debug_print:
+            print(f'len(original_neuron_ids): {len(original_neuron_ids)}, len(included_aclus): {len(included_aclus)}')
+        modified_decoder = a_decoder.get_by_id(included_aclus)
+        return modified_decoder
+
 
     # ==================================================================================================================== #
     # HDF5 Methods:                                                                                                        #
