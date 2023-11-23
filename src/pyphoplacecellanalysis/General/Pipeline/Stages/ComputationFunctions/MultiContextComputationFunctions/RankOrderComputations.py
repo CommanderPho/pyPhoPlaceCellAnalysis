@@ -309,13 +309,16 @@ DirectionalRankOrderLikelihoods = namedtuple('DirectionalRankOrderLikelihoods', 
                                                            'short_best_direction_indices'])
 
 
-DirectionalRankOrderResult = namedtuple('DirectionalRankOrderResult', ['active_epochs', 
+DirectionalRankOrderResultBase = namedtuple('DirectionalRankOrderResultBase', ['active_epochs', 
                                                                        'long_best_dir_z_score_values', 
                                                            'short_best_dir_z_score_values', 
                                                            'long_short_best_dir_z_score_diff_values', 
                                                            'directional_likelihoods_tuple', "masked_z_score_values_list"])
 
-
+class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
+    def plot_histogram(self):
+        return pd.DataFrame({'long_z_scores': self.long_best_dir_z_score_values, 'short_z_scores': self.short_best_dir_z_score_values}).hist()
+    
 
 
 @define(slots=False, repr=False, eq=False)
