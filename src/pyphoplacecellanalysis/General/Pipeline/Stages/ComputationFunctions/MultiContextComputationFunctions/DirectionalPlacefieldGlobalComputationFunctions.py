@@ -598,6 +598,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 return ratemap.pdf_normalized_tuning_curves[CoM_sort_indicies, :]
 
             def sorting_decoder(decoder, shared_sort_neuron_IDs, shared_sort_IDX):
+                """ called to sort each decoder relative to the reference one. """
                 neuron_IDs = decoder.neuron_IDs
                 shared_sort_IDX_list = list(shared_sort_neuron_IDs)  # Contains neuron IDs in the order of shared_sort_IDX
                 # Handle neuron IDs present in both the shared sort and the decoder
@@ -617,16 +618,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 'short_RL': track_templates.short_RL_decoder,
             }
 
-            # Get the primary sort which will be compared against:
+            # Get the primary sort (provided by `long_LR_decoder`) which will be compared against:
             shared_sort_neuron_IDs = deepcopy(track_templates.long_LR_decoder.neuron_IDs)
             shared_sort_IDX = _get_decoder_sort_IDXs(track_templates.long_LR_decoder)
-
 
             ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
             _out_pf1D_heatmaps = {}
             for a_decoder_name, a_decoder in decoders_dict.items():
-                _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorting_decoder(a_decoder, shared_sort_neuron_IDs, shared_sort_IDX), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True)
-                # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True)
+                # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorting_decoder(a_decoder, shared_sort_neuron_IDs, shared_sort_IDX), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first
+                _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Individual Sort
 
             even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_even_dock_colors)
             odd_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_odd_dock_colors)
