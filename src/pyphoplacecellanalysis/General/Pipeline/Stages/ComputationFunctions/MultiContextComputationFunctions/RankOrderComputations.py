@@ -280,6 +280,7 @@ class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
     epochs_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
 
     selected_spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
+    extra_info_dict: Dict = serialized_field(default=Factory(dict), repr=False)
     
     @classmethod
     def init_from_analysis_output_tuple(cls, a_tuple):
@@ -672,7 +673,7 @@ class RankOrderAnalyses:
             
             # Chop the other direction:
             is_template_aclu_actually_active_in_epoch: NDArray = np.isin(template_aclus, actually_included_epoch_aclus) # a bool array indicating whether each aclu in the template is active in  in the epoch (spikes_df). Used for indexing into the template peak_ranks (`long_pf_peak_ranks`, `short_pf_peak_ranks`)
-            actually_included_template_aclus: NDArray = np.array(template_aclus)[is_template_aclu_actually_active_in_epoch] ## `actually_included_template_aclus`: the final aclus for this template actually active in this epoch
+            template_epoch_actually_included_aclus: NDArray = np.array(template_aclus)[is_template_aclu_actually_active_in_epoch] ## `actually_included_template_aclus`: the final aclus for this template actually active in this epoch
 
             epoch_active_long_pf_peak_ranks = np.array(long_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch]
             epoch_active_short_pf_peak_ranks = np.array(short_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch]
@@ -704,7 +705,7 @@ class RankOrderAnalyses:
                 print(f'\tepoch_neuron_IDX_ranks: {print_array(epoch_neuron_IDX_ranks)}')
     
             #TODO 2023-11-22 08:35: - [ ] keep da' indicies we actually use for this template/epoch. They're needed in the RankOrderDebugger.
-            output_dict[epoch_id] = (template_epoch_neuron_IDXs, actually_included_template_aclus, epoch_neuron_IDX_ranks) # might need multiple for each templates if they aren't clipped to shared.
+            output_dict[epoch_id] = (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks) # might need multiple for each templates if they aren't clipped to shared.
 
             ## EPOCH SPECIFIC:
             long_spearmanr_rank_stats_results = []
@@ -731,15 +732,10 @@ class RankOrderAnalyses:
                 
             ## PERFORM SHUFFLE HERE:
             # On-the-fly shuffling mode using shuffle_helper:
-            epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = shuffle_helper.generate_shuffle(actually_included_template_aclus) # TODO: peformance, might be slower than pre-shuffling method. Wait, with a fixed seed are all the shuffles the same????
+            epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = shuffle_helper.generate_shuffle(template_epoch_actually_included_aclus) # TODO: peformance, might be slower than pre-shuffling method. Wait, with a fixed seed are all the shuffles the same????
                 
-            # for i, (a_shuffled_aclus, a_shuffled_IDXs) in enumerate(zip(shuffled_aclus, shuffle_IDXs)):
             for i, (epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies) in enumerate(zip(epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies)):
-
-                # long_shared_aclus_only_decoder.pf.ratemap.get_by_id(a_shuffled_aclus)
-                # epoch_specific_shuffled_indicies = a_shuffled_IDXs[template_epoch_neuron_IDXs] # get only the subset that is active during this epoch
-
-                #TODO 2023-11-22 12:50: - [ ] Are the sizes corect since `a_shuffled_IDXs` doesn't know the size of the template?
+                #TODO 2023-11-22 12:50: - [X] Are the sizes correct since `a_shuffled_IDXs` doesn't know the size of the template?
 
                 ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
                 # active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
@@ -794,7 +790,7 @@ class RankOrderAnalyses:
         long_short_z_score_diff_values = np.array(long_short_z_score_diff_values)
         
         return RankOrderResult(is_global=True, ranked_aclus_stats_dict=epoch_ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=epoch_selected_spikes_fragile_linear_neuron_IDX_dict, long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values,
-                               spikes_df=active_spikes_df, epochs_df=active_epochs, selected_spikes_df=selected_spikes_only_df)
+                               spikes_df=active_spikes_df, epochs_df=active_epochs, selected_spikes_df=selected_spikes_only_df, extra_info_dict=output_dict)
     
 
     @classmethod
