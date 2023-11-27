@@ -144,7 +144,6 @@ class TrackAssignmentState(ExtendedEnum):
     SHORT_TRACK = "short_track"
     NEITHER = "neither"
     
-
     @property
     def displayColor(self):
         return self.displayColorList()[self]
@@ -153,7 +152,6 @@ class TrackAssignmentState(ExtendedEnum):
     def displayColorList(cls):
         return cls.build_member_value_dict(['grey', 'blue', 'red', 'black'])
     
-
     # track_assignment = epoch['track_assignment'].decision.name
     # # Set the color of the epoch based on the track assignment
     # if track_assignment == 'UNASSIGNED':
@@ -395,7 +393,6 @@ class AssigningEpochs:
         assigning_epochs_obj._debug_print_assignment_statuses()
         fig, axs = assigning_epochs_obj._subfn_plot_epoch_track_assignments(axis_idx=axis_idx, defer_render=True)
 
-
         ## User Assignment:
         # # Partition based on whether the user included the epoch in the long or short track in the user-included epochs:
         # is_user_exclusive_L = np.logical_and(assigning_epochs_obj.unassigned_epochs_df['long_is_user_included'], np.logical_not(assigning_epochs_obj.unassigned_epochs_df['short_is_user_included']))
@@ -451,9 +448,6 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
     
     long_results_obj, short_results_obj 
     """
-   
-    
-
     ## Use the `long_short_decoding_analyses` global result to access `long_results_obj.active_filter_epochs`:
     curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
     long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
@@ -473,11 +467,6 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
 
     ## TODO: need to usee the actual LxC/SxCs (hand-picked) instead of the ones based on placefields.
     filter_epoch_spikes_df, filter_epochs_df = assigning_epochs_obj.determine_if_contains_active_set_exclusive_cells(spikes_df, exclusive_aclus=EITHER_subset.track_exclusive_aclus, short_exclusive=short_exclusive, long_exclusive=long_exclusive, included_neuron_ids=included_neuron_ids) # adds 'active_unique_aclus'    
-
-
-    
-
-
 
     # filter_epoch_spikes_df, filter_epochs_df = assigning_epochs_obj._find_example_epochs(spikes_df, EITHER_subset.track_exclusive_aclus, included_neuron_ids=included_neuron_ids) # adds 'active_unique_aclus'
     # # epoch_contains_any_exclusive_aclus.append(np.isin(epoch_spikes_unique_aclus, exclusive_aclus).any())

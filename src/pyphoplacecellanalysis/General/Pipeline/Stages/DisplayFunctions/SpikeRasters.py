@@ -1,4 +1,5 @@
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Tuple
+from collections import namedtuple
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -403,6 +404,10 @@ class RasterScatterPlotManager:
 
 # Note that these raster plots could implement some variant of HideShowSpikeRenderingMixin, SpikeRenderingMixin, etc but these classes frankly suck. 
 
+# Define the namedtuple
+RasterPlotSetupTuple = namedtuple('RasterPlotSetupTuple', ['app', 'win', 'plots', 'plots_data']) # tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]
+
+
 def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False, active_context=None) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ simple helper to initialize the mkQApp, spawn the window, and build the plots and plots_data. """
     ## Perform the plotting:
@@ -421,7 +426,8 @@ def _plot_empty_raster_plot_frame(scatter_app_name='pho_test', defer_show=False,
     if active_context is not None:
         plots_data.active_context = active_context
 
-    return app, win, plots, plots_data
+    return RasterPlotSetupTuple(app, win, plots, plots_data) # app, win, plots, plots_data
+
 
 
 def _build_default_tick(tick_width: float = 0.1, tick_height: float = 1.0) -> QtGui.QPainterPath:
@@ -599,10 +605,15 @@ def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identif
     return plots.scatter_plots[_active_plot_identifier], plots.ax[_active_plot_identifier], plots.grid[_active_plot_identifier]
 
 
-@function_attributes(short_name=None, tags=['plotting','raster', 'sort'], input_requires=[], output_provides=[], uses=['_subfn_build_and_add_scatterplot_row', '_build_scatter_plotting_managers'], used_by=[], creation_date='2023-10-30 22:23', related_items=[])
+@function_attributes(short_name=None, tags=['plotting','raster', 'sort'], input_requires=[], output_provides=[], uses=['_subfn_build_and_add_scatterplot_row', '_build_scatter_plotting_managers'], used_by=['RankOrderDebugger'], creation_date='2023-10-30 22:23', related_items=[])
 def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_orders_dict=None, unit_colors_list_dict=None, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None):
-    """ Plots a neat stack
+    """ Plots a neat stack of raster plots.
+    
+    ISSUES:
+    - [ ] TODO 2023-11-27 - does not color (brush) the spikes, so when they are wide enough for this to matter a strange default grey/blue color shows through for all of them. This could be fixed I believe by adding 'brush' property to all_spots dict
 
+    
+    
     Basic Plotting:    
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
 
@@ -645,11 +656,11 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     plots_data.all_spots_dict = {}
     plots_data.all_scatterplot_tooltips_kwargs_dict = {}
 
-    # vtick_simple_line = _build_default_tick(tick_width=0.0, tick_height=0.9)
-    # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1, hoverable=False) # , pen=None, brush=None
+    vtick_simple_line = _build_default_tick(tick_width=0.0, tick_height=0.9)
+    override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1, hoverable=False) # , pen=None, brush=None
 
-    vtick_simple_line = _build_default_tick(tick_width=1.0, tick_height=0.9)
-    override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=True, symbol=vtick_simple_line, size=80.0, hoverable=False) # , pen=None, brush=None
+    # vtick_simple_line = _build_default_tick(tick_width=1.0, tick_height=0.9)
+    # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1.0, hoverable=False) # , pen=None, brush=None
     # print(f'override_scatter_plot_kwargs: {override_scatter_plot_kwargs}')
 
     i = 0

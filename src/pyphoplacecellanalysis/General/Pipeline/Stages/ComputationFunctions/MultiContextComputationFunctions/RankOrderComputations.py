@@ -347,31 +347,13 @@ class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, Compu
         """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
         # return iter(astuple(self)) # deep unpacking causes problems
         return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global, self.__attrs_attrs__.ripple_most_likely_result_tuple, self.__attrs_attrs__.laps_most_likely_result_tuple))) #  'is_global'
-        # return iter(self.__dict__.values())
 
 
-# def _subfn_rank_order_shuffle(epoch_specific_shuffled_indicies, epoch_neuron_IDX_ranks, long_pf_peak_ranks, short_pf_peak_ranks, disable_re_ranking:bool):
-#     """ attempts to parallelize the rank-order computations """
-#     ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
-#     active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-#     long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-#     # long_result = (np.abs(long_rank_stats.statistic), long_rank_stats.pvalue)
-#     long_result = (long_rank_stats.statistic, long_rank_stats.pvalue)
-    
-#     active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-#     short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-#     # short_result = (np.abs(short_rank_stats.statistic), short_rank_stats.pvalue)
-#     short_result = (short_rank_stats.statistic, short_rank_stats.pvalue)
-#     return long_result, short_result
 
 
 # ==================================================================================================================== #
 # 2023-11-16 - Long/Short Most-likely LR/RL decoder                                                                    #
 # ==================================================================================================================== #
-
-
-
-
 
 class RankOrderAnalyses:
     """ 
@@ -841,18 +823,9 @@ class RankOrderAnalyses:
         long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
         global_epoch_name = global_any_name
 
-        # Most popular
-        # long_LR_name, short_LR_name, long_RL_name, short_RL_name, global_any_name
-
         # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-        # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        # long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'].pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
-        # (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
         (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        # (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name]['computation_config'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
         (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
-        # (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
-        # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
 
 
         ## Extract the rank_order_results:
@@ -919,9 +892,6 @@ class RankOrderAnalyses:
         ripple_directional_likelihoods_tuple = _compute_best(active_epochs)
         long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
         # now do the shuffle:
-        # Old-style (Odd/Even) naming:
-        # odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, rank_order_results.LR_ripple.short_z_score, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.LR_ripple # LR_ripple_rank_order_result # rank_order_results.odd_ripple
-        # even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.RL_ripple.long_z_score, rank_order_results.RL_ripple.short_z_score, even_ripple_evts_long_short_z_score_diff_values = rank_order_results.RL_ripple # RL_ripple_rank_order_result # rank_order_results.even_ripple
 
         ## 2023-11-16 - Finally, get the raw z-score values for the best direction at each epoch and then take the long - short difference of those to get `ripple_evts_long_short_best_dir_z_score_diff_values`:
         # Using NumPy advanced indexing to select from array_a or array_b:
@@ -1065,6 +1035,10 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         print(f'perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
+        
+        # Needs to store the parameters
+        # num_shuffles:int=1000
+        # minimum_inclusion_fr_Hz:float=12.0
         
         
         if ('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')):

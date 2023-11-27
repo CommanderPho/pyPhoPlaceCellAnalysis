@@ -356,8 +356,8 @@ class DirectionalLapsHelpers:
 
 
     @classmethod
-    def build_global_directional_result_from_natural_epochs(cls, curr_active_pipeline, progress_print=False):
-        """ 2023-10-31 - 4pm 
+    def build_global_directional_result_from_natural_epochs(cls, curr_active_pipeline, progress_print=False) -> "DirectionalLapsResult":
+        """ 2023-10-31 - 4pm  - Main computation function, simply extracts the diretional laps from the existing epochs.
 
         Does not update `curr_active_pipeline` or mess with its filters/configs/etc.
 
@@ -557,17 +557,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
             from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
             from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
-
+            
             # raise NotImplementedError
-    
-            reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)
-            # reuse_axs_tuple = None # plot fresh
-            # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
-            # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
-            single_figure = kwargs.pop('single_figure', True)
-            debug_print = kwargs.pop('debug_print', False)
-
-            active_config_name = kwargs.pop('active_config_name', None)
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
             fignum = kwargs.pop('fignum', None)
@@ -579,6 +570,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # Recover from the saved global result:
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
             long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [directional_laps_results.__dict__[k] for k in ['long_LR_shared_aclus_only_one_step_decoder_1D', 'long_RL_shared_aclus_only_one_step_decoder_1D', 'short_LR_shared_aclus_only_one_step_decoder_1D', 'short_RL_shared_aclus_only_one_step_decoder_1D']]
+            # directional_laps_results
             track_templates: TrackTemplates = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D), RL_decoder_pair=(long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D))
 
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
@@ -639,10 +631,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             for i, (a_decoder_name, a_heatmap) in enumerate(_out_pf1D_heatmaps.items()):
                 _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_heatmap[0], dockSize=(300,200), dockAddLocationOpts=dock_add_locations[i], display_config=dock_configs[i])
 
-
+            
             # Outputs: root_dockAreaWindow, app, epochs_editor, _out_pf1D_heatmaps, _out_dock_widgets
             graphics_output_dict = {'win': root_dockAreaWindow, 'app': app,  'ui': (epochs_editor, _out_dock_widgets), 'plots': _out_pf1D_heatmaps}
-
 
             # Saving/Exporting to file ___________________________________________________________________________________________ #
             #TODO 2023-11-16 22:16: - [ ] Figure out how to save
