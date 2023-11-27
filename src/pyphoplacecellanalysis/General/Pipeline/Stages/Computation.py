@@ -629,7 +629,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         if computation_kwargs_list is None:
             computation_kwargs_list = [{} for _ in computation_functions_name_includelist]
         else:
-            has_custom_kwargs_list = True            
+            has_custom_kwargs_list = np.any([len(x)>0 for x in computation_kwargs_list])
+            # has_custom_kwargs_list = True            
 
         assert isinstance(computation_kwargs_list, List), f"computation_kwargs_list: Optional<list>: is supposed to be a list of kwargs corresponding to each function name in computation_functions_name_includelist but instead is of type:\n\ttype(computation_kwargs_list): {type(computation_kwargs_list)}"
         assert len(computation_kwargs_list) == len(computation_functions_name_includelist)
