@@ -472,12 +472,12 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         long_single_cell_pfmap_processing_fn = None
         short_single_cell_pfmap_processing_fn = None
         sort_idx = 'peak_long'
-        _out = curr_active_pipeline.display('_display_short_long_pf1D_comparison', curr_active_pipeline.get_session_context(), single_figure=False, debug_print=False, fignum='Short v Long pf1D Comparison',
+        _out = curr_active_pipeline.display('_display_long_short_pf1D_comparison', curr_active_pipeline.get_session_context(), single_figure=False, debug_print=False, fignum='Short v Long pf1D Comparison',
                                    long_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
                                    short_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
                                    save_figure=save_figure) # defer_render=True, 
     except Exception as e:
-        print(f'batch_extended_programmatic_figures(...): _display_short_long_pf1D_comparison failed with error: {e}\n skipping.')
+        print(f'batch_extended_programmatic_figures(...): _display_long_short_pf1D_comparison failed with error: {e}\n skipping.')
 
     ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
     try:

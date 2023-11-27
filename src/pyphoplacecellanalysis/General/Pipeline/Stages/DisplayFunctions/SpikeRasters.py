@@ -573,6 +573,8 @@ def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identif
     scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     scatter_plot.setObjectName(f'scatter_plot_{_active_plot_identifier}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
     scatter_plot.opts['useCache'] = False
+        
+
     # scatter_plot.addPoints(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {})) # , hoverable=True
     new_ax.addItem(scatter_plot)
     plots.scatter_plots[_active_plot_identifier] = scatter_plot
@@ -643,8 +645,11 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     plots_data.all_spots_dict = {}
     plots_data.all_scatterplot_tooltips_kwargs_dict = {}
 
-    vtick_simple_line = _build_default_tick(tick_width=0.0, tick_height=0.9)
-    override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1, hoverable=False) # , pen=None, brush=None
+    # vtick_simple_line = _build_default_tick(tick_width=0.0, tick_height=0.9)
+    # override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=False, symbol=vtick_simple_line, size=1, hoverable=False) # , pen=None, brush=None
+
+    vtick_simple_line = _build_default_tick(tick_width=1.0, tick_height=0.9)
+    override_scatter_plot_kwargs = dict(name='epochSpikeRasterScatterPlotItemSimpleSpike', pxMode=True, symbol=vtick_simple_line, size=80.0, hoverable=False) # , pen=None, brush=None
     # print(f'override_scatter_plot_kwargs: {override_scatter_plot_kwargs}')
 
     i = 0
