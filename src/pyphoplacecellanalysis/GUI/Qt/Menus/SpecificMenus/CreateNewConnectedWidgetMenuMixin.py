@@ -217,7 +217,9 @@ class CreateNewDataExplorer_ipc_PlotterCommand(BaseMenuCommand):
         pActiveTuningCurvesPlotter = self._display_output['pActiveTuningCurvesPlotter']
         root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets = self._display_output['pane'] # for Qt mode:
 
+
 class CreateNewDataExplorer_ipspikes_PlotterCommand(BaseMenuCommand):
+    """ creates a new `ipspikesDataExplorer` 3D plotter. """
     def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
         super(CreateNewDataExplorer_ipspikes_PlotterCommand, self).__init__()
         self._spike_raster_window = spike_raster_window

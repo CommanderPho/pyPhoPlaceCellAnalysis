@@ -625,9 +625,15 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
 
+        has_custom_kwargs_list: bool = False # indicates whether user provided a kwargs list
         if computation_kwargs_list is None:
             computation_kwargs_list = [{} for _ in computation_functions_name_includelist]
-            assert len(computation_kwargs_list) == len(computation_functions_name_includelist)
+        else:
+            has_custom_kwargs_list = np.any([len(x)>0 for x in computation_kwargs_list])
+            # has_custom_kwargs_list = True            
+
+        assert isinstance(computation_kwargs_list, List), f"computation_kwargs_list: Optional<list>: is supposed to be a list of kwargs corresponding to each function name in computation_functions_name_includelist but instead is of type:\n\ttype(computation_kwargs_list): {type(computation_kwargs_list)}"
+        assert len(computation_kwargs_list) == len(computation_functions_name_includelist)
 
 
         active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.ANY) # find_registered_computation_functions is a pipeline.stage property
@@ -653,8 +659,10 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             ## TODO: ERROR: `owning_pipeline_reference=self` is not CORRECT as self is of type `ComputedPipelineStage` (or `DisplayPipelineStage`) and not `NeuropyPipeline`
                 # this has been fine for all the global functions so far because the majority of the properties are defined on the stage anyway, but any pipeline properties will be missing! 
             global_kwargs = dict(owning_pipeline_reference=self, global_computation_results=previous_computation_result, computation_results=self.computation_results, active_configs=self.active_configs, include_includelist=enabled_filter_names, debug_print=debug_print)
+    
+            assert (not has_custom_kwargs_list), f"#TODO 2023-11-22 23:41: - [ ] perform_specific_computation(...) computation_kwargs_list seems to have no effect in global functions, maybe fix? For now, just throw an error so you don't think your custom kwargs are working when they aren't."
 
-            self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print)
+            self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
         else:
             # Non-global functions:
             for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
@@ -1235,6 +1243,78 @@ class PipelineWithComputedPipelineStageMixin:
         saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
         return global_computation_results_pickle_path
 
+
+    def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, debug_print:bool=True):
+        """Save out the `global_computation_results` which are not currently saved with the pipeline
+        Usage:
+            split_save_folder, split_save_paths, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
+            
+        #TODO 2023-11-22 18:54: - [ ] One major is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
+        # Update result with correct type:
+        curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
+
+        """
+        'global_computation_results.pkl'
+        ## Case 1. `override_global_pickle_path` is provided:
+        if override_global_pickle_path is not None:
+            ## override_global_pickle_path is provided:
+            if not isinstance(override_global_pickle_path, Path):
+                override_global_pickle_path = Path(override_global_pickle_path).resolve()
+            # Case 1a: `override_global_pickle_path` is a complete file path
+            if not override_global_pickle_path.is_dir():
+                # a full filepath, just use that directly
+                global_computation_results_pickle_path = override_global_pickle_path.resolve()
+            else:
+                # default case, assumed to be a directory and we'll use the normal filename.
+                active_global_pickle_filename: str = (override_global_pickle_filename or self.global_computation_results_pickle_path or "global_computation_results.pkl")
+                global_computation_results_pickle_path = override_global_pickle_path.joinpath(active_global_pickle_filename).resolve()
+
+        else:
+            # No override path provided
+            if override_global_pickle_filename is None:
+                # no filename provided either, use default global pickle path:
+                global_computation_results_pickle_path = self.global_computation_results_pickle_path
+            else:
+                # Otherwise use default output path but specified override_global_pickle_filename:
+                global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+
+        if debug_print:
+            print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
+        
+        ## In split save, we save each result separately in a folder
+        split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
+        split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+        if debug_print:
+            print(f'split_save_folder: {split_save_folder}')
+        # make if doesn't exist
+        split_save_folder.mkdir(exist_ok=True)
+        
+        computed_data = self.global_computation_results.computed_data
+        split_save_paths = {}
+        failed_keys = []
+        for k, v in computed_data.items():
+            curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
+            if debug_print:
+                print(f'curr_split_result_pickle_path: {curr_split_result_pickle_path}')
+            was_save_success = False
+            try:
+                ## try get as dict
+                v_dict = v.__dict__ #__getstate__()
+                saveData(curr_split_result_pickle_path, (v_dict))
+                was_save_success = True
+            except KeyError as e:
+                print(f'{k} encountered {e} while trying to save {k}. Skipping')
+                pass
+            if was_save_success:
+                split_save_paths[k] = curr_split_result_pickle_path
+            else:
+                failed_keys.append(k)
+                
+        if len(failed_keys) > 0:
+            print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
+        return split_save_folder, split_save_paths, failed_keys
+        
+
     def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
         Usage:
@@ -1251,3 +1331,78 @@ class PipelineWithComputedPipelineStageMixin:
         loaded_global_computation_results = ComputationResult(**loaded_global_computation_dict)
 
         self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
+
+
+    def load_split_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
+        """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+        Reciprocal: `save_split_global_computation_results`
+        
+        allow_overwrite_existing_allow_keys: keys allowed to be overwritten in the current computation_results if they can be loaded from disk.
+        
+        Usage:
+            sucessfully_updated_keys, successfully_loaded_keys, found_split_paths = curr_active_pipeline.load_split_pickled_global_computation_results(allow_overwrite_existing_allow_keys=['DirectionalLaps', 'RankOrder'])
+        """
+        allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
+        
+        if override_global_computation_results_pickle_path is None:
+            # Use the default if no override is provided.
+            global_computation_results_pickle_path = self.global_computation_results_pickle_path
+        else:
+            global_computation_results_pickle_path = override_global_computation_results_pickle_path
+        
+        if not isinstance(global_computation_results_pickle_path, Path):
+            global_computation_results_pickle_path = Path(global_computation_results_pickle_path).resolve()
+            
+        if not global_computation_results_pickle_path.is_dir():	
+            split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
+            split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+        else:
+            split_save_folder: Path = global_computation_results_pickle_path.resolve()
+            
+        if debug_print:
+            print(f'split_save_folder to load from: {split_save_folder}')
+            
+        assert split_save_folder.exists()
+        assert split_save_folder.is_dir()
+        loaded_global_computation_results = {}
+        
+        found_split_paths = []
+        successfully_loaded_keys = {}
+        sucessfully_updated_keys = []
+        
+        for p in split_save_folder.rglob('Split_*.pkl'):
+            if debug_print:
+                print(f'p: {p}')
+            found_split_paths.append(p)
+            curr_result_key: str = p.stem.removeprefix('Split_') # the key name into global_computation_results, parsed back from the file name
+            
+            # Actually do the loading:
+            loaded_value = loadData(p)
+            loaded_global_computation_results[curr_result_key] = loaded_value
+            successfully_loaded_keys[curr_result_key] = p
+
+        ## append them to the extant global_computations (`curr_active_pipeline.global_computation_results.computed_data`)
+        for curr_result_key, loaded_value in loaded_global_computation_results.items():
+            should_apply: bool = False
+            if curr_result_key in self.global_computation_results.computed_data:
+                # key already exists, overwrite it?
+                
+                if not allow_overwrite_existing:
+                    if (curr_result_key in allow_overwrite_existing_allow_keys):
+                        should_apply = True
+                    else:
+                        print(f'WARN: key {curr_result_key} already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?')
+                else:
+                    should_apply = True
+            else:
+                ## add it
+                should_apply = True
+            
+            if should_apply:
+                # apply the loaded result to the computed_data.
+                sucessfully_updated_keys.append(curr_result_key)
+                self.global_computation_results.computed_data[curr_result_key] = loaded_value
+
+        return sucessfully_updated_keys, successfully_loaded_keys, found_split_paths
+    
+

@@ -3,7 +3,7 @@ import weakref
 from collections import OrderedDict
 
 from copy import deepcopy
-from typing import Optional, Dict, List, Tuple, Callable
+from typing import Optional, Dict, List, Tuple, Callable, Union
 from attrs import define, field, Factory
 import numpy as np
 import pandas as pd
@@ -80,11 +80,11 @@ class RankOrderDebugger:
     global_spikes_df: pd.DataFrame = field(repr=False)
     active_epochs_df: pd.DataFrame = field(repr=False)
     track_templates: TrackTemplates = field(repr=False)
-    RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Dict = field(repr=False)
-    LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Dict = field(repr=False)
+    RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame] = field(repr=False)
+    LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame] = field(repr=False)
     
     plots: RenderPlots = field(init=False)
-    plots_data: RenderPlotsData = field(init=False)
+    plots_data: RenderPlotsData = field(init=False, repr=False)
 
     active_epoch_IDX: int = field(default=0, repr=True)
 
@@ -95,7 +95,7 @@ class RankOrderDebugger:
     
 
     @classmethod
-    def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict):
+    def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame]):
         """ 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -115,17 +115,27 @@ class RankOrderDebugger:
         _obj.plots_data = RenderPlotsData(name=name, LR_plots_data=LR_plots_data, LR_on_update_active_epoch=LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs=LR_on_update_active_scatterplot_kwargs,
                                            RL_plots_data=RL_plots_data, RL_on_update_active_epoch=RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs=RL_on_update_active_scatterplot_kwargs)
         
-        ## Build the selected spikes df:
-        (_obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map), (_obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map) = _obj.build_selected_spikes_df(_obj.track_templates, _obj.active_epochs_df,
-                                                                                                                                                                                                            _obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict,
-                                                                                                                                                                                                            _obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict)
+        
+        try:
+            ## rank_order_results.LR_ripple.selected_spikes_df mode:
+            if isinstance(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
+                # already a selected_spikes_df! Use it raw!
+                _obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map = deepcopy(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+                _obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map = deepcopy(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+            else:
+                ## Build the selected spikes df:
+                (_obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map), (_obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map) = _obj.build_selected_spikes_df(_obj.track_templates, _obj.active_epochs_df,
+                                                                                                                                                                                                                    _obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict,                                                                                                                                                                                                                _obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict)
+            ## Add the spikes
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
 
-        ## Add the spikes
-        _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
-        _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
-        _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
-        _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
-
+        except IndexError:
+            print(f'WARN: the selected spikes did not work properly, so none will be shown.')
+            pass
+        
         return _obj
 
 
@@ -221,11 +231,12 @@ class RankOrderDebugger:
 
 
         # CORRECT: Even: RL, Odd: LR
-        RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
-        LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
-        RL_long, RL_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list]
+        RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy() # (69, )
+        LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy() # (64, )
+        RL_long, RL_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list] # nope, different sizes: (62,), (69,)
         LR_long, LR_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
 
+        assert np.shape(RL_long) == np.shape(RL_short), f"{np.shape(RL_long)} != {np.shape(RL_short)}"
 
         neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
         unit_colors_list = neuron_colors_ndarray.copy()
@@ -281,7 +292,7 @@ class RankOrderDebugger:
         RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy()
         LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy()
 
-        ## WE HAVE TO BUILT OUT selected_spikes_df ahead of time or die trying. Not one epoch at a time.
+        ## WE HAVE TO BUILD OUT selected_spikes_df ahead of time or die trying. Not one epoch at a time.
 
         # Converts the selected spikes information dict (containing the median/first spikes for each epoch) into a spikes_df capable of being rendered on the raster plot.
         # selected_spike_df_list = []

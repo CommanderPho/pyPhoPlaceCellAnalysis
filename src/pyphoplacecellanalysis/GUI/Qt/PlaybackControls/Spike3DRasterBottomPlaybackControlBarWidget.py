@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.PlaybackControls import Spike3DRasterBottomPlaybackControlBar
 
 # from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Ui_RootWidget  # Generated file from .ui
-from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Uic_AUTOGEN_Spike3DRasterBottomPlaybackControlBarBase import Ui_RootWidget
+# from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Uic_AUTOGEN_Spike3DRasterBottomPlaybackControlBarBase import Ui_RootWidget
 
 
 # Custom Widget classes
@@ -26,7 +26,7 @@ from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
 import qtawesome as qta
 
 from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin, ComboBoxCtrlOwningMixin
-
+from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Spike3DRasterBottomPlaybackControlBarBase
 
 """ TODO: Refactor from pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\Mixins\RenderWindowControlsMixin.py
 
@@ -48,7 +48,7 @@ btnCurrentIntervals_Customize
 """
 
 
-class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
+class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRasterBottomPlaybackControlBarBase):
     """ A playback bar with buttons loaded from a Qt .ui file. """
     
     play_pause_toggled = QtCore.pyqtSignal(bool) # returns bool indicating whether is_playing
@@ -70,8 +70,10 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = Ui_RootWidget()
-        self.ui.setupUi(self) # builds the design from the .ui onto this widget.
+        
+        # # Auto
+        # self.ui = Ui_RootWidget()
+        # self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
         self.initUI()
         self.show() # Show the GUI
@@ -133,8 +135,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self._update_series_action_buttons(self.has_valid_current_target_series_name) # should disable the action buttons to start
 
         
-    def __str__(self):
-         return 
+    # def __str__(self):
+    #      return 
     
     # Called when the play/pause button is clicked:
     def play_pause(self):
@@ -333,7 +335,8 @@ class SpikeRasterBottomFrameControlsMixin:
     """ renders the UI controls for the Spike3DRaster_Vedo class 
         Follows Conventions outlined in ModelViewMixin Conventions.md
         
-        Currently Unused after being removed from Spike3DRaster_Vedo
+        Used in `Spike3DRasterWindowWidget`
+        
     """
     
     @QtCore.pyqtSlot()
@@ -407,9 +410,18 @@ class SpikeRasterBottomFrameControlsMixin:
     @QtCore.pyqtSlot(float, float)
     def SpikeRasterBottomFrameControlsMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
-        # TODO: NOT CALLED
+        # Called the Implementor's update_window(...) function
+        #TODO 2023-11-21 18:49: - [ ] Doesn't work :[
+        # need to block signals:
+        # doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
+        # doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
+        # if new_start is not None:
+        #     self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(new_start)
+        # if new_end is not None:
+        #     self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(new_end)
+        # doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
+        # doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
         pass
-    
     
     # ## Update Functions:
     # @QtCore.pyqtSlot(bool)
