@@ -1,4 +1,4 @@
-from typing import Any, Optional, Union, Tuple
+from typing import Any, Dict, Optional, Union, Tuple
 from collections import namedtuple
 from copy import deepcopy
 import numpy as np
@@ -9,7 +9,7 @@ from indexed import IndexedOrderedDict
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 from neuropy.utils.result_context import overwriting_display_context, providing_context
-
+from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays # `paired_incremental_sort_neurons`
 
 from pyphocorehelpers.indexing_helpers import partition # needed by `_find_example_epochs` to partition the dataframe by aclus
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -902,6 +902,73 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
     # returns `filter_epoch_spikes_df`
     return filter_epoch_spikes_df
 
+
+@function_attributes(short_name=None, tags=['neuron_ID', 'color'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-28 11:07', related_items=[])
+def build_shared_sorted_neuron_color_maps(neuron_IDs_lists) -> Tuple[Dict, Dict]:
+    """ builds the shared colors for all neuron_IDs in any of the lists. This approach lends itself to globally-unique color mapping, like would be done when wanting to compare between different spike raster plots. 
+
+    Outputs:
+
+    - unit_colors_ndarray_map: Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
+
+
+    unit_qcolors_map, unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
+    """
+    # If you have a set of values that can be larger than the entries in each list:
+    any_list_neuron_IDs = np.sort(union_of_arrays(*neuron_IDs_lists)) # neuron_IDs as they appear in any list
+    ## build color values from these:
+    any_list_n_neurons = len(any_list_neuron_IDs)
+    _neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(any_list_n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
+    unit_colors_ndarray_map: Dict = dict(zip(any_list_neuron_IDs, neuron_colors_ndarray.copy().T)) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
+    unit_qcolors_map: Dict = dict(zip(any_list_neuron_IDs, _neuron_qcolors_list.copy())) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
+    # `unit_colors_map` is main colors output
+    return unit_qcolors_map, unit_colors_ndarray_map
+
+# INPUTS: decoders_dict, included_any_context_neuron_ids
+
+@function_attributes(short_name=None, tags=['sort', 'raster', 'sorting', 'important', 'visualization', 'order', 'neuron_ids'], input_requires=[], output_provides=[], uses=['DataSeriesColorHelpers.build_cell_colors', 'paired_incremental_sorting'], used_by=[], creation_date='2023-11-28 10:52', related_items=[])
+def paired_incremental_sort_neurons(decoders_dict: Dict, included_any_context_neuron_ids=None):
+    """ Given a set of decoders (or more generally placefields, ratemaps, or anything else with neuron_IDs and a property that can be sorted) return the iterative successive sort.
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_incremental_sort_neurons
+        
+    decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+    # included_any_context_neuron_ids = None
+
+    epoch_active_aclus = np.array([9,  26,  31,  39,  40,  43,  47,  52,  53,  54,  60,  61,  65,  68,  72,  75,  77,  78,  81,  82,  84,  85,  90,  92,  93,  98, 102])
+    included_any_context_neuron_ids = deepcopy(epoch_active_aclus)
+
+    sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=track_templates.get_decoders_dict(), included_any_context_neuron_ids=included_any_context_neuron_ids)
+    """
+    
+    # 2023-11-28 - New Sorting using `paired_incremental_sorting`
+    neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in decoders_dict.values()] # [A, B, C, D, ...]
+    unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
+    # `unit_colors_map` is main colors output
+
+    # Here is where we want to filter by specific included_neuron_IDs (before we plot and output):
+    if included_any_context_neuron_ids is not None:
+        # restrict only to `included_any_context_neuron_ids`
+        print(f'restricting only to included_any_context_neuron_ids: {included_any_context_neuron_ids}...')
+        is_neuron_IDs_included_lists = [np.isin(neuron_ids, included_any_context_neuron_ids) for neuron_ids in neuron_IDs_lists]
+        neuron_IDs_lists = [neuron_ids[is_neuron_IDs_included] for neuron_ids, is_neuron_IDs_included in zip(neuron_IDs_lists, is_neuron_IDs_included_lists)] # filtered_neuron_IDs_lists
+        sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)[is_neuron_IDs_included]) for a_decoder, is_neuron_IDs_included in zip(decoders_dict.values(), is_neuron_IDs_included_lists)]
+        
+    else:
+        sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for a_decoder in decoders_dict.values()]
+
+    # `sort_helper_original_neuron_id_to_IDX_dicts` needs to be built after filtering (if it occurs)
+    sort_helper_original_neuron_id_to_IDX_dicts = [dict(zip(neuron_ids, np.arange(len(neuron_ids)))) for neuron_ids in neuron_IDs_lists] # just maps each neuron_id in the list to a fragile_linear_IDX 
+
+    ## DO SORTING: determine sorting:
+    sorted_neuron_IDs_lists = paired_incremental_sorting(neuron_IDs_lists, sortable_values_lists)
+    # `sort_helper_neuron_id_to_sort_IDX_dicts` dictionaries in the appropriate order (sorted order) with appropriate indexes. Its .values() can be used to index into things originally indexed with aclus.
+    sort_helper_neuron_id_to_sort_IDX_dicts = [{aclu:a_sort_helper_neuron_id_to_IDX_map[aclu] for aclu in sorted_neuron_ids} for a_sort_helper_neuron_id_to_IDX_map, sorted_neuron_ids in zip(sort_helper_original_neuron_id_to_IDX_dicts, sorted_neuron_IDs_lists)]
+    sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
+    # So unlike other attempts, these colors are sorted along with the aclus for each decoder, and we don't try to keep them separate. Since they're actually in a dict (where conceptually the order doesn't really matter) this should be indistinguishable performance-wise from other implementation.
+    sort_helper_neuron_id_to_neuron_colors_dicts = [{aclu:unit_colors_map[aclu] for aclu in sorted_neuron_ids} for sorted_neuron_ids in sorted_neuron_IDs_lists] # [{72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, {72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, ...]
+    # `sort_helper_neuron_id_to_sort_IDX_dicts` is main output here:
+    return sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sorted_pf_tuning_curves
 
 
 

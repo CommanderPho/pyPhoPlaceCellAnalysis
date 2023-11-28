@@ -546,6 +546,8 @@ import pyqtgraph.exporters
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_incremental_sort_neurons # _display_directional_template_debugger
+from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
 
 
 class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -566,7 +568,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
             from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
             from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
-            from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
             from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
             from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
 
@@ -604,27 +605,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
 
-            # 2023-11-28 - New Sorting using `paired_incremental_sorting`
-            neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in decoders_dict.values()] # [A, B, C, D, ...]
-            # If you have a set of values that can be larger than the entries in each list:
-            any_list_neuron_IDs = np.sort(union_of_arrays(*neuron_IDs_lists)) # neuron_IDs as they appear in any list
-            ## build color values from these:
-            any_list_n_neurons = len(any_list_neuron_IDs)
-            _neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(any_list_n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
-            # unit_colors_map: Dict = dict(zip(any_list_neuron_IDs, neuron_colors_ndarray.copy().T)) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
-            unit_colors_map: Dict = dict(zip(any_list_neuron_IDs, _neuron_qcolors_list.copy())) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
-            
-            # `unit_colors_map` is main colors output
-            sort_helper_original_neuron_id_to_IDX_dicts = [dict(zip(neuron_ids, np.arange(len(neuron_ids)))) for neuron_ids in neuron_IDs_lists] # just maps each neuron_id in the list to a fragile_linear_IDX 
-            sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for a_decoder in decoders_dict.values()]
-            ## DO SORTING: determine sorting:
-            sorted_neuron_IDs_lists = paired_incremental_sorting(neuron_IDs_lists, sortable_values_lists)
-            # `sort_helper_neuron_id_to_sort_IDX_dicts` dictionaries in the appropriate order (sorted order) with appropriate indexes. Its .values() can be used to index into things originally indexed with aclus.
-            sort_helper_neuron_id_to_sort_IDX_dicts = [{aclu:a_sort_helper_neuron_id_to_IDX_map[aclu] for aclu in sorted_neuron_ids} for a_sort_helper_neuron_id_to_IDX_map, sorted_neuron_ids in zip(sort_helper_original_neuron_id_to_IDX_dicts, sorted_neuron_IDs_lists)]
-            sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
-            # So unlike other attempts, these colors are sorted along with the aclus for each decoder, and we don't try to keep them separate. Since they're actually in a dict (where conceptually the order doesn't really matter) this should be indistinguishable performance-wise from other implementation.
-            sort_helper_neuron_id_to_neuron_colors_dicts = [{aclu:unit_colors_map[aclu] for aclu in sorted_neuron_ids} for sorted_neuron_ids in sorted_neuron_IDs_lists] # [{72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, {72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, ...]
-            # `sort_helper_neuron_id_to_sort_IDX_dicts` is main output here:
+            # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`               
+            sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids=included_any_context_neuron_ids)
 
             ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
             _out_pf1D_heatmaps = {}
