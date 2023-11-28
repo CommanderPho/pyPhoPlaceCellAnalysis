@@ -90,6 +90,8 @@ class RankOrderDebugger:
 
     active_epoch_IDX: int = field(default=0, repr=True)
 
+    on_idx_changed_callback_function_dict: Dict[str, Callable] = field(default=Factory(dict), repr=False)
+    
 
     @property
     def n_epochs(self) -> int:
@@ -187,6 +189,9 @@ class RankOrderDebugger:
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.lap_id == (an_epoch_idx+1))]
         curr_epoch = list(curr_epoch_df.itertuples())[0]
         self.on_update_active_epoch(an_epoch_idx, curr_epoch)
+
+        for a_callback_name, a_callback_fn in self.on_idx_changed_callback_function_dict.items():
+            a_callback_fn(an_epoch_idx)
 
 
     def get_ipywidget(self):
