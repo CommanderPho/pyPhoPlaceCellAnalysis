@@ -113,7 +113,7 @@ class DisplayColorsEnum:
             if is_dim:
                 fg_color = '#aaa' # Grey
             else:
-                fg_color = '#fff' # White
+                fg_color = '#666' # White
                 
             # a purplish-royal-blue 
             if is_dim:
