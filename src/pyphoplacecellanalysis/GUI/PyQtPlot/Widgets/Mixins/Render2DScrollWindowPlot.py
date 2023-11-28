@@ -295,12 +295,20 @@ class Render2DScrollWindowPlotMixin:
         # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
         # Emphasis/Deemphasis-Dependent Pens:
         curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
-        curr_spikes_brushes = [] # scared to modify/use the brushes here out of fear of breaking the spike_emphasis_states
+        
+        has_brushes: bool = np.all([(len(config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX])>=6) for a_fragile_linear_neuron_IDX in filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy()])
+        if has_brushes:
+            curr_spikes_brushes = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][-1][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
+        else:
+            curr_spikes_brushes = [] # scared to modify/use the brushes here out of fear of breaking the spike_emphasis_states
         
         curr_n = len(curr_spike_t) # curr number of spikes
         # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
         pos = np.vstack((curr_spike_t, curr_spike_y))
-        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # returned spikes {'pos','data','pen'}
+        if has_brushes:
+            all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i], 'brush': curr_spikes_brushes[i]} for i in range(curr_n)] # returned spikes {'pos','data','pen'}
+        else:
+            all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # returned spikes {'pos','data','pen'}
         return curr_spike_t, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n
     
 

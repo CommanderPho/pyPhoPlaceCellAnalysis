@@ -4,7 +4,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 from functools import partial
-from attrs import define, Factory
+from attrs import define, field, Factory
 from indexed import IndexedOrderedDict
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
@@ -322,10 +322,14 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
         return spikes_df
 
 
+
+NeuronSpikesConfigTuple = namedtuple('NeuronSpikesConfigTuple', ['idx', 'fragile_linear_neuron_IDX', 'curr_state_pen_dict', 'lower_y_value', 'upper_y_value', 'curr_state_brush_dict'])
+
+
 @define
 class RasterScatterPlotManager:
-    unit_sort_manager: UnitSortOrderManager
-    config_fragile_linear_neuron_IDX_map: dict = None
+    unit_sort_manager: UnitSortOrderManager = field(default=None)
+    config_fragile_linear_neuron_IDX_map: Optional[IndexedOrderedDict[int, NeuronSpikesConfigTuple]] = field(default=None)
 
     @property
     def params(self):
@@ -336,7 +340,7 @@ class RasterScatterPlotManager:
         self.unit_sort_manager.params = value
 
     @function_attributes(short_name='_build_cell_configs', tags=['config','private'], input_requires=['self.params.neuron_qcolors_map'], output_provides=['self.params.config_items', 'self.config_fragile_linear_neuron_IDX_map'], uses=['self.find_cell_ids_from_neuron_IDXs', 'build_adjusted_color'], used_by=[], creation_date='2023-03-31 18:46')
-    def _build_cell_configs(self):
+    def _build_cell_configs(self, should_build_brushes:bool=True):
         """ Adds the neuron/cell configurations that are used to color and format the scatterplot spikes and such. 
         Requires:
             self._series_identity_lower_y_values = DataSeriesToSpatial.build_series_identity_axis(self.n_cells, center_mode=self.params.center_mode, bin_position_mode='left_edges', side_bin_margins = self.params.side_bin_margins) / self.n_cells
@@ -355,6 +359,9 @@ class RasterScatterPlotManager:
         Known Calls:
             From self._buildGraphics()
             From self.on_neuron_colors_changed(...) and self.on_unit_sort_order_changed(...)
+            
+            Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(...)
+            
         """
         
         # SpikeEmphasisState
@@ -380,17 +387,26 @@ class RasterScatterPlotManager:
             curr_neuron_id = curr_neuron_ids_list[i] # aclu value
             
             curr_state_pen_dict = dict()
+            if should_build_brushes:
+                curr_state_brush_dict = dict()
+            else:
+                curr_state_brush_dict = None
+                
             for an_emphasis_state, alpha_value in state_alpha.items():
                 curr_color = self.params.neuron_qcolors_map[fragile_linear_neuron_IDX]
                 curr_color.setAlphaF(alpha_value)
                 curr_color = state_color_adjust_fcns[an_emphasis_state](curr_color)
                 curr_pen = pg.mkPen(curr_color)
                 curr_state_pen_dict[an_emphasis_state] = curr_pen
-            
+                if should_build_brushes:
+                    curr_brush = pg.mkBrush(curr_color)
+                    curr_state_brush_dict[an_emphasis_state] = curr_brush
+                    
             # curr_config_item = (i, fragile_linear_neuron_IDX, curr_state_pen_dict, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i]) # config item is just a tuple here
 
             # TEST: Seems like these other values are unused, and only curr_config_item[2] (containing the curr_state_pen_dict) is ever accessed in the subsequent functions.
-            curr_config_item = (None, None, curr_state_pen_dict, None, None) # config item is just a tuple here
+            # curr_config_item = (None, None, curr_state_pen_dict, None, None) # config item is just a tuple here
+            curr_config_item = NeuronSpikesConfigTuple(None, None, curr_state_pen_dict, None, None, curr_state_brush_dict) # config item is just a tuple here
             self.params.config_items[curr_neuron_id] = curr_config_item # add the current config item to the config items 
 
 
