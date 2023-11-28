@@ -49,8 +49,10 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
         self.GlobalConnectionManagerAccessingMixin_on_destroy()
         self.DynamicDockDisplayAreaContentMixin_on_destroy()
         
-        for window in QtWidgets.QApplication.topLevelWidgets():
-            window.close()
+        # for window in QtWidgets.QApplication.topLevelWidgets():
+        #     window.close() # we don't want this do we? This accidentally closes all other widgets?
+
+
             
     ########################################################
     ## For GlobalConnectionManagerAccessingMixin conformance:
