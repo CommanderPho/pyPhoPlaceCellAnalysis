@@ -626,9 +626,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             sort_helper_neuron_id_to_neuron_colors_dicts = [{aclu:unit_colors_map[aclu] for aclu in sorted_neuron_ids} for sorted_neuron_ids in sorted_neuron_IDs_lists] # [{72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, {72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, ...]
             # `sort_helper_neuron_id_to_sort_IDX_dicts` is main output here:
 
-
-            
-
             ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
             _out_pf1D_heatmaps = {}
             for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
@@ -640,17 +637,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 
                 a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
 
-                # Coloring each row of the 1D heatmap:
+                # Coloring the heatmap data for each row of the 1D heatmap:
                 curr_data = deepcopy(sorted_pf_tuning_curves[i])
                 if debug_print:
                     print(f'np.shape(curr_data): {np.shape(curr_data)}, np.nanmax(curr_data): {np.nanmax(curr_data)}, np.nanmin(curr_data): {np.nanmin(curr_data)}') # np.shape(curr_data): (34, 62), np.nanmax(curr_data): 0.15320444716258447, np.nanmin(curr_data): 0.0
 
-                # DataSeriesColorHelpers.colors_NDarray_to_qColorsList(a_color_vector)
-
                 _temp_curr_out_colors_heatmap_image = [] # used to accumulate the rows so they can be built into a color image in `out_colors_heatmap_image_matrix`
-
-                # # Create an image of the same shape but with 3 color channels
-                # image_matrix = np.zeros((brightness_matrix.shape[0], brightness_matrix.shape[1], 3), dtype=np.uint8)
 
                 # for i, aclu in enumerate(sorted_shared_sort_neuron_IDs):
                 for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
@@ -659,9 +651,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
                     curr_win.addItem(text)
 
-                    # modulate heatmap color for this row:
+                    # modulate heatmap color for this row (`curr_data[i, :]`):
                     heatmap_base_color = pg.mkColor(a_color_vector)
-                    # curr_data[i, :]
                     out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
                     _temp_curr_out_colors_heatmap_image.append(out_colors_row)
 
@@ -669,6 +660,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
                 if debug_print:
                     print(f"np.shape(out_colors_heatmap_image_matrix): {np.shape(out_colors_heatmap_image_matrix)}") # (34, 62, 4) - (n_cells, n_pos_bins, n_channels_RGBA)
+
                 # Ensure the data is in the correct range [0, 1]
                 out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
                 curr_img.updateImage(out_colors_heatmap_image_matrix)
