@@ -81,6 +81,14 @@ class TrackTemplates:
         """
         return DirectionalDecodersTuple(self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)
     
+
+    def get_decoders_dict(self) -> Dict[str, BasePositionDecoder]:
+        return {'long_LR': self.long_LR_decoder,
+            'long_RL': self.long_RL_decoder,
+            'short_LR': self.short_LR_decoder,
+            'short_RL': self.short_RL_decoder,
+        }
+
     @classmethod
     def init_from_paired_decoders(cls, LR_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], RL_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder]) -> "TrackTemplates":
         """ 2023-10-31 - Extract from pairs
