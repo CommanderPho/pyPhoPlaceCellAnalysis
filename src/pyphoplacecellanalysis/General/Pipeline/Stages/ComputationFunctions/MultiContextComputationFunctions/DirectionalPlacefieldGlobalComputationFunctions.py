@@ -724,8 +724,174 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # graphics_output_dict['saved_figures'] = active_out_figure_paths
             
+            
+            return graphics_output_dict
 
 
+    @function_attributes(short_name='directional_template_debugger', tags=['directional','template','debug', 'overview'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-28 10:13', related_items=[], is_global=True)
+    def _display_directional_template_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+            """ Renders a window with the four templates displayed to the left and right of center, and the ability to filter the actively included aclus via `included_any_context_neuron_ids`
 
+            """
+            
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import EpochsEditor # perform_plot_laps_diagnoser
+            from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
+            from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+            from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
+
+            from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
+            from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
+
+            # raise NotImplementedError
+            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+            
+            defer_render = kwargs.pop('defer_render', False) 
+            debug_print: bool = kwargs.pop('debug_print', False) 
+
+            figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')  
+            _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
+            
+            # Recover from the saved global result:
+            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+            # track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=None) # shared-only
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=None) # non-shared-only
+            # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            # long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+
+            # uses `global_session`
+            root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Directional Template Debugger', defer_show=False)
+
+            def _get_decoder_sorted_pfs(a_decoder):
+                """ used only when viewing with individual sorts (instead of all four decoder's pfs aligned to the first decoder's sort) """
+                ratemap = a_decoder.pf.ratemap
+                CoM_sort_indicies = np.argsort(ratemap.peak_tuning_curve_center_of_masses) # get the indicies to sort the placefields by their center-of-mass (CoM) location # CoM_sort_indicies.shape # (n_neurons,)
+                return ratemap.pdf_normalized_tuning_curves[CoM_sort_indicies, :]
+            
+            # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting` 
+            decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+            sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids=included_any_context_neuron_ids)
+            # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
+
+            ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
+            _out_pf1D_heatmaps = {}
+            for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
+                _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorted_pf_tuning_curves[i], title=f'{a_decoder_name}_pf1Ds [sort: long_RL]', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
+                # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Individual Sort
+
+                # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
+                curr_win, curr_img = _out_pf1D_heatmaps[a_decoder_name] # win, img
+                
+                a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
+
+                # Coloring the heatmap data for each row of the 1D heatmap:
+                curr_data = deepcopy(sorted_pf_tuning_curves[i])
+                if debug_print:
+                    print(f'np.shape(curr_data): {np.shape(curr_data)}, np.nanmax(curr_data): {np.nanmax(curr_data)}, np.nanmin(curr_data): {np.nanmin(curr_data)}') # np.shape(curr_data): (34, 62), np.nanmax(curr_data): 0.15320444716258447, np.nanmin(curr_data): 0.0
+
+                _temp_curr_out_colors_heatmap_image = [] # used to accumulate the rows so they can be built into a color image in `out_colors_heatmap_image_matrix`
+
+                for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
+                    # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
+                    text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+                    text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                    curr_win.addItem(text)
+
+                    # modulate heatmap color for this row (`curr_data[i, :]`):
+                    heatmap_base_color = pg.mkColor(a_color_vector)
+                    out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
+                    _temp_curr_out_colors_heatmap_image.append(out_colors_row)
+
+                ## Build the colored heatmap:
+                out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
+                if debug_print:
+                    print(f"np.shape(out_colors_heatmap_image_matrix): {np.shape(out_colors_heatmap_image_matrix)}") # (34, 62, 4) - (n_cells, n_pos_bins, n_channels_RGBA)
+
+                # Ensure the data is in the correct range [0, 1]
+                out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
+                curr_img.updateImage(out_colors_heatmap_image_matrix)
+                _out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name] = out_colors_heatmap_image_matrix
+
+
+            even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_even_dock_colors)
+            odd_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_odd_dock_colors)
+
+            _out_dock_widgets = {}
+            dock_configs = (even_dock_config, odd_dock_config, even_dock_config, odd_dock_config)
+            dock_add_locations = (['left'], ['left'], ['right'], ['right'])
+
+            for i, (a_decoder_name, a_heatmap) in enumerate(_out_pf1D_heatmaps.items()):
+                _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_heatmap[0], dockSize=(300,200), dockAddLocationOpts=dock_add_locations[i], display_config=dock_configs[i])
+
+            
+            # Outputs: root_dockAreaWindow, app, epochs_editor, _out_pf1D_heatmaps, _out_dock_widgets
+            graphics_output_dict = {'win': root_dockAreaWindow, 'app': app,  'ui': (_out_dock_widgets), 'plots': _out_pf1D_heatmaps, 'data': _out_data}
+
+            # Saving/Exporting to file ___________________________________________________________________________________________ #
+            #TODO 2023-11-16 22:16: - [ ] Figure out how to save
+                    
+            def save_figure(): # export_file_base_path: Path = Path(f'output').resolve()
+                """ captures: epochs_editor, _out_pf1D_heatmaps 
+                
+                TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
+                import pyqtgraph as pg
+                import pyqtgraph.exporters
+                from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+                """
+                ## Get main laps plotter:
+                # print_keys_if_possible('_out', _out, max_depth=4)
+                # plots = _out['plots']
+
+                ## Already have: epochs_editor, _out_pf1D_heatmaps
+                epochs_editor = graphics_output_dict['ui'][0]
+
+                shared_output_file_prefix = f'output/2023-11-20'
+                # print(list(plots.keys()))
+                # pg.GraphicsLayoutWidget 
+                main_graphics_layout_widget = epochs_editor.plots.win
+                export_file_path = Path(f'{shared_output_file_prefix}_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
+                export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
+
+                _out_pf1D_heatmaps = graphics_output_dict['plots']
+                for a_decoder_name, a_decoder_heatmap_tuple in _out_pf1D_heatmaps.items():
+                    a_win, a_img = a_decoder_heatmap_tuple
+                    # a_win.export_image(f'{a_decoder_name}_heatmap.png')
+                    print(f'a_win: {type(a_win)}')
+
+                    # create an exporter instance, as an argument give it the item you wish to export
+                    exporter = pg.exporters.ImageExporter(a_win.plotItem)
+                    # exporter = pg.exporters.SVGExporter(a_win.plotItem)
+                    # set export parameters if needed
+                    # exporter.parameters()['width'] = 300   # (note this also affects height parameter)
+
+                    # save to file
+                    export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
+                    
+                    exporter.export(str(export_file_path)) # '.png'
+                    print(f'exporting to {export_file_path}')
+                    # .scene()
+
+
+            #TODO 2023-11-16 22:23: - [ ] The other display functions using matplotlib do things like this: 
+            # final_context = active_context
+            # graphics_output_dict['context'] = final_context
+            # graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate,
+            #     'time_variable_name':time_variable_name, 'fignum':curr_fig_num}
+
+            # def _perform_write_to_file_callback():
+            #     ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
+            #     return owning_pipeline_reference.output_figure(final_context, graphics_output_dict.figures[0])
+            
+            # if save_figure:
+            #     active_out_figure_paths = _perform_write_to_file_callback()
+            # else:
+            #     active_out_figure_paths = []
+
+            # graphics_output_dict['saved_figures'] = active_out_figure_paths
             
             return graphics_output_dict
