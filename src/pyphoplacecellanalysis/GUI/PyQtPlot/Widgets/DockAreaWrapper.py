@@ -113,8 +113,12 @@ class DockAreaWrapper(object):
     """
 
     @classmethod
-    def _build_default_dockAreaWindow(cls, title='_test_PhoDockAreaWidgetApp', defer_show=False) -> Tuple[PhoDockAreaContainingWindow, QtWidgets.QApplication]:
-        """ builds a simple PhoDockAreaContainingWindow """
+    def build_default_dockAreaWindow(cls, title='_test_PhoDockAreaWidgetApp', defer_show=False) -> Tuple[PhoDockAreaContainingWindow, QtWidgets.QApplication]:
+        """ builds a simple PhoDockAreaContainingWindow, empty 
+        
+        root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Debug Plot Directional Template Rasters')
+        
+        """
         win = PhoDockAreaContainingWindow(title=title)
         win.setWindowTitle(f'{title}: dockAreaWindow')
         app = win.app

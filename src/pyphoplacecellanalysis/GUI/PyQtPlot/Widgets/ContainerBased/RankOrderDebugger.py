@@ -118,7 +118,9 @@ class RankOrderDebugger:
         RL_app, RL_win, RL_plots, RL_plots_data, RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs = RL_display_outputs
 
         # Embedding in docks:
-        root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(RL_win, LR_win, title='Pho Debug Plot Directional Template Rasters')
+        # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(RL_win, LR_win, title='Pho Debug Plot Directional Template Rasters')
+
+        root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Debug Plot Directional Template Rasters')
 
         even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_even_dock_colors)
         odd_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_odd_dock_colors)
@@ -127,9 +129,9 @@ class RankOrderDebugger:
         dock_configs = (even_dock_config, odd_dock_config)
         dock_add_locations = (['left'], ['right'])
         
-        _out_dock_widgets['RL'] = root_dockAreaWindow.add_display_dock(identifier='RL', widget=RL_win, dockSize=(300,200), dockAddLocationOpts=dock_add_locations[0], display_config=dock_configs[0])
-        _out_dock_widgets['LR'] = root_dockAreaWindow.add_display_dock(identifier='LR', widget=LR_win, dockSize=(300,200), dockAddLocationOpts=dock_add_locations[1], display_config=dock_configs[1])
-
+        _out_dock_widgets['RL'] = root_dockAreaWindow.add_display_dock(identifier='RL', widget=RL_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[0], display_config=dock_configs[0])
+        _out_dock_widgets['LR'] = root_dockAreaWindow.add_display_dock(identifier='LR', widget=LR_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[1], display_config=dock_configs[1])
+        root_dockAreaWindow.resize(500, 600)
 
         _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, LR_app=LR_app, LR_win=LR_win, LR_plots=LR_plots, RL_app=RL_app, RL_win=RL_win, RL_plots=RL_plots, dock_widgets=_out_dock_widgets)
         _obj.plots_data = RenderPlotsData(name=name, LR_plots_data=LR_plots_data, LR_on_update_active_epoch=LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs=LR_on_update_active_scatterplot_kwargs,
@@ -165,8 +167,12 @@ class RankOrderDebugger:
         self.plots_data.LR_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
         self.plots_data.RL_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
         # Update window titles:
-        self.plots.LR_win.setWindowTitle(f'LR Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {str(an_epoch)}')
-        self.plots.RL_win.setWindowTitle(f'RL Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {str(an_epoch)}')
+        an_epoch_string: str = f'idx: {an_epoch.Index}, t: {an_epoch.start:0.2f}, {an_epoch.stop:0.2f}, lbl: {str(an_epoch.label)}'
+        self.plots.dock_widgets['LR'][1].setTitle(f'LR Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
+        self.plots.dock_widgets['RL'][1].setTitle(f'RL Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
+        
+        self.plots.LR_win.setWindowTitle(f'LR Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
+        self.plots.RL_win.setWindowTitle(f'RL Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
 
     def on_update_epoch_IDX(self, an_epoch_idx: int):
         """ Calls self.on_update_epoch_IDX(...)
