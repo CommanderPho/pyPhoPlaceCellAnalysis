@@ -579,13 +579,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # Recover from the saved global result:
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-            track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=None) # shared-only
-            # track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=None) # non-shared-only
-            
-            # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [directional_laps_results.__dict__[k] for k in ['long_LR_shared_aclus_only_one_step_decoder_1D', 'long_RL_shared_aclus_only_one_step_decoder_1D', 'short_LR_shared_aclus_only_one_step_decoder_1D', 'short_RL_shared_aclus_only_one_step_decoder_1D']]
-            # directional_laps_results
-            # track_templates: TrackTemplates = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D), RL_decoder_pair=(long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D))
-
+            # track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=None) # shared-only
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=None) # non-shared-only
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
@@ -593,29 +588,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=False, include_accel=False)
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(epochs_editor.plots.win, None, title='Pho Directional Laps Templates')
             
-            # def _get_decoder_sort_IDXs(a_decoder):
-            #     return np.argsort(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses)
-
             def _get_decoder_sorted_pfs(a_decoder):
+                """ used only when viewing with individual sorts (instead of all four decoder's pfs aligned to the first decoder's sort) """
                 ratemap = a_decoder.pf.ratemap
                 CoM_sort_indicies = np.argsort(ratemap.peak_tuning_curve_center_of_masses) # get the indicies to sort the placefields by their center-of-mass (CoM) location
                 # CoM_sort_indicies.shape # (n_neurons,)
                 return ratemap.pdf_normalized_tuning_curves[CoM_sort_indicies, :]
-
-            # def sorting_decoder(decoder, shared_sort_neuron_IDs, shared_sort_IDX):
-            #     """ called to sort each decoder relative to the reference one. """
-            #     neuron_IDs = decoder.neuron_IDs
-            #     shared_sort_IDX_list = list(shared_sort_neuron_IDs)  # Contains neuron IDs in the order of shared_sort_IDX
-            #     # Handle neuron IDs present in both the shared sort and the decoder
-            #     shared_neuron_sort = {neuron_id: shared_sort_IDX_list.index(neuron_id) for neuron_id in neuron_IDs if neuron_id in shared_sort_neuron_IDs}
-            #     # Handle neuron IDs not present in the shared sort
-            #     unique_neuron_sort = {neuron_id: i + len(shared_sort_IDX) for i, neuron_id in enumerate(neuron_IDs) if neuron_id not in shared_sort_neuron_IDs}
-            #     # Combine both sorts
-            #     sort_index_map = {**shared_neuron_sort, **unique_neuron_sort}
-            #     # Get indices for sorting
-            #     sorted_neuron_IDs_indices = sorted(range(len(neuron_IDs)), key=lambda x: sort_index_map[neuron_IDs[x]])
-            #     # Sort the pdf_normalized_tuning_curves
-            #     return decoder.pf.ratemap.pdf_normalized_tuning_curves[sorted_neuron_IDs_indices, :]
 
 
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
@@ -629,10 +607,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # `sort_helper_neuron_id_to_sort_IDX_dicts` dictionaries in the appropriate order (sorted order) with appropriate indexes. Its .values() can be used to index into things originally indexed with aclus.
             sort_helper_neuron_id_to_sort_IDX_dicts = [{aclu:a_sort_helper_neuron_id_to_IDX_map[aclu] for aclu in sorted_neuron_ids} for a_sort_helper_neuron_id_to_IDX_map, sorted_neuron_ids in zip(sort_helper_original_neuron_id_to_IDX_dicts, sorted_neuron_IDs_lists)]
             sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
-
-            # Get the primary sort (provided by `long_LR_decoder`) which will be compared against:
-            # shared_sort_neuron_IDs = deepcopy(track_templates.long_LR_decoder.neuron_IDs)
-            # shared_sort_IDX = _get_decoder_sort_IDXs(track_templates.long_LR_decoder)
 
             ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
             _out_pf1D_heatmaps = {}
