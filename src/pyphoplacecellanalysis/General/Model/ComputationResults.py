@@ -13,7 +13,7 @@ from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 ## Import with: from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
@@ -103,11 +103,11 @@ class ComputationResult(HDF_SerializationMixin):
         The result of a single computation, on a filtered session with a specified config 
         The primary output data is stored in self.computed_data's dict
     """
-    sess: DataSession = serialized_field()
-    computation_config: Optional[DynamicParameters] = serialized_field(default=None, is_computable=False)
-    computed_data: Optional[DynamicParameters] = serialized_field(default=None)
-    accumulated_errors: Optional[DynamicParameters] = non_serialized_field(default=Factory(DynamicParameters), is_computable=True)
-    computation_times: Optional[DynamicParameters] = serialized_field(default=Factory(DynamicParameters), is_computable=False)
+    sess: DataSession = serialized_field(repr=True)
+    computation_config: Optional[DynamicParameters] = serialized_field(default=None, is_computable=False, repr=True)
+    computed_data: Optional[DynamicParameters] = serialized_field(default=None, repr=keys_only_repr)
+    accumulated_errors: Optional[DynamicParameters] = non_serialized_field(default=Factory(DynamicParameters), is_computable=True, repr=keys_only_repr)
+    computation_times: Optional[DynamicParameters] = serialized_field(default=Factory(DynamicParameters), is_computable=False, repr=keys_only_repr)
     
     ## For serialization/pickling:
 
