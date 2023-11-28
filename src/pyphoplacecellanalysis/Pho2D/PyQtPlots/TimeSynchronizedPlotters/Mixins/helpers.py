@@ -42,7 +42,7 @@ def build_combined_time_synchronized_plotters_window(active_pf_2D_dt, fixed_wind
             print(f'final_desired_width: {final_desired_width}, final_desired_height: {final_desired_height}')
         
         # build a win of type PhoDockAreaContainingWindow
-        root_dockAreaWindow, app = DockAreaWrapper._build_default_dockAreaWindow(title=title, defer_show=True)
+        root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
         
         display_config1 = CustomDockDisplayConfig(showCloseButton=False)
         _, dDisplayItem1 = root_dockAreaWindow.add_display_dock("Placefields", dockSize=(final_desired_width, final_desired_height), widget=curr_placefields_plotter, dockAddLocationOpts=['left'], display_config=display_config1)

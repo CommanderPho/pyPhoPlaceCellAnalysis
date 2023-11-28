@@ -144,7 +144,7 @@ class DockAreaWrapper(object):
 
         """        
         # build a win of type PhoDockAreaContainingWindow
-        win, app = cls._build_default_dockAreaWindow(title=title, defer_show=True)
+        win, app = cls.build_default_dockAreaWindow(title=title, defer_show=True)
         
         # curr_main_window_size = main_window.size()
         main_win_geom = main_window.window().geometry() # get the QTCore PyRect object

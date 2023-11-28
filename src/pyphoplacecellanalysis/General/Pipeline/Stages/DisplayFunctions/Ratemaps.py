@@ -269,7 +269,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             active_recursive_latent_pf_2Ds = computation_result.computed_data['pf2D_RecursiveLatent']
 
             ## Build the outer window:
-            master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='recurrsive_latent_placefield_comparisons', defer_show=False)
+            master_dock_win, app = DockAreaWrapper.build_default_dockAreaWindow(title='recurrsive_latent_placefield_comparisons', defer_show=False)
             master_dock_win.resize(1920, 1024)
             out_items = {}
 

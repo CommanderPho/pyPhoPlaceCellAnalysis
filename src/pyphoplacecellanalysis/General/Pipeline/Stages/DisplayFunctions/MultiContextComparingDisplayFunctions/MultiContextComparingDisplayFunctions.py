@@ -205,7 +205,7 @@ def _context_nested_docks(curr_active_pipeline, active_config_names, enable_gui=
     # include_includelist = curr_active_pipeline.active_completed_computation_result_names # ['maze', 'sprinkle']
 
     if enable_gui:
-        master_dock_win, app = DockAreaWrapper._build_default_dockAreaWindow(title='active_global_window', defer_show=False)
+        master_dock_win, app = DockAreaWrapper.build_default_dockAreaWindow(title='active_global_window', defer_show=False)
         master_dock_win.resize(1920, 1024)
     else:
         master_dock_win = None
