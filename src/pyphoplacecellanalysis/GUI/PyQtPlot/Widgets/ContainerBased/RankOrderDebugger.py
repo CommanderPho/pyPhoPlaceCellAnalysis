@@ -144,14 +144,20 @@ class RankOrderDebugger:
         """ captures: LR_on_update_active_epoch, RL_on_update_active_epoch """
         self.plots_data.LR_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
         self.plots_data.RL_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
-
+        # Update window titles:
+        self.plots.LR_win.setWindowTitle(f'LR Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {str(an_epoch)}')
+        self.plots.RL_win.setWindowTitle(f'RL Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {str(an_epoch)}')
 
     def on_update_epoch_IDX(self, an_epoch_idx: int):
         """ Calls self.on_update_epoch_IDX(...)
         
         captures on_update_active_epoch, active_epochs_df to extract the epoch time range and call `on_update_active_epoch` """
+        self.active_epoch_IDX = an_epoch_idx # set the active_epoch_IDX, not the index value
         a_df_idx = self.active_epochs_df.index.to_numpy()[an_epoch_idx]
-        curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == (a_df_idx+1))]
+        print(f'a_df_idx: {a_df_idx}')
+        # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == (a_df_idx+1))] # this +1 here makes zero sense
+        curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)] # this +1 here makes zero sense
+
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.lap_id == (an_epoch_idx+1))]
         curr_epoch = list(curr_epoch_df.itertuples())[0]
         self.on_update_active_epoch(an_epoch_idx, curr_epoch)
@@ -174,14 +180,13 @@ class RankOrderDebugger:
             # Add your update logic here
             print(f"Slider value updated to: {new_value}")
             self.on_update_epoch_IDX(new_value) # call the update
-            print(f'n_unique_cells_participating_in_replay[{active_epoch_IDX}]: {n_unique_cells_participating_in_replay[active_epoch_IDX]}')
-            selected_epoch_df = global_replays.to_dataframe()[global_replays.to_dataframe().index == active_epoch_IDX] # should only contain one entry, the selected epoch.
+            # print(f'n_unique_cells_participating_in_replay[{active_epoch_IDX}]: {n_unique_cells_participating_in_replay[active_epoch_IDX]}')
+            selected_epoch_df = self.active_epochs_df[self.active_epochs_df.index == active_epoch_IDX] # should only contain one entry, the selected epoch.
             curr_epoch = list(selected_epoch_df.itertuples())[0] # extract the interval of interest as a namedtuple object
             print(f"curr_epoch: {curr_epoch}")
-
             
         # Create a slider widget
-        slider = widgets.IntSlider(value=0, min=0, max=np.shape(self.active_epochs_df)[0], step=1, description='Test Slider')
+        slider = widgets.IntSlider(value=0, min=0, max=(self.n_epochs-1), step=1, description='Epoch Index')
 
         # Link the update function to value changes in the slider
         slider.observe(update_function, names='value')
