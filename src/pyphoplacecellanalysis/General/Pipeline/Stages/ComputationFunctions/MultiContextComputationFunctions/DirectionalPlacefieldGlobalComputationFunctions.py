@@ -544,7 +544,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunc
 import pyqtgraph as pg
 import pyqtgraph.exporters
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
-
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
 
 
 class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -565,8 +566,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
             from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
             from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
-            from neuropy.utils.indexing_helpers import paired_incremental_sorting
-            
+            from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
+            from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
+            from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
 
             # raise NotImplementedError
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
@@ -576,7 +578,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
             
             defer_render = kwargs.pop('defer_render', False) 
+            debug_print: bool = kwargs.pop('debug_print', False) 
 
+            figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')  
+            _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
+
+            
             # Recover from the saved global result:
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
             # track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=None) # shared-only
@@ -591,8 +598,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             def _get_decoder_sorted_pfs(a_decoder):
                 """ used only when viewing with individual sorts (instead of all four decoder's pfs aligned to the first decoder's sort) """
                 ratemap = a_decoder.pf.ratemap
-                CoM_sort_indicies = np.argsort(ratemap.peak_tuning_curve_center_of_masses) # get the indicies to sort the placefields by their center-of-mass (CoM) location
-                # CoM_sort_indicies.shape # (n_neurons,)
+                CoM_sort_indicies = np.argsort(ratemap.peak_tuning_curve_center_of_masses) # get the indicies to sort the placefields by their center-of-mass (CoM) location # CoM_sort_indicies.shape # (n_neurons,)
                 return ratemap.pdf_normalized_tuning_curves[CoM_sort_indicies, :]
 
 
@@ -600,19 +606,74 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # 2023-11-28 - New Sorting using `paired_incremental_sorting`
             neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in decoders_dict.values()] # [A, B, C, D, ...]
+            # If you have a set of values that can be larger than the entries in each list:
+            any_list_neuron_IDs = np.sort(union_of_arrays(*neuron_IDs_lists)) # neuron_IDs as they appear in any list
+            ## build color values from these:
+            any_list_n_neurons = len(any_list_neuron_IDs)
+            _neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(any_list_n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
+            # unit_colors_map: Dict = dict(zip(any_list_neuron_IDs, neuron_colors_ndarray.copy().T)) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
+            unit_colors_map: Dict = dict(zip(any_list_neuron_IDs, _neuron_qcolors_list.copy())) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
+            
+            # `unit_colors_map` is main colors output
             sort_helper_original_neuron_id_to_IDX_dicts = [dict(zip(neuron_ids, np.arange(len(neuron_ids)))) for neuron_ids in neuron_IDs_lists] # just maps each neuron_id in the list to a fragile_linear_IDX 
             sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for a_decoder in decoders_dict.values()]
-            ## determine sorting:
+            ## DO SORTING: determine sorting:
             sorted_neuron_IDs_lists = paired_incremental_sorting(neuron_IDs_lists, sortable_values_lists)
             # `sort_helper_neuron_id_to_sort_IDX_dicts` dictionaries in the appropriate order (sorted order) with appropriate indexes. Its .values() can be used to index into things originally indexed with aclus.
             sort_helper_neuron_id_to_sort_IDX_dicts = [{aclu:a_sort_helper_neuron_id_to_IDX_map[aclu] for aclu in sorted_neuron_ids} for a_sort_helper_neuron_id_to_IDX_map, sorted_neuron_ids in zip(sort_helper_original_neuron_id_to_IDX_dicts, sorted_neuron_IDs_lists)]
             sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
+            # So unlike other attempts, these colors are sorted along with the aclus for each decoder, and we don't try to keep them separate. Since they're actually in a dict (where conceptually the order doesn't really matter) this should be indistinguishable performance-wise from other implementation.
+            sort_helper_neuron_id_to_neuron_colors_dicts = [{aclu:unit_colors_map[aclu] for aclu in sorted_neuron_ids} for sorted_neuron_ids in sorted_neuron_IDs_lists] # [{72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, {72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, ...]
+            # `sort_helper_neuron_id_to_sort_IDX_dicts` is main output here:
+
+
+            
 
             ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
             _out_pf1D_heatmaps = {}
             for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
                 _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorted_pf_tuning_curves[i], title=f'{a_decoder_name}_pf1Ds [sort: long_RL]', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
                 # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Individual Sort
+
+                # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
+                curr_win, curr_img = _out_pf1D_heatmaps[a_decoder_name] # win, img
+                
+                a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
+
+                # Coloring each row of the 1D heatmap:
+                curr_data = deepcopy(sorted_pf_tuning_curves[i])
+                if debug_print:
+                    print(f'np.shape(curr_data): {np.shape(curr_data)}, np.nanmax(curr_data): {np.nanmax(curr_data)}, np.nanmin(curr_data): {np.nanmin(curr_data)}') # np.shape(curr_data): (34, 62), np.nanmax(curr_data): 0.15320444716258447, np.nanmin(curr_data): 0.0
+
+                # DataSeriesColorHelpers.colors_NDarray_to_qColorsList(a_color_vector)
+
+                _temp_curr_out_colors_heatmap_image = [] # used to accumulate the rows so they can be built into a color image in `out_colors_heatmap_image_matrix`
+
+                # # Create an image of the same shape but with 3 color channels
+                # image_matrix = np.zeros((brightness_matrix.shape[0], brightness_matrix.shape[1], 3), dtype=np.uint8)
+
+                # for i, aclu in enumerate(sorted_shared_sort_neuron_IDs):
+                for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
+                    # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
+                    text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+                    text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                    curr_win.addItem(text)
+
+                    # modulate heatmap color for this row:
+                    heatmap_base_color = pg.mkColor(a_color_vector)
+                    # curr_data[i, :]
+                    out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
+                    _temp_curr_out_colors_heatmap_image.append(out_colors_row)
+
+                ## Build the colored heatmap:
+                out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
+                if debug_print:
+                    print(f"np.shape(out_colors_heatmap_image_matrix): {np.shape(out_colors_heatmap_image_matrix)}") # (34, 62, 4) - (n_cells, n_pos_bins, n_channels_RGBA)
+                # Ensure the data is in the correct range [0, 1]
+                out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
+                curr_img.updateImage(out_colors_heatmap_image_matrix)
+                _out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name] = out_colors_heatmap_image_matrix
+
 
             even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_even_dock_colors)
             odd_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_odd_dock_colors)
@@ -626,7 +687,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             
             # Outputs: root_dockAreaWindow, app, epochs_editor, _out_pf1D_heatmaps, _out_dock_widgets
-            graphics_output_dict = {'win': root_dockAreaWindow, 'app': app,  'ui': (epochs_editor, _out_dock_widgets), 'plots': _out_pf1D_heatmaps}
+            graphics_output_dict = {'win': root_dockAreaWindow, 'app': app,  'ui': (epochs_editor, _out_dock_widgets), 'plots': _out_pf1D_heatmaps, 'data': _out_data}
 
             # Saving/Exporting to file ___________________________________________________________________________________________ #
             #TODO 2023-11-16 22:16: - [ ] Figure out how to save
