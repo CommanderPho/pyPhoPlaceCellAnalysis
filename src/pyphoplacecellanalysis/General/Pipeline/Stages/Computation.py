@@ -537,7 +537,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 # `a_filtered_session` seems to be working. a_filtered_session.laps is correctly filtered.
                 # for maze2: a_filtered_session.t_start, a_filtered_session.t_stop
                 curr_active_computation_params.pf_params.computation_epochs = curr_active_computation_params.pf_params.computation_epochs.time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
-                print(f'curr_active_computation_params.pf_params.computation_epochs: {curr_active_computation_params.pf_params.computation_epochs}')
+                if debug_print:
+                    print(f'curr_active_computation_params.pf_params.computation_epochs: {curr_active_computation_params.pf_params.computation_epochs}')
 
 
                 if computation_parameters_need_update:
