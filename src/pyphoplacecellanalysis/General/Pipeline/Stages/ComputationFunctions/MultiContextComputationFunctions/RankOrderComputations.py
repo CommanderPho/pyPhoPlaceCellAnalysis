@@ -344,10 +344,13 @@ class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, Compu
     ripple_most_likely_result_tuple: Optional[DirectionalRankOrderResult] = serialized_field(default=None, repr=False)
     laps_most_likely_result_tuple: Optional[DirectionalRankOrderResult] = serialized_field(default=None, repr=False)
 
+    minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=2.0, repr=True)
+    
+
     def __iter__(self):
         """ allows unpacking. See https://stackoverflow.com/questions/37837520/implement-packing-unpacking-in-an-object """
         # return iter(astuple(self)) # deep unpacking causes problems
-        return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global, self.__attrs_attrs__.ripple_most_likely_result_tuple, self.__attrs_attrs__.laps_most_likely_result_tuple))) #  'is_global'
+        return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global, self.__attrs_attrs__.ripple_most_likely_result_tuple, self.__attrs_attrs__.laps_most_likely_result_tuple, self.__attrs_attrs__.minimum_inclusion_fr_Hz))) #  'is_global'
 
 
 
@@ -1039,7 +1042,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         
         if ('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')):
             # initialize
-            global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=None, RL_ripple=None, LR_laps=None, RL_laps=None)
+            global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=None, RL_ripple=None, LR_laps=None, RL_laps=None, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, is_global=True)
         
         ## Laps Rank-Order Analysis:
         print(f'\tcomputing Laps rank-order shuffles:')
