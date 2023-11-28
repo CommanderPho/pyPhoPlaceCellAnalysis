@@ -73,7 +73,7 @@ class PaginationControlWidget(QWidget):
 
 
     ## Practical Example of using PaginationControlWidget to update a plot:
-
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
 
 
     """

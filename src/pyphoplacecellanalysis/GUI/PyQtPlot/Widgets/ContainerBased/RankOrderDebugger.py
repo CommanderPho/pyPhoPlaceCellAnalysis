@@ -87,7 +87,8 @@ class RankOrderDebugger:
     
     plots: RenderPlots = field(init=False)
     plots_data: RenderPlotsData = field(init=False, repr=False)
-
+    ui: PhoUIContainer = field(init=False, repr=False)
+    
     active_epoch_IDX: int = field(default=0, repr=True)
 
     on_idx_changed_callback_function_dict: Dict[str, Callable] = field(default=Factory(dict), repr=False)
@@ -141,8 +142,17 @@ class RankOrderDebugger:
         slider.setValue(50)
         # layout.addWidget(slider)
         slider.valueChanged.connect(_obj.on_update_epoch_IDX)
+        
+        ctrl_layout = pg.LayoutWidget()
+        ctrl_layout.addWidget(slider, row=0, col=0, colspan=1)
+        
+        logTextEdit = pg.QtWidgets.QTextEdit()
+        logTextEdit.setReadOnly(True)
+        logTextEdit.setObjectName("logTextEdit")
 
-        _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=slider, dockSize=(600,100), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
+        ctrl_layout.addWidget(logTextEdit, row=1, rowspan=3, col=0, colspan=1)
+
+        _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,100), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
 
         
         root_dockAreaWindow.resize(500, 600)
@@ -151,7 +161,9 @@ class RankOrderDebugger:
         _obj.plots_data = RenderPlotsData(name=name, LR_plots_data=LR_plots_data, LR_on_update_active_epoch=LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs=LR_on_update_active_scatterplot_kwargs,
                                            RL_plots_data=RL_plots_data, RL_on_update_active_epoch=RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs=RL_on_update_active_scatterplot_kwargs)
         
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, slider=slider, logTextEdit=logTextEdit, dock_configs=dock_configs)
         
+
         try:
             ## rank_order_results.LR_ripple.selected_spikes_df mode:
             if isinstance(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
@@ -203,9 +215,12 @@ class RankOrderDebugger:
         self.on_update_active_epoch(an_epoch_idx, curr_epoch)
 
         for a_callback_name, a_callback_fn in self.on_idx_changed_callback_function_dict.items():
-            a_callback_fn(an_epoch_idx)
+            a_callback_fn(self, an_epoch_idx)
 
-
+    def write_to_log(self, log_messages):
+        self.ui.logTextEdit.append(log_messages)
+        
+        
     def get_ipywidget(self):
         """ Displays a slider that allows the user to select the epoch_IDX instead of having to type it and call it manually
 
