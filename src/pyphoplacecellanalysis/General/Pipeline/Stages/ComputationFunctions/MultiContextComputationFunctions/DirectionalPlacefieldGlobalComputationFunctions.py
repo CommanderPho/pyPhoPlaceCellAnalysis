@@ -644,7 +644,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                 _temp_curr_out_colors_heatmap_image = [] # used to accumulate the rows so they can be built into a color image in `out_colors_heatmap_image_matrix`
 
-                # for i, aclu in enumerate(sorted_shared_sort_neuron_IDs):
                 for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
                     # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
                     text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
