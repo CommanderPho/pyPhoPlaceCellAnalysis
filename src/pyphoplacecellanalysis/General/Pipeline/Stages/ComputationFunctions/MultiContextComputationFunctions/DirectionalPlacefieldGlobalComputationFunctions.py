@@ -329,19 +329,23 @@ class DirectionalLapsHelpers:
         """
         was_updated = False
         for a_name, a_named_timerange in curr_active_pipeline.filtered_epochs.items():
-            filter_name:str = a_named_timerange.name
+            # `desired_filter_name`: the correct name to be set as the .filter_name in the context
+            # 2023-11-29 - as of right now, I think the full name including the lap_dir 'maze1_any' (mode 2) should be used as this is literally what the name of the corresponding filtering function is.
+            # desired_filter_name:str = a_named_timerange.name # mode 1: uses the period name 'maze1' without the lap_dir part, probably best for compatibility in most places
+            desired_filter_name:str = a_name  # mode 2: uses the config_name: 'maze1_any', includes the lap_dir part
+            
             if debug_print:
-                print(f'{a_name} - {filter_name}')
+                print(f'"{a_name}" - desired_filter_name: "{desired_filter_name}"')
             a_filtered_ctxt = curr_active_pipeline.filtered_contexts[a_name]
             ## Parse the name into the parts:
             _split_parts = a_name.split('_')
             if (len(_split_parts) >= 2):
                 # also have lap_dir:
                 a_split_name, lap_dir, *remainder_list = a_name.split('_') # successfully splits 'maze_odd_laps' into good
-                if (a_filtered_ctxt.filter_name != filter_name):
+                if (a_filtered_ctxt.filter_name != desired_filter_name):
                     was_updated = True
-                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
-                    a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name, lap_dir=lap_dir)
+                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: '{a_filtered_ctxt.filter_name}' != desired_filter_name: '{desired_filter_name}'\n\tUpdating it. (THIS IS A HACK)")
+                    a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=desired_filter_name, lap_dir=lap_dir)
 
                 if not a_filtered_ctxt.has_keys('lap_dir'):
                     print(f'WARNING: context {a_name} is missing the "lap_dir" key despite directional laps being detected from the name! Adding missing context key! lap_dir="{lap_dir}"')
@@ -349,10 +353,10 @@ class DirectionalLapsHelpers:
                     was_updated = True
 
             else:
-                if a_filtered_ctxt.filter_name != filter_name:
+                if a_filtered_ctxt.filter_name != desired_filter_name:
                     was_updated = True
-                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
-                    a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name)
+                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: '{a_filtered_ctxt.filter_name}' != desired_filter_name: '{desired_filter_name}'\n\tUpdating it. (THIS IS A HACK)")
+                    a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=desired_filter_name)
                     
             if debug_print:
                 print(f'\t{a_filtered_ctxt.to_dict()}')
