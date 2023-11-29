@@ -996,7 +996,7 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    def validate_has_rank_order_results(cls, curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:float=2.0):
+    def validate_has_rank_order_results(cls, curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
         """ 
         TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
         
@@ -1026,8 +1026,12 @@ class RankOrderAnalyses:
         
         # make sure result is for the current minimimum:
         results_minimum_inclusion_fr_Hz = rank_order_results.minimum_inclusion_fr_Hz
-        return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
-        
+
+        if minimum_inclusion_fr_Hz is not None:
+            return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
+        else:
+            #TODO 2023-11-29 08:42: - [ ] cannot validate minimum because none was passed, eventually reformulate to use parameters
+            return True    
 
 
 class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
