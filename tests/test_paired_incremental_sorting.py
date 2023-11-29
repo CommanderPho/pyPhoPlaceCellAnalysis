@@ -94,7 +94,7 @@ class TestPairedIncrementalSorting(unittest.TestCase):
         self.assertTrue(np.all([np.array_equal(self.sorted_pf_tuning_curves[i], test1_sorted_pf_tuning_curves[i]) for i in range(len(test1_sorted_pf_tuning_curves))]))
         
 
-    def test_omitted_neuron_id(self):
+    def test_single_omitted_neuron_id(self):
         """ Test with one neuron ID omitted (aclu == 25), the first one in the sorted lists from included_any_context_neuron_ids """
         test2_included_any_context_neuron_ids = np.array([9, 10, 11, 15, 16, 18, 24, 26, 31, 39, 40, 43, 44, 47, 48, 51, 52, 53, 54, 56, 60, 61, 65, 66, 68, 70, 72, 75, 77, 78, 79, 80, 81, 82, 84, 85, 87, 89, 90, 92, 93, 98, 101, 102, 104])
         test2_sorted_neuron_IDs_lists, test2_sort_helper_neuron_id_to_neuron_colors_dicts, test2_sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=self.decoders_dict, included_any_context_neuron_ids=test2_included_any_context_neuron_ids)
@@ -106,6 +106,28 @@ class TestPairedIncrementalSorting(unittest.TestCase):
 
         self.assertTrue(np.all([np.array_equal(self.sorted_neuron_IDs_lists[i][1:], test2_sorted_neuron_IDs_lists[i]) for i in range(len(test2_sorted_neuron_IDs_lists))]))  # sorted lists should just be the same without the omitted element
           
+        # self.assertTrue(np.all([np.array_equal(self.sorted_pf_tuning_curves[i], test2_sorted_pf_tuning_curves[i]) for i in range(len(test2_sorted_pf_tuning_curves))]))
+
+        # Additional assertions or verifications can be added here
+
+    def test_many_omitted_neuron_id(self):
+        """ Test with one neuron ID omitted (aclu == 25), the first one in the sorted lists from included_any_context_neuron_ids """
+        test2_included_any_context_neuron_ids = np.array([9, 10, 11, 15, 16, 18, 24, 26, 31, 39, 40, 43, 44, 47, 48, 51, 52, 53, 54, 56, 60, 61, 65, 66, 68, 70, 72, 75, 77, 78, 79, 80, 81, 82, 84, 85, 87, 89, 90, 92, 93, 98, 101, 102, 104])
+        # test3 omits many elements:
+        test3_included_any_context_neuron_ids = np.array([54,  56,  70,  72,  75,  77,  78,  80,  81,  82,  84,  85,  87,  92,  93,  98, 101, 102, 104])
+        test3_sorted_neuron_IDs_lists, test3_sort_helper_neuron_id_to_neuron_colors_dicts, test3_sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=self.decoders_dict, included_any_context_neuron_ids=test3_included_any_context_neuron_ids)
+
+        # _out_test3_directional_template_pfs_debugger = curr_active_pipeline.display(DirectionalPlacefieldGlobalDisplayFunctions._display_directional_template_debugger, included_any_context_neuron_ids=test3_included_any_context_neuron_ids, debug_print=True, figure_name=f'many omitted indicies')
+
+        testNone_included_any_context_neuron_ids = None
+        testNone_sorted_neuron_IDs_lists, testNone_sort_helper_neuron_id_to_neuron_colors_dicts, testNone_sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=self.decoders_dict, included_any_context_neuron_ids=testNone_included_any_context_neuron_ids)
+
+        self.assertTrue(np.all([np.array_equal(self.sorted_neuron_IDs_lists[i][1:], test3_sorted_neuron_IDs_lists[i]) for i in range(len(test3_sorted_neuron_IDs_lists))]))  # sorted lists should just be the same without the omitted element
+
+
+        #TODO 2023-11-28 19:30: - [ ] Finish implementing
+
+
         # self.assertTrue(np.all([np.array_equal(self.sorted_pf_tuning_curves[i], test2_sorted_pf_tuning_curves[i]) for i in range(len(test2_sorted_pf_tuning_curves))]))
 
         # Additional assertions or verifications can be added here
