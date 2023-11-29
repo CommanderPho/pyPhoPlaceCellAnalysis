@@ -958,6 +958,7 @@ def paired_incremental_sort_neurons(decoders_dict: Dict, included_any_context_ne
     """
     
     # 2023-11-28 - New Sorting using `paired_incremental_sorting`
+    original_neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in decoders_dict.values()] # immutable, required to get proper original indicies after exclusions
     neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in decoders_dict.values()] # [A, B, C, D, ...]
     unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
     # `unit_colors_map` is main colors output
@@ -966,15 +967,20 @@ def paired_incremental_sort_neurons(decoders_dict: Dict, included_any_context_ne
     if included_any_context_neuron_ids is not None:
         # restrict only to `included_any_context_neuron_ids`
         print(f'restricting only to included_any_context_neuron_ids: {included_any_context_neuron_ids}...')
-        is_neuron_IDs_included_lists = [np.isin(neuron_ids, included_any_context_neuron_ids) for neuron_ids in neuron_IDs_lists]
+        is_neuron_IDs_included_lists = [np.isin(neuron_ids, deepcopy(included_any_context_neuron_ids)) for neuron_ids in neuron_IDs_lists]
         neuron_IDs_lists = [neuron_ids[is_neuron_IDs_included] for neuron_ids, is_neuron_IDs_included in zip(neuron_IDs_lists, is_neuron_IDs_included_lists)] # filtered_neuron_IDs_lists
-        sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)[is_neuron_IDs_included]) for a_decoder, is_neuron_IDs_included in zip(decoders_dict.values(), is_neuron_IDs_included_lists)]
+        # sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)[is_neuron_IDs_included]) for a_decoder, is_neuron_IDs_included in zip(decoders_dict.values(), is_neuron_IDs_included_lists)]
+        # sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves[is_neuron_IDs_included, :], axis=1)) for a_decoder, is_neuron_IDs_included in zip(decoders_dict.values(), is_neuron_IDs_included_lists)]        
+        sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for a_decoder in decoders_dict.values()] # (46, 56) - (n_neurons, n_pos_bins)
+        sortable_values_lists = [a_sortable_vals_list[is_neuron_IDs_included_lists[i]] for i, a_sortable_vals_list in enumerate(sortable_values_lists)] #
         
     else:
-        sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for a_decoder in decoders_dict.values()]
+        sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for a_decoder in decoders_dict.values()] # (46, 56) - (n_neurons, n_pos_bins)
 
     # `sort_helper_original_neuron_id_to_IDX_dicts` needs to be built after filtering (if it occurs)
-    sort_helper_original_neuron_id_to_IDX_dicts = [dict(zip(neuron_ids, np.arange(len(neuron_ids)))) for neuron_ids in neuron_IDs_lists] # just maps each neuron_id in the list to a fragile_linear_IDX 
+    # sort_helper_original_neuron_id_to_IDX_dicts = [dict(zip(neuron_ids, np.arange(len(neuron_ids)))) for neuron_ids in neuron_IDs_lists] # just maps each neuron_id in the list to a fragile_linear_IDX 
+    sort_helper_original_neuron_id_to_IDX_dicts = [dict(zip(neuron_ids, np.arange(len(neuron_ids)))) for neuron_ids in original_neuron_IDs_lists] # just maps each neuron_id in the list to a fragile_linear_IDX 
+
 
     ## DO SORTING: determine sorting:
     sorted_neuron_IDs_lists = paired_incremental_sorting(neuron_IDs_lists, sortable_values_lists)
