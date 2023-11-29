@@ -707,7 +707,7 @@ class RankOrderAnalyses:
                 print(f'\ttemplate_epoch_neuron_IDXs: {print_array(template_epoch_neuron_IDXs)}')
                 print(f'\tepoch_neuron_IDX_ranks: {print_array(epoch_neuron_IDX_ranks)}')
     
-            #TODO 2023-11-22 08:35: - [ ] keep da' indicies we actually use for this template/epoch. They're needed in the RankOrderDebugger.
+            #TODO 2023-11-22 08:35: - [ ] keep da' indicies we actually use for this template/epoch. They're needed in the RankOrderRastersDebugger.
             output_dict[epoch_id] = (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks) # might need multiple for each templates if they aren't clipped to shared.
 
             ## EPOCH SPECIFIC:
@@ -1112,7 +1112,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunc
 
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderDebugger import RankOrderDebugger
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions # used in `plot_z_score_diff_and_raw`
 
 
@@ -1167,7 +1167,7 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             LR_ripple_evts_epoch_ranked_aclus_stats_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_long_z_score_values, LR_ripple_evts_short_z_score_values, LR_ripple_evts_long_short_z_score_diff_values = rank_order_results.LR_ripple
             RL_ripple_evts_epoch_ranked_aclus_stats_dict, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, RL_ripple_evts_long_z_score_values, RL_ripple_evts_short_z_score_values, RL_ripple_evts_long_short_z_score_diff_values = rank_order_results.RL_ripple
 
-            return RankOrderDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+            return RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
             
 
 
