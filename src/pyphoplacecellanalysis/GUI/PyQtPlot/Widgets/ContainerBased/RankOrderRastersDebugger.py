@@ -449,6 +449,7 @@ class RankOrderRastersDebugger:
         from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
         from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
         from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons
 
         ## spikes_df: get the spikes to plot
         # included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
@@ -490,17 +491,30 @@ class RankOrderRastersDebugger:
 
         assert np.shape(RL_long) == np.shape(RL_short), f"{np.shape(RL_long)} != {np.shape(RL_short)}"
 
-        # neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
-        # unit_colors_list = neuron_colors_ndarray.copy()
-
         unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_long, LR_long, RL_short, LR_short)))
         # unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
 
+        included_any_context_neuron_ids_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_neuron_ids, LR_neuron_ids, RL_neuron_ids, LR_neuron_ids)))
+        sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict, sortable_values_list_dict=unit_sort_orders_dict)
+
+
+        # neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
+        # unit_colors_list = neuron_colors_ndarray.copy()
+
+        
         
         ## Do Even/Odd Separately:
         # unit_colors_map = dict(zip(included_neuron_ids, neuron_colors_ndarray.copy().T))
-        RL_unit_colors_list = np.array([v for k, v in unit_colors_map.items() if k in RL_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
-        LR_unit_colors_list = np.array([v for k, v in unit_colors_map.items() if k in LR_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
+
+        ## This is for the NDArray version:
+        RL_unit_colors_list = [pg.mkColor(v) for k, v in unit_colors_map.items() if k in RL_neuron_ids] # should be a list of QColors, this is confirmed to be what is expected for the colors
+        LR_unit_colors_list = [pg.mkColor(v) for k, v in unit_colors_map.items() if k in LR_neuron_ids] # should be a list of QColors
+
+        # ## This is for the NDArray version:
+        # RL_unit_colors_list = np.array([v for k, v in _unit_colors_ndarray_map.items() if k in RL_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
+        # LR_unit_colors_list = np.array([v for k, v in _unit_colors_ndarray_map.items() if k in LR_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
+        
+
         unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_unit_colors_list, LR_unit_colors_list, RL_unit_colors_list, LR_unit_colors_list))) # the colors dict for all four templates
 
         # THE LOGIC MUST BE WRONG HERE. Slicing and dicing each Epoch separately is NOT OKAY. Spikes must be built before-hand. Loser.
