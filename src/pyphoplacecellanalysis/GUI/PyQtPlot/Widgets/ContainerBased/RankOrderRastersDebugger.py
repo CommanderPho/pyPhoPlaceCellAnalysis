@@ -31,7 +31,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _build_default_tick, build_scatter_plot_kwargs, build_shared_sorted_neuron_color_maps
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import RasterScatterPlotManager, UnitSortOrderManager, _build_default_tick, _build_scatter_plotting_managers, _prepare_spikes_df_from_filter_epochs, _subfn_build_and_add_scatterplot_row
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multi_sort_raster_browser
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin, ScatterItemData
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState
@@ -98,6 +98,81 @@ class RankOrderRastersDebugger:
     def n_epochs(self) -> int:
         return np.shape(self.active_epochs_df)[0]
     
+    @classmethod
+    def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map):
+        """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots. """
+        [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range for initial position
+        
+        _out_text_items = {}
+        for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
+            # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
+            text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+            text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+            a_plot_item.addItem(text)
+
+            # ## Mode 2: stillItem
+            # text.setFlag(text.GraphicsItemFlag.ItemIgnoresTransformations) # This line is necessary
+            # text.setParentItem(a_plot_item) # # Use this instead of `plot.addItem`
+            # # This position will be in pixels, not scene coordinates since transforms are ignored. You can use helpers like `mapFromScene()` etc. to translate between pixels and viewbox coordinates
+            # text.setPos(300, (10*(cell_i+1)))
+
+            # ## Mode 3: pg.LabelItem - this does not resize when the plot is resized like when the window is resized.
+            # text = pg.LabelItem(f"{int(aclu)}", size="12pt", color=pg.mkColor(a_color_vector))
+            # text.setParentItem(a_plot_item)
+            # text.anchor(itemPos=(1,0), parentPos=(1,0), offset=(-10,(1*(cell_i+1))))
+
+            _out_text_items[aclu] = text
+            
+        return _out_text_items
+
+    @classmethod
+    def _perform_update_cell_y_labels(cls, text_items_dict):
+        """ text_items_dict, _out_rank_order_event_raster_debugger, _out_text_items """
+        # _active_plot_identifier = 'long_LR'
+        # a_plot_item = _out_rank_order_event_raster_debugger.plots.LR_plots.ax[_active_plot_identifier]
+        
+        for a_plot_item, _out_text_items in text_items_dict.items():
+            # a_plot_item = _out_rank_order_event_raster_debugger.plots.LR_plots.scatter_plots[_active_plot_identifier] # AttributeError: 'ScatterPlotItem' object has no attribute 'addItem'
+            [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
+            # midpoint = x1 + ((x1 + x2)/2.0)
+            # print(f'x1: {x1}, x2: {x2}, midpoint: {midpoint}')
+            for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
+                text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+
+
+    def _build_cell_y_labels(self):
+        """Builds y-axis labels for each of the rasters and stores them in `self.plots.text_items_dict`
+        """
+        LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
+        RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
+
+        ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
+        _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
+        _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
+        _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
+
+        emphasis_state = SpikeEmphasisState.Default
+
+        self.plots.text_items_dict = {}
+
+        for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
+            # plots_data: RenderPlotsData = LR_plots_data
+
+            # plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
+            # plots_data.plots_spikes_df_dict[_active_plot_identifier]
+
+            ## Add the neuron_id labels to the rasters:
+            raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
+            aclus_list = list(raster_plot_manager.params.config_items.keys())
+            a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
+            a_plot_item = plots.ax[_active_plot_identifier]	
+            self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map)
+
+
+    def update_cell_y_labels(self):
+        """ called whenever the window scrolls or changes to reposition the y-axis labels created with self._build_cell_y_labels """
+        self._perform_update_cell_y_labels(self.plots.text_items_dict)
+
 
     @classmethod
     def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame]):
@@ -157,7 +232,7 @@ class RankOrderRastersDebugger:
         
         root_dockAreaWindow.resize(500, 600)
 
-        _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, LR_app=LR_app, LR_win=LR_win, LR_plots=LR_plots, RL_app=RL_app, RL_win=RL_win, RL_plots=RL_plots, dock_widgets=_out_dock_widgets, ctrl_widgets={'slider': slider})
+        _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, LR_app=LR_app, LR_win=LR_win, LR_plots=LR_plots, RL_app=RL_app, RL_win=RL_win, RL_plots=RL_plots, dock_widgets=_out_dock_widgets, ctrl_widgets={'slider': slider}, text_items_dict=None)
         _obj.plots_data = RenderPlotsData(name=name, LR_plots_data=LR_plots_data, LR_on_update_active_epoch=LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs=LR_on_update_active_scatterplot_kwargs,
                                            RL_plots_data=RL_plots_data, RL_on_update_active_epoch=RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs=RL_on_update_active_scatterplot_kwargs)
         
@@ -184,6 +259,9 @@ class RankOrderRastersDebugger:
             print(f'WARN: the selected spikes did not work properly, so none will be shown.')
             pass
         
+
+        _obj._build_cell_y_labels() # builds the cell labels
+
         return _obj
 
 
@@ -199,6 +277,9 @@ class RankOrderRastersDebugger:
         
         self.plots.LR_win.setWindowTitle(f'LR Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
         self.plots.RL_win.setWindowTitle(f'RL Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
+
+        self.update_cell_y_labels()
+                
 
     def on_update_epoch_IDX(self, an_epoch_idx: int):
         """ Calls self.on_update_epoch_IDX(...)
@@ -256,7 +337,7 @@ class RankOrderRastersDebugger:
         # display(slider)
 
 
-    @function_attributes(short_name='debug_plot_directional_template_rasters', tags=['directional', 'templates', 'debugger', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_plot_multi_sort_raster_browser'], used_by=[], creation_date='2023-11-02 14:06', related_items=[])
+    @function_attributes(short_name='debug_plot_directional_template_rasters', tags=['directional', 'templates', 'debugger', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['plot_multi_sort_raster_browser'], used_by=[], creation_date='2023-11-02 14:06', related_items=[])
     @classmethod
     def _debug_plot_directional_template_rasters(cls, spikes_df, active_epochs_df, track_templates):
         """ Perform raster plotting by getting our data from track_templates (TrackTemplates)
@@ -327,7 +408,7 @@ class RankOrderRastersDebugger:
         RL_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in RL_names}
         RL_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(RL_neuron_ids)
         RL_spikes_df, RL_neuron_id_to_new_IDX_map = RL_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-        RL_display_outputs = _plot_multi_sort_raster_browser(RL_spikes_df, RL_neuron_ids, unit_sort_orders_dict=RL_unit_sort_orders_dict, unit_colors_list_dict=RL_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_RL', defer_show=False, active_context=None)
+        RL_display_outputs = plot_multi_sort_raster_browser(RL_spikes_df, RL_neuron_ids, unit_sort_orders_dict=RL_unit_sort_orders_dict, unit_colors_list_dict=RL_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_RL', defer_show=False, active_context=None)
         # RL_app, RL_win, RL_plots, RL_plots_data, RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs = RL_display_outputs
 
         # Odd:
@@ -336,10 +417,10 @@ class RankOrderRastersDebugger:
         LR_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in LR_names}
         LR_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(LR_neuron_ids)
         LR_spikes_df, LR_neuron_id_to_new_IDX_map = LR_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-        LR_display_outputs = _plot_multi_sort_raster_browser(LR_spikes_df, LR_neuron_ids, unit_sort_orders_dict=LR_unit_sort_orders_dict, unit_colors_list_dict=LR_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_LR', defer_show=False, active_context=None)
+        LR_display_outputs = plot_multi_sort_raster_browser(LR_spikes_df, LR_neuron_ids, unit_sort_orders_dict=LR_unit_sort_orders_dict, unit_colors_list_dict=LR_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_LR', defer_show=False, active_context=None)
         # LR_app, LR_win, LR_plots, LR_plots_data, LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs = LR_display_outputs
 
-        # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = _plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
+        # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
         
         return LR_display_outputs, RL_display_outputs
 
@@ -430,7 +511,7 @@ class RankOrderRastersDebugger:
         RL_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in RL_names}
         RL_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(RL_neuron_ids)
         RL_spikes_df, RL_neuron_id_to_new_IDX_map = RL_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-        RL_display_outputs = _plot_multi_sort_raster_browser(RL_spikes_df, RL_neuron_ids, unit_sort_orders_dict=RL_unit_sort_orders_dict, unit_colors_list_dict=RL_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_RL', defer_show=False, active_context=None)
+        RL_display_outputs = plot_multi_sort_raster_browser(RL_spikes_df, RL_neuron_ids, unit_sort_orders_dict=RL_unit_sort_orders_dict, unit_colors_list_dict=RL_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_RL', defer_show=False, active_context=None)
         # RL_app, RL_win, RL_plots, RL_plots_data, RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs = RL_display_outputs
 
         # Odd:
@@ -439,10 +520,10 @@ class RankOrderRastersDebugger:
         LR_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in LR_names}
         LR_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(LR_neuron_ids)
         LR_spikes_df, LR_neuron_id_to_new_IDX_map = LR_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-        LR_display_outputs = _plot_multi_sort_raster_browser(LR_spikes_df, LR_neuron_ids, unit_sort_orders_dict=LR_unit_sort_orders_dict, unit_colors_list_dict=LR_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_LR', defer_show=False, active_context=None)
+        LR_display_outputs = plot_multi_sort_raster_browser(LR_spikes_df, LR_neuron_ids, unit_sort_orders_dict=LR_unit_sort_orders_dict, unit_colors_list_dict=LR_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_LR', defer_show=False, active_context=None)
         # LR_app, LR_win, LR_plots, LR_plots_data, LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs = LR_display_outputs
 
-        # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = _plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
+        # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
         
         return LR_display_outputs, RL_display_outputs
 
