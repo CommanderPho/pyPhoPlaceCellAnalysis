@@ -799,7 +799,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
     @function_attributes(short_name='directional_template_debugger', tags=['directional','template','debug', 'overview'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-28 10:13', related_items=[], is_global=True)
     def _display_directional_template_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
-            """ Renders a window with the four templates displayed to the left and right of center, and the ability to filter the actively included aclus via `included_any_context_neuron_ids`
+            """ Renders a window with the four template heatmaps displayed to the left and right of center, and the ability to filter the actively included aclus via `included_any_context_neuron_ids`
 
             """
             
@@ -854,25 +854,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             _out_data.sorted_neuron_IDs_lists = sorted_neuron_IDs_lists
             _out_data.sort_helper_neuron_id_to_neuron_colors_dicts = sort_helper_neuron_id_to_neuron_colors_dicts
             _out_data.sorted_pf_tuning_curves = sorted_pf_tuning_curves
-
-            # saveData('output/2023-11-28_debug_paired_incremental_sort_neurons_data.pkl', (decoders_dict, included_any_context_neuron_ids, sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sorted_pf_tuning_curves))
-
-            # testNone_included_any_context_neuron_ids = None
-            # testNone_sorted_neuron_IDs_lists, testNone_sort_helper_neuron_id_to_neuron_colors_dicts, testNone_sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids=testNone_included_any_context_neuron_ids)
-            # all_neuron_ids = np.sort(union_of_arrays(*testNone_sorted_neuron_IDs_lists))
-
-            # test0_included_any_context_neuron_ids = np.array([25])
-            # test_sorted_neuron_IDs_lists, test_sort_helper_neuron_id_to_neuron_colors_dicts, test_sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids=test0_included_any_context_neuron_ids)
-            
-            # test1_included_any_context_neuron_ids = np.array([9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
-            # test1_sorted_neuron_IDs_lists, test1_sort_helper_neuron_id_to_neuron_colors_dicts, test1_sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids=test1_included_any_context_neuron_ids)
-            # assert np.all([testNone_sorted_pf_tuning_curves[i] == test1_sorted_pf_tuning_curves[i] for i in np.arange(len(test1_sorted_pf_tuning_curves))])
-            # assert np.all([testNone_sorted_neuron_IDs_lists[i] == test1_sorted_neuron_IDs_lists[i] for i in np.arange(len(test1_sorted_pf_tuning_curves))])
-
-            # # test2 omits only one element: aclu == 25
-            # test2_included_any_context_neuron_ids = np.array([9, 10, 11,  15,  16,  18,  24,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
-            # test2_sorted_neuron_IDs_lists, test2_sort_helper_neuron_id_to_neuron_colors_dicts, test2_sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids=test2_included_any_context_neuron_ids)
-
 
             ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
             _out_plots.pf1D_heatmaps = {}
