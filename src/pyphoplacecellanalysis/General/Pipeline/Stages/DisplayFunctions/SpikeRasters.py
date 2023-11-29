@@ -181,10 +181,10 @@ class RasterPlotParams:
     side_bin_margins: float = 0.0
 
     # Colors:
-    neuron_qcolors: list = None
-    neuron_colors: np.ndarray = None # of shape (4, self.n_cells)
-    neuron_colors_hex: np.ndarray = None #
-    neuron_qcolors_map: dict = Factory(dict)
+    neuron_qcolors: list = field(default=Factory(list))
+    neuron_colors: Optional[np.ndarray] = field(default=None) # of shape (4, self.n_cells)
+    neuron_colors_hex: Optional[np.ndarray] = field(default=None) #
+    neuron_qcolors_map: dict = field(default=Factory(dict)) 
 
     # Configs:
     config_items: IndexedOrderedDict = Factory(IndexedOrderedDict)
@@ -622,7 +622,7 @@ def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identif
 
 
 @function_attributes(short_name=None, tags=['plotting','raster', 'sort'], input_requires=[], output_provides=[], uses=['_subfn_build_and_add_scatterplot_row', '_build_scatter_plotting_managers'], used_by=['RankOrderRastersDebugger'], creation_date='2023-10-30 22:23', related_items=[])
-def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_orders_dict=None, unit_colors_list_dict=None, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None):
+def plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_orders_dict=None, unit_colors_list_dict=None, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None):
     """ Plots a neat stack of raster plots.
     
     ISSUES:
@@ -631,13 +631,13 @@ def _plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids
     
     
     Basic Plotting:    
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _plot_multi_sort_raster_browser
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multi_sort_raster_browser
 
         included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
         unit_sort_orders_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (even_long, odd_long, even_short, odd_short)))
         unit_colors_list_dict = dict(zip(['long_even', 'long_odd', 'short_even', 'short_odd'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
 
-        app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = _plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
+        app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
 
 
     Updating Raster Epoch:
