@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional, List, Dict
+from typing import Callable, Optional, List, Dict, Union
 import numpy as np
 from attrs import define, field, Factory
 
@@ -440,7 +440,7 @@ class PipelineWithDisplayPipelineStageMixin:
 
 
     # MAIN FUNCTION ______________________________________________________________________________________________________ #
-    def display(self, display_function, active_session_configuration_context=None, **kwargs):
+    def display(self, display_function: Optional[Union[str, Callable]], active_session_configuration_context: Optional[Union[str, IdentifyingContext]]=None, **kwargs):
         """ Called to actually perform the display. Should output a figure/widget/graphic of some kind. 
         Inputs:
             display_function: either a Callable display function (e.g. DefaultDisplayFunctions._display_1d_placefield_validations) or a str containing the name of a registered display function (e.g. '_display_1d_placefield_validations')
@@ -452,7 +452,10 @@ class PipelineWithDisplayPipelineStageMixin:
 
         """
         assert self.can_display, "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
+        debug_print = kwargs.get('debug_print', False)
+        
         if display_function is None:
+            # Default display function is `._display_normal`
             display_function = DefaultDisplayFunctions._display_normal
         
         if isinstance(display_function, (str)):
@@ -460,28 +463,73 @@ class PipelineWithDisplayPipelineStageMixin:
             assert (display_function in self.registered_display_function_names), f"ERROR: The display function with the name {display_function} could not be found! Is it registered?"
             display_function = self.registered_display_function_dict[display_function] # find the actual function from the name
         
+        # Determine whether the `active_session_configuration_context` passed was really a context or str which should be used as `active_session_configuration_name` (and the real context must be extracted from `self.filtered_contexts`):
         active_session_configuration_name: Optional[str] = None
         
         ## Old form: active_session_filter_configuration: str compared to updated 2022-09-12-style call with an identifying context (IdentifyingContext) object
+        # After this we will have both: `active_session_configuration_name`, `active_session_configuration_name` properly set
         if active_session_configuration_context is None:
-            # This is only allowed for global functions:
+            # No context specified is only allowed for global functions:
             assert getattr(display_function, 'is_global', False), f"display_function must be global if `active_session_configuration_context` is not specified but it is not! {display_function}"
             assert not hasattr(active_session_configuration_context, 'filter_name'), f"global functions should NOT have filter_name specified in their contexts: \n\tdisplay_function:{display_function}\n\tactive_session_configuration_context: {active_session_configuration_context}"
             active_session_configuration_context = self.sess.get_context() # get the appropriate context for global display functions
-            
+            active_session_configuration_name = None # config name is None for a session-level context. 
+            # Now have both `active_session_configuration_name`, `active_session_configuration_name`
         elif isinstance(active_session_configuration_context, str):
             ## Old strictly name-based version (pre 2022-09-12). Extract the actual context from self.filtered_contexts:
-            active_session_configuration_name = active_session_configuration_context
+            active_session_configuration_name = active_session_configuration_context # `active_session_configuration_context` was actually the name (`active_session_configuration_name`)
+            # Get the context:
             assert active_session_configuration_name in self.filtered_contexts, f'active_session_configuration_name: {active_session_configuration_name} is NOT in the self.filtered_contexts dict: {list(self.filtered_contexts.keys())}'
             active_session_configuration_context = self.filtered_contexts[active_session_configuration_name]
+            # Now have both `active_session_configuration_name`, `active_session_configuration_name`
 
+        elif isinstance(active_session_configuration_context, IdentifyingContext):
+            # Passed a context directly. Need to extract the `active_session_configuration_name`
+
+            # Check if the context is filtered or at the session level:
+            if not hasattr(active_session_configuration_context, 'filter_name'):
+                ## Global session-level context (not filtered, so not corresponding to a specific config name):
+                active_session_configuration_name = None
+            else:
+                ## Non-global (filtered) context (most common):
+                if active_session_configuration_context.has_keys(['lap_dir'])[0]:
+                    # directional laps version:
+                    active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
+                else:
+                    # typical (non-directional laps) version:
+                    active_session_configuration_name = active_session_configuration_context.filter_name
+
+                # # typical (non-directional laps) version:
+                # active_session_configuration_name = active_session_configuration_context.filter_name
+
+
+            ## Sanity checking:
+            assert active_session_configuration_name is not None
+            if (active_session_configuration_context.filter_name != active_session_configuration_name):
+                print(f'WARN: active_session_configuration_context.filter_name != active_session_configuration_name: {active_session_configuration_context.filter_name} != {active_session_configuration_name}. This used to be an assert but to enable directional pfs it was reduced to a warning.')
+            # assert active_session_configuration_context.filter_name == active_session_configuration_name
+            assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
+
+            # Now have both `active_session_configuration_name`, `active_session_configuration_name`
         else:
+            raise NotImplementedError
             pass # hope that it's an IdentifyingContext, but we'll check soon.
         
+
         ## Sets the active_context kwarg that's passed in to the display function:
         assert isinstance(active_session_configuration_context, IdentifyingContext)
         ## Now we're certain that we have an active_session_configuration_context:
         kwargs.setdefault('active_context', active_session_configuration_context) # add 'active_context' to the kwargs for the display function if possible
+
+        if debug_print:
+            print(f'active_session_configuration_name: "{active_session_configuration_name}", active_session_configuration_context: {active_session_configuration_context}')
+
+        # Remove obsolite kwarg: We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        
+        kwarg_active_config_name = kwargs.pop('active_config_name', None)
+        if kwarg_active_config_name is not None:
+            assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
+            raise PendingDeprecationWarning(f"2023-11-29- We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below")
+
 
         # Check if the context is filtered or at the session level:
         if not hasattr(active_session_configuration_context, 'filter_name'):
@@ -489,35 +537,23 @@ class PipelineWithDisplayPipelineStageMixin:
             ## For a global-style display function, pass ALL of the computation_results and active_configs just to preserve the argument style.
             # NOTE: global-style display functions have re-arranged arguments of the form (owning_pipeline_reference, global_computation_results, computation_results, active_configs, **kwargs). This differs from standard ones.
             assert getattr(display_function, 'is_global', False), f"display_function must be global if `active_session_configuration_context` does not have a `filter_name` property, but it is not!\n\tdisplay_function:{display_function}\n\tactive_session_configuration_context: {active_session_configuration_context}"
-            
             curr_display_output = display_function(self, self.global_computation_results, self.computation_results, self.active_configs, active_config_name=None, **kwargs) # CALL GLOBAL DISPLAY FUNCTION
         
         else:
-            ## Non-global display functions: The expected filtered context:
-            if active_session_configuration_name is not None:
-                if (active_session_configuration_context.filter_name == active_session_configuration_name):
-                    print(f'WARN: active_session_configuration_context.filter_name != active_session_configuration_name: {active_session_configuration_context.filter_name} != {active_session_configuration_name}. This used to be an assert but to enable directional pfs it was reduced to a warning.')
-                # assert active_session_configuration_context.filter_name == active_session_configuration_name
-    
-            if active_session_configuration_context.has_keys(['lap_dir'])[0]:
-                # directional laps version:
-                active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
-            else:
-                # typical (non-directional laps) version:
-                active_session_configuration_name = active_session_configuration_context.filter_name
+            ## Non-global (filtered) context:
 
-            # # typical (non-directional laps) version:
-            # active_session_configuration_name = active_session_configuration_context.filter_name
-                
+            # Should be a display functions: The expected filtered context:
+            
+            # if active_session_configuration_context.has_keys(['lap_dir'])[0]:
+            #     # directional laps version:
+            #     active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
+            # else:
+            #     # typical (non-directional laps) version:
+            #     active_session_configuration_name = active_session_configuration_context.filter_name
 
-            ## Sanity checking:
-            assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
-            # We pop the active_config_name parameter from the kwargs, as this was an outdated workaround to optionally get the display functions this string but now it's passed directly by the call below        
-            kwarg_active_config_name = kwargs.pop('active_config_name', None)
-            if kwarg_active_config_name is not None:
-                assert kwarg_active_config_name == active_session_configuration_name # they better be equal or else there is a conflict.
-
-
+            # # # typical (non-directional laps) version:
+            # # active_session_configuration_name = active_session_configuration_context.filter_name
+            
             curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
             
     
