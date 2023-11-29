@@ -492,15 +492,16 @@ class PipelineWithDisplayPipelineStageMixin:
                 active_session_configuration_name = None
             else:
                 ## Non-global (filtered) context (most common):
-                if active_session_configuration_context.has_keys(['lap_dir'])[0]:
-                    # directional laps version:
-                    active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
-                else:
-                    # typical (non-directional laps) version:
-                    active_session_configuration_name = active_session_configuration_context.filter_name
+                # if active_session_configuration_context.has_keys(['lap_dir'])[0]:
+                #     # directional laps version:
+                #     active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
+                #     # retired on 2023-11-29 after changing the 
+                # else:
+                #     # typical (non-directional laps) version:
+                #     active_session_configuration_name = active_session_configuration_context.filter_name
 
                 # # typical (non-directional laps) version:
-                # active_session_configuration_name = active_session_configuration_context.filter_name
+                active_session_configuration_name = active_session_configuration_context.filter_name
 
             # Now have both `active_session_configuration_name`, `active_session_configuration_name`
         else:
