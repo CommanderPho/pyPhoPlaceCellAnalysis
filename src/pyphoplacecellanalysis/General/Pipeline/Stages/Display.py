@@ -502,14 +502,6 @@ class PipelineWithDisplayPipelineStageMixin:
                 # # typical (non-directional laps) version:
                 # active_session_configuration_name = active_session_configuration_context.filter_name
 
-
-            ## Sanity checking:
-            assert active_session_configuration_name is not None
-            if (active_session_configuration_context.filter_name != active_session_configuration_name):
-                print(f'WARN: active_session_configuration_context.filter_name != active_session_configuration_name: {active_session_configuration_context.filter_name} != {active_session_configuration_name}. This used to be an assert but to enable directional pfs it was reduced to a warning.')
-            # assert active_session_configuration_context.filter_name == active_session_configuration_name
-            assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
-
             # Now have both `active_session_configuration_name`, `active_session_configuration_name`
         else:
             raise NotImplementedError
@@ -541,19 +533,16 @@ class PipelineWithDisplayPipelineStageMixin:
         
         else:
             ## Non-global (filtered) context:
-
             # Should be a display functions: The expected filtered context:
-            
-            # if active_session_configuration_context.has_keys(['lap_dir'])[0]:
-            #     # directional laps version:
-            #     active_session_configuration_name = active_session_configuration_context.get_subset(['filter_name','lap_dir']).get_description()
-            # else:
-            #     # typical (non-directional laps) version:
-            #     active_session_configuration_name = active_session_configuration_context.filter_name
 
-            # # # typical (non-directional laps) version:
-            # # active_session_configuration_name = active_session_configuration_context.filter_name
-            
+            ## Sanity checking:
+            assert active_session_configuration_name is not None # not true for global contexts
+            if (active_session_configuration_context.filter_name != active_session_configuration_name):
+                print(f'WARN: active_session_configuration_context.filter_name != active_session_configuration_name: {active_session_configuration_context.filter_name} != {active_session_configuration_name}. This used to be an assert but to enable directional pfs it was reduced to a warning.')
+            # assert active_session_configuration_context.filter_name == active_session_configuration_name
+            assert (active_session_configuration_name in self.computation_results), f"self.computation_results doesn't contain a key for the provided active_session_filter_configuration ('{active_session_configuration_name}'). Did you only enable computation with enabled_filter_names in perform_computation that didn't include this key?"
+
+
             curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
             
     
