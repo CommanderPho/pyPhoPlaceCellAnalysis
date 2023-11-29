@@ -310,6 +310,55 @@ class DirectionalLapsHelpers:
         else:
             return args
     
+    @classmethod
+    def post_fixup_filtered_contexts(cls, curr_active_pipeline, debug_print=False) -> bool:
+        """ 2023-10-24 - tries to update misnamed `curr_active_pipeline.filtered_contexts`
+
+            curr_active_pipeline.filtered_contexts with correct filter_names
+
+            Uses: `curr_active_pipeline.filtered_epoch`
+            Updates: `curr_active_pipeline.filtered_contexts`
+            
+        Still needed for 2023-11-29 to add back in the 'lap_dir' key
+        
+        History: factored out of BatchCompletionHandler
+        
+
+        """
+        was_updated = False
+        for a_name, a_named_timerange in curr_active_pipeline.filtered_epochs.items():
+            filter_name:str = a_named_timerange.name
+            if debug_print:
+                print(f'{a_name} - {filter_name}')
+            a_filtered_ctxt = curr_active_pipeline.filtered_contexts[a_name]
+            ## Parse the name into the parts:
+            _split_parts = a_name.split('_')
+            if (len(_split_parts) >= 2):
+                # also have lap_dir:
+                a_split_name, lap_dir, *remainder_list = a_name.split('_') # successfully splits 'maze_odd_laps' into good
+                if (a_filtered_ctxt.filter_name != filter_name):
+                    was_updated = True
+                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
+                    a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name, lap_dir=lap_dir)
+
+                if not a_filtered_ctxt.has_keys('lap_dir'):
+                    print(f'WARNING: context {a_name} is missing the "lap_dir" key despite directional laps being detected from the name! Adding missing context key! lap_dir="{lap_dir}"')
+                    a_filtered_ctxt = a_filtered_ctxt.adding_context_if_missing(lap_dir=lap_dir) # Add the lap_dir context if it was missing                
+                    was_updated = True
+
+            else:
+                if a_filtered_ctxt.filter_name != filter_name:
+                    was_updated = True
+                    print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: {a_filtered_ctxt.filter_name} != a_name: {a_name}\n\tUpdating it. (THIS IS A HACK)")
+                    a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=filter_name)
+                    
+            if debug_print:
+                print(f'\t{a_filtered_ctxt.to_dict()}')
+            curr_active_pipeline.filtered_contexts[a_name] = a_filtered_ctxt # correct the context
+
+        # end for
+        return was_updated
+
 
     @classmethod
     def fix_computation_epochs_if_needed(cls, curr_active_pipeline, debug_print=False):
@@ -363,7 +412,17 @@ class DirectionalLapsHelpers:
         return was_modified
 
 
+    @classmethod
+    def fixup_directional_pipeline_if_needed(cls, curr_active_pipeline, debug_print=False):
+        """2023-11-29 - Updates the filtered context and decouples the configs and constrains the computation_epochs to the relevant long/short periods as needed. Will need recomputations if was_modified """
+        #TODO 2023-11-10 23:32: - [ ] WORKING NOW!
+        # 2023-11-10 21:15: - [X] Not yet finished! Does not work due to shared memory issue. Changes to the first two affect the next two
 
+        was_modified: bool = False
+        was_modified = was_modified or DirectionalLapsHelpers.post_fixup_filtered_contexts(curr_active_pipeline)        
+        was_modified = was_modified or DirectionalLapsHelpers.fix_computation_epochs_if_needed(curr_active_pipeline)
+        return was_modified
+    
 
     @classmethod
     def build_global_directional_result_from_natural_epochs(cls, curr_active_pipeline, progress_print=False) -> "DirectionalLapsResult":
@@ -401,6 +460,7 @@ class DirectionalLapsHelpers:
         assert not (curr_active_pipeline.computation_results[short_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         was_modified = cls.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
+        was_modified = was_modified or DirectionalLapsHelpers.post_fixup_filtered_contexts(curr_active_pipeline)
         print(f'build_global_directional_result_from_natural_epochs(...): was_modified: {was_modified}')
         
         # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
