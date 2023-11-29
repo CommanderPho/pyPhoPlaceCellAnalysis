@@ -996,15 +996,38 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    def validate_has_rank_order_results(cls, curr_active_pipeline, computation_filter_name='maze'):
+    def validate_has_rank_order_results(cls, curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:float=2.0):
+        """ 
+        TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
+        
+        """
         # Unpacking:
-        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-        odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values = rank_order_results.odd_laps
-        even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values = rank_order_results.even_laps
-        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.odd_ripple
-        even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values = rank_order_results.even_ripple
-        return True
+        rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        oripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
 
+        # Extract the real spearman-values/p-values:
+        LR_long_relative_real_p_values = np.array([x[0].real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        LR_long_relative_real_values = np.array([x[0].real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+
+        LR_short_relative_real_p_values = np.array([x[1].real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        LR_short_relative_real_values = np.array([x[1].real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+
+        LR_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.LR_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
+        LR_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.LR_ripple.extra_info_dict.values()])
+
+        RL_long_relative_real_p_values = np.array([x[0].real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        RL_long_relative_real_values = np.array([x[0].real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+
+        RL_short_relative_real_p_values = np.array([x[1].real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        RL_short_relative_real_values = np.array([x[1].real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+
+        RL_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.RL_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
+        RL_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.RL_ripple.extra_info_dict.values()])
+        
+        # make sure result is for the current minimimum:
+        results_minimum_inclusion_fr_Hz = rank_order_results.minimum_inclusion_fr_Hz
+        return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
+        
 
 
 class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
