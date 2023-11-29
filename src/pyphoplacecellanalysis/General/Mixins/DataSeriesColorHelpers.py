@@ -67,12 +67,12 @@ class DataSeriesColorHelpers:
         """
         n_cells = len(fragile_linear_neuron_IDXs)
         if provided_cell_colors is not None:
-            assert isinstance(provided_cell_colors, np.ndarray)
 
             if np.all([isinstance(v, QColor) for v in provided_cell_colors]):
                 print(f'WARN: passed an array of QColors to `DataSeriesColorHelpers._build_cell_qcolor_list(...)`, which expected a (4, n_cells) NDArray! 2023-11-28 - Converting and continuing...')
                 provided_cell_colors = DataSeriesColorHelpers.qColorsList_to_NDarray(provided_cell_colors, is_255_array=True) # None makes them all black
 
+            assert isinstance(provided_cell_colors, (np.ndarray, list)), f"make sure that it isn't a dict being passed in!"
             assert provided_cell_colors.shape[0] == 4, f"provided_cell_colors should be a (4, n_cells) {(4, {n_cells})} array of colors but provided_cell_colors.shape: {provided_cell_colors.shape}"
             assert provided_cell_colors.shape[1] >= n_cells, f"provided_cell_colors should be a (4, n_cells) {(4, {n_cells})} array of colors but provided_cell_colors.shape: {provided_cell_colors.shape}"
             
