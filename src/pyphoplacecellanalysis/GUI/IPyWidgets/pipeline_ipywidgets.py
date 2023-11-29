@@ -99,9 +99,11 @@ class PipelineJupyterHelpers:
             print(f'WARN: pipeline does not seem to have been updated since last pickle. Saving anyway.')
         try:
             saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+            print(f'saving pipeline...')
             curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+            print(f'saving global_computation_results...')
             curr_active_pipeline.save_global_computation_results()
-
+            print(f'saving complete.')
         except Exception as e:
             ## TODO: catch/log saving error and indicate that it isn't saved.
             exception_info = sys.exc_info()
@@ -111,8 +113,6 @@ class PipelineJupyterHelpers:
             # saving_mode = _bak_saving_mode
             print(f'done!')
             
-
-
 
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:
     """	Displays a row of four buttons relating to the curr_active_pipeline that reveal the Output Folder, global pickle, pipeline pickle, and .h5 export path in the system file explorer.
