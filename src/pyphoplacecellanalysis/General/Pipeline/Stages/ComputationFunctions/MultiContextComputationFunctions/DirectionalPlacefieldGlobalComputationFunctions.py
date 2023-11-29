@@ -323,6 +323,8 @@ class DirectionalLapsHelpers:
         
         History: factored out of BatchCompletionHandler
         
+        NOTE: works for non-directional contexts as well, fixing `filter_name` as needed.
+        
 
         """
         was_updated = False
