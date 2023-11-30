@@ -850,11 +850,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting` 
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
 
-            # if len(included_any_context_neuron_ids) != len(decoders_dict):
-            #     included_any_context_neuron_ids_dict = {k:deepcopy(included_any_context_neuron_ids) for k, v in decoders_dict.items()}
-            # else:
-            #     included_any_context_neuron_ids_dict = included_any_context_neuron_ids
-
             # INCRIMENTAL SORTING:
             if use_incremental_sorting:
                 ref_decoder_name: str = list(decoders_dict.keys())[0] # name of the reference coder. Should be 'long_LR'                
