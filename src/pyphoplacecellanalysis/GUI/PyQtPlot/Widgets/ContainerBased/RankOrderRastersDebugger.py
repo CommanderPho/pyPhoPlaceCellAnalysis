@@ -330,6 +330,7 @@ class RankOrderRastersDebugger:
             # - todo - remove the old items?
             aclus_list = list(raster_plot_manager.params.config_items.keys())
             a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
+            raise NotImplementedError("needs aclu_y_values_dict")
             self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map)
 
 
@@ -464,6 +465,8 @@ class RankOrderRastersDebugger:
         _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
         _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
 
+        emphasis_state = SpikeEmphasisState.Default
+
         for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
             raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
             aclus_list = list(raster_plot_manager.params.config_items.keys())
@@ -477,9 +480,11 @@ class RankOrderRastersDebugger:
 
             ## Perform the update:
             [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
+            print(f'bounds: [[x1:{x1}, x2:{x2}], [y1:{y1}, y2:{y2}]]')
             for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
                 # text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-                text.setPos(x2, y_values_dict[aclu])
+                # print(f'aclu_y_values_dict[aclu={aclu}]: {aclu_y_values_dict[aclu]}')
+                text.setPos(x2, aclu_y_values_dict[aclu])
                 is_aclu_active: bool = aclu in curr_active_aclus
                 text.setVisible(is_aclu_active)
 
