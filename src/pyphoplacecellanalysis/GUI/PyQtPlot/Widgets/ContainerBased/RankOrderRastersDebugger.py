@@ -383,15 +383,17 @@ class RankOrderRastersDebugger:
     # ==================================================================================================================== #
 
     @classmethod
-    def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map):
+    def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map, aclu_y_values_dict: Dict):
         """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots. """
         [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range for initial position
         
         _out_text_items = {}
         for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
             # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
-            text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
-            text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+            # anchor=(1,0.5) should be its upper-middle point.
+            text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0.5)) # , angle=15
+            # text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+            text.setPos(x2, aclu_y_values_dict[aclu])
             a_plot_item.addItem(text)
 
             # ## Mode 2: stillItem
@@ -408,6 +410,9 @@ class RankOrderRastersDebugger:
             _out_text_items[aclu] = text
             
         return _out_text_items
+
+
+
 
 
     @function_attributes(short_name=None, tags=['cell_y_labels'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-29 20:05', related_items=[])
@@ -436,8 +441,12 @@ class RankOrderRastersDebugger:
             raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
             aclus_list = list(raster_plot_manager.params.config_items.keys())
             a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
-            a_plot_item = plots.ax[_active_plot_identifier]	
-            self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map)
+            a_plot_item = plots.ax[_active_plot_identifier]
+            ## Get the y-values for the labels
+            y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
+            aclu_y_values_dict = dict(zip(aclus_list, y_values))
+
+            self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map, aclu_y_values_dict)
 
 
     @function_attributes(short_name=None, tags=['cell_y_labels', 'update', 'active_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-29 20:05', related_items=[])
@@ -446,15 +455,40 @@ class RankOrderRastersDebugger:
         # Adjust based on the whether the aclu is active or not:
         curr_active_aclus = self.get_epoch_active_aclus()
 
-        for a_plot_item, _out_text_items in self.plots.text_items_dict.items():
-            # a_plot_item = _out_rank_order_event_raster_debugger.plots.LR_plots.scatter_plots[_active_plot_identifier] # AttributeError: 'ScatterPlotItem' object has no attribute 'addItem'
+
+        LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
+        RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
+
+        ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
+        _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
+        _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
+        _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
+
+        for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
+            raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
+            aclus_list = list(raster_plot_manager.params.config_items.keys())
+            a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
+            a_plot_item = plots.ax[_active_plot_identifier]
+            ## Get the y-values for the labels
+            y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
+            aclu_y_values_dict = dict(zip(aclus_list, y_values))
+            # get the labels to update:
+            _out_text_items = self.plots.text_items_dict[a_plot_item]
+
+            ## Perform the update:
             [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
-            # midpoint = x1 + ((x1 + x2)/2.0)
-            # print(f'x1: {x1}, x2: {x2}, midpoint: {midpoint}')
             for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
-                text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                # text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                text.setPos(x2, y_values_dict[aclu])
                 is_aclu_active: bool = aclu in curr_active_aclus
                 text.setVisible(is_aclu_active)
+
+        # for a_plot_item, _out_text_items in self.plots.text_items_dict.items():
+        #     [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
+        #     for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
+        #         text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+        #         is_aclu_active: bool = aclu in curr_active_aclus
+        #         text.setVisible(is_aclu_active)
 
 
 
