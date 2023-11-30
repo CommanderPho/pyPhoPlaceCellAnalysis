@@ -114,80 +114,6 @@ class RankOrderRastersDebugger:
         return active_epoch_unique_active_aclus
 
 
-
-    @classmethod
-    def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map):
-        """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots. """
-        [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range for initial position
-        
-        _out_text_items = {}
-        for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
-            # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
-            text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
-            text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-            a_plot_item.addItem(text)
-
-            # ## Mode 2: stillItem
-            # text.setFlag(text.GraphicsItemFlag.ItemIgnoresTransformations) # This line is necessary
-            # text.setParentItem(a_plot_item) # # Use this instead of `plot.addItem`
-            # # This position will be in pixels, not scene coordinates since transforms are ignored. You can use helpers like `mapFromScene()` etc. to translate between pixels and viewbox coordinates
-            # text.setPos(300, (10*(cell_i+1)))
-
-            # ## Mode 3: pg.LabelItem - this does not resize when the plot is resized like when the window is resized.
-            # text = pg.LabelItem(f"{int(aclu)}", size="12pt", color=pg.mkColor(a_color_vector))
-            # text.setParentItem(a_plot_item)
-            # text.anchor(itemPos=(1,0), parentPos=(1,0), offset=(-10,(1*(cell_i+1))))
-
-            _out_text_items[aclu] = text
-            
-        return _out_text_items
-
-
-    def _build_cell_y_labels(self):
-        """Builds y-axis labels for each of the rasters and stores them in `self.plots.text_items_dict`
-        """
-        LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
-        RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
-
-        ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
-        _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
-        _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
-        _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
-
-        emphasis_state = SpikeEmphasisState.Default
-
-        self.plots.text_items_dict = {}
-
-        for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
-            # plots_data: RenderPlotsData = LR_plots_data
-
-            # plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
-            # plots_data.plots_spikes_df_dict[_active_plot_identifier]
-
-            ## Add the neuron_id labels to the rasters:
-            raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
-            aclus_list = list(raster_plot_manager.params.config_items.keys())
-            a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
-            a_plot_item = plots.ax[_active_plot_identifier]	
-            self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map)
-
-
-    def update_cell_y_labels(self):
-        """ called whenever the window scrolls or changes to reposition the y-axis labels created with self._build_cell_y_labels """
-        # Adjust based on the whether the aclu is active or not:
-        curr_active_aclus = self.get_epoch_active_aclus()
-
-        for a_plot_item, _out_text_items in self.plots.text_items_dict.items():
-            # a_plot_item = _out_rank_order_event_raster_debugger.plots.LR_plots.scatter_plots[_active_plot_identifier] # AttributeError: 'ScatterPlotItem' object has no attribute 'addItem'
-            [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
-            # midpoint = x1 + ((x1 + x2)/2.0)
-            # print(f'x1: {x1}, x2: {x2}, midpoint: {midpoint}')
-            for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
-                text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-                is_aclu_active: bool = aclu in curr_active_aclus
-                text.setVisible(is_aclu_active)
-
-
     @classmethod
     def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame]):
         """ 
@@ -283,7 +209,9 @@ class RankOrderRastersDebugger:
 
 
 
-
+    # ==================================================================================================================== #
+    # Update Active Epoch Functions                                                                                        #
+    # ==================================================================================================================== #
 
     def on_update_active_epoch(self, an_epoch_idx: int, an_epoch):
         """ captures: LR_on_update_active_epoch, RL_on_update_active_epoch """
@@ -317,9 +245,12 @@ class RankOrderRastersDebugger:
         for a_callback_name, a_callback_fn in self.on_idx_changed_callback_function_dict.items():
             a_callback_fn(self, an_epoch_idx)
 
+    # ==================================================================================================================== #
+    # Other Functions                                                                                                      #
+    # ==================================================================================================================== #
+
     def write_to_log(self, log_messages):
         self.ui.logTextEdit.append(log_messages)
-        
         
     def get_ipywidget(self):
         """ Displays a slider that allows the user to select the epoch_IDX instead of having to type it and call it manually
@@ -354,6 +285,86 @@ class RankOrderRastersDebugger:
     
         # Display the slider
         # display(slider)
+
+
+    # ==================================================================================================================== #
+    # Cell y-axis Labels                                                                                                   #
+    # ==================================================================================================================== #
+
+    @classmethod
+    def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map):
+        """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots. """
+        [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range for initial position
+        
+        _out_text_items = {}
+        for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
+            # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
+            text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+            text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+            a_plot_item.addItem(text)
+
+            # ## Mode 2: stillItem
+            # text.setFlag(text.GraphicsItemFlag.ItemIgnoresTransformations) # This line is necessary
+            # text.setParentItem(a_plot_item) # # Use this instead of `plot.addItem`
+            # # This position will be in pixels, not scene coordinates since transforms are ignored. You can use helpers like `mapFromScene()` etc. to translate between pixels and viewbox coordinates
+            # text.setPos(300, (10*(cell_i+1)))
+
+            # ## Mode 3: pg.LabelItem - this does not resize when the plot is resized like when the window is resized.
+            # text = pg.LabelItem(f"{int(aclu)}", size="12pt", color=pg.mkColor(a_color_vector))
+            # text.setParentItem(a_plot_item)
+            # text.anchor(itemPos=(1,0), parentPos=(1,0), offset=(-10,(1*(cell_i+1))))
+
+            _out_text_items[aclu] = text
+            
+        return _out_text_items
+
+
+    @function_attributes(short_name=None, tags=['cell_y_labels'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-29 20:05', related_items=[])
+    def _build_cell_y_labels(self):
+        """Builds y-axis labels for each of the rasters and stores them in `self.plots.text_items_dict`
+        """
+        LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
+        RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
+
+        ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
+        _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
+        _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
+        _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
+
+        emphasis_state = SpikeEmphasisState.Default
+
+        self.plots.text_items_dict = {}
+
+        for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
+            # plots_data: RenderPlotsData = LR_plots_data
+
+            # plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
+            # plots_data.plots_spikes_df_dict[_active_plot_identifier]
+
+            ## Add the neuron_id labels to the rasters:
+            raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
+            aclus_list = list(raster_plot_manager.params.config_items.keys())
+            a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
+            a_plot_item = plots.ax[_active_plot_identifier]	
+            self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map)
+
+
+    @function_attributes(short_name=None, tags=['cell_y_labels', 'update', 'active_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-29 20:05', related_items=[])
+    def update_cell_y_labels(self):
+        """ called whenever the window scrolls or changes to reposition the y-axis labels created with self._build_cell_y_labels """
+        # Adjust based on the whether the aclu is active or not:
+        curr_active_aclus = self.get_epoch_active_aclus()
+
+        for a_plot_item, _out_text_items in self.plots.text_items_dict.items():
+            # a_plot_item = _out_rank_order_event_raster_debugger.plots.LR_plots.scatter_plots[_active_plot_identifier] # AttributeError: 'ScatterPlotItem' object has no attribute 'addItem'
+            [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
+            # midpoint = x1 + ((x1 + x2)/2.0)
+            # print(f'x1: {x1}, x2: {x2}, midpoint: {midpoint}')
+            for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
+                text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                is_aclu_active: bool = aclu in curr_active_aclus
+                text.setVisible(is_aclu_active)
+
 
 
     @function_attributes(short_name='debug_plot_directional_template_rasters', tags=['directional', 'templates', 'debugger', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['plot_multi_sort_raster_browser'], used_by=[], creation_date='2023-11-02 14:06', related_items=[])
