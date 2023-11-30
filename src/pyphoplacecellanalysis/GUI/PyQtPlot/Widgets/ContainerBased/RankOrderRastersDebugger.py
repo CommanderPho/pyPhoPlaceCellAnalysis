@@ -485,7 +485,11 @@ class RankOrderRastersDebugger:
                 # print(f'aclu_y_values_dict[aclu={aclu}]: {aclu_y_values_dict[aclu]}')
                 text.setPos(x2, aclu_y_values_dict[aclu])
                 is_aclu_active: bool = aclu in curr_active_aclus
-                text.setVisible(is_aclu_active)
+                if is_aclu_active:
+                    text.setColor(pg.mkColor(a_decoder_color_map[aclu]))
+                else:
+                    text.setColor(pg.mkColor("#666666"))
+                # text.setVisible(is_aclu_active)
 
 
 
