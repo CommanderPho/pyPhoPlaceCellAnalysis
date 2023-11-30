@@ -1027,7 +1027,7 @@ def paired_incremental_sort_neurons(decoders_dict: Dict, included_any_context_ne
 
 
 @function_attributes(short_name=None, tags=['sort', 'raster', 'sorting', 'important', 'visualization', 'order', 'neuron_ids'], input_requires=[], output_provides=[], uses=['DataSeriesColorHelpers.build_cell_colors', 'paired_incremental_sorting'], used_by=[], creation_date='2023-11-29 17:13', related_items=['paired_incremental_sort_neurons'])
-def paired_separately_sort_neurons(decoders_dict: Dict, included_any_context_neuron_ids_dict=None, sortable_values_list_dict=None):
+def paired_separately_sort_neurons(decoders_dict: Dict, included_any_context_neuron_ids_dict_dict=None, sortable_values_list_dict=None):
     """ Given a set of decoders (or more generally placefields, ratemaps, or anything else with neuron_IDs and a property that can be sorted) return the iterative successive sort.
     
     History: Built from working `paired_incremental_sort_neurons` with an attempt to generalize for raster plotting.
@@ -1063,15 +1063,20 @@ def paired_separately_sort_neurons(decoders_dict: Dict, included_any_context_neu
         
 
     # Here is where we want to filter by specific included_neuron_IDs (before we plot and output):
-    if included_any_context_neuron_ids_dict is not None:
-        assert len(included_any_context_neuron_ids_dict) == len(decoders_dict), f"included_any_context_neuron_ids_dict should contain one `included_any_context_neuron_ids` list for each decoder"
+    if included_any_context_neuron_ids_dict_dict is not None:
+        # assert len(included_any_context_neuron_ids_dict_dict) == len(decoders_dict), f"included_any_context_neuron_ids_dict should contain one `included_any_context_neuron_ids` list for each decoder"
+        if (len(included_any_context_neuron_ids_dict_dict) != len(decoders_dict)):
+            print(f'len(included_any_context_neuron_ids_dict_dict) != len(decoders_dict), assuming this is a single included_any_context_neuron_ids_dict for all decoders like used in `paired_incremental_sort_neurons(...)`. Fixing. ')
+            included_any_context_neuron_ids_dict = deepcopy(included_any_context_neuron_ids_dict_dict)
+            included_any_context_neuron_ids_dict_dict = {k:deepcopy(included_any_context_neuron_ids_dict) for k, v in decoders_dict.items()}
+
         assert sortable_values_list_dict is not None
-        assert len(sortable_values_list_dict) == len(included_any_context_neuron_ids_dict)
+        assert len(sortable_values_list_dict) == len(included_any_context_neuron_ids_dict_dict)
         
         # for a_name, included_any_context_neuron_ids in included_any_context_neuron_ids_dict.items():
         # restrict only to `included_any_context_neuron_ids`
         # print(f'restricting only to included_any_context_neuron_ids: {included_any_context_neuron_ids}...')
-        is_neuron_IDs_included_lists = [np.isin(neuron_ids, deepcopy(included_any_context_neuron_ids)) for neuron_ids, included_any_context_neuron_ids in zip(neuron_IDs_lists, included_any_context_neuron_ids_dict.values())]
+        is_neuron_IDs_included_lists = [np.isin(neuron_ids, deepcopy(included_any_context_neuron_ids)) for neuron_ids, included_any_context_neuron_ids in zip(neuron_IDs_lists, included_any_context_neuron_ids_dict_dict.values())]
         neuron_IDs_lists = [neuron_ids[is_neuron_IDs_included] for neuron_ids, is_neuron_IDs_included in zip(neuron_IDs_lists, is_neuron_IDs_included_lists)] # filtered_neuron_IDs_lists
         ## These are the sortable values:
         # sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for a_decoder in decoders_dict.values()] # (46, 56) - (n_neurons, n_pos_bins)

@@ -664,26 +664,17 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=False, include_accel=False)
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(epochs_editor.plots.win, None, title='Pho Directional Laps Templates')
             
-            def _get_decoder_sorted_pfs(a_decoder):
-                """ used only when viewing with individual sorts (instead of all four decoder's pfs aligned to the first decoder's sort) """
-                ratemap = a_decoder.pf.ratemap
-                CoM_sort_indicies = np.argsort(ratemap.peak_tuning_curve_center_of_masses) # get the indicies to sort the placefields by their center-of-mass (CoM) location # CoM_sort_indicies.shape # (n_neurons,)
-                return ratemap.pdf_normalized_tuning_curves[CoM_sort_indicies, :]
-
-
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
 
-            
-            
             # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`               
 
             # INCRIMENTAL SORTING:
             if use_incremental_sorting:
                 ref_decoder_name: str = list(decoders_dict.keys())[0] # name of the reference coder. Should be 'long_LR'
-                sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids_dict=included_any_context_neuron_ids)
+                sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_incremental_sort_neurons(decoders_dict, included_any_context_neuron_ids)
             else:
                 # INDIVIDUAL SORTING:
-                sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids_dict=included_any_context_neuron_ids)
+                sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict, included_any_context_neuron_ids)
 
             sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
 
@@ -856,21 +847,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, dock_widgets=None, on_update_callback=None)
             root_dockAreaWindow.resize(800, 400)
 
-            def _get_decoder_sorted_pfs(a_decoder):
-                """ used only when viewing with individual sorts (instead of all four decoder's pfs aligned to the first decoder's sort) """
-                ratemap = a_decoder.pf.ratemap
-                CoM_sort_indicies = np.argsort(ratemap.peak_tuning_curve_center_of_masses) # get the indicies to sort the placefields by their center-of-mass (CoM) location # CoM_sort_indicies.shape # (n_neurons,)
-                return ratemap.pdf_normalized_tuning_curves[CoM_sort_indicies, :]
-            
             # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting` 
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+
+            # if len(included_any_context_neuron_ids) != len(decoders_dict):
+            #     included_any_context_neuron_ids_dict = {k:deepcopy(included_any_context_neuron_ids) for k, v in decoders_dict.items()}
+            # else:
+            #     included_any_context_neuron_ids_dict = included_any_context_neuron_ids
+
             # INCRIMENTAL SORTING:
             if use_incremental_sorting:
-                ref_decoder_name: str = list(decoders_dict.keys())[0] # name of the reference coder. Should be 'long_LR'
-                sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids_dict=included_any_context_neuron_ids)
+                ref_decoder_name: str = list(decoders_dict.keys())[0] # name of the reference coder. Should be 'long_LR'                
+                sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_incremental_sort_neurons(decoders_dict, included_any_context_neuron_ids)
             else:
                 # INDIVIDUAL SORTING:
-                sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids_dict=included_any_context_neuron_ids)
+                sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict, included_any_context_neuron_ids)
 
             sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
             
