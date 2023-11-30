@@ -245,6 +245,7 @@ class RankOrderRastersDebugger:
         for a_callback_name, a_callback_fn in self.on_idx_changed_callback_function_dict.items():
             a_callback_fn(self, an_epoch_idx)
 
+
     ## Update the colors for the individual rasters plotted by multiplot rasters or w/e 
     def update_neurons_color_data(self, updated_neuron_render_configs_dict):
         """updates the colors for each neuron/cell given the updated_neuron_render_configs map
@@ -330,8 +331,11 @@ class RankOrderRastersDebugger:
             # - todo - remove the old items?
             aclus_list = list(raster_plot_manager.params.config_items.keys())
             a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
-            raise NotImplementedError("needs aclu_y_values_dict")
-            self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map)
+
+            ## Get the y-values for the labels
+            y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
+            aclu_y_values_dict = dict(zip(aclus_list, y_values))
+            self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map, aclu_y_values_dict) # ideally we could just add a color update to the update function
 
 
         return updated_color_dict_dict
@@ -430,14 +434,13 @@ class RankOrderRastersDebugger:
 
         emphasis_state = SpikeEmphasisState.Default
 
+        if self.plots.text_items_dict is not None:
+            #TODO 2023-11-30 08:33: - [ ] Remove the old labels here if they exist.
+            print(f'TODO 2023-11-30 08:33: - [ ] Remove the old labels here if they exist.')
+
         self.plots.text_items_dict = {}
 
         for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
-            # plots_data: RenderPlotsData = LR_plots_data
-
-            # plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
-            # plots_data.plots_spikes_df_dict[_active_plot_identifier]
-
             ## Add the neuron_id labels to the rasters:
             raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
             aclus_list = list(raster_plot_manager.params.config_items.keys())
@@ -455,7 +458,6 @@ class RankOrderRastersDebugger:
         """ called whenever the window scrolls or changes to reposition the y-axis labels created with self._build_cell_y_labels """
         # Adjust based on the whether the aclu is active or not:
         curr_active_aclus = self.get_epoch_active_aclus()
-
 
         LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
         RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
@@ -480,20 +482,13 @@ class RankOrderRastersDebugger:
 
             ## Perform the update:
             [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
-            print(f'bounds: [[x1:{x1}, x2:{x2}], [y1:{y1}, y2:{y2}]]')
+            # print(f'bounds: [[x1:{x1}, x2:{x2}], [y1:{y1}, y2:{y2}]]')
             for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
-                # text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
                 # print(f'aclu_y_values_dict[aclu={aclu}]: {aclu_y_values_dict[aclu]}')
                 text.setPos(x2, aclu_y_values_dict[aclu])
                 is_aclu_active: bool = aclu in curr_active_aclus
                 text.setVisible(is_aclu_active)
 
-        # for a_plot_item, _out_text_items in self.plots.text_items_dict.items():
-        #     [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
-        #     for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
-        #         text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-        #         is_aclu_active: bool = aclu in curr_active_aclus
-        #         text.setVisible(is_aclu_active)
 
 
 
