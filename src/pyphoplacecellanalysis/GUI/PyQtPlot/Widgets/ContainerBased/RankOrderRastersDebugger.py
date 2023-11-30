@@ -99,17 +99,22 @@ class RankOrderRastersDebugger:
         return np.shape(self.active_epochs_df)[0]
     
     @property
-    def active_epoch(self) -> tuple:
+    def active_epoch_tuple(self) -> tuple:
         """ returns a namedtuple describing the single epoch corresponding to `self.active_epoch_IDX`. """
         a_df_idx = self.active_epochs_df.index.to_numpy()[self.active_epoch_IDX]
         curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)] # this +1 here makes zero sense
         curr_epoch = list(curr_epoch_df.itertuples(name='EpochTuple'))[0]
         return curr_epoch
     
+
+    def get_active_epoch_spikes_df(self) -> pd.DataFrame:
+        active_epoch_tuple = self.active_epoch_tuple
+        active_epoch_spikes_df: pd.DataFrame = deepcopy(self.global_spikes_df.spikes.time_sliced(active_epoch_tuple.start, active_epoch_tuple.stop))
+        return active_epoch_spikes_df
+    
     def get_epoch_active_aclus(self) -> np.array:
         """ returns a list of aclus active (having at least one spike) in the current epoch (based on `self.active_epoch`) """
-        active_epoch_tuple = self.active_epoch
-        active_epoch_spikes_df: pd.DataFrame = self.global_spikes_df.spikes.time_sliced(active_epoch_tuple.start, active_epoch_tuple.stop)
+        active_epoch_spikes_df: pd.DataFrame = self.get_active_epoch_spikes_df()
         active_epoch_unique_active_aclus = np.unique(active_epoch_spikes_df['aclu'].to_numpy())
         return active_epoch_unique_active_aclus
 
@@ -134,6 +139,11 @@ class RankOrderRastersDebugger:
         LR_display_outputs, RL_display_outputs = cls._modern_debug_plot_directional_template_rasters(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates) # `_debug_plot_directional_template_rasters` main plot commmand
         LR_app, LR_win, LR_plots, LR_plots_data, LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs = LR_display_outputs
         RL_app, RL_win, RL_plots, RL_plots_data, RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs = RL_display_outputs
+        
+
+        ## 2023-11-30 - Newest Version using separate rasters:
+        # _obj.plots_data, _obj.plots = cls._post_modern_debug_plot_directional_template_rasters(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates, debug_print=True)
+        #TODO 2023-11-30 15:14: - [ ] Unpacking and putting in docks and such not yet finished. Update functions would need to be done separately.
 
         # Embedding in docks:
         # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(RL_win, LR_win, title='Pho Debug Plot Directional Template Rasters')
@@ -648,7 +658,9 @@ class RankOrderRastersDebugger:
 
         assert np.shape(RL_long) == np.shape(RL_short), f"{np.shape(RL_long)} != {np.shape(RL_short)}"
 
-        unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_long, LR_long, RL_short, LR_short)))
+        # unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_long, LR_long, RL_short, LR_short))) # SORTED
+        unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (None, None, None, None))) # unsorted
+
         # unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
 
         # included_any_context_neuron_ids_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_neuron_ids, LR_neuron_ids, RL_neuron_ids, LR_neuron_ids)))
@@ -672,7 +684,7 @@ class RankOrderRastersDebugger:
         RL_unit_colors_list = np.array([v for k, v in _unit_colors_ndarray_map.items() if k in RL_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
         LR_unit_colors_list = np.array([v for k, v in _unit_colors_ndarray_map.items() if k in LR_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))        
 
-        unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_unit_colors_list, LR_unit_colors_list, RL_unit_colors_list, LR_unit_colors_list))) # the colors dict for all four templates
+        unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (deepcopy(RL_unit_colors_list), deepcopy(LR_unit_colors_list), deepcopy(RL_unit_colors_list), deepcopy(LR_unit_colors_list)))) # the colors dict for all four templates
 
         # # #TODO 2023-11-29 18:16: - [ ] paired_separately_sort_neurons version:
         # unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], sort_helper_neuron_id_to_neuron_colors_dicts))
@@ -698,9 +710,108 @@ class RankOrderRastersDebugger:
         LR_display_outputs = plot_multi_sort_raster_browser(LR_spikes_df, LR_neuron_ids, unit_sort_orders_dict=LR_unit_sort_orders_dict, unit_colors_list_dict=LR_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_LR', defer_show=False, active_context=None)
         # LR_app, LR_win, LR_plots, LR_plots_data, LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs = LR_display_outputs
 
+
+        ## Single Figure Mode:
+        # merged_display_outputs = plot_multi_sort_raster_browser(deepcopy(spikes_df), included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
+        # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = merged_display_outputs
+        # return merged_display_outputs
+    
+        return LR_display_outputs, RL_display_outputs
+
+
+    @classmethod
+    def _post_modern_debug_plot_directional_template_rasters(cls, spikes_df, active_epochs_df, track_templates, debug_print=True, **kwargs):
+        """ 2023-11-30 **DO EM ALL SEPERATELY** 
+
+        
+        _out_data, _out_plots = _post_modern_debug_plot_directional_template_rasters(spikes_df, active_epochs_df, track_templates, debug_print=True)
+        """
+        from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
+        from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
+        from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
+        from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons
+
+        ## spikes_df: get the spikes to plot
+        # included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
+        # included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
+        # track_templates.shared_LR_aclus_only_neuron_IDs
+
+        figure_name: str = kwargs.pop('figure_name', 'rasters debugger')
+
+
+        decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+
+        neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in decoders_dict.values()] # [A, B, C, D, ...]
+        # _unit_qcolors_map, unit_colors_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
+        unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
+        # `unit_colors_map` is main colors output
+
+        included_neuron_ids = np.array(list(unit_colors_map.keys()))
+        n_neurons = len(included_neuron_ids)
+
+        print(f'included_neuron_ids: {included_neuron_ids}, n_neurons: {n_neurons}')
+        
+        # included_neuron_ids = np.sort(np.union1d(track_templates.shared_RL_aclus_only_neuron_IDs, track_templates.shared_LR_aclus_only_neuron_IDs))
+        # n_neurons = len(included_neuron_ids)
+
+        # Get only the spikes for the shared_aclus:
+        spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(included_neuron_ids)
+        # spikes_df = spikes_df.spikes.adding_lap_identity_column(active_epochs_df, epoch_id_key_name='new_lap_IDX')
+        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='new_lap_IDX', epoch_label_column_name=None) # , override_time_variable_name='t_seconds'
+        # spikes_df = spikes_df[spikes_df['ripple_id'] != -1]
+        spikes_df = spikes_df[(spikes_df['new_lap_IDX'] != -1)] # ['lap', 'maze_relative_lap', 'maze_id']
+        spikes_df, neuron_id_to_new_IDX_map = spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+
+
+        # CORRECT: Even: RL, Odd: LR
+        RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy() # (69, )
+        LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy() # (64, )
+        RL_long, RL_short = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list] # nope, different sizes: (62,), (69,)
+        LR_long, LR_short = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
+
+        assert np.shape(RL_long) == np.shape(RL_short), f"{np.shape(RL_long)} != {np.shape(RL_short)}"
+
+        unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_long, LR_long, RL_short, LR_short)))
+
+        included_any_context_neuron_ids_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_neuron_ids, LR_neuron_ids, RL_neuron_ids, LR_neuron_ids)))
+        # INDIVIDUAL SORTING:
+        sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict=decoders_dict,
+                                                                                                                                                        included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict,
+                                                                                                                                                        sortable_values_list_dict=unit_sort_orders_dict)
+
+        _out_data = RenderPlotsData(name=figure_name, spikes_df=spikes_df, unit_sort_orders_dict=unit_sort_orders_dict, included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None)
+        _out_plots = RenderPlots(name=figure_name, rasters=None, rasters_display_outputs=None)
+
+        # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
+        _out_data.sorted_neuron_IDs_lists = sorted_neuron_IDs_lists
+        _out_data.sort_helper_neuron_id_to_neuron_colors_dicts = sort_helper_neuron_id_to_neuron_colors_dicts
+        _out_data.sort_helper_neuron_id_to_sort_IDX_dicts = sort_helper_neuron_id_to_sort_IDX_dicts
+
+        ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
+        _out_plots.rasters = {}
+        _out_plots.rasters_display_outputs = {}
+        for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
+            title_str = f'{a_decoder_name}'
+            
+            an_included_unsorted_neuron_ids = deepcopy(included_any_context_neuron_ids_dict[a_decoder_name])
+            
+            # Get only the spikes for the shared_aclus:
+            a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(an_included_unsorted_neuron_ids)
+            a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+
+            a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
+
+            _out_plots.rasters_display_outputs[a_decoder_name] = plot_multi_sort_raster_browser(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict[a_decoder_name], unit_colors_list_dict=a_decoder_color_map, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=True, active_context=None)
+            # an_app, a_win, a_plots, a_plots_data, an_on_update_active_epoch, an_on_update_active_scatterplot_kwargs = _out_plots.rasters_display_outputs[a_decoder_name]
+
+            # _out_plots.rasters[a_decoder_name]
+
         # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
         
-        return LR_display_outputs, RL_display_outputs
+        return _out_data, _out_plots
+
+
 
 
     # ==================================================================================================================== #
