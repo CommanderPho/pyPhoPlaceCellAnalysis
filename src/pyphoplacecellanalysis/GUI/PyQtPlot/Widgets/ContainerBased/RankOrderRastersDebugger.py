@@ -98,6 +98,23 @@ class RankOrderRastersDebugger:
     def n_epochs(self) -> int:
         return np.shape(self.active_epochs_df)[0]
     
+    @property
+    def active_epoch(self) -> tuple:
+        """ returns a namedtuple describing the single epoch corresponding to `self.active_epoch_IDX`. """
+        a_df_idx = self.active_epochs_df.index.to_numpy()[self.active_epoch_IDX]
+        curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)] # this +1 here makes zero sense
+        curr_epoch = list(curr_epoch_df.itertuples(name='EpochTuple'))[0]
+        return curr_epoch
+    
+    def get_epoch_active_aclus(self) -> np.array:
+        """ returns a list of aclus active (having at least one spike) in the current epoch (based on `self.active_epoch`) """
+        active_epoch_tuple = self.active_epoch
+        active_epoch_spikes_df: pd.DataFrame = self.global_spikes_df.spikes.time_sliced(active_epoch_tuple.start, active_epoch_tuple.stop)
+        active_epoch_unique_active_aclus = np.unique(active_epoch_spikes_df['aclu'].to_numpy())
+        return active_epoch_unique_active_aclus
+
+
+
     @classmethod
     def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map):
         """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots. """
@@ -124,20 +141,6 @@ class RankOrderRastersDebugger:
             _out_text_items[aclu] = text
             
         return _out_text_items
-
-    @classmethod
-    def _perform_update_cell_y_labels(cls, text_items_dict):
-        """ text_items_dict, _out_rank_order_event_raster_debugger, _out_text_items """
-        # _active_plot_identifier = 'long_LR'
-        # a_plot_item = _out_rank_order_event_raster_debugger.plots.LR_plots.ax[_active_plot_identifier]
-        
-        for a_plot_item, _out_text_items in text_items_dict.items():
-            # a_plot_item = _out_rank_order_event_raster_debugger.plots.LR_plots.scatter_plots[_active_plot_identifier] # AttributeError: 'ScatterPlotItem' object has no attribute 'addItem'
-            [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
-            # midpoint = x1 + ((x1 + x2)/2.0)
-            # print(f'x1: {x1}, x2: {x2}, midpoint: {midpoint}')
-            for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
-                text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
 
 
     def _build_cell_y_labels(self):
@@ -171,7 +174,18 @@ class RankOrderRastersDebugger:
 
     def update_cell_y_labels(self):
         """ called whenever the window scrolls or changes to reposition the y-axis labels created with self._build_cell_y_labels """
-        self._perform_update_cell_y_labels(self.plots.text_items_dict)
+        # Adjust based on the whether the aclu is active or not:
+        curr_active_aclus = self.get_epoch_active_aclus()
+
+        for a_plot_item, _out_text_items in self.plots.text_items_dict.items():
+            # a_plot_item = _out_rank_order_event_raster_debugger.plots.LR_plots.scatter_plots[_active_plot_identifier] # AttributeError: 'ScatterPlotItem' object has no attribute 'addItem'
+            [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range
+            # midpoint = x1 + ((x1 + x2)/2.0)
+            # print(f'x1: {x1}, x2: {x2}, midpoint: {midpoint}')
+            for cell_i, (aclu, text) in enumerate(_out_text_items.items()):
+                text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                is_aclu_active: bool = aclu in curr_active_aclus
+                text.setVisible(is_aclu_active)
 
 
     @classmethod
@@ -263,6 +277,11 @@ class RankOrderRastersDebugger:
         _obj._build_cell_y_labels() # builds the cell labels
 
         return _obj
+
+
+
+
+
 
 
 
