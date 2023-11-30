@@ -65,18 +65,18 @@ class DisplayColorsEnum:
     
     """
     class Laps:
-        even = '#5522de' # a purplish-royal-blue 
-        odd = '#aadd21' # a yellowish-green
+        RL = '#5522de' # a purplish-royal-blue
+        LR = '#aadd21' # a yellowish-green
 
 
         @classmethod
-        def get_even_dock_colors(cls, orientation, is_dim):
+        def get_RL_dock_colors(cls, orientation, is_dim):
             """ used for CustomDockDisplayConfig for even laps
             
             Usage:
                 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
                 
-                even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_even_dock_colors)
+                even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors())
             
             
             """
@@ -99,7 +99,7 @@ class DisplayColorsEnum:
 
 
         @classmethod
-        def get_odd_dock_colors(cls, orientation, is_dim):
+        def get_LR_dock_colors(cls, orientation, is_dim):
             """ used for CustomDockDisplayConfig for odd laps
             
             Usage:

@@ -491,9 +491,9 @@ class RankOrderAnalyses:
         else:
             first_plot_name = 'best'
 
-        even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, even_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.even), pen=symbolPen, symbol='t2', name=first_plot_name, hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+        even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, even_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.RL), pen=symbolPen, symbol='t2', name=first_plot_name, hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
         if odd_laps_long_short_z_score_diff_values is not None:
-            odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, odd_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.odd), pen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+            odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, odd_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.LR), pen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
         else:
             odd_out_plot_1D = None
 

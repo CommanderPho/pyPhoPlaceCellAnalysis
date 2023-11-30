@@ -123,8 +123,7 @@ class RankOrderRastersDebugger:
         global_laps_epochs_df = global_laps.to_dataframe()
           
         """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
-        from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
         _obj = cls(global_spikes_df=global_spikes_df, active_epochs_df=active_epochs_df.copy(), track_templates=track_templates,
@@ -141,15 +140,15 @@ class RankOrderRastersDebugger:
 
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Debug Plot Directional Template Rasters')
 
-        even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_even_dock_colors)
-        odd_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_odd_dock_colors)
+        RL_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors)
+        LR_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors)
 
         _out_dock_widgets = {}
-        dock_configs = (even_dock_config, odd_dock_config)
+        dock_configs = (RL_dock_config, LR_dock_config)
         dock_add_locations = (['left'], ['right'])
         
-        _out_dock_widgets['RL'] = root_dockAreaWindow.add_display_dock(identifier='RL', widget=RL_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[0], display_config=dock_configs[0])
-        _out_dock_widgets['LR'] = root_dockAreaWindow.add_display_dock(identifier='LR', widget=LR_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[1], display_config=dock_configs[1])
+        _out_dock_widgets['RL'] = root_dockAreaWindow.add_display_dock(identifier='RL', widget=RL_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[0], display_config=RL_dock_config)
+        _out_dock_widgets['LR'] = root_dockAreaWindow.add_display_dock(identifier='LR', widget=LR_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[1], display_config=LR_dock_config)
         
         ctrls_dock_config = CustomDockDisplayConfig(showCloseButton=False)
         slider = pg.QtWidgets.QSlider(pg.QtCore.Qt.Horizontal)
@@ -178,7 +177,6 @@ class RankOrderRastersDebugger:
         
         _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, slider=slider, logTextEdit=logTextEdit, dock_configs=dock_configs)
         
-
         try:
             ## rank_order_results.LR_ripple.selected_spikes_df mode:
             if isinstance(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):

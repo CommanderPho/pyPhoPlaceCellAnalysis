@@ -946,6 +946,31 @@ def build_shared_sorted_neuron_color_maps(neuron_IDs_lists) -> Tuple[Dict, Dict]
 def paired_incremental_sort_neurons(decoders_dict: Dict, included_any_context_neuron_ids=None, sortable_values_list_dict=None):
     """ Given a set of decoders (or more generally placefields, ratemaps, or anything else with neuron_IDs and a property that can be sorted) return the iterative successive sort.
     
+    This means:
+    
+    [A, B, C, D, E, F]
+    [A, B, C, D, E, F]
+    Sort Order: [0, 3, 5, 1, 4, 2]
+    Sorted: [A, D, F, B, E, C]
+    
+    
+    D0: [A, B, C]
+    D1: [A, C, D]
+    D2: [A, B, D, E, F]
+    D3: [A, B, C, D, E, F]
+        
+    Sort Order on D0 is:
+    [A, B, C]
+    [0, 1, 2]
+    
+    So sorted order on D0 is:
+    [A, B, C]
+
+    # For D1 all entries previously ranked are kept in the same order, then the remaining entries are sorted according to their D1-relative sorts:
+    
+    #TODO 2023-11-30 12:08: - [ ] Example, finish for D2, D3
+
+        
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_incremental_sort_neurons
         
     decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }

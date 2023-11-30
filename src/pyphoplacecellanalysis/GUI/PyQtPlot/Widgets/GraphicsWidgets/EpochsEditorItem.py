@@ -79,9 +79,9 @@ class EpochsEditor:
         """
         # Add 'lap_color' column to curr_laps_df
         if ('lap_color' not in curr_laps_df.columns) or ('lap_accent_color' not in curr_laps_df.columns):
-            curr_laps_df['lap_color'] = DisplayColorsEnum.Laps.even
+            curr_laps_df['lap_color'] = DisplayColorsEnum.Laps.RL
             curr_laps_df['lap_accent_color'] = '#6227ffde'
-            curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_color'] = DisplayColorsEnum.Laps.odd
+            curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_color'] = DisplayColorsEnum.Laps.LR
             curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_accent_color'] = '#c4ff26de'
         return curr_laps_df
 
