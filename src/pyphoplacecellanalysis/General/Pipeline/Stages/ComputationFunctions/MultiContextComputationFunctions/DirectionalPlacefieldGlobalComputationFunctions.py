@@ -34,22 +34,22 @@ DirectionalDecodersTuple = namedtuple('DirectionalDecodersTuple', ['long_LR', 'l
 class TrackTemplates:
     """ Holds the four directional templates for direction placefield analysis.
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
-    
+
     History:
         Based off of `ShuffleHelper` on 2023-10-27
         TODO: eliminate functional overlap with `ShuffleHelper`
         TODO: should be moved into `DirectionalPlacefieldGlobalComputation` instead of RankOrder
-        
+
     """
     long_LR_decoder: BasePositionDecoder = field()
     long_RL_decoder: BasePositionDecoder = field()
     short_LR_decoder: BasePositionDecoder = field()
     short_RL_decoder: BasePositionDecoder = field()
-    
+
     # ## Computed properties
     shared_LR_aclus_only_neuron_IDs: NDArray = field()
     is_good_LR_aclus: NDArray = field()
-    
+
     shared_RL_aclus_only_neuron_IDs: NDArray = field()
     is_good_RL_aclus: NDArray = field()
 
@@ -62,7 +62,7 @@ class TrackTemplates:
         """ Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
         minimum_inclusion_fr_Hz: float = 5.0
         modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-        
+
         Usage:
             minimum_inclusion_fr_Hz: float = 5.0
             filtered_decoder_list = [filtered_by_frate(a_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True) for a_decoder in (track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)]
@@ -78,11 +78,11 @@ class TrackTemplates:
         return _obj
 
     def get_decoders(self) -> Tuple[BasePositionDecoder, BasePositionDecoder, BasePositionDecoder, BasePositionDecoder]:
-        """ 
-        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders() 
+        """
+        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
         """
         return DirectionalDecodersTuple(self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)
-    
+
 
     def get_decoders_dict(self) -> Dict[str, BasePositionDecoder]:
         return {'long_LR': self.long_LR_decoder,
@@ -94,17 +94,17 @@ class TrackTemplates:
     @classmethod
     def init_from_paired_decoders(cls, LR_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], RL_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder]) -> "TrackTemplates":
         """ 2023-10-31 - Extract from pairs
-        
+
         """
         long_LR_decoder, short_LR_decoder = LR_decoder_pair
         long_RL_decoder, short_RL_decoder = RL_decoder_pair
-            
+
         shared_LR_aclus_only_neuron_IDs = deepcopy(long_LR_decoder.neuron_IDs)
         assert np.all(short_LR_decoder.neuron_IDs == shared_LR_aclus_only_neuron_IDs), f"{short_LR_decoder.neuron_IDs} != {shared_LR_aclus_only_neuron_IDs}"
-        
+
         shared_RL_aclus_only_neuron_IDs = deepcopy(long_RL_decoder.neuron_IDs)
         assert np.all(short_RL_decoder.neuron_IDs == shared_RL_aclus_only_neuron_IDs), f"{short_RL_decoder.neuron_IDs} != {shared_RL_aclus_only_neuron_IDs}"
-    
+
         # is_good_aclus = np.logical_not(np.isin(shared_aclus_only_neuron_IDs, bimodal_exclude_aclus))
         # shared_aclus_only_neuron_IDs = shared_aclus_only_neuron_IDs[is_good_aclus]
 
@@ -112,7 +112,7 @@ class TrackTemplates:
         # decoder_peak_coms_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[is_good_aclus] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
         ## Compute the ranks:
         # decoder_pf_peak_ranks_list = [scipy.stats.rankdata(a_peaks_com, method='dense') for a_peaks_com in decoder_peak_coms_list]
-        
+
         #TODO 2023-11-21 13:06: - [ ] Note this are in order of the original entries, and do not reflect any sorts or ordering changes.
 
 
@@ -125,9 +125,9 @@ class TrackTemplates:
         """ Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
         minimum_inclusion_fr_Hz: float = 5.0
         modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-        
+
         individual_decoder_filtered_aclus_list: list of four lists of aclus, not constrained to have the same aclus as its long/short pair
-        
+
         Usage:
             filtered_decoder_list, filtered_direction_shared_aclus_list, is_aclu_included_list, individual_decoder_filtered_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate(track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)
 
@@ -152,7 +152,7 @@ class TrackTemplates:
 @define(slots=False, repr=False)
 class DirectionalLapsResult(ComputedResult):
     """ a container for holding information regarding the computation of directional laps.
-    
+
     ## Build a `DirectionalLapsResult` container object to hold the result:
     directional_laps_result = DirectionalLapsResult()
     directional_laps_result.directional_lap_specific_configs = directional_lap_specific_configs
@@ -167,9 +167,9 @@ class DirectionalLapsResult(ComputedResult):
     directional_laps_result.short_odd_shared_aclus_only_one_step_decoder_1D = short_odd_shared_aclus_only_one_step_decoder_1D
     directional_laps_result.short_even_shared_aclus_only_one_step_decoder_1D = short_even_shared_aclus_only_one_step_decoder_1D
 
-        
+
     long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [directional_laps_results.__dict__[k] for k in ['long_LR_shared_aclus_only_one_step_decoder_1D', 'long_RL_shared_aclus_only_one_step_decoder_1D', 'short_LR_shared_aclus_only_one_step_decoder_1D', 'short_RL_shared_aclus_only_one_step_decoder_1D']]
-        
+
     """
     directional_lap_specific_configs: Dict = field(default=Factory(dict))
     split_directional_laps_dict: Dict = field(default=Factory(dict))
@@ -190,17 +190,17 @@ class DirectionalLapsResult(ComputedResult):
     # long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D
 
     def get_decoders(self) -> Tuple[BasePositionDecoder, BasePositionDecoder, BasePositionDecoder, BasePositionDecoder]:
-        """ 
-        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders() 
+        """
+        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
         """
         return DirectionalDecodersTuple(self.long_LR_one_step_decoder_1D, self.long_RL_one_step_decoder_1D, self.short_LR_one_step_decoder_1D, self.short_RL_one_step_decoder_1D)
-    
+
     def get_shared_aclus_only_decoders(self) -> Tuple[BasePositionDecoder, BasePositionDecoder, BasePositionDecoder, BasePositionDecoder]:
-        """ 
-        long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders() 
+        """
+        long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders()
         """
         return DirectionalDecodersTuple(self.long_LR_shared_aclus_only_one_step_decoder_1D, self.long_RL_shared_aclus_only_one_step_decoder_1D, self.short_LR_shared_aclus_only_one_step_decoder_1D, self.short_RL_shared_aclus_only_one_step_decoder_1D)
-    
+
 
     def get_templates(self, minimum_inclusion_fr_Hz: Optional[float] = None) -> TrackTemplates:
         _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(self.long_LR_one_step_decoder_1D, self.short_LR_one_step_decoder_1D), RL_decoder_pair=(self.long_RL_one_step_decoder_1D, self.short_RL_one_step_decoder_1D))
@@ -208,14 +208,14 @@ class DirectionalLapsResult(ComputedResult):
             return _obj
         else:
             return _obj.filtered_by_frate(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-        
+
     def get_shared_aclus_only_templates(self, minimum_inclusion_fr_Hz: Optional[float] = None) -> TrackTemplates:
         _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(self.long_LR_shared_aclus_only_one_step_decoder_1D, self.short_LR_shared_aclus_only_one_step_decoder_1D), RL_decoder_pair=(self.long_RL_shared_aclus_only_one_step_decoder_1D, self.short_RL_shared_aclus_only_one_step_decoder_1D))
         if minimum_inclusion_fr_Hz is None:
             return _obj
         else:
             return _obj.filtered_by_frate(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-        
+
     ## For serialization/pickling:
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
@@ -230,14 +230,14 @@ class DirectionalLapsResult(ComputedResult):
 
 
 
-            
-    # 
+
+    #
 
     # shared_aclus: np.ndarray
     # long_short_pf_neurons_diff: SetPartition
     # n_neurons: int
 
-    
+
 
 class DirectionalLapsHelpers:
     """ 2023-10-24 - Directional Placefields Computations
@@ -249,17 +249,17 @@ class DirectionalLapsHelpers:
 
     curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
 
-    
-    
-    
+
+
+
     Computing:
-    
+
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
-        
+
         # Run directional laps and set the global result:
         curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] = DirectionalLapsHelpers.complete_directional_pfs_computations(curr_active_pipeline)
 
-    
+
     """
 
 
@@ -279,7 +279,7 @@ class DirectionalLapsHelpers:
 
         long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
         long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders()
-        
+
         # assert (computation_filter_name in computed_base_epoch_names), f'computation_filter_name: {computation_filter_name} is missing from computed_base_epoch_names: {computed_base_epoch_names} '
         return (computation_filter_name in split_directional_laps_config_names)
         # return (computation_filter_name in computed_base_epoch_names)
@@ -293,7 +293,7 @@ class DirectionalLapsHelpers:
 
     @classmethod
     def deduplicate_memory_references(cls, *args) -> list:
-        """ Ensures that all entries in the args list point to unique memory addresses, deduplicating them with `deepcopy` if needed. 
+        """ Ensures that all entries in the args list point to unique memory addresses, deduplicating them with `deepcopy` if needed.
 
         Usage:
 
@@ -309,7 +309,7 @@ class DirectionalLapsHelpers:
             return de_deuped_args
         else:
             return args
-    
+
     @classmethod
     def post_fixup_filtered_contexts(cls, curr_active_pipeline, debug_print=False) -> bool:
         """ 2023-10-24 - tries to update misnamed `curr_active_pipeline.filtered_contexts`
@@ -318,13 +318,13 @@ class DirectionalLapsHelpers:
 
             Uses: `curr_active_pipeline.filtered_epoch`
             Updates: `curr_active_pipeline.filtered_contexts`
-            
+
         Still needed for 2023-11-29 to add back in the 'lap_dir' key
-        
+
         History: factored out of BatchCompletionHandler
-        
+
         NOTE: works for non-directional contexts as well, fixing `filter_name` as needed.
-        
+
 
         """
         was_updated = False
@@ -333,7 +333,7 @@ class DirectionalLapsHelpers:
             # 2023-11-29 - as of right now, I think the full name including the lap_dir 'maze1_any' (mode 2) should be used as this is literally what the name of the corresponding filtering function is.
             # desired_filter_name:str = a_named_timerange.name # mode 1: uses the period name 'maze1' without the lap_dir part, probably best for compatibility in most places
             desired_filter_name:str = a_name  # mode 2: uses the config_name: 'maze1_any', includes the lap_dir part
-            
+
             if debug_print:
                 print(f'"{a_name}" - desired_filter_name: "{desired_filter_name}"')
             a_filtered_ctxt = curr_active_pipeline.filtered_contexts[a_name]
@@ -349,7 +349,7 @@ class DirectionalLapsHelpers:
 
                 if not a_filtered_ctxt.has_keys('lap_dir'):
                     print(f'WARNING: context {a_name} is missing the "lap_dir" key despite directional laps being detected from the name! Adding missing context key! lap_dir="{lap_dir}"')
-                    a_filtered_ctxt = a_filtered_ctxt.adding_context_if_missing(lap_dir=lap_dir) # Add the lap_dir context if it was missing                
+                    a_filtered_ctxt = a_filtered_ctxt.adding_context_if_missing(lap_dir=lap_dir) # Add the lap_dir context if it was missing
                     was_updated = True
 
             else:
@@ -357,7 +357,7 @@ class DirectionalLapsHelpers:
                     was_updated = True
                     print(f"WARNING: filtered_contexts['{a_name}']'s actual context name is incorrect. \n\ta_filtered_ctxt.filter_name: '{a_filtered_ctxt.filter_name}' != desired_filter_name: '{desired_filter_name}'\n\tUpdating it. (THIS IS A HACK)")
                     a_filtered_ctxt = a_filtered_ctxt.overwriting_context(filter_name=desired_filter_name)
-                    
+
             if debug_print:
                 print(f'\t{a_filtered_ctxt.to_dict()}')
             curr_active_pipeline.filtered_contexts[a_name] = a_filtered_ctxt # correct the context
@@ -383,7 +383,7 @@ class DirectionalLapsHelpers:
 
         ## {"even": "RL", "odd": "LR"}
         long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-        
+
         (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
 
         # Check for duplicated memory references in the configs first:
@@ -408,13 +408,13 @@ class DirectionalLapsHelpers:
 
         for an_epoch_name in (short_LR_name, short_RL_name):
             curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(short_epoch_obj.t_start, short_epoch_obj.t_stop))
-        
+
         modified_num_epochs = np.array([curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.n_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)])
         if debug_print:
             print(f'modified_num_epochs: {modified_num_epochs}')
         was_modified = was_modified or np.any(original_num_epochs != modified_num_epochs)
         assert np.all(modified_num_epochs > 0)
-        
+
         return was_modified
 
 
@@ -425,10 +425,10 @@ class DirectionalLapsHelpers:
         # 2023-11-10 21:15: - [X] Not yet finished! Does not work due to shared memory issue. Changes to the first two affect the next two
 
         was_modified: bool = False
-        was_modified = was_modified or DirectionalLapsHelpers.post_fixup_filtered_contexts(curr_active_pipeline)        
+        was_modified = was_modified or DirectionalLapsHelpers.post_fixup_filtered_contexts(curr_active_pipeline)
         was_modified = was_modified or DirectionalLapsHelpers.fix_computation_epochs_if_needed(curr_active_pipeline)
         return was_modified
-    
+
 
     @classmethod
     def build_global_directional_result_from_natural_epochs(cls, curr_active_pipeline, progress_print=False) -> "DirectionalLapsResult":
@@ -437,15 +437,15 @@ class DirectionalLapsHelpers:
         Does not update `curr_active_pipeline` or mess with its filters/configs/etc.
 
                 ## {"even": "RL", "odd": "LR"}
-        
+
         #TODO 2023-11-10 21:00: - [ ] Convert above "LR/RL" notation to new "LR/RL" versions:
 
         """
-        
+
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
-        
+
         # Unwrap the naturally produced directional placefields:
         long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
         # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
@@ -457,10 +457,10 @@ class DirectionalLapsHelpers:
         (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
         (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
         (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
-        
+
         # Unpack all directional variables:
-        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name 
-        
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name
+
         # Validate:
         assert not (curr_active_pipeline.computation_results[long_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
         assert not (curr_active_pipeline.computation_results[short_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
@@ -468,7 +468,7 @@ class DirectionalLapsHelpers:
         was_modified = cls.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
         was_modified = was_modified or DirectionalLapsHelpers.post_fixup_filtered_contexts(curr_active_pipeline)
         print(f'build_global_directional_result_from_natural_epochs(...): was_modified: {was_modified}')
-        
+
         # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
         # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D  = DirectionalLapsHelpers.build_directional_constrained_decoders(curr_active_pipeline)
 
@@ -535,7 +535,7 @@ class DirectionalLapsHelpers:
         directional_laps_result.long_RL_shared_aclus_only_one_step_decoder_1D = long_RL_shared_aclus_only_one_step_decoder_1D
         directional_laps_result.short_LR_shared_aclus_only_one_step_decoder_1D = short_LR_shared_aclus_only_one_step_decoder_1D
         directional_laps_result.short_RL_shared_aclus_only_one_step_decoder_1D = short_RL_shared_aclus_only_one_step_decoder_1D
-        
+
         return directional_laps_result
 
 
@@ -550,11 +550,11 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     @function_attributes(short_name='split_to_directional_laps', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
         validate_computation_test=DirectionalLapsHelpers.validate_has_directional_laps, is_global=True)
     def _split_to_directional_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
-        """ 
-        
+        """
+
         Requires:
             ['sess']
-            
+
         Provides:
             global_computation_results.computed_data['DirectionalLaps']
                 ['DirectionalLaps']['directional_lap_specific_configs']
@@ -563,7 +563,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalLaps']['split_directional_laps_names']
                 ['DirectionalLaps']['computed_base_epoch_names']
 
-        
+
         """
         if include_includelist is not None:
             print(f'WARN: _split_to_directional_laps(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
@@ -573,7 +573,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             # include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
             # include_includelist = [global_epoch_name] # ['maze'] # only for maze
             # include_includelist = [long_epoch_name, short_epoch_name] # ['maze1', 'maze2'] # only for maze
-        
+
         ## Adds ['*_even_laps', '*_odd_laps'] pseduofilters
 
         # owning_pipeline_reference, directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names = DirectionalLapsHelpers.split_to_directional_laps(owning_pipeline_reference, include_includelist=include_includelist, add_created_configs_to_pipeline=True)
@@ -627,9 +627,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     @function_attributes(short_name='directional_laps_overview', tags=['directional','laps','overview'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 12:03', related_items=[], is_global=True)
     def _display_directional_laps_overview(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
             """ Renders a window with the position/laps displayed in the middle and the four templates displayed to the left and right of them.
-            
+
             """
-            
+
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import EpochsEditor # perform_plot_laps_diagnoser
@@ -645,14 +645,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             fignum = kwargs.pop('fignum', None)
             if fignum is not None:
                 print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
-            
-            defer_render = kwargs.pop('defer_render', False) 
-            debug_print: bool = kwargs.pop('debug_print', False) 
 
-            figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')  
+            defer_render = kwargs.pop('defer_render', False)
+            debug_print: bool = kwargs.pop('debug_print', False)
+
+            figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
             _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
 
-            
+
             # Recover from the saved global result:
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
 
@@ -670,10 +670,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # uses `global_session`
             epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=False, include_accel=False)
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(epochs_editor.plots.win, None, title='Pho Directional Laps Templates')
-            
+
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
 
-            # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`               
+            # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
 
             # INCRIMENTAL SORTING:
             if use_incremental_sorting:
@@ -692,7 +692,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     title_str = f'{a_decoder_name}_pf1Ds [sort: {ref_decoder_name}]'
                 else:
                     title_str = f'{a_decoder_name}_pf1Ds'
-                    
+
                 _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorted_pf_tuning_curves[i], title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
                 # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Individual Sort
 
@@ -746,10 +746,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # Saving/Exporting to file ___________________________________________________________________________________________ #
             #TODO 2023-11-16 22:16: - [ ] Figure out how to save
-                    
+
             def save_figure(): # export_file_base_path: Path = Path(f'output').resolve()
-                """ captures: epochs_editor, _out_pf1D_heatmaps 
-                
+                """ captures: epochs_editor, _out_pf1D_heatmaps
+
                 TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
                 import pyqtgraph as pg
                 import pyqtgraph.exporters
@@ -764,7 +764,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                 shared_output_file_prefix = f'output/2023-11-20'
                 # print(list(plots.keys()))
-                # pg.GraphicsLayoutWidget 
+                # pg.GraphicsLayoutWidget
                 main_graphics_layout_widget = epochs_editor.plots.win
                 export_file_path = Path(f'{shared_output_file_prefix}_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
                 export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
@@ -783,13 +783,13 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                     # save to file
                     export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
-                    
+
                     exporter.export(str(export_file_path)) # '.png'
                     print(f'exporting to {export_file_path}')
                     # .scene()
 
 
-            #TODO 2023-11-16 22:23: - [ ] The other display functions using matplotlib do things like this: 
+            #TODO 2023-11-16 22:23: - [ ] The other display functions using matplotlib do things like this:
             # final_context = active_context
             # graphics_output_dict['context'] = final_context
             # graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate,
@@ -798,15 +798,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # def _perform_write_to_file_callback():
             #     ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
             #     return owning_pipeline_reference.output_figure(final_context, graphics_output_dict.figures[0])
-            
+
             # if save_figure:
             #     active_out_figure_paths = _perform_write_to_file_callback()
             # else:
             #     active_out_figure_paths = []
 
             # graphics_output_dict['saved_figures'] = active_out_figure_paths
-            
-            
+
+
             return graphics_output_dict
 
 
@@ -815,69 +815,70 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             """ Renders a window with the four template heatmaps displayed to the left and right of center, and the ability to filter the actively included aclus via `included_any_context_neuron_ids`
 
             """
-            
+
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import EpochsEditor # perform_plot_laps_diagnoser
-            from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
             from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
             from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
 
             from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
             from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
-            
 
-            # raise NotImplementedError
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
             fignum = kwargs.pop('fignum', None)
             if fignum is not None:
                 print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
-            
-            defer_render = kwargs.pop('defer_render', False) 
+
+            defer_render = kwargs.pop('defer_render', False)
             debug_print: bool = kwargs.pop('debug_print', False)
 
-
             enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
+            use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
 
-            figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')  
+            figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
             _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None)
             _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
-            
-            
+
             # Recover from the saved global result:
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
 
             assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
             rank_order_results = global_computation_results.computed_data['RankOrder'] # RankOrderComputationsContainer
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            assert minimum_inclusion_fr_Hz is not None
+            if (use_shared_aclus_only_templates):
+                track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # shared-only
+            else:
+                track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only
 
-            # track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # shared-only
-            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only
-            
             # build the window with the dock widget in it:
             root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
             _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, dock_widgets=None, dock_configs=None, on_update_callback=None)
-            root_dockAreaWindow.resize(800, 400)
+            root_dockAreaWindow.resize(900, 700)
 
-            # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting` 
+            # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
 
             # INCRIMENTAL SORTING:
             if use_incremental_sorting:
-                ref_decoder_name: str = list(decoders_dict.keys())[0] # name of the reference coder. Should be 'long_LR'                
+                ref_decoder_name: str = list(decoders_dict.keys())[0] # name of the reference coder. Should be 'long_LR'
                 sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_incremental_sort_neurons(decoders_dict, included_any_context_neuron_ids)
             else:
                 # INDIVIDUAL SORTING:
                 sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict, included_any_context_neuron_ids)
 
             sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
-            
+            # sorted_pf_tuning_curves_dict = {a_decoder_name:a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_decoder_name, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts.keys(), sort_helper_neuron_id_to_sort_IDX_dicts.values())}
+
             # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
             _out_data.sorted_neuron_IDs_lists = sorted_neuron_IDs_lists
             _out_data.sort_helper_neuron_id_to_neuron_colors_dicts = sort_helper_neuron_id_to_neuron_colors_dicts
             _out_data.sort_helper_neuron_id_to_sort_IDX_dicts = sort_helper_neuron_id_to_sort_IDX_dicts
             _out_data.sorted_pf_tuning_curves = sorted_pf_tuning_curves
+
+            # _out_data.sorted_pf_tuning_curves = sorted_pf_tuning_curves_dict
+
 
             ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
             _out_plots.pf1D_heatmaps = {}
@@ -886,17 +887,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     title_str = f'{a_decoder_name}_pf1Ds [sort: {ref_decoder_name}]'
                 else:
                     title_str = f'{a_decoder_name}_pf1Ds'
-            
-                _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorted_pf_tuning_curves[i], title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
+
+                curr_curves = sorted_pf_tuning_curves[i]
+                # curr_curves = sorted_pf_tuning_curves_dict[a_decoder_name]
+
+                _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
+
                 # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Individual Sort
 
                 # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
                 curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
-                
+
                 a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
 
                 # Coloring the heatmap data for each row of the 1D heatmap:
-                curr_data = deepcopy(sorted_pf_tuning_curves[i])
+                curr_data = deepcopy(curr_curves)
                 if debug_print:
                     print(f'np.shape(curr_data): {np.shape(curr_data)}, np.nanmax(curr_data): {np.nanmax(curr_data)}, np.nanmin(curr_data): {np.nanmin(curr_data)}') # np.shape(curr_data): (34, 62), np.nanmax(curr_data): 0.15320444716258447, np.nanmin(curr_data): 0.0
 
@@ -945,10 +950,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # Saving/Exporting to file ___________________________________________________________________________________________ #
             #TODO 2023-11-16 22:16: - [ ] Figure out how to save
-                    
+
             def save_figure(): # export_file_base_path: Path = Path(f'output').resolve()
-                """ captures: epochs_editor, _out_pf1D_heatmaps 
-                
+                """ captures: epochs_editor, _out_pf1D_heatmaps
+
                 TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
                 import pyqtgraph as pg
                 import pyqtgraph.exporters
@@ -963,7 +968,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                 shared_output_file_prefix = f'output/2023-11-20'
                 # print(list(plots.keys()))
-                # pg.GraphicsLayoutWidget 
+                # pg.GraphicsLayoutWidget
                 main_graphics_layout_widget = epochs_editor.plots.win
                 export_file_path = Path(f'{shared_output_file_prefix}_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
                 export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
@@ -982,7 +987,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                     # save to file
                     export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
-                    
+
                     exporter.export(str(export_file_path)) # '.png'
                     print(f'exporting to {export_file_path}')
                     # .scene()
@@ -1005,7 +1010,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             #         # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
             #         curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
-                    
+
             #         a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
 
             #         # Coloring the heatmap data for each row of the 1D heatmap:
@@ -1039,7 +1044,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # graphics_output_dict['ui'].on_update_callback = on_update
 
-            #TODO 2023-11-16 22:23: - [ ] The other display functions using matplotlib do things like this: 
+            #TODO 2023-11-16 22:23: - [ ] The other display functions using matplotlib do things like this:
             # final_context = active_context
             # graphics_output_dict['context'] = final_context
             # graphics_output_dict['plot_data'] |= {'df': neuron_replay_stats_df, 'rdf':rdf, 'aclu_to_idx':aclu_to_idx, 'irdf':irdf, 'time_binned_unit_specific_spike_rate': global_computation_results.computed_data['jonathan_firing_rate_analysis'].time_binned_unit_specific_spike_rate,
@@ -1048,12 +1053,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # def _perform_write_to_file_callback():
             #     ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
             #     return owning_pipeline_reference.output_figure(final_context, graphics_output_dict.figures[0])
-            
+
             # if save_figure:
             #     active_out_figure_paths = _perform_write_to_file_callback()
             # else:
             #     active_out_figure_paths = []
 
             # graphics_output_dict['saved_figures'] = active_out_figure_paths
-            
+
             return graphics_output_dict

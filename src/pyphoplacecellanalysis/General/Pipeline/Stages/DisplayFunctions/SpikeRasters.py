@@ -539,44 +539,6 @@ def _build_scatter_plotting_managers(plots_data, spikes_df, included_neuron_ids=
     return plots_data
 
 
-def _build_scatterplot(new_ax) -> pg.GridItem:
-    """create a GridItem and add it to the plot
-
-    Usage:
-        plots.scatter_plots[an_epoch.Index] = _build_scatterplot(new_ax)
-
-    """
-    scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', **scatter_plot_kwargs)
-    scatter_plot.setObjectName(f'scatter_plot_{_active_plot_title}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-    scatter_plot.opts['useCache'] = False
-    scatter_plot.addPoints(plots_data.all_spots_dict[an_epoch.Index]) # , hoverable=True
-
-    ## Add to the axis and set up the axis:
-    new_ax.addItem(scatter_plot)
-
-    new_ax.setXRange(an_epoch.start, an_epoch.stop)
-    new_ax.setYRange(0, n_cells-1)
-    # new_ax.showAxes(True, showValues=(True, True, True, False)) # showValues=(left: True, bottom: True, right: False, top: False) # , size=10       
-    new_ax.hideButtons() # Hides the auto-scale button
-    new_ax.setDefaultPadding(0.0)  # plot without padding data range
-    # Format Labels:
-    # left_label: str = f'Epoch[{an_epoch.label}]: {an_epoch.start:.2f}' # Full label
-    # left_label: str = f'Epoch[{an_epoch.label}]' # Epoch[idx] style label
-    left_label: str = f'[{an_epoch.label}]' # very short (index only) label
-    new_ax.getAxis('left').setLabel(left_label)
-    # new_ax.getAxis('bottom').setLabel('t')
-    # new_ax.getAxis('right').setLabel(f'Epoch[{an_epoch.label}]: {an_epoch.stop:.2f}')
-
-    # new_ax.getAxis('bottom').setTickSpacing(1.0) # 5.0, 1.0 .setTickSpacing(x=[None], y=[1.0])
-    # new_ax.showGrid(x=False, y=True, alpha=1.0)
-    new_ax.getAxis('bottom').setStyle(showValues=False)
-
-    # Disable Interactivity
-    new_ax.setMouseEnabled(x=False, y=False)
-    new_ax.setMenuEnabled(False)
-    return scatter_plot
-
-
 def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identifier: str, row:int, col:int=0, left_label: Optional[str]=None, scatter_plot_kwargs=None):
     """ Adds a single scatter plot row to the plots_data/plots with identifier '_active_plot_identifier':
     usage:
@@ -595,8 +557,7 @@ def _subfn_build_and_add_scatterplot_row(plots_data, plots, _active_plot_identif
     scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     scatter_plot.setObjectName(f'scatter_plot_{_active_plot_identifier}') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
     scatter_plot.opts['useCache'] = False
-        
-
+    
     # scatter_plot.addPoints(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {})) # , hoverable=True
     new_ax.addItem(scatter_plot)
     plots.scatter_plots[_active_plot_identifier] = scatter_plot
@@ -692,7 +653,7 @@ def plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids,
         else:
             unit_colors_list = None
 
-        plots_data.plots_data_dict[_active_plot_identifier] = _build_scatter_plotting_managers(plots_data.plots_data_dict[_active_plot_identifier], spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=active_unit_sort_order, unit_colors_list=unit_colors_list)
+        plots_data.plots_data_dict[_active_plot_identifier] = _build_scatter_plotting_managers(plots_data.plots_data_dict[_active_plot_identifier], spikes_df=spikes_df, included_neuron_ids=deepcopy(included_neuron_ids), unit_sort_order=deepcopy(active_unit_sort_order), unit_colors_list=deepcopy(unit_colors_list))
         
         # Update the dataframe
         plots_data.plots_spikes_df_dict[_active_plot_identifier] = deepcopy(spikes_df)
@@ -1034,7 +995,6 @@ def paired_separately_sort_neurons(decoders_dict: Dict, included_any_context_neu
     
     #TODO 2023-11-29 17:36: - [ ] Actually change to use separately sorted items instead of `paired_individual_sorting`
     
-    
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons
         
     decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
@@ -1089,15 +1049,11 @@ def paired_separately_sort_neurons(decoders_dict: Dict, included_any_context_neu
         # sortable_values_lists = [deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for a_decoder in decoders_dict.values()] # (46, 56) - (n_neurons, n_pos_bins)
         sortable_values_lists = [deepcopy(a_sortable_values_list) for a_sortable_values_list in sortable_values_list_dict.values()] # (46, 56) - (n_neurons, n_pos_bins)
 
-
     # `sort_helper_original_neuron_id_to_IDX_dicts` needs to be built after filtering (if it occurs)
     sort_helper_original_neuron_id_to_IDX_dicts = [dict(zip(neuron_ids, np.arange(len(neuron_ids)))) for neuron_ids in original_neuron_IDs_lists] # just maps each neuron_id in the list to a fragile_linear_IDX 
 
-
     ## DO SORTING: determine sorting:
     sorted_neuron_IDs_lists = paired_individual_sorting(neuron_IDs_lists, sortable_values_lists)
-
-
 
     # `sort_helper_neuron_id_to_sort_IDX_dicts` dictionaries in the appropriate order (sorted order) with appropriate indexes. Its .values() can be used to index into things originally indexed with aclus.
     sort_helper_neuron_id_to_sort_IDX_dicts = [{aclu:a_sort_helper_neuron_id_to_IDX_map[aclu] for aclu in sorted_neuron_ids} for a_sort_helper_neuron_id_to_IDX_map, sorted_neuron_ids in zip(sort_helper_original_neuron_id_to_IDX_dicts, sorted_neuron_IDs_lists)]

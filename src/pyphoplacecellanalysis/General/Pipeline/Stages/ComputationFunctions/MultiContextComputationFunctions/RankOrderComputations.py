@@ -639,7 +639,7 @@ class RankOrderAnalyses:
         # Preprocess the spikes DataFrame
         (shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, long_pf_peak_ranks, short_pf_peak_ranks, active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict) = cls.preprocess_spikes_df(active_spikes_df, active_epochs, shuffle_helper)
         
-        #TODO 2023-11-21 05:42: - [ ] todo_description want the aclus as well, not just the `long_pf_peak_ranks`
+        # TODO 2023-11-21 05:42: - [ ] todo_description want the aclus as well, not just the `long_pf_peak_ranks`
 
         # Select and rank spikes
         epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df = cls.select_and_rank_spikes(active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment)
@@ -1121,53 +1121,53 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
     These display functions compare results across several contexts.
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
-
-    @function_attributes(short_name='rank_order_debugger', tags=['rank-order','debugger','shuffle'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 01:12', related_items=[], is_global=True)
-    def _display_rank_order_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
-            """ 
+    pass
+    # @function_attributes(short_name='rank_order_debugger', tags=['rank-order','debugger','shuffle'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 01:12', related_items=[], is_global=True)
+    # def _display_rank_order_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+    #         """ 
             
-            """
-            reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)
-            # reuse_axs_tuple = None # plot fresh
-            # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
-            # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
-            single_figure = kwargs.pop('single_figure', True)
-            debug_print = kwargs.pop('debug_print', False)
+    #         """
+    #         reuse_axs_tuple = kwargs.pop('reuse_axs_tuple', None)
+    #         # reuse_axs_tuple = None # plot fresh
+    #         # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
+    #         # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
+    #         single_figure = kwargs.pop('single_figure', True)
+    #         debug_print = kwargs.pop('debug_print', False)
 
-            active_config_name = kwargs.pop('active_config_name', None)
-            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+    #         active_config_name = kwargs.pop('active_config_name', None)
+    #         active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
-            fignum = kwargs.pop('fignum', None)
-            if fignum is not None:
-                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+    #         fignum = kwargs.pop('fignum', None)
+    #         if fignum is not None:
+    #             print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
             
 
-            defer_render = kwargs.pop('defer_render', False) 
+    #         defer_render = kwargs.pop('defer_render', False) 
 
 
-            # Plot 1D Keywoard args:
-            shared_kwargs = kwargs.pop('shared_kwargs', {})
-            long_kwargs = kwargs.pop('long_kwargs', {})
-            short_kwargs = kwargs.pop('short_kwargs', {})
+    #         # Plot 1D Keywoard args:
+    #         shared_kwargs = kwargs.pop('shared_kwargs', {})
+    #         long_kwargs = kwargs.pop('long_kwargs', {})
+    #         short_kwargs = kwargs.pop('short_kwargs', {})
 
-            shared_kwargs['active_context'] = active_context
+    #         shared_kwargs['active_context'] = active_context
 
-            ## Inputs: track_templates, global_replays, owning_pipeline_reference
-            global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df)
+    #         ## Inputs: track_templates, global_replays, owning_pipeline_reference
+    #         global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df)
 
-            global_ripples_epochs_df = global_replays.to_dataframe()
-            active_epochs_df = global_ripples_epochs_df.copy()
+    #         global_ripples_epochs_df = global_replays.to_dataframe()
+    #         active_epochs_df = global_ripples_epochs_df.copy()
 
-            rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
+    #         rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
 
-            #TODO 2023-11-17 19:57: - [ ] Find other expansions of this kinda and replace it
-            LR_laps_epoch_ranked_aclus_stats_dict, LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_laps_long_z_score_values, LR_laps_short_z_score_values, LR_laps_long_short_z_score_diff_values = rank_order_results.LR_laps
-            RL_laps_epoch_ranked_aclus_stats_dict, RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, RL_laps_long_z_score_values, RL_laps_short_z_score_values, RL_laps_long_short_z_score_diff_values = rank_order_results.RL_laps
+    #         #TODO 2023-11-17 19:57: - [ ] Find other expansions of this kinda and replace it
+    #         LR_laps_epoch_ranked_aclus_stats_dict, LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_laps_long_z_score_values, LR_laps_short_z_score_values, LR_laps_long_short_z_score_diff_values = rank_order_results.LR_laps
+    #         RL_laps_epoch_ranked_aclus_stats_dict, RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, RL_laps_long_z_score_values, RL_laps_short_z_score_values, RL_laps_long_short_z_score_diff_values = rank_order_results.RL_laps
 
-            LR_ripple_evts_epoch_ranked_aclus_stats_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_long_z_score_values, LR_ripple_evts_short_z_score_values, LR_ripple_evts_long_short_z_score_diff_values = rank_order_results.LR_ripple
-            RL_ripple_evts_epoch_ranked_aclus_stats_dict, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, RL_ripple_evts_long_z_score_values, RL_ripple_evts_short_z_score_values, RL_ripple_evts_long_short_z_score_diff_values = rank_order_results.RL_ripple
+    #         LR_ripple_evts_epoch_ranked_aclus_stats_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_long_z_score_values, LR_ripple_evts_short_z_score_values, LR_ripple_evts_long_short_z_score_diff_values = rank_order_results.LR_ripple
+    #         RL_ripple_evts_epoch_ranked_aclus_stats_dict, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, RL_ripple_evts_long_z_score_values, RL_ripple_evts_short_z_score_values, RL_ripple_evts_long_short_z_score_diff_values = rank_order_results.RL_ripple
 
-            return RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+    #         return RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, RL_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
             
 
 
