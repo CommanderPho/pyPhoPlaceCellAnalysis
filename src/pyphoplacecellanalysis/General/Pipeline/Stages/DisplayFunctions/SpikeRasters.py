@@ -336,6 +336,8 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
             _sorted_map_values = self.series_identity_y_values[self.unit_sort_order].copy() # sort the y-values
             # Builds the sorted version by sorting the map values before building:
             self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, _sorted_map_values)) # Old way
+            # self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs[self.unit_sort_order].copy(), _sorted_map_values)) # 2023-12-06 - Attempted fix for basically scrambled orders
+            # self.y_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDX_to_spatial(self.fragile_linear_neuron_IDXs), self._series_identity_y_values)) # Using `self.fragile_linear_neuron_IDX_to_spatial(self.fragile_linear_neuron_IDXs)` instead of just `self.fragile_linear_neuron_IDXs` should yield sorted results
 
         else:
             if debug_print:
@@ -643,9 +645,9 @@ def _build_scatter_plotting_managers(plots_data: RenderPlotsData, spikes_df: Opt
     params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list, coloring_mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS)
     
     manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=plots_data.n_cells, unit_sort_order=unit_sort_order, params=params)
-    # manager.update_series_identity_y_values()
+    manager.update_series_identity_y_values()
     raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
-    # raster_plot_manager._build_cell_configs()
+    raster_plot_manager._build_cell_configs()
     
     ## Add the managers to the plot_data
     plots_data.params = params
