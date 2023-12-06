@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Union, Tuple
 from collections import namedtuple
 from copy import deepcopy
 import numpy as np
@@ -6,6 +6,7 @@ import pandas as pd
 from functools import partial
 from attrs import define, field, Factory
 from indexed import IndexedOrderedDict
+
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 from neuropy.utils.result_context import overwriting_display_context, providing_context
@@ -173,21 +174,23 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
 
 # Windowing helpers for spikes_df:
 
-@define 
+@define(slots=False)
 class RasterPlotParams:
-    """ factored out of Spike2DRaster to do standalone pyqtgraph plotting of the 2D raster plot. """
-    center_mode: str = 'starting_at_zero' # or 'zero_centered'
-    bin_position_mode: str = 'bin_center' # or 'left_edges'
-    side_bin_margins: float = 0.0
+    """ Holds configuration parameters used in determining how to render a raster plot.
+    History: factored out of Spike2DRaster to do standalone pyqtgraph plotting of the 2D raster plot.
+    """
+    center_mode: str = field(default='starting_at_zero') # or 'zero_centered'
+    bin_position_mode: str = field(default='bin_center') # or 'left_edges'
+    side_bin_margins: float = field(default=0.0)
 
     # Colors:
-    neuron_qcolors: list = field(default=Factory(list))
+    neuron_qcolors: List[QtGui.QColor] = field(default=Factory(list))
     neuron_colors: Optional[np.ndarray] = field(default=None) # of shape (4, self.n_cells)
-    neuron_colors_hex: Optional[np.ndarray] = field(default=None) #
-    neuron_qcolors_map: dict = field(default=Factory(dict)) 
+    neuron_colors_hex: List[str] = field(default=Factory(list)) #
+    neuron_qcolors_map: Dict[int, QtGui.QColor] = field(default=Factory(dict)) 
 
     # Configs:
-    config_items: IndexedOrderedDict = Factory(IndexedOrderedDict)
+    config_items: IndexedOrderedDict = field(default=Factory(IndexedOrderedDict))
 
     def build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER) -> None:
         """ Cell Coloring function
@@ -252,19 +255,24 @@ class RasterPlotParams:
 
 
 
-@define
+@define(slots=False)
 class UnitSortOrderManager(NeuronIdentityAccessingMixin):
     """ factored out of Spike2DRaster to do standalone pyqtgraph plotting of the 2D raster plot. """
-    neuron_ids: np.ndarray
-    fragile_linear_neuron_IDXs: np.ndarray
-    n_cells: int # = len(shared_aclus)
-    unit_sort_order: np.ndarray # = np.arange(n_cells) # in-line sort order
-    _series_identity_y_values: np.ndarray = None
-    _series_identity_lower_y_values: np.ndarray = None
-    _series_identity_upper_y_values: np.ndarray = None
-    y_fragile_linear_neuron_IDX_map: dict = Factory(dict)
-    params: RasterPlotParams = Factory(RasterPlotParams)
+    _neuron_ids: np.ndarray = field() # always kept in the original, unsorted order. np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
+    fragile_linear_neuron_IDXs: np.ndarray = field() # np.array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45])
+    n_cells: int = field() # = len(shared_aclus)
+    unit_sort_order: np.ndarray = field() # = np.arange(n_cells) # in-line sort order, np.array([18, 17, 19,  5, 35, 23, 31,  4, 45, 21, 37, 36, 10,  7, 16,  9,  2, 40, 20, 28, 13, 41, 38, 25, 29, 42,  0, 14, 34, 44, 32, 11, 30, 12, 24,  3, 39,  1,  6, 27,  8, 22, 15, 33, 43, 26])
+    _series_identity_y_values: Optional[np.ndarray] = field(default=None) # np.array([0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5, 20.5, 21.5, 22.5, 23.5, 24.5, 25.5, 26.5, 27.5, 28.5, 29.5, 30.5, 31.5, 32.5, 33.5, 34.5, 35.5, 36.5, 37.5, 38.5, 39.5, 40.5, 41.5, 42.5, 43.5, 44.5, 45.5])
+    _series_identity_lower_y_values: Optional[np.ndarray] = field(default=None) # np.array([0, 0.0217391, 0.0434783, 0.0652174, 0.0869565, 0.108696, 0.130435, 0.152174, 0.173913, 0.195652, 0.217391, 0.23913, 0.26087, 0.282609, 0.304348, 0.326087, 0.347826, 0.369565, 0.391304, 0.413043, 0.434783, 0.456522, 0.478261, 0.5, 0.521739, 0.543478, 0.565217, 0.586957, 0.608696, 0.630435, 0.652174, 0.673913, 0.695652, 0.717391, 0.73913, 0.76087, 0.782609, 0.804348, 0.826087, 0.847826, 0.869565, 0.891304, 0.913043, 0.934783, 0.956522, 0.978261])
+    _series_identity_upper_y_values: Optional[np.ndarray] = field(default=None) # np.array([0.0217391, 0.0434783, 0.0652174, 0.0869565, 0.108696, 0.130435, 0.152174, 0.173913, 0.195652, 0.217391, 0.23913, 0.26087, 0.282609, 0.304348, 0.326087, 0.347826, 0.369565, 0.391304, 0.413043, 0.434783, 0.456522, 0.478261, 0.5, 0.521739, 0.543478, 0.565217, 0.586957, 0.608696, 0.630435, 0.652174, 0.673913, 0.695652, 0.717391, 0.73913, 0.76087, 0.782609, 0.804348, 0.826087, 0.847826, 0.869565, 0.891304, 0.913043, 0.934783, 0.956522, 0.978261, 1])
+    y_fragile_linear_neuron_IDX_map: Dict[int, float] = field(default=Factory(dict)) # Dict[fragile_linear_neuron_IDX:y_value]; {0: 18.5, 1: 17.5, 2: 19.5, 3: 5.5, 4: 35.5, 5: 23.5, 6: 31.5, 7: 4.5, 8: 45.5, 9: 21.5, 10: 37.5, 11: 36.5, 12: 10.5, 13: 7.5, 14: 16.5, 15: 9.5, 16: 2.5, 17: 40.5, 18: 20.5, 19: 28.5, 20: 13.5, 21: 41.5, 22: 38.5, 23: 25.5, 24: 29.5, 25: 42.5, 26: 0.5, 27: 14.5, 28: 34.5, 29: 44.5, 30: 32.5, 31: 11.5, 32: 30.5, 33: 12.5, 34: 24.5, 35: 3.5, 36: 39.5, 37: 1.5, 38: 6.5, 39: 27.5, 40: 8.5, 41: 22.5, 42: 15.5, 43: 33.5, 44: 43.5, 45: 26.5}
+    params: RasterPlotParams = field(default=Factory(RasterPlotParams))
 
+    @property
+    def neuron_ids(self):
+        """ e.g. return np.array(active_epoch_placefields2D.cell_ids) """
+        return self._neuron_ids
+    
     @property
     def series_identity_y_values(self):
         """The series_identity_y_values property."""
@@ -310,7 +318,7 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
         return self.series_identity_y_values[fragile_linear_neuron_IDX_series_indicies]
 
 
-    def update_spikes_df_visualization_columns(self, spikes_df: pd.DataFrame, overwrite_existing:bool=True):
+    def update_spikes_df_visualization_columns(self, spikes_df: pd.DataFrame, overwrite_existing:bool=True) -> pd.DataFrame:
         """ updates spike_df's columns: ['visualization_raster_y_location', 'visualization_raster_emphasis_state'] """
         if overwrite_existing or ('visualization_raster_y_location' not in spikes_df.columns):
             all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
@@ -326,8 +334,12 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
 NeuronSpikesConfigTuple = namedtuple('NeuronSpikesConfigTuple', ['idx', 'fragile_linear_neuron_IDX', 'curr_state_pen_dict', 'lower_y_value', 'upper_y_value', 'curr_state_brush_dict'])
 
 
-@define
+@define(slots=False)
 class RasterScatterPlotManager:
+    """ Consists of `unit_sort_manager: UnitSortOrderManager` and `config_fragile_linear_neuron_IDX_map`
+    
+    
+    """
     unit_sort_manager: UnitSortOrderManager = field(default=None)
     config_fragile_linear_neuron_IDX_map: Optional[IndexedOrderedDict[int, NeuronSpikesConfigTuple]] = field(default=None)
 
@@ -418,6 +430,15 @@ class RasterScatterPlotManager:
         # self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, np.array(list(self.params.config_items.values()))[self.unit_sort_order])) # sort using the `unit_sort_order`
 
 
+    def update_sort(self, new_sort_order):
+        """ conceptually re-sorts the cells """
+        raise NotImplementedError
+    
+
+
+
+    
+
 # Note that these raster plots could implement some variant of HideShowSpikeRenderingMixin, SpikeRenderingMixin, etc but these classes frankly suck. 
 
 # Define the namedtuple
@@ -506,7 +527,18 @@ def _build_units_y_grid(plot_item) -> pg.GridItem:
     grid.setZValue(-100)
     return grid
 
-def _build_scatter_plotting_managers(plots_data, spikes_df, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None):
+
+# class FmtAxisItem(pg.AxisItem):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+
+#     def tickStrings(self, values, scale, spacing):
+#         return [f'{v:.4f}' for v in values]
+    
+
+
+@function_attributes(short_name=None, tags=['scatterplot', 'raster', 'manager'], input_requires=[], output_provides=[], uses=['RasterPlotParams','UnitSortOrderManager','RasterScatterPlotManager'], used_by=['plot_raster_plot', 'plot_multi_sort_raster_browser'], creation_date='2023-12-06 02:24', related_items=[])
+def _build_scatter_plotting_managers(plots_data: RenderPlotsData, spikes_df: Optional[pd.DataFrame], included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None) -> RenderPlotsData:
     """ 
     Does not modify `spikes_df` and it's unused when included_neuron_ids is provided
 
@@ -694,7 +726,7 @@ def plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids,
 
 
 @providing_context(fn_name='plot_raster_plot')
-@function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-03-31 20:53')
+@function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame', '_build_scatter_plotting_managers'], used_by=[], creation_date='2023-03-31 20:53')
 def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
@@ -715,8 +747,14 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     ## Build the spots for the raster plot:
     plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
+    # Add header label
+    plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
+    win.addItem(plots.debug_header_label)
+    
     # # Actually setup the plot:
     plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
+
+
 
     scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
     
@@ -729,7 +767,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     # build the y-axis grid to separate the units
     plots.grid = _build_units_y_grid(plots.root_plot)
 
-    return app, win, plots, plots_data
+    return RasterPlotSetupTuple(app, win, plots, plots_data)
 
 @providing_context(fn_name='plot_multiple_raster_plot')
 @function_attributes(short_name=None, tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_plot_empty_raster_plot_frame'], used_by=[], creation_date='2023-06-16 20:45', related_items=['plot_raster_plot'])

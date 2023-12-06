@@ -373,7 +373,13 @@ class RankOrderRastersDebugger:
 
     @classmethod
     def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map, aclu_y_values_dict: Dict):
-        """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots. """
+        """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots.
+        
+        
+        Uses:
+            a_decoder_color_map, aclu_y_values_dict
+        
+        """
         [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range for initial position
 
         _out_text_items = {}

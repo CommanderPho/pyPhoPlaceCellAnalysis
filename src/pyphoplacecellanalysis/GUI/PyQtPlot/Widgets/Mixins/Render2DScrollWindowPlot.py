@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
@@ -13,7 +14,8 @@ class ScatterItemData:
     t: float = field(alias='t_rel_seconds')
     aclu: int = field() # alias='neuron_ID'
     neuron_IDX: int = field(alias='fragile_linear_neuron_IDX')
-    
+    visualization_raster_y_location: float = field(default=np.nan)
+
 
 class Render2DScrollWindowPlotMixin:
     """ Adds a LinearRegionItem to the plot that represents the entire data timerange which defines a user-adjustable window into the data. Finally, also adds a plot that shows only the zoomed-in data within the window. 
@@ -220,14 +222,15 @@ class Render2DScrollWindowPlotMixin:
     # ==================================================================================================================== #
     
     @classmethod
-    def _build_spike_data_tuples_from_spikes_df(cls, spikes_df, generate_debug_tuples=False) -> dict:
+    def _build_spike_data_tuples_from_spikes_df(cls, spikes_df: pd.DataFrame, generate_debug_tuples=False) -> dict:
         """ generates a list of tuples uniquely identifying each spike in the spikes_df as requested by the pg.ScatterPlotItem's `data` argument.
                 data: a list of python objects used to uniquely identify each spot.
                 tip: A string-valued function of a spot's (x, y, data) values. Set to None to prevent a tool tip from being shown.
         """
         # from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
         if generate_debug_tuples:
-            debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'neuron_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
+            # debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'neuron_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
+            debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'] # a subset I'm actually interested in for debugging
             active_datapoint_column_names = debug_datapoint_column_names # all values for the purpose of debugging
         else:
             default_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
@@ -249,7 +252,7 @@ class Render2DScrollWindowPlotMixin:
 
 
     @classmethod
-    def build_spikes_data_values_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, **kwargs):
+    def build_spikes_data_values_from_df(cls, spikes_df: pd.DataFrame, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, **kwargs):
         """ build global spikes for entire dataframe (not just the current window) 
         
         Called by:
@@ -287,7 +290,8 @@ class Render2DScrollWindowPlotMixin:
         # Build the "tooltips" for each spike:
         # curr_spike_data_tooltips = [f"{an_aclu}" for an_aclu in spikes_df['aclu'].to_numpy()]
         if should_return_data_tooltips_kwargs:
-            all_scatterplot_tooltips_kwargs = cls._build_spike_data_tuples_from_spikes_df(spikes_df) # need the full spikes_df, not the filtered one
+            # #TODO 2023-12-06 03:35: - [ ] This doesn't look like it can sort the tooltips at all, right? Or does this not matter?
+            all_scatterplot_tooltips_kwargs = cls._build_spike_data_tuples_from_spikes_df(spikes_df, generate_debug_tuples=True) # need the full spikes_df, not the filtered one
             assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
         else:
             all_scatterplot_tooltips_kwargs = None
@@ -313,7 +317,7 @@ class Render2DScrollWindowPlotMixin:
     
 
     @classmethod
-    def build_spikes_all_spots_from_df(cls, spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, **kwargs):
+    def build_spikes_all_spots_from_df(cls, spikes_df: pd.DataFrame, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, **kwargs):
         """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
         Internally calls `cls.build_spikes_data_values_from_df(...)
         """
