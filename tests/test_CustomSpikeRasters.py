@@ -90,6 +90,21 @@ class TestScatterPlottingManagers(unittest.TestCase):
         ## Build the spots for the raster plot:
         plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
+        expected_sorted_y_values = deepcopy(plots_data.unit_sort_manager.series_identity_y_values)[active_sort_idxs]
+        
+        ## Get actual values:
+        # Grouped on columns: 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'
+        a_grouped_spikes_df = deepcopy(a_spikes_df).groupby(['aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']).count().reset_index()[['aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']]
+        # Sort by column: 'visualization_raster_y_location' (ascending)
+        a_grouped_spikes_df = a_grouped_spikes_df.sort_values(['visualization_raster_y_location'])
+        # Actually recreates the observed sort in the raster plot (that looks "basically random")
+        actual_sorted_neuron_IDs = a_grouped_spikes_df.aclu.to_numpy()
+        actual_sorted_fragile_linear_neuron_IDX = a_grouped_spikes_df.fragile_linear_neuron_IDX.to_numpy()
+
+        print(f'actual_sorted_neuron_IDs: {actual_sorted_neuron_IDs}') # actual_sorted_neuron_IDs: [ 70  87  51  84  25  15  89  44  92  48  43  79  81  56  72  98  47  10   9  11  53  31  93  18  82  65 104  90  54  66  80  24  78 101  75  16  40  39  61  85  52  60  68 102  77  26]
+        print(f'actual_sorted_fragile_linear_neuron_IDX: {actual_sorted_fragile_linear_neuron_IDX}') # actual_sorted_fragile_linear_neuron_IDX: [26 37 16 35  7  3 38 13 40 15 12 31 33 20 27 42 14  1  0  2 18  9 41  5 34 23 45 39 19 24 32  6 30 43 28  4 11 10 22 36 17 21 25 44 29  8]
+
+
 
         self.assertIsNotNone(plots_data)
         
