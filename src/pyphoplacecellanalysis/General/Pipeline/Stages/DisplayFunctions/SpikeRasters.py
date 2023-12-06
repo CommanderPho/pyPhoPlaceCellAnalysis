@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Union, Tuple
 from collections import namedtuple
 from copy import deepcopy
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 from functools import partial
@@ -172,7 +173,9 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
     2023-03-31: All this crap was brought in to replace the functionality used in SpikeRaster2D 
 """
 
-# Windowing helpers for spikes_df:
+
+NeuronSpikesConfigTuple = namedtuple('NeuronSpikesConfigTuple', ['idx', 'fragile_linear_neuron_IDX', 'curr_state_pen_dict', 'lower_y_value', 'upper_y_value', 'curr_state_brush_dict'])
+
 
 @define(slots=False)
 class RasterPlotParams:
@@ -190,7 +193,7 @@ class RasterPlotParams:
     neuron_qcolors_map: Dict[int, QtGui.QColor] = field(default=Factory(dict)) 
 
     # Configs:
-    config_items: IndexedOrderedDict = field(default=Factory(IndexedOrderedDict))
+    config_items: IndexedOrderedDict[int, NeuronSpikesConfigTuple] = field(default=Factory(IndexedOrderedDict))
 
     def build_neurons_color_data(self, fragile_linear_neuron_IDXs, neuron_colors_list=None, coloring_mode:UnitColoringMode=UnitColoringMode.COLOR_BY_INDEX_ORDER) -> None:
         """ Cell Coloring function
@@ -252,12 +255,16 @@ class RasterPlotParams:
 
 
 
-
-
-
 @define(slots=False)
 class UnitSortOrderManager(NeuronIdentityAccessingMixin):
-    """ factored out of Spike2DRaster to do standalone pyqtgraph plotting of the 2D raster plot. """
+    """ factored out of Spike2DRaster to do standalone pyqtgraph plotting of the 2D raster plot.
+    
+    _neuron_ids, fragile_linear_neuron_IDXs
+    
+    It looks like modifying `unit_sort_order` only affects:
+        .y_fragile_linear_neuron_IDX_map
+            
+    """
     _neuron_ids: np.ndarray = field() # always kept in the original, unsorted order. np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
     fragile_linear_neuron_IDXs: np.ndarray = field() # np.array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45])
     n_cells: int = field() # = len(shared_aclus)
@@ -269,17 +276,43 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
     params: RasterPlotParams = field(default=Factory(RasterPlotParams))
 
     @property
-    def neuron_ids(self):
+    def neuron_ids(self) -> NDArray:
         """ e.g. return np.array(active_epoch_placefields2D.cell_ids) """
         return self._neuron_ids
     
     @property
-    def series_identity_y_values(self):
+    def sorted_neuron_ids(self) -> NDArray:
+        """ e.g. return the neuron_ids sorted by self.unit_sort_order """
+        assert len(self._neuron_ids) == len(self.unit_sort_order)
+        return self._neuron_ids[self.unit_sort_order]
+
+
+    @property
+    def series_identity_y_values(self) -> NDArray:
         """The series_identity_y_values property."""
         return self._series_identity_y_values
 
+
+    # @property
+    # def y_from_neuron_ID_map(self) -> Dict[int, float]:
+    #     """The series_identity_y_values property."""
+    #     sorted_neuron_ids = deepcopy(self.sorted_neuron_ids)
+        
+    #     return self.y_fragile_linear_neuron_IDX_map
+
+
+    def __attrs_post_init__(self):
+        """ validate and initialize """
+        assert len(self.neuron_ids) == self.n_cells
+        assert len(self.unit_sort_order) == len(self.unit_sort_order)
+        assert len(self.neuron_ids) == len(self.fragile_linear_neuron_IDXs)
+        self.update_series_identity_y_values()
+
+
     def update_series_identity_y_values(self, debug_print=False):
         """ updates the fixed self._series_identity_y_values using the DataSeriesToSpatial.build_series_identity_axis(...) function.
+        
+        Updates: self.y_fragile_linear_neuron_IDX_map, (self._series_identity_y_values, self._series_identity_lower_y_values, self._series_identity_upper_y_values)
         
         Should be called whenever:
             self.n_cells, 
@@ -331,24 +364,40 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
 
 
 
-NeuronSpikesConfigTuple = namedtuple('NeuronSpikesConfigTuple', ['idx', 'fragile_linear_neuron_IDX', 'curr_state_pen_dict', 'lower_y_value', 'upper_y_value', 'curr_state_brush_dict'])
 
 
 @define(slots=False)
-class RasterScatterPlotManager:
+class RasterScatterPlotManager(NeuronIdentityAccessingMixin):
     """ Consists of `unit_sort_manager: UnitSortOrderManager` and `config_fragile_linear_neuron_IDX_map`
     
     
+    Modifying `unit_sort_order` only affects:
+        unit_sort_manager.y_fragile_linear_neuron_IDX_map
+        
+        
+    Overall, it looks like:
+
+    
     """
     unit_sort_manager: UnitSortOrderManager = field(default=None)
-    config_fragile_linear_neuron_IDX_map: Optional[IndexedOrderedDict[int, NeuronSpikesConfigTuple]] = field(default=None)
+    config_fragile_linear_neuron_IDX_map: Optional[IndexedOrderedDict[int, NeuronSpikesConfigTuple]] = field(default=None) #  dict<self.fragile_linear_neuron_IDXs, self.params.config_items>
 
     @property
-    def params(self):
+    def neuron_ids(self) -> NDArray:
+        """ passthrough to self.unit_sort_manager. e.g. return np.array(active_epoch_placefields2D.cell_ids) """
+        return self.unit_sort_manager.neuron_ids
+
+    @property
+    def sorted_neuron_ids(self) -> NDArray:
+        """ passthrough to self.unit_sort_manager. e.g. return the neuron_ids sorted by self.unit_sort_order """
+        return self.unit_sort_manager.sorted_neuron_ids
+    
+    @property
+    def params(self) -> "RasterPlotParams":
         """Passthrough to params."""
         return self.unit_sort_manager.params
     @params.setter
-    def params(self, value):
+    def params(self, value: "RasterPlotParams"):
         self.unit_sort_manager.params = value
 
     @function_attributes(short_name='_build_cell_configs', tags=['config','private'], input_requires=['self.params.neuron_qcolors_map'], output_provides=['self.params.config_items', 'self.config_fragile_linear_neuron_IDX_map'], uses=['self.find_cell_ids_from_neuron_IDXs', 'build_adjusted_color'], used_by=[], creation_date='2023-03-31 18:46')
@@ -392,7 +441,7 @@ class RasterScatterPlotManager:
         
         # self._build_neuron_id_graphics(self.ui.main_gl_widget, self.y)
         self.params.config_items = IndexedOrderedDict()
-        curr_neuron_ids_list = self.unit_sort_manager.find_cell_ids_from_neuron_IDXs(self.unit_sort_manager.fragile_linear_neuron_IDXs)
+        curr_neuron_ids_list = self.unit_sort_manager.find_cell_ids_from_neuron_IDXs(self.unit_sort_manager.fragile_linear_neuron_IDXs) # this does not seem to necissarily return them in the sorted order
         
         # builds one config for each neuron color:
         for i, fragile_linear_neuron_IDX in enumerate(self.unit_sort_manager.fragile_linear_neuron_IDXs):
@@ -430,10 +479,39 @@ class RasterScatterPlotManager:
         # self.config_fragile_linear_neuron_IDX_map = dict(zip(self.fragile_linear_neuron_IDXs, np.array(list(self.params.config_items.values()))[self.unit_sort_order])) # sort using the `unit_sort_order`
 
 
-    def update_sort(self, new_sort_order):
+    def __attrs_post_init__(self):
+        """ validate and initialize """
+        assert self.unit_sort_manager is not None
+        self._build_cell_configs()
+        assert len(self.config_fragile_linear_neuron_IDX_map) == len(self.params.config_items)
+        
+    
+    def update_sort(self, new_sort_order: NDArray):
         """ conceptually re-sorts the cells """
+        assert len(new_sort_order) == len(self.unit_sort_manager.neuron_ids)
+        prev_sort = deepcopy(self.unit_sort_manager.unit_sort_order)
+
+        is_new_sort = np.any(new_sort_order != prev_sort)
+        if not is_new_sort:
+            print(f'WARN: sort did not change.')
+            return False
+        else:
+            # Update the sort
+            self.unit_sort_manager.unit_sort_order = deepcopy(new_sort_order)
+            self.unit_sort_manager.update_series_identity_y_values()
+            self._build_cell_configs() # rebuild self configs
+            print(f'new sort complete.')
+            return True
+
+
+    def update_colors(self, new_colors_mapping):
+        """ conceptually re-colors the cells """
         raise NotImplementedError
     
+    def get_colors(self):
+        """ conceptually returns the appropriate colors for the cells """
+        raise NotImplementedError
+
 
 
 
@@ -561,9 +639,10 @@ def _build_scatter_plotting_managers(plots_data: RenderPlotsData, spikes_df: Opt
     params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
     
     manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=plots_data.n_cells, unit_sort_order=unit_sort_order, params=params)
-    manager.update_series_identity_y_values()
+    # manager.update_series_identity_y_values()
     raster_plot_manager = RasterScatterPlotManager(unit_sort_manager=manager)
-    raster_plot_manager._build_cell_configs()
+    # raster_plot_manager._build_cell_configs()
+    
     ## Add the managers to the plot_data
     plots_data.params = params
     plots_data.unit_sort_manager = manager
@@ -689,7 +768,7 @@ def plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids,
         
         # Update the dataframe
         plots_data.plots_spikes_df_dict[_active_plot_identifier] = deepcopy(spikes_df)
-        plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
+        plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier], overwrite_existing=True)
         ## Build the spots for the raster plot:
         # plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
         plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.plots_spikes_df_dict[_active_plot_identifier], plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
@@ -741,11 +820,15 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
     
     plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
+    
+    ## Add the source data (spikes_df) to the plot_data
+    plots_data.spikes_df = deepcopy(spikes_df)
+    
     # Update the dataframe
-    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
+    plots_data.spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(plots_data.spikes_df, overwrite_existing=True)
     
     ## Build the spots for the raster plot:
-    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
     # Add header label
     plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
@@ -753,8 +836,6 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     
     # # Actually setup the plot:
     plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
-
-
 
     scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
     
@@ -810,7 +891,7 @@ def plot_multiple_raster_plot(filter_epochs_df: pd.DataFrame, spikes_df: pd.Data
     plots_data = _build_scatter_plotting_managers(plots_data, spikes_df=spikes_df, included_neuron_ids=included_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=unit_colors_list)
 
     # Update the dataframe
-    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df)
+    spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(spikes_df, overwrite_existing=True)
     
     # Common Tick Label 
     scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)

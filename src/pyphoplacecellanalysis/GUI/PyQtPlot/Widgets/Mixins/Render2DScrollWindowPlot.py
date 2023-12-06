@@ -239,9 +239,10 @@ class Render2DScrollWindowPlotMixin:
         def _tip_fn(x, y, data):
             """ the function required by pg.ScatterPlotItem's `tip` argument to print the tooltip for each spike. """
             # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
-            data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in asdict(data).items()])
+            # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in asdict(data).items()])
+            data_string:str = '|'.join([f"{k}: {str(v)}" for k, v in asdict(data).items()])
             print(f'_tip_fn(...): data_string: {data_string}')
-            return f"spike: (x={x}, y={y})\n{data_string}"
+            return f"spike: (x={x:.3f}, y={y:.2f})\n{data_string}"
 
         # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
         spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
@@ -258,14 +259,24 @@ class Render2DScrollWindowPlotMixin:
         Called by:
             self.build_spikes_all_spots_from_df(...)
             cls.build_spikes_all_spots_from_df(...)
+            
+            
+        Needs to be called whenever:
+            spikes_df['visualization_raster_y_location']
+            spikes_df['visualization_raster_emphasis_state']
+            spikes_df['fragile_linear_neuron_IDX']
+        Changes.
 
+        
         Uses the df['visualization_raster_y_location'] field added to the spikes dataframe to get the y-value for the spike
         
-        Note that the colors are built using the self.config_fragile_linear_neuron_IDX_map property
+        Note that the colors are built using the pens contained in self.config_fragile_linear_neuron_IDX_map property
         
         config_fragile_linear_neuron_IDX_map: a map from fragile_linear_neuron_IDX to config (tuple) values
         is_included_indicies: Optional np.array of bools indicating whether each spike is included in the generated points
         
+        
+        2023-12-06 `config_fragile_linear_neuron_IDX_map` comes in mostly empty except for Pens and Brushes for each state
         """
         # All units at once approach:
         active_time_variable_name = spikes_df.spikes.time_variable_name

@@ -9,7 +9,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
+from pyphoplacecellanalysis.GUI.Qt.PlacefieldVisualSelectionControls.PlacefieldVisualSelectionControlWidget import PlacefieldVisualSelectionWidget
 
 
 class MainWindow(QtWidgets.QMainWindow):
