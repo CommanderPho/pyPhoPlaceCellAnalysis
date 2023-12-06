@@ -22,7 +22,7 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
-
+from pyphoplacecellanalysis.GUI.Qt.Widgets.ScrollBarWithSpinBox.ScrollBarWithSpinBox import ScrollBarWithSpinBox
 
 __all__ = ['RankOrderRastersDebugger']
 
@@ -116,11 +116,7 @@ class RankOrderRastersDebugger:
              RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
         name:str = 'RankOrderRastersDebugger'
-        # # LR_display_outputs, RL_display_outputs = cls._debug_plot_directional_template_rasters(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates) # `_debug_plot_directional_template_rasters` main plot commmand
-        # LR_display_outputs, RL_display_outputs = cls._modern_debug_plot_directional_template_rasters(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates) # `_debug_plot_directional_template_rasters` main plot commmand
-        # LR_app, LR_win, LR_plots, LR_plots_data, LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs = LR_display_outputs
-        # RL_app, RL_win, RL_plots, RL_plots_data, RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs = RL_display_outputs
-
+        
         ## 2023-11-30 - Newest Version using separate rasters:
         _obj.plots_data, _obj.plots = cls._post_modern_debug_plot_directional_template_rasters(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates, debug_print=True)
         #TODO 2023-11-30 15:14: - [ ] Unpacking and putting in docks and such not yet finished. Update functions would need to be done separately.
@@ -181,16 +177,53 @@ class RankOrderRastersDebugger:
                 
                 # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
 
+        from pyphoplacecellanalysis.External.pyqtgraph.widgets.SpinBox import SpinBox
 
         ctrls_dock_config = CustomDockDisplayConfig(showCloseButton=False)
-        slider = pg.QtWidgets.QSlider(pg.QtCore.Qt.Horizontal)
-        slider.setRange(0, (_obj.n_epochs-1))
-        slider.setValue(50)
-        # layout.addWidget(slider)
-        slider.valueChanged.connect(_obj.on_update_epoch_IDX)
 
+        ctrls_widget = ScrollBarWithSpinBox()
+        ctrls_widget.setObjectName("ctrls_widget")
+        ctrls_widget.update_range(0, (_obj.n_epochs-1))
+        ctrls_widget.setValue(10)
+
+        def valueChanged(new_val:int):
+            print(f'valueChanged(new_val: {new_val})')
+            _obj.on_update_epoch_IDX(int(new_val))
+
+        ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
         ctrl_layout = pg.LayoutWidget()
-        ctrl_layout.addWidget(slider, row=0, col=0, colspan=1)
+        ctrl_layout.addWidget(ctrls_widget)
+        
+
+        # changedLabel = pg.QtWidgets.QLabel()   ## updated only when editing is finished or mouse wheel has stopped for 0.3sec
+        # changedLabel.setMinimumWidth(20)
+        # font = changedLabel.font()
+        # font.setBold(True)
+        # font.setPointSize(14)
+        # changedLabel.setFont(font)
+
+        # def valueChanged(sb):
+        #     changedLabel.setText("Final value: %s" % str(sb.value()))
+
+
+        # slider = pg.QtWidgets.QSlider(pg.QtCore.Qt.Horizontal)
+        # slider.setRange(0, (_obj.n_epochs-1))
+        # slider.setValue(50)
+        # # layout.addWidget(slider)
+        # slider.valueChanged.connect(_obj.on_update_epoch_IDX)
+
+        # ctrl_layout = pg.LayoutWidget()
+        # # ctrl_layout.addWidget(ctrls_widget)
+        # ctrl_layout.addWidget(changedLabel, row=0, col=0, colspan=1)
+
+        # ctrl_layout.addWidget(slider, row=0, col=1, colspan=1)
+
+        # spin_box = pg.SpinBox(value=50, bounds=[0, (_obj.n_epochs-1)], int=True, minStep=1, step=1, wrapping=False)
+        # ctrl_layout.addWidget(spin_box, row=0, col=3)        
+        # spin_box.sigValueChanged.connect(valueChanged)
+        # ctrl_widgets_dict = dict(slider=slider, spin_box=spin_box, changedLabel=changedLabel)
+
+        ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
 
         logTextEdit = pg.QtWidgets.QTextEdit()
         logTextEdit.setReadOnly(True)
@@ -202,15 +235,14 @@ class RankOrderRastersDebugger:
 
         root_dockAreaWindow.resize(600, 1400)
 
-
         ## Build final .plots and .plots_data:
         _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
                                   root_plots=all_separate_root_plots, grids=all_separate_grids, scatter_plots=all_separate_scatter_plots, debug_header_labels=all_separate_debug_header_labels,
-                                  dock_widgets=_out_dock_widgets, ctrl_widgets={'slider': slider}, text_items_dict=None)
+                                  dock_widgets=_out_dock_widgets, text_items_dict=None) # , ctrl_widgets={'slider': slider}
         _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
                                            seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
                                            on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})                
-        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, slider=slider, logTextEdit=logTextEdit, dock_configs=dock_configs)
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs)
 
         try:
             ## rank_order_results.LR_ripple.selected_spikes_df mode:
@@ -252,9 +284,11 @@ class RankOrderRastersDebugger:
         # Update window titles:
         an_epoch_string: str = f'idx: {an_epoch.Index}, t: {an_epoch.start:0.2f}, {an_epoch.stop:0.2f}, lbl: {str(an_epoch.label)}'
         
-        for i, (a_decoder_name, a_dock_widget) in enumerate(self.plots.dock_widgets.items()):
+        # for i, (a_decoder_name, a_dock_widget) in enumerate(self.plots.dock_widgets.items()):
+        for i, (a_decoder_name, a_win) in enumerate(self.plots.all_windows.items()):
+            a_dock_widget = self.plots.dock_widgets[a_decoder_name]
             a_dock_widget[1].setTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
-            self.plots.all_windows[a_decoder_name].setWindowTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
+            a_win.setWindowTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
         
         self.update_cell_y_labels()
 
@@ -271,6 +305,11 @@ class RankOrderRastersDebugger:
 
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.lap_id == (an_epoch_idx+1))]
         curr_epoch = list(curr_epoch_df.itertuples())[0]
+        
+        # Update the widget if needed, but block changes
+        # self.ui.ctrls_widget
+        # self.ui.ctrls_widget.setValue(an_epoch_idx, False)
+
         self.on_update_active_epoch(an_epoch_idx, curr_epoch)
 
         for a_callback_name, a_callback_fn in self.on_idx_changed_callback_function_dict.items():
