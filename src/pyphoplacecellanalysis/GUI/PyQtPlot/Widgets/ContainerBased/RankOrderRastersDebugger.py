@@ -130,6 +130,20 @@ class RankOrderRastersDebugger:
         all_separate_plots = {a_decoder_name:a_raster_setup_tuple.plots for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
         all_separate_plots_data = {a_decoder_name:a_raster_setup_tuple.plots_data for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
 
+        main_plot_identifiers_list = list(all_windows.keys()) # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+
+        ## Extract the data items:
+        all_separate_data_all_spots = {a_decoder_name:a_raster_setup_tuple.plots_data.all_spots for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+        all_separate_data_all_scatterplot_tooltips_kwargs = {a_decoder_name:a_raster_setup_tuple.plots_data.all_scatterplot_tooltips_kwargs for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+        all_separate_data_new_sorted_rasters = {a_decoder_name:a_raster_setup_tuple.plots_data.new_sorted_raster for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+        all_separate_data_spikes_dfs = {a_decoder_name:a_raster_setup_tuple.plots_data.spikes_df for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+
+        # Extract the items
+        all_separate_root_plots = {a_decoder_name:a_raster_setup_tuple.plots.root_plot for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+        all_separate_grids = {a_decoder_name:a_raster_setup_tuple.plots.grid for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+        all_separate_scatter_plots = {a_decoder_name:a_raster_setup_tuple.plots.scatter_plot for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+        all_separate_debug_header_labels = {a_decoder_name:a_raster_setup_tuple.plots.debug_header_label for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+        
         # an_app, a_win, a_plots, a_plots_data, an_on_update_active_epoch, an_on_update_active_scatterplot_kwargs = _out_plots.rasters_display_outputs[a_decoder_name]
 
         # Embedding in docks:
@@ -147,23 +161,26 @@ class RankOrderRastersDebugger:
         for i, (a_decoder_name, a_win) in enumerate(all_windows.items()):
             _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name])
 
-        def on_update_active_epoch(an_epoch_idx, an_epoch):
-            """ captures: main_plot_identifiers_list, plots """
+       
+        # Build callback functions:
+        def on_update_active_scatterplot_kwargs(override_scatter_plot_kwargs):
+            """ captures: main_plot_identifiers_list, plots, plots_data """
             for _active_plot_identifier in main_plot_identifiers_list:
-                new_ax = plots.ax[_active_plot_identifier]
+                # for _active_plot_identifier, a_scatter_plot in plots.scatter_plots.items():
+                # new_ax = plots.ax[_active_plot_identifier]
+                a_scatter_plot = all_separate_scatter_plots[_active_plot_identifier]
+                plots_data = all_separate_plots_data[_active_plot_identifier]
+                a_scatter_plot.setData(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {}), **override_scatter_plot_kwargs)
+
+        def on_update_active_epoch(an_epoch_idx, an_epoch):
+            """ captures: main_plot_identifiers_list, all_separate_root_plots """
+            for _active_plot_identifier in main_plot_identifiers_list:
+                new_ax = all_separate_root_plots[_active_plot_identifier]
                 new_ax.setXRange(an_epoch.start, an_epoch.stop)
-            # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
-            
-            # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
-        # RL_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors)
-        # LR_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors)
+                # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
+                
+                # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
 
-        # _out_dock_widgets = {}
-        # dock_configs = (RL_dock_config, LR_dock_config)
-        # dock_add_locations = (['left'], ['right'])
-
-        # _out_dock_widgets['RL'] = root_dockAreaWindow.add_display_dock(identifier='RL', widget=RL_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[0], display_config=RL_dock_config)
-        # _out_dock_widgets['LR'] = root_dockAreaWindow.add_display_dock(identifier='LR', widget=LR_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[1], display_config=LR_dock_config)
 
         ctrls_dock_config = CustomDockDisplayConfig(showCloseButton=False)
         slider = pg.QtWidgets.QSlider(pg.QtCore.Qt.Horizontal)
@@ -185,11 +202,17 @@ class RankOrderRastersDebugger:
 
         root_dockAreaWindow.resize(600, 1400)
 
-        _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, dock_widgets=_out_dock_widgets, ctrl_widgets={'slider': slider}, text_items_dict=None)
-        _obj.plots_data = RenderPlotsData(name=name, **_obj.plots_data.to_dict())
 
-
-
+        ## Build final .plots and .plots_data:
+        _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
+                                  root_plots=all_separate_root_plots, grids=all_separate_grids, scatter_plots=all_separate_scatter_plots, debug_header_labels=all_separate_debug_header_labels,
+                                  dock_widgets=_out_dock_widgets, ctrl_widgets={'slider': slider}, text_items_dict=None)
+        _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
+                                           seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
+                                           on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})
+                
+        # **_obj.plots_data.to_dict()
+        
         # _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, LR_app=LR_app, LR_win=LR_win, LR_plots=LR_plots, RL_app=RL_app, RL_win=RL_win, RL_plots=RL_plots, dock_widgets=_out_dock_widgets, ctrl_widgets={'slider': slider}, text_items_dict=None)
         # _obj.plots_data = RenderPlotsData(name=name, LR_plots_data=LR_plots_data, LR_on_update_active_epoch=LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs=LR_on_update_active_scatterplot_kwargs,
         #                                    RL_plots_data=RL_plots_data, RL_on_update_active_epoch=RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs=RL_on_update_active_scatterplot_kwargs)
@@ -232,16 +255,14 @@ class RankOrderRastersDebugger:
 
     def on_update_active_epoch(self, an_epoch_idx: int, an_epoch):
         """ captures: LR_on_update_active_epoch, RL_on_update_active_epoch """
-        self.plots_data.LR_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
-        self.plots_data.RL_on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
+        self.plots_data.on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
         # Update window titles:
         an_epoch_string: str = f'idx: {an_epoch.Index}, t: {an_epoch.start:0.2f}, {an_epoch.stop:0.2f}, lbl: {str(an_epoch.label)}'
-        self.plots.dock_widgets['LR'][1].setTitle(f'LR Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
-        self.plots.dock_widgets['RL'][1].setTitle(f'RL Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
-
-        self.plots.LR_win.setWindowTitle(f'LR Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
-        self.plots.RL_win.setWindowTitle(f'RL Directional Pf Rasters - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
-
+        
+        for i, (a_decoder_name, a_dock_widget) in enumerate(self.plots.dock_widgets.items()):
+            a_dock_widget[1].setTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
+            self.plots.all_windows[a_decoder_name].setWindowTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
+        
         self.update_cell_y_labels()
 
 
@@ -444,15 +465,15 @@ class RankOrderRastersDebugger:
     def _build_cell_y_labels(self):
         """Builds y-axis labels for each of the rasters and stores them in `self.plots.text_items_dict`
         """
-        LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
-        RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
-
-        ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
-        _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
-        _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
-        _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
-
         emphasis_state = SpikeEmphasisState.Default
+
+        # LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
+        # RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
+
+        # ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
+        # _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
+        # _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
+        # _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
 
         if self.plots.text_items_dict is not None:
             #TODO 2023-11-30 08:33: - [ ] Remove the old labels here if they exist.
@@ -460,17 +481,26 @@ class RankOrderRastersDebugger:
 
         self.plots.text_items_dict = {}
 
-        for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
-            ## Add the neuron_id labels to the rasters:
-            raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
-            aclus_list = list(raster_plot_manager.params.config_items.keys())
-            a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
-            a_plot_item = plots.ax[_active_plot_identifier]
-            ## Get the y-values for the labels
-            y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
-            aclu_y_values_dict = dict(zip(aclus_list, y_values))
-
+        for _active_plot_identifier, new_sorted_raster in self.plots_data.seperate_new_sorted_rasters_dict.items():
+            aclu_y_values_dict = {int(aclu):new_sorted_raster.neuron_y_pos[aclu] for aclu in new_sorted_raster.neuron_IDs}
+            a_plot_item = self.plots.root_plots[_active_plot_identifier]
+            # f"{int(aclu)}"
+            a_decoder_color_map = deepcopy(new_sorted_raster.neuron_colors)
             self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map, aclu_y_values_dict)
+
+
+        # for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
+        #     ## Add the neuron_id labels to the rasters:
+        #     raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
+        #     aclus_list = list(raster_plot_manager.params.config_items.keys())
+        #     a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
+        #     a_plot_item = plots.ax[_active_plot_identifier]
+        #     ## Get the y-values for the labels
+        #     y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
+        #     aclu_y_values_dict = dict(zip(aclus_list, y_values))
+
+        #     self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map, aclu_y_values_dict)
+            
 
 
     @function_attributes(short_name=None, tags=['cell_y_labels', 'update', 'active_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-29 20:05', related_items=[])
@@ -757,7 +787,8 @@ class RankOrderRastersDebugger:
         #                                                                                                                                                 included_any_context_neuron_ids_dict,
         #                                                                                                                                                 unit_sort_orders_dict)
 
-        _out_data = RenderPlotsData(name=figure_name, spikes_df=spikes_df, unit_sort_orders_dict=None, included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None,
+        _out_data = RenderPlotsData(name=figure_name, spikes_df=spikes_df, unit_sort_orders_dict=None, included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict,
+                                    sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None,
                                     unsorted_original_neuron_IDs_lists=deepcopy(unsorted_original_neuron_IDs_lists), unsorted_neuron_IDs_lists=deepcopy(unsorted_neuron_IDs_lists), unsorted_sortable_values_lists=deepcopy(unsorted_sortable_values_lists), unsorted_unit_colors_map=deepcopy(unsorted_unit_colors_map))
         _out_plots = RenderPlots(name=figure_name, rasters_display_outputs=None)
 
@@ -765,6 +796,7 @@ class RankOrderRastersDebugger:
         _out_data.sorted_neuron_IDs_lists = sorted_neuron_IDs_lists
         _out_data.sort_helper_neuron_id_to_neuron_colors_dicts = sort_helper_neuron_id_to_neuron_colors_dicts
         _out_data.sort_helper_neuron_id_to_sort_IDX_dicts = sort_helper_neuron_id_to_sort_IDX_dicts
+        _out_data.unit_sort_orders_dict = {} # empty array
 
         ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
         _out_plots.rasters = {}
@@ -781,7 +813,8 @@ class RankOrderRastersDebugger:
 
             unit_sort_order, desired_sort_arr = find_desired_sort_indicies(an_included_unsorted_neuron_ids, a_sorted_neuron_ids)
             print(f'unit_sort_order: {unit_sort_order}\ndesired_sort_arr: {desired_sort_arr}')
-
+            _out_data.unit_sort_orders_dict[a_decoder_name] = deepcopy(unit_sort_order)
+            
             # Get only the spikes for the shared_aclus:
             a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(an_included_unsorted_neuron_ids)
             a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
