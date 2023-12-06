@@ -122,7 +122,8 @@ class UnitSortableMixin:
         return self._unit_sort_order
     @unit_sort_order.setter
     def unit_sort_order(self, value):
-        assert len(value) == self.n_cells, f"len(self._unit_sort_order): {len(self._unit_sort_order)} must equal self.n_cells: {self.n_cells} but it does not!"
+        assert len(value) == self.n_cells, f"len(value): {len(value)} must equal self.n_cells: {self.n_cells} but it does not!"
+        # assert len(self._unit_sort_order) == self.n_cells, f"len(self._unit_sort_order): {len(self._unit_sort_order)} must equal self.n_cells: {self.n_cells} but it does not!"
         self._unit_sort_order = value
         # Emit the sort order changed signal:
         self.unit_sort_order_changed_signal.emit(self._unit_sort_order)
