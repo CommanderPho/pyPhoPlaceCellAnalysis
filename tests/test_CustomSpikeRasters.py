@@ -94,7 +94,7 @@ class TestScatterPlottingManagers(unittest.TestCase):
         
         ## Get actual values:
         # Grouped on columns: 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'
-        a_grouped_spikes_df = deepcopy(a_spikes_df).groupby(['aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']).count().reset_index()[['aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']]
+        a_grouped_spikes_df = deepcopy(plots_data.spikes_df).groupby(['aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']).count().reset_index()[['aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']]
         # Sort by column: 'visualization_raster_y_location' (ascending)
         a_grouped_spikes_df = a_grouped_spikes_df.sort_values(['visualization_raster_y_location'])
         # Actually recreates the observed sort in the raster plot (that looks "basically random")

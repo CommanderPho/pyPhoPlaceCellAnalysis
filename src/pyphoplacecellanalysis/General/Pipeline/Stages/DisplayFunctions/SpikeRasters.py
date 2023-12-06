@@ -352,7 +352,11 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
 
 
     def update_spikes_df_visualization_columns(self, spikes_df: pd.DataFrame, overwrite_existing:bool=True) -> pd.DataFrame:
-        """ updates spike_df's columns: ['visualization_raster_y_location', 'visualization_raster_emphasis_state'] """
+        """ updates spike_df's columns: ['visualization_raster_y_location', 'visualization_raster_emphasis_state']
+        Uses:
+            .y_fragile_linear_neuron_IDX_map
+            
+        """
         if overwrite_existing or ('visualization_raster_y_location' not in spikes_df.columns):
             all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
             spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. y doesn't change because params.center_mode, params.bin_position_mode, and params.side_bin_margins aren't expected to change. 
@@ -636,7 +640,7 @@ def _build_scatter_plotting_managers(plots_data: RenderPlotsData, spikes_df: Opt
 
     params = RasterPlotParams()
     # params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs) # normal coloring of neurons
-    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list)
+    params.build_neurons_color_data(fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, neuron_colors_list=unit_colors_list, coloring_mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS)
     
     manager = UnitSortOrderManager(neuron_ids=neuron_ids, fragile_linear_neuron_IDXs=fragile_linear_neuron_IDXs, n_cells=plots_data.n_cells, unit_sort_order=unit_sort_order, params=params)
     # manager.update_series_identity_y_values()
