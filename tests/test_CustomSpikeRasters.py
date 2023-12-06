@@ -57,6 +57,29 @@ class TestScatterPlottingManagers(unittest.TestCase):
         pass
 
 
+    @classmethod
+    def compare_actual_sorts(cls, rasters_display_outputs3):
+        """ gets the actual order of the neurons """
+        a_spikes_df = deepcopy(rasters_display_outputs3.plots_data.spikes_df)[['t_rel_seconds', 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']]
+        a_spikes_df
+
+        ## Get actual values:
+        # Grouped on columns: 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'
+        a_grouped_spikes_df = deepcopy(a_spikes_df).groupby(['aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']).count().reset_index()[['aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location']]
+
+        # Sort by column: 'visualization_raster_y_location' (ascending)
+        a_grouped_spikes_df = a_grouped_spikes_df.sort_values(['visualization_raster_y_location'])
+        display(a_grouped_spikes_df)
+        # Actually recreates the observed sort in the raster plot (that looks "basically random")
+        actual_sorted_neuron_IDs = a_grouped_spikes_df.aclu.to_numpy()
+        actual_sorted_fragile_linear_neuron_IDX = a_grouped_spikes_df.fragile_linear_neuron_IDX.to_numpy()
+
+        print(f'actual_sorted_neuron_IDs: {actual_sorted_neuron_IDs}') # actual_sorted_neuron_IDs: [ 70  87  51  84  25  15  89  44  92  48  43  79  81  56  72  98  47  10   9  11  53  31  93  18  82  65 104  90  54  66  80  24  78 101  75  16  40  39  61  85  52  60  68 102  77  26]
+        print(f'actual_sorted_fragile_linear_neuron_IDX: {actual_sorted_fragile_linear_neuron_IDX}') # actual_sorted_fragile_linear_neuron_IDX: [26 37 16 35  7  3 38 13 40 15 12 31 33 20 27 42 14  1  0  2 18  9 41  5 34 23 45 39 19 24 32  6 30 43 28  4 11 10 22 36 17 21 25 44 29  8]
+
+
+
+
     def test_none_included_any_context_neuron_ids(self):
         """ Test with None included_any_context_neuron_ids """
         active_neuron_ids = np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
