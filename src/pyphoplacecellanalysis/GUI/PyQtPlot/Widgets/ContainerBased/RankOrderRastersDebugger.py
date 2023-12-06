@@ -209,14 +209,7 @@ class RankOrderRastersDebugger:
                                   dock_widgets=_out_dock_widgets, ctrl_widgets={'slider': slider}, text_items_dict=None)
         _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
                                            seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
-                                           on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})
-                
-        # **_obj.plots_data.to_dict()
-        
-        # _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, LR_app=LR_app, LR_win=LR_win, LR_plots=LR_plots, RL_app=RL_app, RL_win=RL_win, RL_plots=RL_plots, dock_widgets=_out_dock_widgets, ctrl_widgets={'slider': slider}, text_items_dict=None)
-        # _obj.plots_data = RenderPlotsData(name=name, LR_plots_data=LR_plots_data, LR_on_update_active_epoch=LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs=LR_on_update_active_scatterplot_kwargs,
-        #                                    RL_plots_data=RL_plots_data, RL_on_update_active_epoch=RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs=RL_on_update_active_scatterplot_kwargs)
-
+                                           on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})                
         _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, slider=slider, logTextEdit=logTextEdit, dock_configs=dock_configs)
 
         try:
@@ -309,74 +302,73 @@ class RankOrderRastersDebugger:
 
         """
         ## #TODO 2023-11-29 20:14: - [ ] Has to loop through all four rasters and do this for each of them
+        raise NotImplementedError(f"simple raster plots are not supposed to be updated.")
+        # LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
+        # RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
 
-        LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
-        RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
+        # ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
+        # _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
+        # _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
+        # _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
 
-        ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
-        _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
-        _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
-        _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
+        # assert len(updated_neuron_render_configs_dict) == len(_active_plot_identifiers)
+        # emphasis_state = SpikeEmphasisState.Default
+        # # self.plots.text_items_dict = {}
 
-        assert len(updated_neuron_render_configs_dict) == len(_active_plot_identifiers)
-        emphasis_state = SpikeEmphasisState.Default
-        # self.plots.text_items_dict = {}
+        # updated_color_dict_dict = {}
 
-        updated_color_dict_dict = {}
+        # for _active_plot_identifier, plots_data, plots, updated_neuron_render_configs in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots, updated_neuron_render_configs_dict.values()):
+        #     # plots_data: RenderPlotsData = LR_plots_data
 
-        for _active_plot_identifier, plots_data, plots, updated_neuron_render_configs in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots, updated_neuron_render_configs_dict.values()):
-            # plots_data: RenderPlotsData = LR_plots_data
+        #     # plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
+        #     # plots_data.plots_spikes_df_dict[_active_plot_identifier]
 
-            # plots_data.plots_spikes_df_dict[_active_plot_identifier] = plots_data.plots_data_dict[_active_plot_identifier].unit_sort_manager.update_spikes_df_visualization_columns(plots_data.plots_spikes_df_dict[_active_plot_identifier])
-            # plots_data.plots_spikes_df_dict[_active_plot_identifier]
+        #     ## Add the neuron_id labels to the rasters:
+        #     raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
+        #     a_plot_item = plots.ax[_active_plot_identifier]
+        #     # self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map)
 
-            ## Add the neuron_id labels to the rasters:
-            raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
-            a_plot_item = plots.ax[_active_plot_identifier]
-            # self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map)
+        #     # updated_color_dict = {cell_id:cell_config.color for cell_id, cell_config in updated_neuron_render_configs.items()} ## TODO: efficiency: pass only the colors that changed instead of all the colors:
+        #     updated_color_dict = {}
 
-            # updated_color_dict = {cell_id:cell_config.color for cell_id, cell_config in updated_neuron_render_configs.items()} ## TODO: efficiency: pass only the colors that changed instead of all the colors:
-            updated_color_dict = {}
+        #     for cell_id, cell_config in updated_neuron_render_configs.items():
+        #         # a_fragile_linear_neuron_IDX = raster_plot_manager.cell_id_to_fragile_linear_neuron_IDX_map[cell_id]
+        #         a_fragile_linear_neuron_IDX = raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=[cell_id])[0]
+        #         curr_qcolor = cell_config.qcolor
 
-            for cell_id, cell_config in updated_neuron_render_configs.items():
-                # a_fragile_linear_neuron_IDX = raster_plot_manager.cell_id_to_fragile_linear_neuron_IDX_map[cell_id]
-                a_fragile_linear_neuron_IDX = raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=[cell_id])[0]
-                curr_qcolor = cell_config.qcolor
+        #         # Determine if the color changed: Easiest to compare the hex value string:
+        #         did_color_change = (raster_plot_manager.params.neuron_colors_hex[a_fragile_linear_neuron_IDX] != cell_config.color) # the hex color
 
-                # Determine if the color changed: Easiest to compare the hex value string:
-                did_color_change = (raster_plot_manager.params.neuron_colors_hex[a_fragile_linear_neuron_IDX] != cell_config.color) # the hex color
+        #         # Overwrite the old colors:
+        #         raster_plot_manager.params.neuron_qcolors_map[a_fragile_linear_neuron_IDX] = curr_qcolor
+        #         raster_plot_manager.params.neuron_qcolors[a_fragile_linear_neuron_IDX] = curr_qcolor
+        #         # Overwrite the old secondary/derived colors:
+        #         curr_rgbf_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
+        #         raster_plot_manager.params.neuron_colors[:, a_fragile_linear_neuron_IDX] = curr_rgbf_color[:]
+        #         raster_plot_manager.params.neuron_colors_hex[a_fragile_linear_neuron_IDX] = cell_config.color # the hex color
 
-                # Overwrite the old colors:
-                raster_plot_manager.params.neuron_qcolors_map[a_fragile_linear_neuron_IDX] = curr_qcolor
-                raster_plot_manager.params.neuron_qcolors[a_fragile_linear_neuron_IDX] = curr_qcolor
-                # Overwrite the old secondary/derived colors:
-                curr_rgbf_color = curr_qcolor.getRgbF() # (1.0, 0.0, 0.0, 0.5019607843137255)
-                raster_plot_manager.params.neuron_colors[:, a_fragile_linear_neuron_IDX] = curr_rgbf_color[:]
-                raster_plot_manager.params.neuron_colors_hex[a_fragile_linear_neuron_IDX] = cell_config.color # the hex color
+        #         if did_color_change:
+        #             # If the color changed, add it to the changed array:
+        #             updated_color_dict[cell_id] = cell_config.color
 
-                if did_color_change:
-                    # If the color changed, add it to the changed array:
-                    updated_color_dict[cell_id] = cell_config.color
+        #     updated_color_dict_dict[_active_plot_identifier] = updated_color_dict
 
-            updated_color_dict_dict[_active_plot_identifier] = updated_color_dict
+        #     #TODO 2023-11-29 20:39: - [ ] rebuild the spikes
+        #     # raster_plot_manager.unit_sort_manager.update_spikes_df_visualization_columns(self.global_spikes_df)
+        #     plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.plots_spikes_df_dict[_active_plot_identifier], plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
 
-            #TODO 2023-11-29 20:39: - [ ] rebuild the spikes
-            # raster_plot_manager.unit_sort_manager.update_spikes_df_visualization_columns(self.global_spikes_df)
-            plots_data.all_spots_dict[_active_plot_identifier], plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.plots_spikes_df_dict[_active_plot_identifier], plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+        #     #TODO 2023-11-29 20:40: - [ ] Rebuild the y-axis labels:
+        #     # - make sure configs are updated so the colors used to rebuild are correct.
+        #     # - todo - remove the old items?
+        #     aclus_list = list(raster_plot_manager.params.config_items.keys())
+        #     a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
 
-            #TODO 2023-11-29 20:40: - [ ] Rebuild the y-axis labels:
-            # - make sure configs are updated so the colors used to rebuild are correct.
-            # - todo - remove the old items?
-            aclus_list = list(raster_plot_manager.params.config_items.keys())
-            a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
+        #     ## Get the y-values for the labels
+        #     y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
+        #     aclu_y_values_dict = dict(zip(aclus_list, y_values))
+        #     self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map, aclu_y_values_dict) # ideally we could just add a color update to the update function
 
-            ## Get the y-values for the labels
-            y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
-            aclu_y_values_dict = dict(zip(aclus_list, y_values))
-            self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map, aclu_y_values_dict) # ideally we could just add a color update to the update function
-
-
-        return updated_color_dict_dict
+        # return updated_color_dict_dict
 
 
     # ==================================================================================================================== #
@@ -466,15 +458,6 @@ class RankOrderRastersDebugger:
         """Builds y-axis labels for each of the rasters and stores them in `self.plots.text_items_dict`
         """
         emphasis_state = SpikeEmphasisState.Default
-
-        # LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
-        # RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
-
-        # ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
-        # _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
-        # _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
-        # _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
-
         if self.plots.text_items_dict is not None:
             #TODO 2023-11-30 08:33: - [ ] Remove the old labels here if they exist.
             print(f'TODO 2023-11-30 08:33: - [ ] Remove the old labels here if they exist.')
@@ -489,44 +472,18 @@ class RankOrderRastersDebugger:
             self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map, aclu_y_values_dict)
 
 
-        # for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
-        #     ## Add the neuron_id labels to the rasters:
-        #     raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
-        #     aclus_list = list(raster_plot_manager.params.config_items.keys())
-        #     a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
-        #     a_plot_item = plots.ax[_active_plot_identifier]
-        #     ## Get the y-values for the labels
-        #     y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
-        #     aclu_y_values_dict = dict(zip(aclus_list, y_values))
-
-        #     self.plots.text_items_dict[a_plot_item] = self._build_neuron_y_labels(a_plot_item, a_decoder_color_map, aclu_y_values_dict)
-            
-
-
     @function_attributes(short_name=None, tags=['cell_y_labels', 'update', 'active_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-29 20:05', related_items=[])
     def update_cell_y_labels(self):
         """ called whenever the window scrolls or changes to reposition the y-axis labels created with self._build_cell_y_labels """
         # Adjust based on the whether the aclu is active or not:
         curr_active_aclus = self.get_epoch_active_aclus()
-
-        LR_plots_data: RenderPlotsData = self.plots_data.LR_plots_data
-        RL_plots_data: RenderPlotsData = self.plots_data.RL_plots_data
-
-        ## Built flat lists across all four rasters so they aren't broken up into LR/RL when indexing:
-        _active_plot_identifiers = list(LR_plots_data.plots_data_dict.keys()) + list(RL_plots_data.plots_data_dict.keys()) # ['long_LR', 'short_LR', 'long_RL', 'short_RL']
-        _paired_plots_data = [LR_plots_data, LR_plots_data, RL_plots_data, RL_plots_data]
-        _paired_plots = [self.plots.LR_plots, self.plots.LR_plots, self.plots.RL_plots, self.plots.RL_plots]
-
         emphasis_state = SpikeEmphasisState.Default
 
-        for _active_plot_identifier, plots_data, plots in zip(_active_plot_identifiers, _paired_plots_data, _paired_plots):
-            raster_plot_manager = plots_data.plots_data_dict[_active_plot_identifier].raster_plot_manager
-            aclus_list = list(raster_plot_manager.params.config_items.keys())
-            a_decoder_color_map = {aclu:raster_plot_manager.params.config_items[aclu].curr_state_pen_dict[emphasis_state].color() for aclu in aclus_list} # Recover color from pen:
-            a_plot_item = plots.ax[_active_plot_identifier]
-            ## Get the y-values for the labels
-            y_values = raster_plot_manager.unit_sort_manager.fragile_linear_neuron_IDX_to_spatial(raster_plot_manager.unit_sort_manager.find_neuron_IDXs_from_cell_ids(cell_ids=aclus_list))
-            aclu_y_values_dict = dict(zip(aclus_list, y_values))
+        for _active_plot_identifier, new_sorted_raster in self.plots_data.seperate_new_sorted_rasters_dict.items():
+            aclu_y_values_dict = {int(aclu):new_sorted_raster.neuron_y_pos[aclu] for aclu in new_sorted_raster.neuron_IDs}
+            a_plot_item = self.plots.root_plots[_active_plot_identifier]
+            # f"{int(aclu)}"
+            a_decoder_color_map = deepcopy(new_sorted_raster.neuron_colors)
             # get the labels to update:
             _out_text_items = self.plots.text_items_dict[a_plot_item]
 
@@ -542,6 +499,7 @@ class RankOrderRastersDebugger:
                 else:
                     text.setColor(pg.mkColor("#666666"))
                 # text.setVisible(is_aclu_active)
+
 
 
     # ==================================================================================================================== #
