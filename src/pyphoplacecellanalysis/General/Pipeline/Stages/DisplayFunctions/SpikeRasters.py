@@ -5,9 +5,11 @@ from nptyping import NDArray
 import numpy as np
 import pandas as pd
 from functools import partial
-from attrs import define, field, Factory
+from attrs import define, field, Factory, asdict
 from indexed import IndexedOrderedDict
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 from neuropy.utils.result_context import overwriting_display_context, providing_context
@@ -21,7 +23,10 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPl
 from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color # required for the different emphasis states in ._build_cell_configs()
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
+from qtpy import QtGui # for QColor
+from qtpy.QtGui import QColor, QBrush, QPen
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import ScatterItemData # used in `NewSimpleRaster`
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers, UnitColoringMode # for build_neurons_color_data
@@ -177,6 +182,9 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
 NeuronSpikesConfigTuple = namedtuple('NeuronSpikesConfigTuple', ['idx', 'fragile_linear_neuron_IDX', 'curr_state_pen_dict', 'lower_y_value', 'upper_y_value', 'curr_state_brush_dict'])
 
 
+# ==================================================================================================================== #
+# Spike2DRaster-like Managers                                                                                          #
+# ==================================================================================================================== #
 @define(slots=False)
 class RasterPlotParams:
     """ Holds configuration parameters used in determining how to render a raster plot.
@@ -252,8 +260,6 @@ class RasterPlotParams:
         # get hex colors:
         self.neuron_colors_hex = [self.neuron_qcolors[i].name(QtGui.QColor.HexRgb) for i, cell_id in enumerate(fragile_linear_neuron_IDXs)]
         return self
-
-
 
 @define(slots=False)
 class UnitSortOrderManager(NeuronIdentityAccessingMixin):
@@ -367,10 +373,6 @@ class UnitSortOrderManager(NeuronIdentityAccessingMixin):
             # TODO: This might be the one we don't want to overwrite unless it's missing, as we probably don't want to always reset it to default emphasis if a column with customized values already exists.
             spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
         return spikes_df
-
-
-
-
 
 @define(slots=False)
 class RasterScatterPlotManager(NeuronIdentityAccessingMixin):
@@ -520,6 +522,244 @@ class RasterScatterPlotManager(NeuronIdentityAccessingMixin):
 
 
 
+# ==================================================================================================================== #
+# Simplified 2023-12-06 Rasters                                                                                        #
+# ==================================================================================================================== #
+
+
+@metadata_attributes(short_name=None, tags=['raster', 'simple', 'working', 'state', 'modal', 'independent'], input_requires=[], output_provides=[], uses=['ScatterItemData'], used_by=[], creation_date='2023-12-06 13:48', related_items=['new_plot_raster_plot'])
+@define(slots=False, eq=False)
+class NewSimpleRaster:
+    """ Simpler one-shot raster plotter that doesn't support the flexiblity of SpikeRaster2D and the managers extracted from it but is much simpler to debug and use. 
+    
+    All of its fields are Dict with keys of `aclu` (neuron_ID)
+    
+    To specify a specific sort, pass already sorted neuron_IDs
+    
+    ```
+        if unit_sort_order is None:
+            unit_sort_order = np.arange(len(included_neuron_ids))
+        active_sorted_neuron_ids = included_neuron_ids[unit_sort_order]
+        plots_data.new_sorted_raster = NewSimpleRaster.init_from_neuron_ids(active_sorted_neuron_ids, neuron_colors=unit_colors_list)
+    ```
+    
+    """
+    neuron_IDs: NDArray = field(repr=True)
+    neuron_colors: Dict[int, QColor] = field(init=False, repr=False)
+    neuron_y_pos: Dict[int, float] = field(init=False, repr=True)
+
+    @classmethod
+    def init_from_neuron_ids(cls, neuron_IDs, neuron_colors=None):
+        _obj = cls(neuron_IDs=neuron_IDs)
+        n_cells = len(_obj.neuron_IDs)
+        
+        if neuron_colors is None:	
+            neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(np.arange(n_cells), mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS, provided_cell_colors=None)
+        else:
+            assert len(neuron_colors) == n_cells
+            if isinstance(neuron_colors, dict):
+                assert np.all(np.isin(neuron_IDs, np.array(list(neuron_colors.keys())))), f" if colors dict is provided, all neuron_ids must be present in the neuron_color's keys."
+                _obj.neuron_colors = neuron_colors
+            else:
+                neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(np.arange(n_cells), mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS, provided_cell_colors=neuron_colors)	
+                _obj.neuron_colors = dict(zip(_obj.neuron_IDs, neuron_qcolors_list))
+                
+        ## build raw y-values:
+        _series_identity_y_values = DataSeriesToSpatial.build_series_identity_axis(n_cells, center_mode='starting_at_zero', bin_position_mode='bin_center')
+        _obj.neuron_y_pos = dict(zip(_obj.neuron_IDs, _series_identity_y_values))
+        return _obj
+
+
+    def update_sort(self, ordered_aclus_list: NDArray):
+        """ called to update the sort order of the neuron, adjusting ony `.neuron_y_pos`."""
+        raise NotImplementedError
+
+
+    def update_colors(self, aclu_color_map: Dict[int, QColor]):
+        """ updates the neuron's color """
+        for aclu, a_color in aclu_color_map.items():
+            self.neuron_colors[aclu] = a_color.copy()
+
+
+    def update_spikes_df_visualization_columns(self, spikes_df: pd.DataFrame, overwrite_existing:bool=True) -> pd.DataFrame:
+        """ updates spike_df's columns: ['visualization_raster_y_location', 'visualization_raster_emphasis_state']
+        Uses:
+            .y_fragile_linear_neuron_IDX_map
+            
+        Always returns a copy of spikes_df
+        
+        """
+        # Get only the spikes for the shared_aclus:
+        a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(self.neuron_IDs)
+        a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+
+        if overwrite_existing or ('visualization_raster_y_location' not in a_spikes_df.columns):
+            # all_y = [self.y_fragile_linear_neuron_IDX_map[a_cell_IDX] for a_cell_IDX in spikes_df['fragile_linear_neuron_IDX'].to_numpy()]
+            all_y = [self.neuron_y_pos[aclu] for aclu in a_spikes_df['aclu'].to_numpy()]
+            a_spikes_df['visualization_raster_y_location'] = all_y # adds as a column to the dataframe. Only needs to be updated when the number of active units changes. BUG? NO, RESOLVED: actually, this should be updated when anything that would change .y_fragile_linear_neuron_IDX_map would change, right? Meaning: .y, ... oh, I see. y doesn't change because params.center_mode, params.bin_position_mode, and params.side_bin_margins aren't expected to change. 
+
+        if overwrite_existing or ('visualization_raster_emphasis_state' not in a_spikes_df.columns):
+            # TODO: This might be the one we don't want to overwrite unless it's missing, as we probably don't want to always reset it to default emphasis if a column with customized values already exists.
+            a_spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
+        return a_spikes_df
+
+    def build_spikes_all_spots_from_df(self, spikes_df: pd.DataFrame, is_spike_included=None, should_return_data_tooltips_kwargs:bool=True, generate_debug_tuples=False, **kwargs):
+        """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
+            Needs to be called whenever:
+                spikes_df['visualization_raster_y_location']
+                spikes_df['visualization_raster_emphasis_state']
+                spikes_df['fragile_linear_neuron_IDX']
+            Changes.
+        Removed `config_fragile_linear_neuron_IDX_map`
+        """
+        # INLINEING `build_spikes_data_values_from_df`: ______________________________________________________________________ #
+        # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
+        # All units at once approach:
+        active_time_variable_name = spikes_df.spikes.time_variable_name
+        # Copy only the relevent columns so filtering is easier:
+        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'aclu', 'fragile_linear_neuron_IDX']].copy()
+        
+        spike_emphasis_states = kwargs.get('spike_emphasis_state', None)
+        if spike_emphasis_states is not None:
+            assert len(spike_emphasis_states) == np.shape(spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
+            # Can set it on the dataframe:
+            # 'visualization_raster_y_location'
+        
+        if is_spike_included is not None:
+            assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
+            ## filter them by the is_included_indicies:
+            filtered_spikes_df = filtered_spikes_df[is_spike_included]
+        
+        # Filter the dataframe using that column and value from the list
+        curr_spike_t = filtered_spikes_df[active_time_variable_name].to_numpy() # this will map
+        curr_spike_y = filtered_spikes_df['visualization_raster_y_location'].to_numpy() # this will map
+        
+        # Build the "tooltips" for each spike:
+        # curr_spike_data_tooltips = [f"{an_aclu}" for an_aclu in spikes_df['aclu'].to_numpy()]
+        if should_return_data_tooltips_kwargs:
+            # #TODO 2023-12-06 03:35: - [ ] This doesn't look like it can sort the tooltips at all, right? Or does this not matter?
+            # all_scatterplot_tooltips_kwargs = cls._build_spike_data_tuples_from_spikes_df(spikes_df, generate_debug_tuples=True) # need the full spikes_df, not the filtered one
+            # INLINING: _build_spike_data_tuples_from_spikes_df __________________________________________________________________ #
+
+            if generate_debug_tuples:
+                # debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'neuron_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
+                debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'] # a subset I'm actually interested in for debugging
+                active_datapoint_column_names = debug_datapoint_column_names # all values for the purpose of debugging
+            else:
+                default_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
+                active_datapoint_column_names = default_datapoint_column_names
+                
+            def _tip_fn(x, y, data):
+                """ the function required by pg.ScatterPlotItem's `tip` argument to print the tooltip for each spike. """
+                from attrs import asdict
+                # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
+                # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in asdict(data).items()])
+                data_string:str = '|'.join([f"{k}: {str(v)}" for k, v in asdict(data).items()])
+                print(f'_tip_fn(...): data_string: {data_string}')
+                return f"spike: (x={x:.3f}, y={y:.2f})\n{data_string}"
+
+            # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
+            spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
+            spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+            all_scatterplot_tooltips_kwargs = dict(data=spikes_data, tip=_tip_fn)
+            assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
+        else:
+            all_scatterplot_tooltips_kwargs = None
+            
+        # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
+        # Emphasis/Deemphasis-Dependent Pens:
+        # curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
+        curr_spike_pens = [pg.mkPen(self.neuron_colors[aclu], width=1) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state
+        curr_spikes_brushes = [pg.mkBrush(self.neuron_colors[aclu]) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state
+
+        curr_n = len(curr_spike_t) # curr number of spikes
+        # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
+        pos = np.vstack((curr_spike_t, curr_spike_y))
+        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i], 'brush': curr_spikes_brushes[i]} for i in range(curr_n)] # returned spikes {'pos','data','pen'}		
+        if should_return_data_tooltips_kwargs:
+            return all_spots, all_scatterplot_tooltips_kwargs
+        else:
+            return all_spots
+
+
+@function_attributes(short_name=None, tags=['raster', 'simple', 'working', 'stateless'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-06 13:49', related_items=['NewSimpleRaster'])
+def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs): # -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+    """ This uses `NewSimpleRaster` and pyqtgraph's scatter function to render a simple raster plot. Simpler than the `SpikeRaster2D`-like implementations.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot
+
+        app, win, plots, plots_data = new_plot_raster_plot(_temp_active_spikes_df, shared_aclus)
+
+    """
+    
+    # make root container for plots
+    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
+    if unit_sort_order is None:
+        unit_sort_order = np.arange(len(included_neuron_ids))
+    active_sorted_neuron_ids = included_neuron_ids[unit_sort_order]
+    plots_data.new_sorted_raster = NewSimpleRaster.init_from_neuron_ids(active_sorted_neuron_ids, neuron_colors=unit_colors_list)
+
+    ## Add the source data (spikes_df) to the plot_data
+    plots_data.spikes_df = deepcopy(spikes_df)    
+    # Update the dataframe
+    plots_data.spikes_df = plots_data.new_sorted_raster.update_spikes_df_visualization_columns(spikes_df=plots_data.spikes_df)
+    ## Build the spots for the raster plot:
+    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = plots_data.new_sorted_raster.build_spikes_all_spots_from_df(spikes_df=plots_data.spikes_df, should_return_data_tooltips_kwargs=True, generate_debug_tuples=False)
+
+
+    # Add header label
+    # plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
+    # win.addItem(plots.debug_header_label)
+
+    plots.debug_header_label = win.addLabel("debug_header_label") # , row=1, colspan=4
+    win.nextRow()
+    # plots.debug_label2 = win.addLabel("Label2") # , col=1, colspan=4
+    # win.nextRow()
+    
+    # # Actually setup the plot:
+    plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
+
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
+    
+    plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
+    plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+    plots.scatter_plot.opts['useCache'] = True
+    plots.scatter_plot.addPoints(plots_data.all_spots, **(plots_data.all_scatterplot_tooltips_kwargs or {})) # , hoverable=True
+    plots.root_plot.addItem(plots.scatter_plot)
+
+    # build the y-axis grid to separate the units
+    plots.grid = _build_units_y_grid(plots.root_plot)
+    
+    ## Build the y-axis cell labels:
+    # Need to get the y-axis positions corresponding to each cell.
+    # sorted_neuron_ids = deepcopy(plots_data.new_sorted_raster.neuron_IDs)
+    # for aclu in sorted_neuron_ids:
+    #     plots_data.new_sorted_raster.neuron_y_pos[aclu]
+    a_left_axis = plots.root_plot.getAxis('left') # axisItem
+    a_left_axis.setLabel('test')
+    # tick_ydict = {y_pos:f"{int(aclu)}" for y_pos, aclu in zip(a_series_identity_y_values, sorted_neuron_ids)} # {0.5: '68', 1.5: '75', 2.5: '54', 3.5: '10', 4.5: '104', 5.5: '90', 6.5: '44', 7.5: '15', 8.5: '93', 9.5: '79', 10.5: '56', 11.5: '84', 12.5: '78', 13.5: '31', 14.5: '16', 15.5: '40', 16.5: '25', 17.5: '81', 18.5: '70', 19.5: '66', 20.5: '24', 21.5: '98', 22.5: '80', 23.5: '77', 24.5: '60', 25.5: '39', 26.5: '9', 27.5: '82', 28.5: '85', 29.5: '101', 30.5: '87', 31.5: '26', 32.5: '43', 33.5: '65', 34.5: '48', 35.5: '52', 36.5: '92', 37.5: '11', 38.5: '51', 39.5: '72', 40.5: '18', 41.5: '53', 42.5: '47', 43.5: '89', 44.5: '102', 45.5: '61'}
+    tick_ydict = {plots_data.new_sorted_raster.neuron_y_pos[aclu]:f"{int(aclu)}" for aclu in plots_data.new_sorted_raster.neuron_IDs}
+    a_left_axis.setTicks([tick_ydict.items()])
+
+    # win.nextRow()
+    # plots.debug_label3 = win.addLabel("Label3") # , col=1, colspan=4
+
+    return RasterPlotSetupTuple(app, win, plots, plots_data)
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================== #
+# Main Functions                                                                                                       #
+# ==================================================================================================================== #
 
     
 
