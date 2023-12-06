@@ -1,5 +1,9 @@
 import numpy as np
 import pandas as pd
+from attrs import define, field, fields, asdict, astuple
+
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
@@ -7,7 +11,6 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearReg
 
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 
-from attrs import define, field, fields, asdict, astuple
 
 @define(frozen=True)
 class ScatterItemData:
@@ -337,3 +340,96 @@ class Render2DScrollWindowPlotMixin:
             return all_spots, all_scatterplot_tooltips_kwargs
         else:
             return all_spots
+
+
+
+@function_attributes(short_name=None, tags=['spikes', 'spots', 'raster', 'scatterplot', 'pyqtgraph', 'unused'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-06 14:02', related_items=[])
+def independent_build_spikes_all_spots_from_df(spikes_df: pd.DataFrame, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, generate_debug_tuples=False, **kwargs):
+    """ Made completely independent from the class methods in `Render2DScrollWindowPlotMixin`. Builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
+        Needs to be called whenever:
+            spikes_df['visualization_raster_y_location']
+            spikes_df['visualization_raster_emphasis_state']
+            spikes_df['fragile_linear_neuron_IDX']
+        Changes.
+        
+        
+        History: Flattened on 2023-12-06 but otherwise unmodified
+        
+    """
+    
+    # INLINEING `build_spikes_data_values_from_df`: ______________________________________________________________________ #
+    # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
+    # All units at once approach:
+    active_time_variable_name = spikes_df.spikes.time_variable_name
+    # Copy only the relevent columns so filtering is easier:
+    filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
+    
+    spike_emphasis_states = kwargs.get('spike_emphasis_state', None)
+    if spike_emphasis_states is not None:
+        assert len(spike_emphasis_states) == np.shape(spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
+        # Can set it on the dataframe:
+        # 'visualization_raster_y_location'
+    
+    if is_spike_included is not None:
+        assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
+        ## filter them by the is_included_indicies:
+        filtered_spikes_df = filtered_spikes_df[is_spike_included]
+    
+    # Filter the dataframe using that column and value from the list
+    curr_spike_t = filtered_spikes_df[active_time_variable_name].to_numpy() # this will map
+    curr_spike_y = filtered_spikes_df['visualization_raster_y_location'].to_numpy() # this will map
+    
+    # Build the "tooltips" for each spike:
+    # curr_spike_data_tooltips = [f"{an_aclu}" for an_aclu in spikes_df['aclu'].to_numpy()]
+    if should_return_data_tooltips_kwargs:
+        # #TODO 2023-12-06 03:35: - [ ] This doesn't look like it can sort the tooltips at all, right? Or does this not matter?
+        # all_scatterplot_tooltips_kwargs = cls._build_spike_data_tuples_from_spikes_df(spikes_df, generate_debug_tuples=True) # need the full spikes_df, not the filtered one
+        # INLINING: _build_spike_data_tuples_from_spikes_df __________________________________________________________________ #
+
+        if generate_debug_tuples:
+            # debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'neuron_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
+            debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'] # a subset I'm actually interested in for debugging
+            active_datapoint_column_names = debug_datapoint_column_names # all values for the purpose of debugging
+        else:
+            default_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
+            active_datapoint_column_names = default_datapoint_column_names
+            
+        def _tip_fn(x, y, data):
+            """ the function required by pg.ScatterPlotItem's `tip` argument to print the tooltip for each spike. """
+            # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
+            # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in asdict(data).items()])
+            data_string:str = '|'.join([f"{k}: {str(v)}" for k, v in asdict(data).items()])
+            print(f'_tip_fn(...): data_string: {data_string}')
+            return f"spike: (x={x:.3f}, y={y:.2f})\n{data_string}"
+
+        # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
+        spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
+        spikes_data = [ScatterItemData(**v) for v in spikes_data] 
+        all_scatterplot_tooltips_kwargs = dict(data=spikes_data, tip=_tip_fn)
+        assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
+    else:
+        all_scatterplot_tooltips_kwargs = None
+        
+    # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
+    # Emphasis/Deemphasis-Dependent Pens:
+    curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
+    
+    has_brushes: bool = np.all([(len(config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX])>=6) for a_fragile_linear_neuron_IDX in filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy()])
+    if has_brushes:
+        curr_spikes_brushes = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][-1][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
+    else:
+        curr_spikes_brushes = [] # scared to modify/use the brushes here out of fear of breaking the spike_emphasis_states
+    
+    curr_n = len(curr_spike_t) # curr number of spikes
+    # builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes
+    pos = np.vstack((curr_spike_t, curr_spike_y))
+    if has_brushes:
+        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i], 'brush': curr_spikes_brushes[i]} for i in range(curr_n)] # returned spikes {'pos','data','pen'}
+    else:
+        all_spots = [{'pos': pos[:,i], 'data': i, 'pen': curr_spike_pens[i]} for i in range(curr_n)] # returned spikes {'pos','data','pen'}
+        
+    if should_return_data_tooltips_kwargs:
+        return all_spots, all_scatterplot_tooltips_kwargs
+    else:
+        return all_spots
+

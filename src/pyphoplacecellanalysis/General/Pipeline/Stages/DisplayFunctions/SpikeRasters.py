@@ -683,7 +683,7 @@ class NewSimpleRaster:
 
 
 @function_attributes(short_name=None, tags=['raster', 'simple', 'working', 'stateless'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-06 13:49', related_items=['NewSimpleRaster'])
-def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs): # -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses `NewSimpleRaster` and pyqtgraph's scatter function to render a simple raster plot. Simpler than the `SpikeRaster2D`-like implementations.
 
     Usage:
@@ -697,6 +697,7 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
     if unit_sort_order is None:
         unit_sort_order = np.arange(len(included_neuron_ids))
+    assert len(unit_sort_order) == len(included_neuron_ids)
     active_sorted_neuron_ids = included_neuron_ids[unit_sort_order]
     plots_data.new_sorted_raster = NewSimpleRaster.init_from_neuron_ids(active_sorted_neuron_ids, neuron_colors=unit_colors_list)
 
@@ -707,11 +708,9 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     ## Build the spots for the raster plot:
     plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = plots_data.new_sorted_raster.build_spikes_all_spots_from_df(spikes_df=plots_data.spikes_df, should_return_data_tooltips_kwargs=True, generate_debug_tuples=False)
 
-
     # Add header label
     # plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
     # win.addItem(plots.debug_header_label)
-
     plots.debug_header_label = win.addLabel("debug_header_label") # , row=1, colspan=4
     win.nextRow()
     # plots.debug_label2 = win.addLabel("Label2") # , col=1, colspan=4
@@ -1352,6 +1351,23 @@ def paired_incremental_sort_neurons(decoders_dict: Dict, included_any_context_ne
     return sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts
 
 
+# Define the namedtuple for additional_data
+UnsortedDataTuple = namedtuple(
+    'UnsortedDataTuple',
+    ['original_neuron_IDs_lists', 'neuron_IDs_lists', 'sortable_values_lists', 'unit_colors_map']
+)
+
+PairedSeparatelySortNeuronsResult = namedtuple(
+    'PairedSeparatelySortNeuronsResult',
+    [
+        'sorted_neuron_IDs_lists', 
+        'sort_helper_neuron_id_to_neuron_colors_dicts', 
+        'sort_helper_neuron_id_to_sort_IDX_dicts', 
+        'unsorted_data_tuple'
+    ]
+)
+
+
 @function_attributes(short_name=None, tags=['sort', 'raster', 'sorting', 'important', 'visualization', 'order', 'neuron_ids'], input_requires=[], output_provides=[], uses=['DataSeriesColorHelpers.build_cell_colors', 'paired_incremental_sorting'], used_by=[], creation_date='2023-11-29 17:13', related_items=['paired_incremental_sort_neurons'])
 def paired_separately_sort_neurons(decoders_dict: Dict, included_any_context_neuron_ids_dict_dict=None, sortable_values_list_dict=None):
     """ Given a set of decoders (or more generally placefields, ratemaps, or anything else with neuron_IDs and a property that can be sorted) return the iterative successive sort.
@@ -1425,7 +1441,7 @@ def paired_separately_sort_neurons(decoders_dict: Dict, included_any_context_neu
     # So unlike other attempts, these colors are sorted along with the aclus for each decoder, and we don't try to keep them separate. Since they're actually in a dict (where conceptually the order doesn't really matter) this should be indistinguishable performance-wise from other implementation.
     sort_helper_neuron_id_to_neuron_colors_dicts = [{aclu:unit_colors_map[aclu] for aclu in sorted_neuron_ids} for sorted_neuron_ids in sorted_neuron_IDs_lists] # [{72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, {72: array([11.2724, 145.455, 0.815335, 1]), 84: array([165, 77, 1, 1]), ...}, ...]
     # `sort_helper_neuron_id_to_sort_IDX_dicts` is main output here:
-    return sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts #, sorted_pf_tuning_curves
+    return PairedSeparatelySortNeuronsResult(sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts, UnsortedDataTuple(original_neuron_IDs_lists, neuron_IDs_lists, sortable_values_lists, unit_colors_map)) #, sorted_pf_tuning_curves
 
 
 
