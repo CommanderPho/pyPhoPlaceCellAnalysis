@@ -785,14 +785,17 @@ class RankOrderAnalyses:
 
             # long_short_z_diff: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value))
 
-            long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
-            assert (np.isclose(long_or_short_polarity_multiplier, -1.0) or np.isclose(long_or_short_polarity_multiplier, 1.0)), f"long_or_short_polarity_multiplier: {long_or_short_polarity_multiplier} should equal -1 or +1"
+            
             always_positive_long_short_magnitude_diff: float = np.max([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)]) - np.min([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)])
             assert (always_positive_long_short_magnitude_diff >= 0.0)
-            long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
-
+            long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
+            if (always_positive_long_short_magnitude_diff > 0.0):
+                assert (np.isclose(long_or_short_polarity_multiplier, -1.0) or np.isclose(long_or_short_polarity_multiplier, 1.0)), f"long_or_short_polarity_multiplier: {long_or_short_polarity_multiplier} should equal -1 or +1"            
+                long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
+            else:
+                long_short_z_diff: float = 0.0 # the value is exactly zero. Surprising.
+                
             long_short_naive_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value # `long_short_naive_z_diff` was the old pre-2023-12-07 way of calculating the z-score diff.
-
             epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsTuple(long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay)
 
 
