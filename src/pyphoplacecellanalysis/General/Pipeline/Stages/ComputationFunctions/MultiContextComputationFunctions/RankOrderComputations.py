@@ -787,7 +787,7 @@ class RankOrderAnalyses:
 
             long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
             assert np.isclose(long_or_short_polarity_multiplier, -1.0) or np.isclose(long_or_short_polarity_multiplier, 1.0)
-            always_positive_long_short_magnitude_diff = np.max(np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)) - np.min(np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value))
+            always_positive_long_short_magnitude_diff: float = np.max([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)]) - np.min([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)])
             assert always_positive_long_short_magnitude_diff >= 0.0
             long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
 
