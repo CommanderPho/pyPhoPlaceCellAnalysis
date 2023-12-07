@@ -736,7 +736,7 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     # for aclu in sorted_neuron_ids:
     #     plots_data.new_sorted_raster.neuron_y_pos[aclu]
     a_left_axis = plots.root_plot.getAxis('left') # axisItem
-    a_left_axis.setLabel('test')
+    # a_left_axis.setLabel('test')
     # tick_ydict = {y_pos:f"{int(aclu)}" for y_pos, aclu in zip(a_series_identity_y_values, sorted_neuron_ids)} # {0.5: '68', 1.5: '75', 2.5: '54', 3.5: '10', 4.5: '104', 5.5: '90', 6.5: '44', 7.5: '15', 8.5: '93', 9.5: '79', 10.5: '56', 11.5: '84', 12.5: '78', 13.5: '31', 14.5: '16', 15.5: '40', 16.5: '25', 17.5: '81', 18.5: '70', 19.5: '66', 20.5: '24', 21.5: '98', 22.5: '80', 23.5: '77', 24.5: '60', 25.5: '39', 26.5: '9', 27.5: '82', 28.5: '85', 29.5: '101', 30.5: '87', 31.5: '26', 32.5: '43', 33.5: '65', 34.5: '48', 35.5: '52', 36.5: '92', 37.5: '11', 38.5: '51', 39.5: '72', 40.5: '18', 41.5: '53', 42.5: '47', 43.5: '89', 44.5: '102', 45.5: '61'}
     tick_ydict = {plots_data.new_sorted_raster.neuron_y_pos[aclu]:f"{int(aclu)}" for aclu in plots_data.new_sorted_raster.neuron_IDs}
     a_left_axis.setTicks([tick_ydict.items()])
@@ -847,6 +847,8 @@ def _build_units_y_grid(plot_item) -> pg.GridItem:
     # set the properties of the grid
     grid.setTickSpacing([], [1, 5, 10 ]) # on the y-axis (units) set lines every 1, 5, and 10 units. Looks great on linux.
     grid.setPen(pg.mkPen('#888888', width=1))
+    grid.setTextPen(None) # no text should be generated
+    
     grid.setZValue(-100)
     return grid
 

@@ -77,6 +77,12 @@ class TestScatterPlottingManagers(unittest.TestCase):
         print(f'actual_sorted_neuron_IDs: {actual_sorted_neuron_IDs}') # actual_sorted_neuron_IDs: [ 70  87  51  84  25  15  89  44  92  48  43  79  81  56  72  98  47  10   9  11  53  31  93  18  82  65 104  90  54  66  80  24  78 101  75  16  40  39  61  85  52  60  68 102  77  26]
         print(f'actual_sorted_fragile_linear_neuron_IDX: {actual_sorted_fragile_linear_neuron_IDX}') # actual_sorted_fragile_linear_neuron_IDX: [26 37 16 35  7  3 38 13 40 15 12 31 33 20 27 42 14  1  0  2 18  9 41  5 34 23 45 39 19 24 32  6 30 43 28  4 11 10 22 36 17 21 25 44 29  8]
 
+        unit_sort_manager3 = rasters_display_outputs3.plots_data.unit_sort_manager
+
+        print(f'fragile_linear_neuron_IDXs: {unit_sort_manager3.fragile_linear_neuron_IDXs}')
+        print(f'neuron_ids: {unit_sort_manager3.neuron_ids}')
+        curr_neuron_ids_list = unit_sort_manager3.find_cell_ids_from_neuron_IDXs(unit_sort_manager3.fragile_linear_neuron_IDXs)
+        print(f"curr_neuron_ids_list: {curr_neuron_ids_list}")
 
 
 

@@ -152,10 +152,18 @@ class RankOrderRastersDebugger:
         dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False),
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False))))
         # dock_add_locations = (['left'], ['left'], ['right'], ['right'])
-        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right'])))
+        # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right'])))
+        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
 
         for i, (a_decoder_name, a_win) in enumerate(all_windows.items()):
+            if (a_decoder_name == 'short_RL'):
+                short_LR_dock = root_dockAreaWindow.find_display_dock('short_LR')
+                assert short_LR_dock is not None
+                dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
+                print(f'using overriden dock location.')
+                
             _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name])
+
 
        
         # Build callback functions:
@@ -177,7 +185,6 @@ class RankOrderRastersDebugger:
                 
                 # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
 
-        from pyphoplacecellanalysis.External.pyqtgraph.widgets.SpinBox import SpinBox
 
         ctrls_dock_config = CustomDockDisplayConfig(showCloseButton=False)
 
@@ -192,48 +199,18 @@ class RankOrderRastersDebugger:
 
         ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
         ctrl_layout = pg.LayoutWidget()
-        ctrl_layout.addWidget(ctrls_widget)
-        
-
-        # changedLabel = pg.QtWidgets.QLabel()   ## updated only when editing is finished or mouse wheel has stopped for 0.3sec
-        # changedLabel.setMinimumWidth(20)
-        # font = changedLabel.font()
-        # font.setBold(True)
-        # font.setPointSize(14)
-        # changedLabel.setFont(font)
-
-        # def valueChanged(sb):
-        #     changedLabel.setText("Final value: %s" % str(sb.value()))
-
-
-        # slider = pg.QtWidgets.QSlider(pg.QtCore.Qt.Horizontal)
-        # slider.setRange(0, (_obj.n_epochs-1))
-        # slider.setValue(50)
-        # # layout.addWidget(slider)
-        # slider.valueChanged.connect(_obj.on_update_epoch_IDX)
-
-        # ctrl_layout = pg.LayoutWidget()
-        # # ctrl_layout.addWidget(ctrls_widget)
-        # ctrl_layout.addWidget(changedLabel, row=0, col=0, colspan=1)
-
-        # ctrl_layout.addWidget(slider, row=0, col=1, colspan=1)
-
-        # spin_box = pg.SpinBox(value=50, bounds=[0, (_obj.n_epochs-1)], int=True, minStep=1, step=1, wrapping=False)
-        # ctrl_layout.addWidget(spin_box, row=0, col=3)        
-        # spin_box.sigValueChanged.connect(valueChanged)
-        # ctrl_widgets_dict = dict(slider=slider, spin_box=spin_box, changedLabel=changedLabel)
-
+        ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1)
         ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
 
         logTextEdit = pg.QtWidgets.QTextEdit()
         logTextEdit.setReadOnly(True)
         logTextEdit.setObjectName("logTextEdit")
 
-        ctrl_layout.addWidget(logTextEdit, row=1, rowspan=3, col=0, colspan=1)
+        ctrl_layout.addWidget(logTextEdit, row=2, rowspan=3, col=0, colspan=1)
 
         _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,100), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
 
-        root_dockAreaWindow.resize(600, 1400)
+        root_dockAreaWindow.resize(600, 900)
 
         ## Build final .plots and .plots_data:
         _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
@@ -264,8 +241,28 @@ class RankOrderRastersDebugger:
             print(f'WARN: the selected spikes did not work properly, so none will be shown.')
             pass
 
-
         _obj._build_cell_y_labels() # builds the cell labels
+
+        ## Cleanup when done:
+        for a_decoder_name, a_root_plot in _obj.plots.root_plots.items():
+            a_root_plot.setTitle(title=a_decoder_name)
+            # a_root_plot.setTitle(title="")
+            a_left_axis = a_root_plot.getAxis('left')# axisItem
+            a_left_axis.setLabel(a_decoder_name)
+            a_left_axis.setStyle(showValues=False)
+            a_left_axis.setTicks([])
+            # a_root_plot.hideAxis('bottom')
+            # a_root_plot.hideAxis('bottom')
+            a_root_plot.hideAxis('left')
+
+        # for a_decoder_name, a_scatter_plot_item in _obj.plots.scatter_plots.items():
+        #     a_scatter_plot_item.hideAxis('left')
+
+        # Hide the debugging labels
+        for a_decoder_name, a_label in _obj.plots.debug_header_labels.items():
+            # a_label.setText('NEW')
+            a_label.hide() # hide the labels unless we need them.
+
 
         return _obj
 
@@ -546,155 +543,6 @@ class RankOrderRastersDebugger:
     # ==================================================================================================================== #
 
     @classmethod
-    def _modern_debug_plot_directional_template_rasters(cls, spikes_df, active_epochs_df, track_templates):
-        """ 2023-11-28 **UPDATING** - Perform raster plotting by getting our data from track_templates (TrackTemplates)
-        There will be four templates, one for each run direction x each maze configuration
-
-
-        Usage:
-            from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.DirectionalTemplatesRastersDebugger import _debug_plot_directional_template_rasters
-
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-            global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
-            global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
-            global_laps_epochs_df = global_laps.to_dataframe()
-            # app, win, plots, plots_data, (on_update_active_epoch, on_update_active_scatterplot_kwargs) = _debug_plot_directional_template_rasters(global_spikes_df, global_laps_epochs_df, track_templates)
-
-            LR_display_outputs, RL_display_outputs = _debug_plot_directional_template_rasters(global_spikes_df, global_laps_epochs_df, track_templates)
-
-        """
-        from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
-        from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
-        from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
-        from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons
-
-        ## spikes_df: get the spikes to plot
-        # included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
-        # included_neuron_ids = track_templates.shared_aclus_only_neuron_IDs
-        # track_templates.shared_LR_aclus_only_neuron_IDs
-
-
-        decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
-        # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
-        # sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sorted_pf_tuning_curves = paired_incremental_sort_neurons(decoders_dict=decoders_dict, included_any_context_neuron_ids=included_any_context_neuron_ids)
-
-        neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in decoders_dict.values()] # [A, B, C, D, ...]
-        # _unit_qcolors_map, unit_colors_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
-        unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
-        # `unit_colors_map` is main colors output
-
-        included_neuron_ids = np.array(list(unit_colors_map.keys()))
-        n_neurons = len(included_neuron_ids)
-
-        print(f'included_neuron_ids: {included_neuron_ids}, n_neurons: {n_neurons}')
-
-        # included_neuron_ids = np.sort(np.union1d(track_templates.shared_RL_aclus_only_neuron_IDs, track_templates.shared_LR_aclus_only_neuron_IDs))
-        # n_neurons = len(included_neuron_ids)
-
-        # Get only the spikes for the shared_aclus:
-        spikes_df = spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids)
-        # spikes_df = spikes_df.spikes.adding_lap_identity_column(active_epochs_df, epoch_id_key_name='new_lap_IDX')
-        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='new_lap_IDX', epoch_label_column_name=None) # , override_time_variable_name='t_seconds'
-        # spikes_df = spikes_df[spikes_df['ripple_id'] != -1]
-        spikes_df = spikes_df[(spikes_df['new_lap_IDX'] != -1)] # ['lap', 'maze_relative_lap', 'maze_id']
-        spikes_df, neuron_id_to_new_IDX_map = spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-
-
-        # CORRECT: Even: RL, Odd: LR
-        RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy() # (69, )
-        LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy() # (64, )
-        long_RL, short_RL = [(a_sort-1) for a_sort in track_templates.decoder_RL_pf_peak_ranks_list] # nope, different sizes: (62,), (69,)
-        long_LR, short_LR = [(a_sort-1) for a_sort in track_templates.decoder_LR_pf_peak_ranks_list]
-        assert np.shape(long_RL) == np.shape(short_RL), f"{np.shape(long_RL)} != {np.shape(short_RL)}"
-
-        # unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_long, LR_long, RL_short, LR_short))) # SORTED
-        # unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (None, None, None, None))) # unsorted
-        # unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (np.array(list(reversed(np.arange(len(RL_long))))), None, None, None))) # unsorted
-        unit_sort_orders_dict = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], (long_LR, long_RL, short_LR, short_RL)))
-
-        # np.arange(len(RL_long)))
-        # fake_test_indicies = np.zeros_like(track_templates.long_RL_decoder.neuron_IDs) np.array(list(reversed(np.arange(int(round(len(RL_long)/2.0)))))
-        # unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (fake_test_indicies, None, None, None))) # unsorted
-
-
-        # unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (np.array([ 7, 14, 20, 26, 38, 40, 43,  3, 12, 35, 37,  1, 16, 18, 13, 15, 31, 33, 27, 42,  0, 41, 34,  9,  2, 24, 39, 30,  4, 45, 32,  6, 28, 11, 21, 36, 17, 44, 23,  5,  8, 10, 19, 22, 25, 29]),
-        #                                                                                    None, None, None))) # unsorted
-
-        ## Get what should be the unit indicies:
-        # unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_long, LR_long, RL_short, LR_short)))
-        unit_unordered_neuron_IDs_dict = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], (track_templates.long_LR_decoder.neuron_IDs, track_templates.long_RL_decoder.neuron_IDs, track_templates.short_LR_decoder.neuron_IDs, track_templates.short_RL_decoder.neuron_IDs)))
-        unit_ordered_neuron_IDs_dict = {a_decoder_name:neuron_IDs[unit_sort_orders_dict[a_decoder_name]] for a_decoder_name, neuron_IDs in unit_unordered_neuron_IDs_dict.items()}
-
-        for a_decoder_name, neuron_IDs in unit_unordered_neuron_IDs_dict.items():
-            print(f'a_decoder_name: {a_decoder_name}')
-            print(f'   neuron_IDs: {neuron_IDs}')
-            print(f'   unit_sort_orders_dict[a_decoder_name]: {unit_sort_orders_dict[a_decoder_name]}')
-            print(f'   a_decoder_name:neuron_IDs[unit_sort_orders_dict[a_decoder_name]]: {neuron_IDs[unit_sort_orders_dict[a_decoder_name]]}')
-
-        print(f'unit_ordered_neuron_IDs_dict: {unit_ordered_neuron_IDs_dict}')
-
-        # unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (unit_colors_list, unit_colors_list, unit_colors_list, unit_colors_list)))
-
-        # included_any_context_neuron_ids_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (RL_neuron_ids, LR_neuron_ids, RL_neuron_ids, LR_neuron_ids)))
-        # sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict=decoders_dict,
-        #                                                                                                                                                 included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict,
-        #                                                                                                                                                 sortable_values_list_dict=unit_sort_orders_dict)
-
-        # neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
-        # unit_colors_list = neuron_colors_ndarray.copy()
-
-
-
-        ## Do Even/Odd Separately:
-        # unit_colors_map = dict(zip(included_neuron_ids, neuron_colors_ndarray.copy().T))
-
-        ## This is for the NDArray version:
-        # RL_unit_colors_list = [pg.mkColor(v) for k, v in unit_colors_map.items() if k in RL_neuron_ids] # should be a list of QColors, this is confirmed to be what is expected for the colors
-        # LR_unit_colors_list = [pg.mkColor(v) for k, v in unit_colors_map.items() if k in LR_neuron_ids] # should be a list of QColors
-
-        ## This is for the NDArray version:
-        RL_unit_colors_list = np.array([v for k, v in _unit_colors_ndarray_map.items() if k in RL_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
-        LR_unit_colors_list = np.array([v for k, v in _unit_colors_ndarray_map.items() if k in LR_neuron_ids]).T # should be (4, len(shared_RL_aclus_only_neuron_IDs))
-
-        # unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], (deepcopy(RL_unit_colors_list), deepcopy(LR_unit_colors_list), deepcopy(RL_unit_colors_list), deepcopy(LR_unit_colors_list)))) # the colors dict for all four templates
-        unit_colors_list_dict = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], (deepcopy(LR_unit_colors_list), deepcopy(RL_unit_colors_list), deepcopy(LR_unit_colors_list), deepcopy(RL_unit_colors_list)))) # the colors dict for all four templates
-
-        # # #TODO 2023-11-29 18:16: - [ ] paired_separately_sort_neurons version:
-        # unit_colors_list_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], sort_helper_neuron_id_to_neuron_colors_dicts))
-        # unit_sort_orders_dict = dict(zip(['long_RL', 'long_LR', 'short_RL', 'short_LR'], sort_helper_neuron_id_to_sort_IDX_dicts)) # disable this if doesn't work
-
-        # THE LOGIC MUST BE WRONG HERE. Slicing and dicing each Epoch separately is NOT OKAY. Spikes must be built before-hand. Loser.
-
-        # Even:
-        RL_names = ['long_RL', 'short_RL']
-        RL_unit_sort_orders_dict = {k:v for k, v in unit_sort_orders_dict.items() if k in RL_names}
-        RL_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in RL_names}
-        RL_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(RL_neuron_ids)
-        RL_spikes_df, RL_neuron_id_to_new_IDX_map = RL_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-        RL_display_outputs = plot_multi_sort_raster_browser(RL_spikes_df, RL_neuron_ids, unit_sort_orders_dict=RL_unit_sort_orders_dict, unit_colors_list_dict=RL_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_RL', defer_show=False, active_context=None)
-        # RL_app, RL_win, RL_plots, RL_plots_data, RL_on_update_active_epoch, RL_on_update_active_scatterplot_kwargs = RL_display_outputs
-
-        # Odd:
-        LR_names = ['long_LR', 'short_LR']
-        LR_unit_sort_orders_dict = {k:v for k, v in unit_sort_orders_dict.items() if k in LR_names}
-        LR_unit_colors_list_dict = {k:v for k, v in unit_colors_list_dict.items() if k in LR_names}
-        LR_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(LR_neuron_ids)
-        LR_spikes_df, LR_neuron_id_to_new_IDX_map = LR_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-        LR_display_outputs = plot_multi_sort_raster_browser(LR_spikes_df, LR_neuron_ids, unit_sort_orders_dict=LR_unit_sort_orders_dict, unit_colors_list_dict=LR_unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters_LR', defer_show=False, active_context=None)
-        # LR_app, LR_win, LR_plots, LR_plots_data, LR_on_update_active_epoch, LR_on_update_active_scatterplot_kwargs = LR_display_outputs
-
-
-        ## Single Figure Mode:
-        # merged_display_outputs = plot_multi_sort_raster_browser(deepcopy(spikes_df), included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
-        # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = merged_display_outputs
-        # return merged_display_outputs
-
-        return LR_display_outputs, RL_display_outputs
-
-
-    @classmethod
     def _post_modern_debug_plot_directional_template_rasters(cls, spikes_df, active_epochs_df, track_templates, debug_print=True, **kwargs):
         """ 2023-11-30 **DO EM ALL SEPERATELY**
 
@@ -778,11 +626,6 @@ class RankOrderRastersDebugger:
 
         # active_neuron_ids = np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
         # active_sort_idxs = np.array([25, 28, 19,  1, 45, 39, 13,  3, 41, 31, 20, 35, 30,  9,  4, 11,  7, 33, 26, 24,  6, 42, 32, 29, 21, 10,  0, 34, 36, 43, 37,  8, 12, 23, 15, 17, 40,  2, 16, 27,  5, 18, 14, 38, 44, 22])
-
-
-        # sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts = paired_separately_sort_neurons(decoders_dict,
-        #                                                                                                                                                 included_any_context_neuron_ids_dict,
-        #                                                                                                                                                 unit_sort_orders_dict)
 
         _out_data = RenderPlotsData(name=figure_name, spikes_df=spikes_df, unit_sort_orders_dict=None, included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict,
                                     sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None,
