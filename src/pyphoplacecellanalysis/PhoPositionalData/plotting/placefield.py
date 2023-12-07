@@ -83,6 +83,8 @@ def _plot_helper_setup_gridlines(ax, bin_edges, bin_centers):
     ax.yaxis.grid(True, which='major', color = 'grey', linewidth = 0.5) # , color = 'green', linestyle = '--', linewidth = 0.5
     ax.yaxis.grid(True, which='minor', color = 'grey', linestyle = '--', linewidth = 0.25)
 
+
+@function_attributes(short_name=None, tags=['plotting_fn', 'display_fn', 'pf1D'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation'], used_by=['DefaultDisplayFunctions._display_1d_placefield_validations'], creation_date='2023-12-07 13:58', related_items=[])
 def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_save=False, modifier_string='', save_mode='separate_files', plot_kwargs=None):
     """ Uses plot_1D_placecell_validation(...) to plot a series of plots, one for each potential placecell, that allows you to see how the spiking corresponds to the animal's position/lap and how that contributes to the computed placemap
     
@@ -112,7 +114,7 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
         # fig = ui.add_tab(f'Dataset {modifier_string}', f'Cell {curr_cell_id}') # Tabbed mode only
         fig = ui.add_tab(f'Cell{curr_cell_id}')
 
-        fig, axs = plot_1D_placecell_validation(active_placefields1D, i, extant_fig=fig, **(plot_kwargs or {}))
+        fig, axs = plot_single_cell_1D_placecell_validation(active_placefields1D, i, extant_fig=fig, **(plot_kwargs or {}))
         out_figures_list.append(fig)
         out_axes_list.append(axs)
 
@@ -154,7 +156,7 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
 
 # 2d Placefield comparison figure:
 @function_attributes(short_name=None, tags=['pf1D', '1D'], input_requires=[], output_provides=[], uses=['plot_placefield_tuning_curve', 'active_epoch_placefields1D.plotRaw_v_time'], used_by=['plot_1d_placecell_validations'], creation_date='2023-09-06 01:55', related_items=[])
-def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None, extant_axes=None, **kwargs):
+def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None, extant_axes=None, **kwargs):
     """ A single cell method of analyzing 1D placefields and the spikes that create them 
     
     placefield_cell_index: an flat index into active_epoch_placefields1D.cell_ids. Must be between 0 and len(active_epoch_placefields1D.cell_ids). NOT the cell's original ID!
@@ -187,6 +189,13 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
     should_include_labels = kwargs.get('should_include_labels', True) # whether the plot should include text labels, like the title, axes labels, etc
     should_include_plotRaw_v_time_spikes = kwargs.get('should_include_spikes', True) # whether the plot should include plotRaw_v_time-spikes, should be set to False to plot completely with the new all spikes mode
     use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
+
+
+    # suptitle_params = dict(fontsize='22')
+    # title_params = dict(fontsize='16')
+    suptitle_params = dict(fontsize='14')
+    title_params = dict(fontsize='10')
+    
 
     if extant_fig is not None:
         fig = extant_fig # use the existing passed figure
@@ -236,8 +245,8 @@ def plot_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_ind
         title_string = ' '.join(['pf1D', f'Cell {curr_cell_id:02d}'])
         subtitle_string = ' '.join([f'{active_epoch_placefields1D.config.str_for_display(False)}'])
         if should_include_labels:
-            fig.suptitle(title_string, fontsize='22')
-            ax_activity_v_time.set_title(subtitle_string, fontsize='16')
+            fig.suptitle(title_string, **suptitle_params)
+            ax_activity_v_time.set_title(subtitle_string, **title_params)
         
         # axs0.yaxis.grid(True, color = 'green', linestyle = '--', linewidth = 0.5)
         if should_plot_bins_grid:

@@ -28,7 +28,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
-    @function_attributes(short_name='grid_bin_bounds_validation', tags=['grid_bin_bounds','validation','pandas'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-14 18:17', related_items=[], is_global=True)
+    @function_attributes(short_name='grid_bin_bounds_validation', tags=['grid_bin_bounds','validation','pandas','1D','position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-14 18:17', related_items=[], is_global=True)
     def _display_grid_bin_bounds_validation(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
         """ Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
 
