@@ -89,6 +89,9 @@ z
 """
 
 
+LongShortStatsTuple = namedtuple('LongShortStatsTuple', ['long_stats_z_scorer', 'short_stats_z_scorer', 'long_short_z_diff', 'long_short_naive_z_diff', 'is_forward_replay']) # used in `compute_shuffled_rankorder_analyses`
+# LongShortStatsTuple: Tuple[Zscorer, Zscorer, float, float, bool]
+
 
 @function_attributes(short_name=None, tags=['rank_order', 'shuffle', 'renormalize'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-23 13:05', related_items=[])
 def relative_re_ranking(rank_array: NDArray, filter_indicies: Optional[NDArray], debug_checking=False, disable_re_ranking: bool=False) -> NDArray:
@@ -263,13 +266,18 @@ class Zscorer:
 
 
 
+
+
+
+
+
 @define(slots=False, repr=False, eq=False)
 class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
     """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
     
     
     """
-    ranked_aclus_stats_dict: Dict[int, Tuple[Zscorer, Zscorer, float]] = serialized_field(repr=False)
+    ranked_aclus_stats_dict: Dict[int, LongShortStatsTuple] = serialized_field(repr=False)
     selected_spikes_fragile_linear_neuron_IDX_dict: Dict = serialized_field(repr=False)
     
     long_z_score: NDArray = serialized_field()
@@ -358,6 +366,9 @@ class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, Compu
 # ==================================================================================================================== #
 # 2023-11-16 - Long/Short Most-likely LR/RL decoder                                                                    #
 # ==================================================================================================================== #
+
+
+
 
 class RankOrderAnalyses:
     """ 
@@ -628,7 +639,7 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['cls.preprocess_spikes_df', 'cls.select_and_rank_spikes'], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
+    @function_attributes(short_name=None, tags=['shuffle', 'rank_order', 'main'], input_requires=[], output_provides=['LongShortStatsTuple'], uses=['cls.preprocess_spikes_df', 'cls.select_and_rank_spikes', 'LongShortStatsTuple'], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
     def compute_shuffled_rankorder_analyses(cls, active_spikes_df: pd.DataFrame, active_epochs, shuffle_helper: ShuffleHelper, rank_alignment: str = 'first', disable_re_ranking:bool=True, debug_print=True) -> RankOrderResult:
         """ Extracts the two templates (long/short) from the shuffle_helper in addition to the shuffled_aclus, shuffle_IDXs.
 
@@ -775,20 +786,14 @@ class RankOrderAnalyses:
             # long_short_z_diff: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value))
 
             long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
-
+            assert np.isclose(long_or_short_polarity_multiplier, -1.0) or np.isclose(long_or_short_polarity_multiplier, 1.0)
             always_positive_long_short_magnitude_diff = np.max(np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)) - np.min(np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value))
             assert always_positive_long_short_magnitude_diff >= 0.0
-
             long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
 
-            long_stats_z_scorer.z_score_value > 
+            long_short_naive_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value # `long_short_naive_z_diff` was the old pre-2023-12-07 way of calculating the z-score diff.
 
-
-
-            np.sign(
-            # long_short_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value
-
-            epoch_ranked_aclus_stats_dict[epoch_id] = (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff)
+            epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsTuple(long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay)
 
 
         ## END for epoch_id
@@ -797,9 +802,10 @@ class RankOrderAnalyses:
         long_z_score_values = []
         short_z_score_values = []
         long_short_z_score_diff_values = []
+        long_short_z_score_diff_values = []
 
         for epoch_id, epoch_stats in epoch_ranked_aclus_stats_dict.items():
-            long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff = epoch_stats
+            long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff = epoch_stats
             # paired_test = pho_stats_paired_t_test(long_stats_z_scorer.z_score_values, short_stats_z_scorer.z_score_values) # this doesn't seem to work well
             long_z_score_values.append(long_stats_z_scorer.z_score_value)
             short_z_score_values.append(short_stats_z_scorer.z_score_value)
@@ -809,9 +815,13 @@ class RankOrderAnalyses:
         short_z_score_values = np.array(short_z_score_values)
         long_short_z_score_diff_values = np.array(long_short_z_score_diff_values)
         
-        return RankOrderResult(is_global=True, ranked_aclus_stats_dict=epoch_ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=epoch_selected_spikes_fragile_linear_neuron_IDX_dict, long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values,
+        return RankOrderResult(is_global=True, ranked_aclus_stats_dict=epoch_ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=epoch_selected_spikes_fragile_linear_neuron_IDX_dict,
+                               long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values,
                                spikes_df=active_spikes_df, epochs_df=active_epochs, selected_spikes_df=selected_spikes_only_df, extra_info_dict=output_dict)
     
+
+    
+
 
     @classmethod
     @function_attributes(short_name=None, tags=['rank-order', 'shuffle', 'inst_fr', 'epoch', 'lap', 'replay', 'computation'], input_requires=[], output_provides=[], uses=['DirectionalRankOrderLikelihoods', 'DirectionalRankOrderResult'], used_by=[], creation_date='2023-11-16 18:43', related_items=['plot_rank_order_epoch_inst_fr_result_tuples'])
@@ -1040,7 +1050,13 @@ class RankOrderAnalyses:
 
         RL_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.RL_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
         RL_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.RL_ripple.extra_info_dict.values()])
-        
+
+        ## z-diffs:
+        LR_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        LR_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        RL_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        RL_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+
         # make sure result is for the current minimimum:
         results_minimum_inclusion_fr_Hz = rank_order_results.minimum_inclusion_fr_Hz
 
