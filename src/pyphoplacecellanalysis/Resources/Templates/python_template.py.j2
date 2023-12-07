@@ -47,8 +47,12 @@ new_print('__________________________________________________________________')
 # Whether to output figures:
 {% if should_perform_figure_generation_to_file %}
 from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+
 should_perform_figure_generation_to_file=True
+app = pg.mkQApp(f'app_{curr_session_context}')
 _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=False) # , backend='Qt5Agg'
+
 {% else %}
 should_perform_figure_generation_to_file=False
 {% endif %}
@@ -131,8 +135,8 @@ with open(log_file_path, 'a') as f:
         new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
         new_print(f'/* local_computations_override_output_file: {local_computations_override_output_file} __________________________________________________________________________________ */')
         new_print(f'/* global_computation_results_override_output_file: {global_computation_results_override_output_file} __________________________________________________________________________________ */')
-        new_print(f'/* should_freeze_pipeline_updates: {should_freeze_pipeline_updates} __________________________________________________________________________________ */')
-        new_print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
+        new_print(f'/* should_freeze_pipeline_updates: {{{ should_freeze_pipeline_updates }}} __________________________________________________________________________________ */')
+        new_print(f'/* should_force_reload_all: {{{ should_force_reload_all }}} __________________________________________________________________________________ */')
         new_print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
         new_print(f'\n ALL DONE! \n')
         new_print(f'/* ================================================================================================================== */\n')
