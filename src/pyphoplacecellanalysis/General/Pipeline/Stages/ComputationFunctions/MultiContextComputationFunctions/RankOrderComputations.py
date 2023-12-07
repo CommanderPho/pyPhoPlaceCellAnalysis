@@ -769,7 +769,24 @@ class RankOrderAnalyses:
             long_stats_z_scorer = Zscorer.init_from_values(long_stats_corr_values, real_long_result_corr_value, real_long_rank_stats.pvalue)
             short_stats_z_scorer = Zscorer.init_from_values(short_stats_corr_values, real_short_result_corr_value, real_short_rank_stats.pvalue)
 
-            long_short_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value
+
+            is_forward_replay: bool = ((np.mean([long_stats_z_scorer.z_score_value, short_stats_z_scorer.z_score_value])) > 0.0)
+
+            # long_short_z_diff: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value))
+
+            long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
+
+            always_positive_long_short_magnitude_diff = np.max(np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)) - np.min(np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value))
+            assert always_positive_long_short_magnitude_diff >= 0.0
+
+            long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
+
+            long_stats_z_scorer.z_score_value > 
+
+
+
+            np.sign(
+            # long_short_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value
 
             epoch_ranked_aclus_stats_dict[epoch_id] = (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff)
 
