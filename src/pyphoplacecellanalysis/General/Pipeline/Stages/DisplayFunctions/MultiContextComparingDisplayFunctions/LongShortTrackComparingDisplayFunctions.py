@@ -40,7 +40,7 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_replays_custom_scatter_markers, CustomScatterMarkerMode # used in _make_pho_jonathan_batch_plots
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _build_neuron_type_distribution_color # used in _make_pho_jonathan_batch_plots
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PlacefieldOverlapMetricMode
-from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation # for _plot_pho_jonathan_batch_plot_single_cell
+from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_single_cell_1D_placecell_validation # for _plot_pho_jonathan_batch_plot_single_cell
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
@@ -1272,10 +1272,10 @@ class PhoJonathanPlotHelpers:
         return ax_activity_v_time
 
     @classmethod
-    @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['plot_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
+    @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['plot_single_cell_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
     def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
         """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
-        Internally calls `plot_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
+        Internally calls `plot_single_cell_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
 
         # Arguments:
             disable_top_row: bool - default False, if True, disables the entire top row (which usually shows the firing rates during replays, the avg binned fr, etc).
@@ -1296,7 +1296,7 @@ class PhoJonathanPlotHelpers:
         optional_cell_info_labels_dict = kwargs.get('optional_cell_info_labels', {})
         optional_cell_info_labels = optional_cell_info_labels_dict.get(aclu, None) # get the single set of optional labels for this aclu
 
-        # the index passed into `plot_1D_placecell_validation(...)` must be in terms of the `pf1D_all` ratemap that's provided. the `rdf_aclu_to_idx` does NOT work and will result in indexing errors
+        # the index passed into `plot_single_cell_1D_placecell_validation(...)` must be in terms of the `pf1D_all` ratemap that's provided. the `rdf_aclu_to_idx` does NOT work and will result in indexing errors
         # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
 
         # Not sure if this is okay, but it's possible that the aclu isn't in the ratemap, in which case currently we'll just skip plotting?
@@ -1331,7 +1331,7 @@ class PhoJonathanPlotHelpers:
         # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
         # if debug_print:
         #     print(f'\t{title_string}\n\t{subtitle_string}')
-        from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1D_placecell_validation
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_single_cell_1D_placecell_validation
 
         # gridspec mode:
         curr_fig.set_facecolor('0.65') # light grey
@@ -1452,13 +1452,13 @@ class PhoJonathanPlotHelpers:
         curr_ax_placefield.set_yticklabels([])
         curr_ax_placefield.sharey(curr_ax_lap_spikes)
 
-        ## I think that `plot_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
-        _ = plot_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
+        ## I think that `plot_single_cell_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
+        _ = plot_single_cell_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
                 **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
                     'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
                     'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
 
-        # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_1D_placecell_validation` above so the native spikes from that function aren't plotted
+        # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_single_cell_1D_placecell_validation` above so the native spikes from that function aren't plotted
         cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
         time_variable_name = kwargs.get('time_variable_name', None)
         if cell_spikes_dfs_dict is not None:
@@ -1499,7 +1499,7 @@ class PhoJonathanPlotHelpers:
                 print(f'WARNING: truncating included_unit_neuron_IDs of length {len(included_unit_neuron_IDs)} to length {actual_num_unit_neuron_IDs} due to n_max_plot_rows: {n_max_plot_rows}...')
                 included_unit_neuron_IDs = included_unit_neuron_IDs[:actual_num_unit_neuron_IDs]
 
-        # the index passed into plot_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
+        # the index passed into plot_single_cell_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
         _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
 
         actual_num_subfigures = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows
