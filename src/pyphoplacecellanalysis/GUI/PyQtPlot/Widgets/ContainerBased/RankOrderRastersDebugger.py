@@ -227,15 +227,19 @@ class RankOrderRastersDebugger:
 
         _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,100), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
 
-
         ## Add two labels in the top row that show the Long/Short column values:
         long_short_info_layout = pg.LayoutWidget()
         long_short_info_layout.setObjectName('layoutLongShortInfo')
 
         long_info_label = long_short_info_layout.addLabel(text='LONG', row=0, col=0)
         long_info_label.setObjectName('lblLongInfo')
+        # long_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
+        long_info_label.setAlignment(pg.QtCore.Qt.AlignLeft)
+
         short_info_label = long_short_info_layout.addLabel(text='SHORT', row=0, col=1)
         short_info_label.setObjectName('lblShortInfo')
+        # short_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
+        short_info_label.setAlignment(pg.QtCore.Qt.AlignRight)
         
         _out_dock_widgets['LongShortColumnsInfo_dock'] = root_dockAreaWindow.add_display_dock(identifier='LongShortColumnsInfo_dock', widget=long_short_info_layout, dockSize=(600,60), dockAddLocationOpts=['top'], display_config=CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False, corner_radius='0px'))
         _out_dock_widgets['LongShortColumnsInfo_dock'][1].hideTitleBar() # hide the dock title bar
