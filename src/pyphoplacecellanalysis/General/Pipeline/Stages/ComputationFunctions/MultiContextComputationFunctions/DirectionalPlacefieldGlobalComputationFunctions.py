@@ -998,11 +998,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         title_str = f'{a_decoder_name}_pf1Ds'
 
                     curr_curves = sorted_pf_tuning_curves[i]
-                    # _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
-
                     # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
                     curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
-
                     a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
 
                     # Coloring the heatmap data for each row of the 1D heatmap:
@@ -1011,14 +1008,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         print(f'np.shape(curr_data): {np.shape(curr_data)}, np.nanmax(curr_data): {np.nanmax(curr_data)}, np.nanmin(curr_data): {np.nanmin(curr_data)}') # np.shape(curr_data): (34, 62), np.nanmax(curr_data): 0.15320444716258447, np.nanmin(curr_data): 0.0
 
                     _temp_curr_out_colors_heatmap_image = [] # used to accumulate the rows so they can be built into a color image in `out_colors_heatmap_image_matrix`
-
-                    # # Find unused text items and hide them:
-                    # unused_text_items_dict = {aclu:a_text_item for aclu, a_text_item in _out_ui.text_items_dict[a_decoder_name].items() if aclu not in list(a_decoder_color_map.keys())} # data.unsorted_included_any_context_neuron_ids
-                    # num_unused_items = len(unused_text_items_dict)
-                    # if num_unused_items > 0:
-                    #     print(f'hiding {num_unused_items} unused text items')
-                    #     for aclu, a_text_item in unused_text_items_dict.items():
-                    #         a_text_item.hide()
 
                     ## Remove all labels and re-add:
                     for aclu, a_text_item in _out_ui.text_items_dict[a_decoder_name].items():
@@ -1033,10 +1022,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
                         curr_win.addItem(text)
                         _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
-
-                        # text.setColor(pg.mkColor(a_color_vector))
-                        # text.setText(f"{int(aclu)}") # update text
-                        # a_text_item.show() # opposite of hide
 
                         # modulate heatmap color for this row (`curr_data[i, :]`):
                         heatmap_base_color = pg.mkColor(a_color_vector)
