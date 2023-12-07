@@ -22,6 +22,7 @@ script_file_path = os.path.abspath(__file__)
 script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
 log_file_path = script_file_parent_path.joinpath('log_file.log')
 
+
 curr_session_context = {{ curr_session_context }}
 curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
 
@@ -45,10 +46,14 @@ new_print('__________________________________________________________________')
 
 # Whether to output figures:
 {% if should_perform_figure_generation_to_file %}
+from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
 should_perform_figure_generation_to_file=True
+_restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=False) # , backend='Qt5Agg'
 {% else %}
 should_perform_figure_generation_to_file=False
 {% endif %}
+
+multiprocessing_kwargs = dict(use_multiprocessing=False, num_processes=1)
 
 # Override input/output files:
 local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
