@@ -1,3 +1,4 @@
+import sys
 from copy import deepcopy
 from typing import Tuple, Optional, List, Dict
 from enum import Enum # for TrackPositionClassification
@@ -914,3 +915,13 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
     path = Path(verts, codes)
 
     return path
+
+
+
+
+if __name__ == '__main__':
+
+    app, w, cw, (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects) = test_LinearTrackDimensions_2D_pyqtgraph(long_track_dims=None, short_track_dims=None)    
+    sys.exit(app.exec_())
+
+
