@@ -805,7 +805,7 @@ class RankOrderAnalyses:
         long_short_z_score_diff_values = []
 
         for epoch_id, epoch_stats in epoch_ranked_aclus_stats_dict.items():
-            long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff = epoch_stats
+            long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay = epoch_stats
             # paired_test = pho_stats_paired_t_test(long_stats_z_scorer.z_score_values, short_stats_z_scorer.z_score_values) # this doesn't seem to work well
             long_z_score_values.append(long_stats_z_scorer.z_score_value)
             short_z_score_values.append(short_stats_z_scorer.z_score_value)
