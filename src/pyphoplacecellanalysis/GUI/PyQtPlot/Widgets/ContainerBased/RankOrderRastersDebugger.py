@@ -145,6 +145,25 @@ class RankOrderRastersDebugger:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Debug Plot Directional Template Rasters')
 
         ## Build Dock Widgets:
+        def get_utility_dock_colors(orientation, is_dim):
+            """ used for CustomDockDisplayConfig for non-specialized utility docks """
+            # Common to all:
+            if is_dim:
+                fg_color = '#aaa' # Grey
+            else:
+                fg_color = '#fff' # White
+                
+            # a purplish-royal-blue 
+            if is_dim:
+                bg_color = '#d8d8d8' 
+                border_color = '#717171' 
+            else:
+                bg_color = '#9d9d9d' 
+                border_color = '#3a3a3a' 
+
+            return fg_color, bg_color, border_color
+
+
         # decoder_names_list = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
         _out_dock_widgets = {}
         dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False),
@@ -184,7 +203,7 @@ class RankOrderRastersDebugger:
                 # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
 
 
-        ctrls_dock_config = CustomDockDisplayConfig(showCloseButton=False)
+        ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
 
         ctrls_widget = ScrollBarWithSpinBox()
         ctrls_widget.setObjectName("ctrls_widget")
@@ -208,6 +227,25 @@ class RankOrderRastersDebugger:
 
         _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,100), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
 
+
+        ## Add two labels in the top row that show the Long/Short column values:
+        long_short_info_layout = pg.LayoutWidget()
+        long_short_info_layout.setObjectName('layoutLongShortInfo')
+
+        long_info_label = long_short_info_layout.addLabel(text='LONG', row=0, col=0)
+        long_info_label.setObjectName('lblLongInfo')
+        short_info_label = long_short_info_layout.addLabel(text='SHORT', row=0, col=1)
+        short_info_label.setObjectName('lblShortInfo')
+        
+        _out_dock_widgets['LongShortColumnsInfo_dock'] = root_dockAreaWindow.add_display_dock(identifier='LongShortColumnsInfo_dock', widget=long_short_info_layout, dockSize=(600,60), dockAddLocationOpts=['top'], display_config=CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False, corner_radius='0px'))
+        _out_dock_widgets['LongShortColumnsInfo_dock'][1].hideTitleBar() # hide the dock title bar
+
+        # Add the widgets to the .ui:
+        long_short_info_layout = long_short_info_layout
+        long_info_label = long_info_label
+        short_info_label = short_info_label
+        info_labels_widgets_dict = dict(long_short_info_layout=long_short_info_layout, long_info_label=long_info_label, short_info_label=short_info_label)
+
         root_dockAreaWindow.resize(600, 900)
 
         ## Build final .plots and .plots_data:
@@ -217,7 +255,7 @@ class RankOrderRastersDebugger:
         _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
                                            seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
                                            on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})                
-        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs)
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs)
 
         try:
             ## rank_order_results.LR_ripple.selected_spikes_df mode:
@@ -541,7 +579,7 @@ class RankOrderRastersDebugger:
     # ==================================================================================================================== #
 
     @classmethod
-    def _post_modern_debug_plot_directional_template_rasters(cls, spikes_df, active_epochs_df, track_templates, debug_print=True, **kwargs):
+    def _post_modern_debug_plot_directional_template_rasters(cls, spikes_df, active_epochs_df, track_templates, debug_print=True, defer_show=True, **kwargs):
         """ 2023-11-30 **DO EM ALL SEPERATELY**
 
 
@@ -664,7 +702,7 @@ class RankOrderRastersDebugger:
             # _out_plots.rasters_display_outputs[a_decoder_name] = plot_multi_sort_raster_browser(a_spikes_df, a_sorted_neuron_ids, unit_sort_orders_dict=an_unit_sort_orders, unit_colors_list_dict=a_decoder_color_map, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=False, active_context=None)
             # _out_plots.rasters_display_outputs[a_decoder_name] = plot_raster_plot(a_spikes_df, a_sorted_neuron_ids, unit_sort_orders_dict=an_unit_sort_orders, unit_colors_list=a_decoder_color_list, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=False, active_context=None)
             # _out_plots.rasters_display_outputs[a_decoder_name] = new_plot_raster_plot(a_spikes_df, a_sorted_neuron_ids, unit_sort_order=an_unit_sort_orders, unit_colors_list=a_decoder_color_list, scatter_plot_kwargs=None, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=False, active_context=None)
-            _out_plots.rasters_display_outputs[a_decoder_name] = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map), scatter_plot_kwargs=None, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=False, active_context=None)
+            _out_plots.rasters_display_outputs[a_decoder_name] = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map), scatter_plot_kwargs=None, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=defer_show, active_context=None)
 
             # an_app, a_win, a_plots, a_plots_data, an_on_update_active_epoch, an_on_update_active_scatterplot_kwargs = _out_plots.rasters_display_outputs[a_decoder_name]
 
