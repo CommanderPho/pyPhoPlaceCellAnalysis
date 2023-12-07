@@ -1012,12 +1012,31 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                     _temp_curr_out_colors_heatmap_image = [] # used to accumulate the rows so they can be built into a color image in `out_colors_heatmap_image_matrix`
 
-                    for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
-                        # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
-                        text = _out_ui.text_items_dict[a_decoder_name][aclu] # pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+                    # # Find unused text items and hide them:
+                    # unused_text_items_dict = {aclu:a_text_item for aclu, a_text_item in _out_ui.text_items_dict[a_decoder_name].items() if aclu not in list(a_decoder_color_map.keys())} # data.unsorted_included_any_context_neuron_ids
+                    # num_unused_items = len(unused_text_items_dict)
+                    # if num_unused_items > 0:
+                    #     print(f'hiding {num_unused_items} unused text items')
+                    #     for aclu, a_text_item in unused_text_items_dict.items():
+                    #         a_text_item.hide()
+
+                    ## Remove all labels and re-add:
+                    for aclu, a_text_item in _out_ui.text_items_dict[a_decoder_name].items():
+                        curr_win.removeItem(a_text_item)
+                        a_text_item.deleteLater()
+                    _out_ui.text_items_dict[a_decoder_name] = {} # clear the dictionary
+
+                    for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):                        
+                        # text = _out_ui.text_items_dict[a_decoder_name][aclu] # pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+                        # Create a new text item:
+                        text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0))
                         text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-                        text.setColor(pg.mkColor(a_color_vector))
-                        text.setText(f"{int(aclu)}") # update text
+                        curr_win.addItem(text)
+                        _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
+
+                        # text.setColor(pg.mkColor(a_color_vector))
+                        # text.setText(f"{int(aclu)}") # update text
+                        # a_text_item.show() # opposite of hide
 
                         # modulate heatmap color for this row (`curr_data[i, :]`):
                         heatmap_base_color = pg.mkColor(a_color_vector)
@@ -1040,6 +1059,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             _out_data, _out_plots, _out_ui = _subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, decoders_dict=decoders_dict)
 
             # _out_data, _out_plots, _out_ui = _subfn_update_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, decoders_dict=decoders_dict)
+
+            update_callback_fn = (lambda included_neuron_ids: _subfn_update_directional_template_debugger_data(included_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, decoders_dict=decoders_dict))
+            _out_ui.on_update_callback = update_callback_fn
 
             # Outputs: root_dockAreaWindow, app, epochs_editor, _out_pf1D_heatmaps, _out_dock_widgets
             graphics_output_dict = {'win': root_dockAreaWindow, 'app': app,  'ui': _out_ui, 'plots': _out_plots, 'data': _out_data}
