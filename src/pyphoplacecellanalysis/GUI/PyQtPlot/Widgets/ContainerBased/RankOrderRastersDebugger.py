@@ -573,7 +573,9 @@ class RankOrderRastersDebugger:
                 if is_aclu_active:
                     text.setColor(pg.mkColor(a_decoder_color_map[aclu]))
                 else:
-                    text.setColor(pg.mkColor("#666666"))
+                    inactive_color = pg.mkColor("#666666")
+                    inactive_color.setAlpha(0.5)
+                    text.setColor(inactive_color) # dark grey (inactive)
                 # text.setVisible(is_aclu_active)
 
 
