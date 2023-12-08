@@ -631,6 +631,13 @@ class RankOrderAnalyses:
         shared_aclus_only_neuron_IDs, is_good_aclus, num_shuffles, shuffled_aclus, shuffle_IDXs, (long_pf_peak_ranks, short_pf_peak_ranks) = shuffle_helper.to_tuple()
         # Deep copy and preprocess active spikes DataFrame
         active_spikes_df = deepcopy(active_spikes_df)
+
+        # Drop spikes outside of `shared_aclus_only_neuron_IDs`
+        #TODO 2023-12-08 13:30: - [ ] This might be limiting to only the shared
+         
+        # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:
+        active_spikes_df = active_spikes_df.spikes.sliced_by_neuron_id(shared_aclus_only_neuron_IDs)
+
         active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
         # Add epoch IDs to the spikes DataFrame
         active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
@@ -1220,11 +1227,11 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             print(f'\tcomputing Laps rank-order shuffles:')
             print(f'\t\tnum_shuffles: {num_shuffles}, minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz} Hz')
             # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
-        _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-        # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
-        (LR_laps_outputs, RL_laps_outputs, laps_paired_tests)  = _laps_outputs
-        global_computation_results.computed_data['RankOrder'].LR_laps = LR_laps_outputs
-        global_computation_results.computed_data['RankOrder'].RL_laps = RL_laps_outputs
+            _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+            # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
+            (LR_laps_outputs, RL_laps_outputs, laps_paired_tests)  = _laps_outputs
+            global_computation_results.computed_data['RankOrder'].LR_laps = LR_laps_outputs
+            global_computation_results.computed_data['RankOrder'].RL_laps = RL_laps_outputs
 
         ## Ripple Rank-Order Analysis:
         print(f'\tcomputing Ripple rank-order shuffles:')
