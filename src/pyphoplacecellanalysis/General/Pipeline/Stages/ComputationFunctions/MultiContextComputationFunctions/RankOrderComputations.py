@@ -585,6 +585,13 @@ class RankOrderAnalyses:
         # Recover from the saved global result:
         directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
 
+        # non-shared templates:
+        non_shared_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) #.filtered_by_frate(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = non_shared_templates.get_decoders()
+        any_list_neuron_IDs = non_shared_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list   
+        # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:
+        global_spikes_df = global_spikes_df.spikes.sliced_by_neuron_id(any_list_neuron_IDs)
+        
         # ## OLD method, directly get the decoders from `directional_laps_results` using `.get_decoders(...)` or `.get_shared_aclus_only_decoders(...)`:
         # long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
         # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders()
@@ -593,14 +600,6 @@ class RankOrderAnalyses:
         # shared_aclus_only_templates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
         # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = shared_aclus_only_templates.get_decoders()
 
-        # non-shared templates:
-        non_shared_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) #.filtered_by_frate(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = non_shared_templates.get_decoders()
-        any_list_neuron_IDs = non_shared_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list   
-        # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:
-        global_spikes_df = global_spikes_df.spikes.sliced_by_neuron_id(any_list_neuron_IDs)
-        
-        
         ## 2023-10-24 - Simple long/short (2-template, direction independent) analysis:
         # shuffle_helper = ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=1000, bimodal_exclude_aclus=[5, 14, 25, 46, 61, 66, 86, 88, 95])
 
