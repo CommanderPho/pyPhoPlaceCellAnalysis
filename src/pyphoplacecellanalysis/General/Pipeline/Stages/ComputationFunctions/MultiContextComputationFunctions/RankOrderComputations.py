@@ -636,7 +636,7 @@ class RankOrderAnalyses:
         #TODO 2023-12-08 13:30: - [ ] This might be limiting to only the shared
          
         # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:
-        active_spikes_df = active_spikes_df.spikes.sliced_by_neuron_id(shared_aclus_only_neuron_IDs)
+        # active_spikes_df = active_spikes_df.spikes.sliced_by_neuron_id(shared_aclus_only_neuron_IDs)
 
         active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
         # Add epoch IDs to the spikes DataFrame
