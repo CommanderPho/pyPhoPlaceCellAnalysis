@@ -1053,7 +1053,7 @@ def plot_multi_sort_raster_browser(spikes_df: pd.DataFrame, included_neuron_ids,
 
 @providing_context(fn_name='plot_raster_plot')
 @function_attributes(short_name='plot_raster_plot', tags=['pyqtgraph','raster','2D'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame', '_build_scatter_plotting_managers'], used_by=[], creation_date='2023-03-31 20:53')
-def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, should_return_data_tooltips_kwargs=True, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses pyqtgraph's scatter function like SpikeRaster2D to render a raster plot with colored ticks by default
 
     Usage:
@@ -1075,7 +1075,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     plots_data.spikes_df = plots_data.unit_sort_manager.update_spikes_df_visualization_columns(plots_data.spikes_df, overwrite_existing=True)
     
     ## Build the spots for the raster plot:
-    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+    plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(plots_data.spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs)
 
     # Add header label
     plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
