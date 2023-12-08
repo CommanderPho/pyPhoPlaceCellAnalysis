@@ -17,6 +17,8 @@ from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer # used to build config
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch
+from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
+
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
@@ -57,6 +59,18 @@ class TrackTemplates:
     decoder_LR_pf_peak_ranks_list: List = field()
     decoder_RL_pf_peak_ranks_list: List = field()
 
+
+    @property
+    def decoder_neuron_IDs_list(self) -> List[NDArray]:
+        """ a list of the neuron_IDs for each decoder (independently) """
+        return [a_decoder.pf.ratemap.neuron_ids for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
+    
+    @property
+    def any_decoder_neuron_IDs(self) -> NDArray:
+        """ a list of the neuron_IDs for each decoder (independently) """
+        return np.sort(union_of_arrays(*self.decoder_neuron_IDs_list)) # neuron_IDs as they appear in any list
+
+        
 
     def filtered_by_frate(self, minimum_inclusion_fr_Hz: float = 5.0) -> "TrackTemplates":
         """ Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
