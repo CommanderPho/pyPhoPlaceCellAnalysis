@@ -64,3 +64,5 @@ src/cscope.files
 src/cscope.out
 src/myproject.db
 .sourcery.yaml
+src/pyphoplacecellanalysis/Resources/Icons/visualizations/templates_1D.ico
+tests/test_raster_Functions_spikes_df.pkl
