@@ -632,7 +632,7 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    def select_and_rank_spikes(cls, active_spikes_df: pd.DataFrame, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment: str):
+    def select_and_rank_spikes(cls, active_spikes_df: pd.DataFrame, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment: str, time_variable_name_override: Optional[str]=None):
         """Selects and ranks spikes based on rank_alignment, and organizes them into structured dictionaries.
         
         epoch_ranked_aclus_dict: Dict[int, Dict[int, float]]: a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
@@ -642,8 +642,10 @@ class RankOrderAnalyses:
         
         
         """
+        if time_variable_name_override is None:
+            time_variable_name_override = active_spikes_df.spikes.time_variable_name
         # Determine which spikes to use to represent the order
-        selected_spikes = active_spikes_df.groupby(['Probe_Epoch_id', 'aclu'])[active_spikes_df.spikes.time_variable_name]
+        selected_spikes = active_spikes_df.groupby(['Probe_Epoch_id', 'aclu'])[time_variable_name_override]
 
         if rank_alignment == 'first':
             selected_spikes = selected_spikes.first()  # first spike times only
@@ -659,7 +661,7 @@ class RankOrderAnalyses:
         # Reset index on selected_spikes to make 'Probe_Epoch_id' and 'aclu' as columns
         _selected_spikes_reset = deepcopy(selected_spikes).reset_index()
         # Merge with original DataFrame to filter only the selected spikes
-        selected_spikes_only_df: pd.DataFrame = pd.merge(active_spikes_df, _selected_spikes_reset, on=['Probe_Epoch_id', 'aclu', active_spikes_df.spikes.time_variable_name])
+        selected_spikes_only_df: pd.DataFrame = pd.merge(active_spikes_df, _selected_spikes_reset, on=['Probe_Epoch_id', 'aclu', time_variable_name_override])
 
 
         # Rank the aclu values by their first t value in each Probe_Epoch_id
