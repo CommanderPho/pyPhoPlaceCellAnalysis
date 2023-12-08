@@ -496,7 +496,8 @@ class BatchSessionCompletionHandler:
 
 
     def completion_decorator(self, func):
-        """ func (self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) to be called """
+        """ NOT USED. Don't think it works yet. 
+        func (self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) to be called """
         self.completion_functions.append(func)
         
         def wrapper(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict):

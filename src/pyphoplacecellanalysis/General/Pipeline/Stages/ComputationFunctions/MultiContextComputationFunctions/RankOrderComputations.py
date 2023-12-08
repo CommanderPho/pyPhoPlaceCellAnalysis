@@ -128,6 +128,29 @@ def compute_placefield_center_of_masses(tuning_curves):
     return np.squeeze(np.array([ndimage.center_of_mass(x) for x in tuning_curves]))
 
 
+def determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2,4,9]):
+	""" 
+	From all neuron_IDs in the session, get the ones that meet the new qclu criteria (their value is in) `included_qclu_values`
+	
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import determine_good_aclus_by_qclu
+
+	allowed_aclus = determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2,4,9])
+	allowed_aclus
+
+	"""
+	from neuropy.core.neuron_identities import NeuronType
+	
+	neuron_identities: pd.DataFrame = curr_active_pipeline.get_session_unique_aclu_information()
+	print(f"original {len(neuron_identities)}")
+	filtered_neuron_identities: pd.DataFrame = neuron_identities[neuron_identities.neuron_type == NeuronType.PYRAMIDAL]
+	print(f"post PYRAMIDAL filtering {len(filtered_neuron_identities)}")
+	filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
+	filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
+	print(f"post (qclu != [6, 7]) filtering {len(filtered_neuron_identities)}")
+	return filtered_neuron_identities.aclu.to_numpy()
+
+
+
 
 @define(slots=False, repr=False, eq=False)
 class ShuffleHelper:
@@ -442,10 +465,10 @@ class RankOrderAnalyses:
 
         return app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D)
 
-    def _perform_plot_z_score_diff(epoch_idx_list, even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
+    def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
         """ plots the z-score differences 
         Usage:
-            app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, even_laps_long_short_z_score_diff_values, odd_laps_long_short_z_score_diff_values)
+            app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
         """
         app = pg.mkQApp(f"Rank Order {variable_name}s Epoch Debugger")
         win = pg.GraphicsLayoutWidget(show=True, title=f"Rank Order {variable_name} Epoch Debugger")
@@ -457,13 +480,13 @@ class RankOrderAnalyses:
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
         n_x_points = len(epoch_idx_list)
-        n_y_points = np.shape(even_laps_long_short_z_score_diff_values)[0]
+        n_y_points = np.shape(RL_laps_long_short_z_score_diff_values)[0]
         if n_y_points > n_x_points:
             num_missing_points: int = n_y_points - n_x_points
             print(f'WARNING: trimming y-data to [{num_missing_points}:]')
-            even_laps_long_short_z_score_diff_values = even_laps_long_short_z_score_diff_values[num_missing_points:]
-            if odd_laps_long_short_z_score_diff_values is not None:
-                odd_laps_long_short_z_score_diff_values = odd_laps_long_short_z_score_diff_values[num_missing_points:]
+            RL_laps_long_short_z_score_diff_values = RL_laps_long_short_z_score_diff_values[num_missing_points:]
+            if LR_laps_long_short_z_score_diff_values is not None:
+                LR_laps_long_short_z_score_diff_values = LR_laps_long_short_z_score_diff_values[num_missing_points:]
 
         # laps_fig, laps_ax = plt.subplots()
         # laps_ax.scatter(np.arange(len(laps_long_short_z_score_diff_values)), laps_long_short_z_score_diff_values, label=f'laps{suffix_str}')
@@ -497,29 +520,61 @@ class RankOrderAnalyses:
 
         # when using pg.ScatterPlotItem(...) compared to p1.plot(...), you must use the non-'symbol' prefixed argument names: {'symbolBrush':'brush', 'symbolPen':'pen'} 
 
-        if odd_laps_long_short_z_score_diff_values is not None:
+        if LR_laps_long_short_z_score_diff_values is not None:
             first_plot_name = 'even'
         else:
             first_plot_name = 'best'
 
-        even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, even_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.RL), pen=symbolPen, symbol='t2', name=first_plot_name, hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
-        if odd_laps_long_short_z_score_diff_values is not None:
-            odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, odd_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.LR), pen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+        even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, RL_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.RL), pen=symbolPen, symbol='t2', name=first_plot_name, hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
+        if LR_laps_long_short_z_score_diff_values is not None:
+            odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list, LR_laps_long_short_z_score_diff_values, brush=pg.mkBrush(DisplayColorsEnum.Laps.LR), pen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()) ## setting pen=None disables line drawing
         else:
             odd_out_plot_1D = None
 
         p1.addItem(even_out_plot_1D)
-        if odd_laps_long_short_z_score_diff_values is not None:
+        if LR_laps_long_short_z_score_diff_values is not None:
             p1.addItem(odd_out_plot_1D)
         
         # even_out_plot_1D: pg.PlotDataItem = p1.scatterPlot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.even), symbolPen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
         # odd_out_plot_1D: pg.PlotDataItem = p1.scatterPlot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
-        
-        return app, win, p1, (even_out_plot_1D, odd_out_plot_1D)
+
+
+        # good_RL_laps_long_short_z_score_diff_values = RL_laps_long_short_z_score_diff_values[np.isfinite(RL_laps_long_short_z_score_diff_values)]
+
+
+        ## Add marginal histogram to the right of the main plot here:
+        py: pg.PlotItem = win.addPlot(row=1, col=1, right='Marginal Long-Short Z-Score Diff', hoverable=True) # , bottom=f'{variable_name} {x_axis_name_suffix}', title=f'Marginal Rank-Order Long-Short ZScore Diff for {variable_name}'
+        ## compute standard histogram
+        number_of_bins: int = 21
+        vals = deepcopy(RL_laps_long_short_z_score_diff_values)
+        y,x = np.histogram(vals, bins=number_of_bins)
+        # Plot histogram along y-axis:
+        py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal')
+
+        # x = x[:-1] + np.diff(x) / 2 # Adjust x values for stepMode="center"
+        # py.plot(y, x, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal')
+
+        # ## Using stepMode="center" causes the plot to draw two lines for each sample. notice that len(x) == len(y)+1
+        # py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150)) # swapping x, y should make it horizontal? , stepMode="center"
+
+        if LR_laps_long_short_z_score_diff_values is not None:
+            print('TODO: add the LR scatter')
+            # good_LR_laps_long_short_z_score_diff_values = LR_laps_long_short_z_score_diff_values[np.isfinite(LR_laps_long_short_z_score_diff_values)]
+            vals = deepcopy(LR_laps_long_short_z_score_diff_values)
+            y,x = np.histogram(vals, bins=number_of_bins)
+            # Plot histogram along y-axis:
+            py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal', name='LR')
+
+
+        return app, win, p1, (even_out_plot_1D, odd_out_plot_1D), (py, )
+
+
+
+
 
 
     @classmethod
-    def common_analysis_helper(cls, curr_active_pipeline, num_shuffles:int=300, minimum_inclusion_fr_Hz:float=5.0):
+    def common_analysis_helper(cls, curr_active_pipeline, num_shuffles:int=300, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2,4,9]):
         ## Shared:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         # global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
