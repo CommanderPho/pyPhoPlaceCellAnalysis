@@ -1358,7 +1358,7 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
         point_data_values=epoch_identifiers
     )
 
-    app, win, diff_p1, out_plot_1D = _display_z_score_diff_outputs
+    app, win, diff_p1, out_plot_1D, *out_hist_stuff = _display_z_score_diff_outputs
     long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(diff_p1, long_epoch, short_epoch)
     raw_app, raw_win, raw_p1, raw_out_plot_1D = _display_z_score_raw_outputs
     long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
