@@ -1183,6 +1183,28 @@ class RankOrderAnalyses:
             return True #TODO 2023-11-29 08:42: - [ ] cannot validate minimum because none was passed, eventually reformulate to use parameters
         
 
+    @classmethod
+    def find_only_significant_events(cls, rank_order_results, high_z_criteria: float = 1.96):
+        # Find only the significant events (|z| > 1.96):
+        _out_z_score = pd.DataFrame({'LR_long_z_scores': rank_order_results.LR_ripple.long_z_score, 'LR_short_z_scores': rank_order_results.LR_ripple.short_z_score,
+                    'RL_long_z_scores': rank_order_results.RL_ripple.long_z_score, 'RL_short_z_scores': rank_order_results.RL_ripple.short_z_score})
+
+        n_events: int = len(_out_z_score)
+        print(f'n_events: {n_events}')
+        
+        # Filter rows based on columns: 'LR_long_z_scores', 'LR_short_z_scores' and 2 other columns
+        # filtered_z_score_df: pd.DataFrame = _out_z_score[(_out_z_score['LR_long_z_scores'].abs() > high_z_criteria) | (_out_z_score['LR_short_z_scores'].abs() > high_z_criteria) | (_out_z_score['RL_long_z_scores'].abs() > high_z_criteria) | (_out_z_score['RL_short_z_scores'].abs() > high_z_criteria)] # any z-score at all > 1.96
+        filtered_z_score_df: pd.DataFrame = _out_z_score[((_out_z_score['LR_long_z_scores'].abs() > high_z_criteria) | (_out_z_score['LR_short_z_scores'].abs() > high_z_criteria)) & ((_out_z_score['RL_long_z_scores'].abs() > high_z_criteria) | (_out_z_score['RL_short_z_scores'].abs() > high_z_criteria))] # at least one direction (both short and long) > 1.96
+        # filtered_z_score_df: pd.DataFrame = _out_z_score[((_out_z_score['LR_long_z_scores'].abs() > high_z_criteria) & (_out_z_score['LR_short_z_scores'].abs() > high_z_criteria)) & ((_out_z_score['RL_long_z_scores'].abs() > high_z_criteria) & (_out_z_score['RL_short_z_scores'].abs() > high_z_criteria))] # all required to be > 1.96
+        n_significant_events: int = len(filtered_z_score_df)
+        print(f'n_significant_events: {n_significant_events}')
+
+        percent_significant_events = float(n_significant_events) / float(n_events)
+        print(f'percent_significant_events: {percent_significant_events}')
+        
+        return filtered_z_score_df, (n_events, n_significant_events, percent_significant_events)
+
+
 
 class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """ functions related to directional placefield computations. """
