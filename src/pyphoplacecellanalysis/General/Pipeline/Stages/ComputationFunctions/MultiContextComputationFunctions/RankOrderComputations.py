@@ -286,12 +286,6 @@ class Zscorer:
     # def Zscore(self, xcritical: np.array) -> np.array:
     #     return (xcritical - self.mean)/self.std_dev
 
-# def Zscore(xcritical, mean, stdev):
-#     return (xcritical - mean)/stdev
-
-
-
-
 
 
 
