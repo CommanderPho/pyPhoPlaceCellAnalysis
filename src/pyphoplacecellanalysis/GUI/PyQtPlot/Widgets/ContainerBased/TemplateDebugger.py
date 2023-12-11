@@ -177,212 +177,49 @@ class TemplateDebugger:
         
         return _obj
 
+    # Saving/Exporting to file ___________________________________________________________________________________________ #
+    #TODO 2023-11-16 22:16: - [ ] Figure out how to save
 
-    # @classmethod
-    # def init_templates_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame]):
-    #     """
-    #     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    #     global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
-    #     global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps) # .trimmed_to_non_overlapping()
-    #     global_laps_epochs_df = global_laps.to_dataframe()
+    def save_figure(self): # export_file_base_path: Path = Path(f'output').resolve()
+        """ captures: epochs_editor, _out_pf1D_heatmaps
 
-    #     """
-    #     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
-    #     from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+        TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
+        import pyqtgraph as pg
+        import pyqtgraph.exporters
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+        """
+        ## Get main laps plotter:
+        # print_keys_if_possible('_out', _out, max_depth=4)
+        # plots = _out['plots']
 
-    #     _obj = cls(global_spikes_df=global_spikes_df, active_epochs_df=active_epochs_df.copy(), track_templates=track_templates,
-    #          RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+        ## Already have: epochs_editor, _out_pf1D_heatmaps
+        epochs_editor = graphics_output_dict['ui'][0]
 
-    #     name:str = 'TemplateDebugger'
-        
-    #     ## 2023-11-30 - Newest Version using separate rasters:
-    #     _obj.plots_data, _obj.plots = cls._build_internal_raster_plots(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates, debug_print=True)
-    #     #TODO 2023-11-30 15:14: - [ ] Unpacking and putting in docks and such not yet finished. Update functions would need to be done separately.
-    #     rasters_display_outputs = _obj.plots.rasters_display_outputs
-    #     all_apps = {a_decoder_name:a_raster_setup_tuple.app for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_windows = {a_decoder_name:a_raster_setup_tuple.win for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_separate_plots = {a_decoder_name:a_raster_setup_tuple.plots for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_separate_plots_data = {a_decoder_name:a_raster_setup_tuple.plots_data for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+        shared_output_file_prefix = f'output/2023-11-20'
+        # print(list(plots.keys()))
+        # pg.GraphicsLayoutWidget
+        main_graphics_layout_widget = epochs_editor.plots.win
+        export_file_path = Path(f'{shared_output_file_prefix}_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
+        export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
 
-    #     main_plot_identifiers_list = list(all_windows.keys()) # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        _out_pf1D_heatmaps = graphics_output_dict['plots']
+        for a_decoder_name, a_decoder_heatmap_tuple in _out_pf1D_heatmaps.items():
+            a_win, a_img = a_decoder_heatmap_tuple
+            # a_win.export_image(f'{a_decoder_name}_heatmap.png')
+            print(f'a_win: {type(a_win)}')
 
-    #     ## Extract the data items:
-    #     all_separate_data_all_spots = {a_decoder_name:a_raster_setup_tuple.plots_data.all_spots for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_separate_data_all_scatterplot_tooltips_kwargs = {a_decoder_name:a_raster_setup_tuple.plots_data.all_scatterplot_tooltips_kwargs for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_separate_data_new_sorted_rasters = {a_decoder_name:a_raster_setup_tuple.plots_data.new_sorted_raster for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_separate_data_spikes_dfs = {a_decoder_name:a_raster_setup_tuple.plots_data.spikes_df for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
+            # create an exporter instance, as an argument give it the item you wish to export
+            exporter = pg.exporters.ImageExporter(a_win.plotItem)
+            # exporter = pg.exporters.SVGExporter(a_win.plotItem)
+            # set export parameters if needed
+            # exporter.parameters()['width'] = 300   # (note this also affects height parameter)
 
-    #     # Extract the plot/renderable items
-    #     all_separate_root_plots = {a_decoder_name:a_raster_setup_tuple.plots.root_plot for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_separate_grids = {a_decoder_name:a_raster_setup_tuple.plots.grid for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_separate_scatter_plots = {a_decoder_name:a_raster_setup_tuple.plots.scatter_plot for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-    #     all_separate_debug_header_labels = {a_decoder_name:a_raster_setup_tuple.plots.debug_header_label for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        
-    #     # Embedding in docks:
-    #     # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(RL_win, LR_win, title='Pho Debug Plot Directional Template Rasters')
-    #     root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Debug Plot Directional Template Rasters')
+            # save to file
+            export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
 
-    #     ## Build Dock Widgets:
-    #     def get_utility_dock_colors(orientation, is_dim):
-    #         """ used for CustomDockDisplayConfig for non-specialized utility docks """
-    #         # Common to all:
-    #         if is_dim:
-    #             fg_color = '#aaa' # Grey
-    #         else:
-    #             fg_color = '#fff' # White
-                
-    #         # a purplish-royal-blue 
-    #         if is_dim:
-    #             bg_color = '#d8d8d8' 
-    #             border_color = '#717171' 
-    #         else:
-    #             bg_color = '#9d9d9d' 
-    #             border_color = '#3a3a3a' 
-
-    #         return fg_color, bg_color, border_color
-
-
-    #     # decoder_names_list = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
-    #     _out_dock_widgets = {}
-    #     dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False),
-    #                     CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False))))
-    #     # dock_add_locations = (['left'], ['left'], ['right'], ['right'])
-    #     # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right'])))
-    #     dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
-
-    #     for i, (a_decoder_name, a_win) in enumerate(all_windows.items()):
-    #         if (a_decoder_name == 'short_RL'):
-    #             short_LR_dock = root_dockAreaWindow.find_display_dock('short_LR')
-    #             assert short_LR_dock is not None
-    #             dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
-    #             print(f'using overriden dock location.')
-                
-    #         _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name])
-
-
-       
-    #     # Build callback functions:
-    #     def on_update_active_scatterplot_kwargs(override_scatter_plot_kwargs):
-    #         """ captures: main_plot_identifiers_list, plots, plots_data """
-    #         for _active_plot_identifier in main_plot_identifiers_list:
-    #             # for _active_plot_identifier, a_scatter_plot in plots.scatter_plots.items():
-    #             # new_ax = plots.ax[_active_plot_identifier]
-    #             a_scatter_plot = all_separate_scatter_plots[_active_plot_identifier]
-    #             plots_data = all_separate_plots_data[_active_plot_identifier]
-    #             a_scatter_plot.setData(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {}), **override_scatter_plot_kwargs)
-
-    #     def on_update_active_epoch(an_epoch_idx, an_epoch):
-    #         """ captures: main_plot_identifiers_list, all_separate_root_plots """
-    #         for _active_plot_identifier in main_plot_identifiers_list:
-    #             new_ax = all_separate_root_plots[_active_plot_identifier]
-    #             new_ax.setXRange(an_epoch.start, an_epoch.stop)
-    #             # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
-                
-    #             # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
-
-
-    #     ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
-
-    #     ctrls_widget = ScrollBarWithSpinBox()
-    #     ctrls_widget.setObjectName("ctrls_widget")
-    #     ctrls_widget.update_range(0, (_obj.n_epochs-1))
-    #     ctrls_widget.setValue(10)
-
-    #     def valueChanged(new_val:int):
-    #         print(f'valueChanged(new_val: {new_val})')
-    #         _obj.on_update_epoch_IDX(int(new_val))
-
-    #     ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
-    #     ctrl_layout = pg.LayoutWidget()
-    #     ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1)
-    #     ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
-
-    #     logTextEdit = pg.QtWidgets.QTextEdit()
-    #     logTextEdit.setReadOnly(True)
-    #     logTextEdit.setObjectName("logTextEdit")
-
-    #     ctrl_layout.addWidget(logTextEdit, row=2, rowspan=3, col=0, colspan=1)
-
-    #     _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,100), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
-
-    #     ## Add two labels in the top row that show the Long/Short column values:
-    #     long_short_info_layout = pg.LayoutWidget()
-    #     long_short_info_layout.setObjectName('layoutLongShortInfo')
-
-    #     long_info_label = long_short_info_layout.addLabel(text='LONG', row=0, col=0)
-    #     long_info_label.setObjectName('lblLongInfo')
-    #     # long_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
-    #     long_info_label.setAlignment(pg.QtCore.Qt.AlignLeft)
-
-    #     short_info_label = long_short_info_layout.addLabel(text='SHORT', row=0, col=1)
-    #     short_info_label.setObjectName('lblShortInfo')
-    #     # short_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
-    #     short_info_label.setAlignment(pg.QtCore.Qt.AlignRight)
-        
-    #     _out_dock_widgets['LongShortColumnsInfo_dock'] = root_dockAreaWindow.add_display_dock(identifier='LongShortColumnsInfo_dock', widget=long_short_info_layout, dockSize=(600,60), dockAddLocationOpts=['top'], display_config=CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False, corner_radius='0px'))
-    #     _out_dock_widgets['LongShortColumnsInfo_dock'][1].hideTitleBar() # hide the dock title bar
-
-    #     # Add the widgets to the .ui:
-    #     long_short_info_layout = long_short_info_layout
-    #     long_info_label = long_info_label
-    #     short_info_label = short_info_label
-    #     info_labels_widgets_dict = dict(long_short_info_layout=long_short_info_layout, long_info_label=long_info_label, short_info_label=short_info_label)
-
-    #     root_dockAreaWindow.resize(600, 900)
-
-    #     ## Build final .plots and .plots_data:
-    #     _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
-    #                               root_plots=all_separate_root_plots, grids=all_separate_grids, scatter_plots=all_separate_scatter_plots, debug_header_labels=all_separate_debug_header_labels,
-    #                               dock_widgets=_out_dock_widgets, text_items_dict=None) # , ctrl_widgets={'slider': slider}
-    #     _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
-    #                                        seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
-    #                                        on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})                
-    #     _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs)
-
-    #     try:
-    #         ## rank_order_results.LR_ripple.selected_spikes_df mode:
-    #         if isinstance(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
-    #             # already a selected_spikes_df! Use it raw!
-    #             _obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map = deepcopy(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-    #             _obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map = deepcopy(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-    #         else:
-    #             ## Build the selected spikes df:
-    #             (_obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map), (_obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map) = _obj.build_selected_spikes_df(_obj.track_templates, _obj.active_epochs_df,
-    #                                                                                                                                                                                                                 _obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict,                                                                                                                                                                                                                _obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict)
-    #         ## Add the spikes
-    #         _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
-    #         _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
-    #         _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
-    #         _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
-
-    #     except (IndexError, KeyError):
-    #         print(f'WARN: the selected spikes did not work properly, so none will be shown.')
-    #         pass
-
-    #     _obj._build_cell_y_labels() # builds the cell labels
-
-    #     ## Cleanup when done:
-    #     for a_decoder_name, a_root_plot in _obj.plots.root_plots.items():
-    #         a_root_plot.setTitle(title=a_decoder_name)
-    #         # a_root_plot.setTitle(title="")
-    #         a_left_axis = a_root_plot.getAxis('left')# axisItem
-    #         a_left_axis.setLabel(a_decoder_name)
-    #         a_left_axis.setStyle(showValues=False)
-    #         a_left_axis.setTicks([])
-    #         # a_root_plot.hideAxis('bottom')
-    #         # a_root_plot.hideAxis('bottom')
-    #         a_root_plot.hideAxis('left')
-
-    #     # for a_decoder_name, a_scatter_plot_item in _obj.plots.scatter_plots.items():
-    #     #     a_scatter_plot_item.hideAxis('left')
-
-    #     # Hide the debugging labels
-    #     for a_decoder_name, a_label in _obj.plots.debug_header_labels.items():
-    #         # a_label.setText('NEW')
-    #         a_label.hide() # hide the labels unless we need them.
-
-
-    #     return _obj
+            exporter.export(str(export_file_path)) # '.png'
+            print(f'exporting to {export_file_path}')
+            # .scene()
 
 
     

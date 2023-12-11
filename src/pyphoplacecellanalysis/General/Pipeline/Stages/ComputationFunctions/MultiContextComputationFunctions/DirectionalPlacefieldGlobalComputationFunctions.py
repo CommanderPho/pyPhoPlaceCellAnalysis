@@ -943,49 +943,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             graphics_output_dict = {'win': template_debugger.ui.root_dockAreaWindow, 'app': template_debugger.ui.app,  'ui': template_debugger.ui, 'plots': template_debugger.plots, 'data': template_debugger.plots_data}
 
 
-            # Saving/Exporting to file ___________________________________________________________________________________________ #
-            #TODO 2023-11-16 22:16: - [ ] Figure out how to save
-
-            def save_figure(): # export_file_base_path: Path = Path(f'output').resolve()
-                """ captures: epochs_editor, _out_pf1D_heatmaps
-
-                TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
-                import pyqtgraph as pg
-                import pyqtgraph.exporters
-                from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
-                """
-                ## Get main laps plotter:
-                # print_keys_if_possible('_out', _out, max_depth=4)
-                # plots = _out['plots']
-
-                ## Already have: epochs_editor, _out_pf1D_heatmaps
-                epochs_editor = graphics_output_dict['ui'][0]
-
-                shared_output_file_prefix = f'output/2023-11-20'
-                # print(list(plots.keys()))
-                # pg.GraphicsLayoutWidget
-                main_graphics_layout_widget = epochs_editor.plots.win
-                export_file_path = Path(f'{shared_output_file_prefix}_test_main_position_laps_line_plot').with_suffix('.svg').resolve()
-                export_pyqtgraph_plot(main_graphics_layout_widget, savepath=export_file_path) # works
-
-                _out_pf1D_heatmaps = graphics_output_dict['plots']
-                for a_decoder_name, a_decoder_heatmap_tuple in _out_pf1D_heatmaps.items():
-                    a_win, a_img = a_decoder_heatmap_tuple
-                    # a_win.export_image(f'{a_decoder_name}_heatmap.png')
-                    print(f'a_win: {type(a_win)}')
-
-                    # create an exporter instance, as an argument give it the item you wish to export
-                    exporter = pg.exporters.ImageExporter(a_win.plotItem)
-                    # exporter = pg.exporters.SVGExporter(a_win.plotItem)
-                    # set export parameters if needed
-                    # exporter.parameters()['width'] = 300   # (note this also affects height parameter)
-
-                    # save to file
-                    export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix('.png').resolve() # '.svg' # .resolve()
-
-                    exporter.export(str(export_file_path)) # '.png'
-                    print(f'exporting to {export_file_path}')
-                    # .scene()
+            
 
             # def on_update(included_any_context_neuron_ids):
             #     """ call to update when `included_any_context_neuron_ids` changes.
