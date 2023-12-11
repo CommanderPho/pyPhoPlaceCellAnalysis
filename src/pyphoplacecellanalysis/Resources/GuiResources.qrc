@@ -1,5 +1,8 @@
 <RCC>
   <qresource prefix="Icons">
+    <file>Icons/visualizations/rank_order_raster_debugger.ico</file>
+    <file>Icons/visualizations/template_1D_debugger.ico</file>
+    <file>Icons/visualizations/templates_1D.ico</file>
     <file>Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico</file>
     <file>Icons/TuningMapDataExplorerIconWithLabel.ico</file>
     <file>Icons/SpikeRaster2DIcon.ico</file>
