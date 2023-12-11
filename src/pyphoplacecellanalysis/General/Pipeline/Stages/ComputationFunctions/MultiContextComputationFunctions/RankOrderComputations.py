@@ -1427,7 +1427,8 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
     # spikes_df = deepcopy(global_spikes_df)
 
     if analysis_type == 'Ripple':
-        global_events = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
+        # global_events = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
+        global_events = deepcopy(result_tuple.active_epochs)
     elif analysis_type == 'Lap':
         global_events = deepcopy(result_tuple.active_epochs)
     else:
