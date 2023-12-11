@@ -1357,7 +1357,7 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
 
 
 @function_attributes(short_name=None, tags=['rank-order', 'inst_fr', 'epoch', 'lap', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-16 18:42', related_items=['most_likely_directional_rank_order_shuffling'])
-def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tuple, analysis_type):
+def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tuple, analysis_type, included_epoch_idxs=None):
     """
     Generalized function to perform analysis and plot for either ripples or laps.
 
@@ -1399,17 +1399,27 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
     if isinstance(global_events, pd.DataFrame):
         global_events = Epoch(global_events.epochs.get_valid_df())
 
+    if included_epoch_idxs is not None:
+        print(f'filtering global epochs:')
+        is_epoch_significant = np.isin(global_events.to_dataframe().index, included_epoch_idxs)
+        global_events = deepcopy(global_events).boolean_indicies_slice(is_epoch_significant)
+        
+        # significant_ripple_epochs: pd.DataFrame = deepcopy(global_events.epochs.get_valid_df())[is_epoch_significant]
+    else:
+        is_epoch_significant = np.arange(global_events.n_epochs)
+
+
     epoch_identifiers = np.arange(global_events.n_epochs)
     x_values = global_events.midtimes
     x_axis_name_suffix = 'Mid-time (Sec)'
 
     _display_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(
-        x_values, result_tuple.long_short_best_dir_z_score_diff_values, None, 
+        x_values, result_tuple.long_short_best_dir_z_score_diff_values[is_epoch_significant], None, 
         variable_name=analysis_type, x_axis_name_suffix=x_axis_name_suffix, 
         point_data_values=epoch_identifiers
     )
     _display_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(
-        x_values, *result_tuple.masked_z_score_values_list, 
+        x_values, *[x[is_epoch_significant] for x in result_tuple.masked_z_score_values_list], 
         variable_name=analysis_type, x_axis_name_suffix=x_axis_name_suffix, 
         point_data_values=epoch_identifiers
     )
