@@ -52,7 +52,6 @@ from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, s
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
-
 # ==================================================================================================================== #
 # 2023-10-20 - Close-to-working Rank Order Strategy:                                                                   #
 # ==================================================================================================================== #
@@ -148,16 +147,16 @@ def determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2
 
 
 @define(slots=False, repr=False, eq=False)
-class ShuffleHelper:
+class ShuffleHelper(HDFMixin):
     """ holds the result of shuffling templates. Used for rank-order analyses """
-    shared_aclus_only_neuron_IDs: NDArray = field()
-    is_good_aclus: NDArray = field(repr=False)
+    shared_aclus_only_neuron_IDs: NDArray = serialized_field()
+    is_good_aclus: NDArray = serialized_field(repr=False)
     
-    num_shuffles: int = field(repr=True) # default=1000
-    shuffled_aclus = field(repr=False)
-    shuffle_IDX = field(repr=False)
+    num_shuffles: int = serialized_attribute_field(repr=True) # default=1000
+    shuffled_aclus = non_serialized_field(repr=False, is_computable=True)
+    shuffle_IDX = non_serialized_field(repr=False, is_computable=True)
     
-    decoder_pf_peak_ranks_list = field(repr=True)
+    decoder_pf_peak_ranks_list = serialized_field(repr=True)
     
 
     @property
@@ -231,15 +230,15 @@ class ShuffleHelper:
 
 
 @define(slots=False, repr=False, eq=False)
-class Zscorer:
-    original_values: NDArray = field(repr=False)
-    mean: float = field(repr=True)
-    std_dev: float = field(repr=True)
-    n_values: int = field(repr=True)
+class Zscorer(HDFMixin):
+    original_values: NDArray = serialized_field(repr=False, is_computable=False)
+    mean: float = serialized_attribute_field(repr=True, is_computable=True)
+    std_dev: float = serialized_attribute_field(repr=True, is_computable=True)
+    n_values: int = serialized_attribute_field(repr=True, is_computable=True)
 
-    real_value: float = field(default=None, repr=True)
-    real_p_value: float = field(default=None, repr=True)
-    z_score_value: float = field(default=None, repr=True) # z-score values
+    real_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False)
+    real_p_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False)
+    z_score_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False) # z-score values
 
 
     @classmethod
@@ -251,7 +250,6 @@ class Zscorer:
     def Zscore(self, xcritical):
         self.z_score_value = (xcritical - self.mean)/self.std_dev
         return self.z_score_value
-
 
     def plot_distribution(self):
         """ plots a standalone figure showing the distribution of the original values and their fisher_z_transformed version in a histogram. """
@@ -279,21 +277,15 @@ class Zscorer:
         return win, plt1
     
 
-    # def Zscore(self, xcritical: np.array) -> np.array:
-    #     return (xcritical - self.mean)/self.std_dev
-
-
-
-
-
 @define(slots=False, repr=False, eq=False)
-class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
+class RankOrderResult(ComputedResult):
     """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
     
     
     """
-    ranked_aclus_stats_dict: Dict[int, LongShortStatsTuple] = serialized_field(repr=False)
-    selected_spikes_fragile_linear_neuron_IDX_dict: Dict = serialized_field(repr=False)
+    # is_global: bool = non_serialized_field(default=True, repr=False)
+    ranked_aclus_stats_dict: Dict[int, LongShortStatsTuple] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v))) # , serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v))
+    selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v)))
     
     long_z_score: NDArray = serialized_field()
     short_z_score: NDArray = serialized_field()
@@ -303,7 +295,7 @@ class RankOrderResult(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
     epochs_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
 
     selected_spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
-    extra_info_dict: Dict = serialized_field(default=Factory(dict), repr=False)
+    extra_info_dict: Dict = non_serialized_field(default=Factory(dict), repr=False)
     
     @classmethod
     def init_from_analysis_output_tuple(cls, a_tuple):
@@ -346,7 +338,7 @@ class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
 
 
 @define(slots=False, repr=False, eq=False)
-class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
+class RankOrderComputationsContainer(ComputedResult):
     """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
     
 
@@ -375,8 +367,10 @@ class RankOrderComputationsContainer(HDFMixin, AttrsBasedClassHelperMixin, Compu
         # return iter(astuple(self)) # deep unpacking causes problems
         return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global, self.__attrs_attrs__.ripple_most_likely_result_tuple, self.__attrs_attrs__.laps_most_likely_result_tuple, self.__attrs_attrs__.minimum_inclusion_fr_Hz))) #  'is_global'
 
+    def to_dict(self) -> Dict:
+        return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
 
-
+    
 
 # ==================================================================================================================== #
 # 2023-11-16 - Long/Short Most-likely LR/RL decoder                                                                    #

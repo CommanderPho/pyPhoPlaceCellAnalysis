@@ -326,7 +326,7 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
 
 
 @custom_define(slots=False, repr=False)
-class LeaveOneOutDecodingAnalysis(HDFMixin, AttrsBasedClassHelperMixin, ComputedResult):
+class LeaveOneOutDecodingAnalysis(ComputedResult):
     """ 2023-05-10 - holds the results of a leave-one-out decoding analysis of the long and short track 
     Usage:
         leave_one_out_decoding_analysis_obj = LeaveOneOutDecodingAnalysis(long_decoder, short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj)
@@ -347,7 +347,7 @@ class LeaveOneOutDecodingAnalysis(HDFMixin, AttrsBasedClassHelperMixin, Computed
 
 
 @custom_define(slots=False, kw_only=True) # NOTE: kw_only=True prevents errors from only assigning some of the attributes with a specific field
-class ExpectedVsObservedResult(HDFMixin, ComputedResult):
+class ExpectedVsObservedResult(ComputedResult):
     """ Allows initialization from 
     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
     expected_v_observed_result = curr_long_short_post_decoding.expected_v_observed_result
@@ -395,7 +395,7 @@ class ExpectedVsObservedResult(HDFMixin, ComputedResult):
     long_long_diff: np.ndarray
     
 @custom_define(slots=False, kw_only=True) # NOTE: kw_only=True prevents errors from only assigning some of the attributes with a specific field
-class RateRemappingResult(HDFMixin, ComputedResult):
+class RateRemappingResult(ComputedResult):
     """ 
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import RateRemappingResult
 
@@ -456,7 +456,7 @@ class RateRemappingResult(HDFMixin, ComputedResult):
 
 
 @custom_define(slots=False)
-class TruncationCheckingResults(HDFMixin, ComputedResult):
+class TruncationCheckingResults(ComputedResult):
     """ result for `_perform_long_short_endcap_analysis`
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import TruncationCheckingResults

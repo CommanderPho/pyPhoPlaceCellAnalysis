@@ -121,9 +121,6 @@ class ComputationResult(HDF_SerializationMixin):
              # typical update
             self.__dict__.update(state)
 
-
-    
-
     # LEGACY WORKAROUND __________________________________________________________________________________________________ #
     def to_dict(self):
         """ TEMPORARY WORK AROUND: workaround after conversion from DynamicParameters-based class. """
@@ -137,7 +134,7 @@ class ComputationResult(HDF_SerializationMixin):
 
 
 @define(slots=False, repr=False)
-class ComputedResult:
+class ComputedResult(HDFMixin):
     """ 2023-05-10 - an object to replace DynamicContainers and static dicts for holding specific computed results
     
     Usage:
@@ -162,7 +159,9 @@ class ComputedResult:
 
             
     """
-    is_global: bool = field(default=False)
+    is_global: bool = non_serialized_field(default=False, repr=False, is_computable=True)
+     
+    # field(default=False, metadata={'is_hdf_handled_custom': True, 'serialization': {'hdf': False, 'csv': False, 'pkl': True}})
 
 
 
