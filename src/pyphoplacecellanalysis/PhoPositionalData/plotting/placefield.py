@@ -48,7 +48,7 @@ from vtkmodules.vtkCommonCore import vtkLookupTable # required for build_custom_
 # 1D Placefields and Tuning Curves                                                                                     #
 # ==================================================================================================================== #
 
-def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal=False, color='g', fill_alpha=0.3, border_line_override_color=None, border_line_alpha=0.8):
+def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal:bool=False, color='g', fill_alpha=0.3, border_line_override_color=None, border_line_alpha=0.8):
     """ Plots the 1D Normalized Tuning Curve in a 2D Plot
 
     fill_alpha: the alpha for the fill color
@@ -211,7 +211,7 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
         # Need axes:
         # Layout Subplots in Figure:
         gs = fig.add_gridspec(1, 8)
-        gs.update(wspace=0, hspace=0.05) # set the spacing between axes.
+        gs.update(wspace=0, hspace=0.05) # set the spacing between axes. # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
         ax_activity_v_time = fig.add_subplot(gs[0, :-1]) # all except the last element are the trajectory over time
         ax_pf_tuning_curve = fig.add_subplot(gs[0, -1], sharey=ax_activity_v_time) # The last element is the tuning curve
         if should_include_labels:
@@ -258,7 +258,6 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
         curr_cell_spike_times = active_epoch_placefields1D.ratemap_spiketrains[placefield_cell_index]  # (271,)
         curr_cell_spike_positions = active_epoch_placefields1D.ratemap_spiketrains_pos[placefield_cell_index]  # (271,)
         curr_cell_normalized_tuning_curve = active_epoch_placefields1D.ratemap.normalized_tuning_curves[placefield_cell_index, :].squeeze()
-        
         
         # Interpolate the tuning curve for all the spike values:
         if should_plot_spike_indicator_lines_on_trajectory or should_plot_spike_indicator_points_on_placefield:

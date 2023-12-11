@@ -682,7 +682,7 @@ class NewSimpleRaster:
             return all_spots
 
 
-@function_attributes(short_name=None, tags=['raster', 'simple', 'working', 'stateless'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-06 13:49', related_items=['NewSimpleRaster'])
+@function_attributes(short_name=None, tags=['raster', 'simple', 'working', 'stateless'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame', 'build_scatter_plot_kwargs', '_build_units_y_grid'], used_by=['_plot_empty_raster_plot_frame', ''], creation_date='2023-12-06 13:49', related_items=['NewSimpleRaster'])
 def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses `NewSimpleRaster` and pyqtgraph's scatter function to render a simple raster plot. Simpler than the `SpikeRaster2D`-like implementations.
 

@@ -737,6 +737,11 @@ class RankOrderAnalyses:
         # TODO 2023-11-21 05:42: - [ ] todo_description want the aclus as well, not just the `long_pf_peak_ranks`
 
         #TODO 2023-12-08 12:53: - [ ] Drop epochs with fewer than the minimum active aclus
+
+        #TODO 2023-12-10 19:40: - [ ] Need to save the epochs that were used to compute.
+        filtered_active_epochs
+
+
         
         # Select and rank spikes
         epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df = cls.select_and_rank_spikes(active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment)
@@ -1003,14 +1008,19 @@ class RankOrderAnalyses:
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         ## Replays:
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-        active_epochs = global_replays.copy()
+        if isinstance(global_replays, pd.DataFrame):
+            global_replays = Epoch(global_replays.epochs.get_valid_df())
+            
+        active_epochs = global_replays.to_dataframe().copy()
         ripple_directional_likelihoods_tuple = _compute_best(active_epochs)
         long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
         # now do the shuffle:
 
+        #TODO 2023-12-10 18:39: - [ ] The issue is that some epochs are excluded now, and so the number of epochs don't match the rank_order_results.LR_ripple.long_z_score, rank_order_results.RL_ripple.long_z_score
+
         ## 2023-11-16 - Finally, get the raw z-score values for the best direction at each epoch and then take the long - short difference of those to get `ripple_evts_long_short_best_dir_z_score_diff_values`:
         # Using NumPy advanced indexing to select from array_a or array_b:
-        ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_ripple.long_z_score, rank_order_results.RL_ripple.long_z_score)
+        ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_ripple.long_z_score, rank_order_results.RL_ripple.long_z_score) # #TODO 2023-12-10 18:35: - [ ] ValueError: operands could not be broadcast together with shapes (611,) (551,) (551,)
         ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.short_z_score)
         # print(f'np.shape(ripple_evts_long_best_dir_z_score_values): {np.shape(ripple_evts_long_best_dir_z_score_values)}')
         ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
@@ -1062,7 +1072,6 @@ class RankOrderAnalyses:
         ## Ripple Rank-Order Analysis: needs `global_spikes_df`
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
-
 
         # curr_active_pipeline.sess.config.preprocessing_parameters
         min_num_unique_aclu_inclusions: int = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions
@@ -1179,6 +1188,11 @@ class RankOrderAnalyses:
 
     @classmethod
     def find_only_significant_events(cls, rank_order_results, high_z_criteria: float = 1.96):
+        """ 
+        #TODO 2023-12-10 19:01: - [ ] Only works for ripples, ignores laps
+        
+        
+        """
         # Find only the significant events (|z| > 1.96):
         _out_z_score = pd.DataFrame({'LR_long_z_scores': rank_order_results.LR_ripple.long_z_score, 'LR_short_z_scores': rank_order_results.LR_ripple.short_z_score,
                     'RL_long_z_scores': rank_order_results.RL_ripple.long_z_score, 'RL_short_z_scores': rank_order_results.RL_ripple.short_z_score})
