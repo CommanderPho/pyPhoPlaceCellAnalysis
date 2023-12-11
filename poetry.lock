@@ -4213,8 +4213,8 @@ numpy = [
     {version = ">=1.21.0", markers = "python_version == \"3.9\" and platform_system == \"Darwin\" and platform_machine == \"arm64\""},
     {version = ">=1.19.3", markers = "platform_system == \"Linux\" and platform_machine == \"aarch64\" and python_version >= \"3.8\" and python_version < \"3.10\" or python_version > \"3.9\" and python_version < \"3.10\" or python_version >= \"3.9\" and platform_system != \"Darwin\" and python_version < \"3.10\" or python_version >= \"3.9\" and platform_machine != \"arm64\" and python_version < \"3.10\""},
     {version = ">=1.23.5", markers = "python_version >= \"3.11\""},
-    {version = ">=1.21.2", markers = "platform_system != \"Darwin\" and python_version >= \"3.10\" and python_version < \"3.11\""},
     {version = ">=1.21.4", markers = "python_version >= \"3.10\" and platform_system == \"Darwin\" and python_version < \"3.11\""},
+    {version = ">=1.21.2", markers = "platform_system != \"Darwin\" and python_version >= \"3.10\" and python_version < \"3.11\""},
 ]
 
 [[package]]
@@ -4997,6 +4997,20 @@ files = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
 ]
+
+[[package]]
+name = "pycscope"
+version = "1.2.1"
+description = "Generates a cscope index of Python source trees"
+optional = false
+python-versions = "*"
+files = [
+    {file = "current.whl", hash = "sha256:5ff28b6d7326ba2dc5353425b1699a61c69ad5e40e2127088ea34ea564897dcd"},
+]
+
+[package.source]
+type = "file"
+url = "../pycscope/dist/pycscope-1.2.1-py3-none-any.whl"
 
 [[package]]
 name = "pydantic"
@@ -8103,4 +8117,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "fde768991cab1dbe22752461dc9941ed2fd79853556a8890a2c98c5400f70bbb"
+content-hash = "7fe8bc5eb4128de81c14d4ce806b54999da722b2b50cb9592a50bf43e50a4a65"
