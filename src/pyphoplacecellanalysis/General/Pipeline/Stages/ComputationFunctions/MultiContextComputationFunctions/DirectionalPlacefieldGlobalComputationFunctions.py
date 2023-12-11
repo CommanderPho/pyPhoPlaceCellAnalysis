@@ -252,6 +252,37 @@ class DirectionalLapsResult(ComputedResult):
         else:
             return _obj.filtered_by_frate(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
 
+
+    def filtered_by_included_aclus(self, qclu_included_aclus) -> "DirectionalLapsResult":
+        """ Returns a copy of self with each decoder filtered by the `qclu_included_aclus`
+        
+        Usage:
+        
+        qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2,4,9])
+        modified_directional_laps_results = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
+        modified_directional_laps_results
+
+        """
+        directional_laps_results = deepcopy(self)
+        
+        decoders_list = [directional_laps_results.long_LR_one_step_decoder_1D, directional_laps_results.long_RL_one_step_decoder_1D, directional_laps_results.short_LR_one_step_decoder_1D, directional_laps_results.short_RL_one_step_decoder_1D,
+                         directional_laps_results.long_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.long_RL_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_RL_shared_aclus_only_one_step_decoder_1D
+                        ]
+        modified_decoders_list = []
+        for a_decoder in decoders_list:
+            # a_decoder = deepcopy(directional_laps_results.long_LR_one_step_decoder_1D)
+            is_aclu_qclu_included_list = np.isin(a_decoder.pf.ratemap.neuron_ids, qclu_included_aclus)
+            included_aclus = np.array(a_decoder.pf.ratemap.neuron_ids)[is_aclu_qclu_included_list]
+            modified_decoder = a_decoder.get_by_id(included_aclus)
+            modified_decoders_list.append(modified_decoder)
+
+        ## Assign the modified decoders:
+        directional_laps_results.long_LR_one_step_decoder_1D, directional_laps_results.long_RL_one_step_decoder_1D, directional_laps_results.short_LR_one_step_decoder_1D, directional_laps_results.short_RL_one_step_decoder_1D, directional_laps_results.long_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.long_RL_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_RL_shared_aclus_only_one_step_decoder_1D = modified_decoders_list
+
+        return directional_laps_results
+    
+
+
     ## For serialization/pickling:
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
