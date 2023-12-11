@@ -20,8 +20,8 @@ from neuropy.utils.dynamic_container import DynamicContainer # used to build con
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
-from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
@@ -35,8 +35,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 # Define the namedtuple
 DirectionalDecodersTuple = namedtuple('DirectionalDecodersTuple', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
 
-@define(slots=False, repr=False, eq=False) # , repr=True
-class TrackTemplates:
+@define(slots=False, repr=False, eq=False)
+class TrackTemplates(HDFMixin):
     """ Holds the four directional templates for direction placefield analysis.
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
 
@@ -46,21 +46,21 @@ class TrackTemplates:
         TODO: should be moved into `DirectionalPlacefieldGlobalComputation` instead of RankOrder
 
     """
-    long_LR_decoder: BasePositionDecoder = field(repr=False)
-    long_RL_decoder: BasePositionDecoder = field(repr=False) # keys_only_repr
-    short_LR_decoder: BasePositionDecoder = field(repr=False)
-    short_RL_decoder: BasePositionDecoder = field(repr=False)
+    long_LR_decoder: BasePositionDecoder = serialized_field(repr=False)
+    long_RL_decoder: BasePositionDecoder = serialized_field(repr=False) # keys_only_repr
+    short_LR_decoder: BasePositionDecoder = serialized_field(repr=False)
+    short_RL_decoder: BasePositionDecoder = serialized_field(repr=False)
 
     # ## Computed properties
-    shared_LR_aclus_only_neuron_IDs: NDArray = field(repr=True)
-    is_good_LR_aclus: NDArray = field(repr=False)
+    shared_LR_aclus_only_neuron_IDs: NDArray = serialized_field(repr=True)
+    is_good_LR_aclus: NDArray = serialized_field(repr=False)
 
-    shared_RL_aclus_only_neuron_IDs: NDArray = field(repr=True)
-    is_good_RL_aclus: NDArray = field(repr=False)
+    shared_RL_aclus_only_neuron_IDs: NDArray = serialized_field(repr=True)
+    is_good_RL_aclus: NDArray = serialized_field(repr=False)
 
     ## Computed properties
-    decoder_LR_pf_peak_ranks_list: List = field(repr=True)
-    decoder_RL_pf_peak_ranks_list: List = field(repr=True)
+    decoder_LR_pf_peak_ranks_list: List = serialized_field(repr=True)
+    decoder_RL_pf_peak_ranks_list: List = serialized_field(repr=True)
 
 
     @property
@@ -213,21 +213,21 @@ class DirectionalLapsResult(ComputedResult):
     long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [directional_laps_results.__dict__[k] for k in ['long_LR_shared_aclus_only_one_step_decoder_1D', 'long_RL_shared_aclus_only_one_step_decoder_1D', 'short_LR_shared_aclus_only_one_step_decoder_1D', 'short_RL_shared_aclus_only_one_step_decoder_1D']]
 
     """
-    directional_lap_specific_configs: Dict = field(default=Factory(dict))
-    split_directional_laps_dict: Dict = field(default=Factory(dict))
-    split_directional_laps_contexts_dict: Dict = field(default=Factory(dict))
-    split_directional_laps_config_names: List[str] = field(default=Factory(list))
-    computed_base_epoch_names: List[str] = field(default=Factory(list))
+    directional_lap_specific_configs: Dict = non_serialized_field(default=Factory(dict))
+    split_directional_laps_dict: Dict = non_serialized_field(default=Factory(dict))
+    split_directional_laps_contexts_dict: Dict = non_serialized_field(default=Factory(dict))
+    split_directional_laps_config_names: List[str] = serialized_field(default=Factory(list))
+    computed_base_epoch_names: List[str] = serialized_field(default=Factory(list))
 
-    long_LR_one_step_decoder_1D: BasePositionDecoder = field(default=None)
-    long_RL_one_step_decoder_1D: BasePositionDecoder = field(default=None)
-    short_LR_one_step_decoder_1D: BasePositionDecoder = field(default=None)
-    short_RL_one_step_decoder_1D: BasePositionDecoder = field(default=None)
+    long_LR_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
+    long_RL_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
+    short_LR_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
+    short_RL_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
 
-    long_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = field(default=None, alias='long_odd_shared_aclus_only_one_step_decoder_1D')
-    long_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = field(default=None, alias='long_even_shared_aclus_only_one_step_decoder_1D')
-    short_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = field(default=None, alias='short_odd_shared_aclus_only_one_step_decoder_1D')
-    short_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = field(default=None, alias='short_even_shared_aclus_only_one_step_decoder_1D')
+    long_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='long_odd_shared_aclus_only_one_step_decoder_1D')
+    long_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='long_even_shared_aclus_only_one_step_decoder_1D')
+    short_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='short_odd_shared_aclus_only_one_step_decoder_1D')
+    short_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='short_even_shared_aclus_only_one_step_decoder_1D')
 
     # long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D
 
@@ -287,8 +287,6 @@ class DirectionalLapsResult(ComputedResult):
 
         return directional_laps_results
     
-
-
     ## For serialization/pickling:
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
@@ -301,14 +299,6 @@ class DirectionalLapsResult(ComputedResult):
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         super(DirectionalLapsResult, self).__init__() # from
 
-
-
-
-    #
-
-    # shared_aclus: np.ndarray
-    # long_short_pf_neurons_diff: SetPartition
-    # n_neurons: int
 
 
 

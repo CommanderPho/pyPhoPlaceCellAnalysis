@@ -370,7 +370,21 @@ class RankOrderComputationsContainer(ComputedResult):
     def to_dict(self) -> Dict:
         return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
 
+
+    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path
+        enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.
+        
     
+        Usage:
+            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+            _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+            _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+        """
+        super().to_hdf(file_path, key=key, debug_print=debug_print, enable_hdf_testing_mode=enable_hdf_testing_mode, **kwargs)
+        # handle custom properties here
+        
+
 
 # ==================================================================================================================== #
 # 2023-11-16 - Long/Short Most-likely LR/RL decoder                                                                    #
