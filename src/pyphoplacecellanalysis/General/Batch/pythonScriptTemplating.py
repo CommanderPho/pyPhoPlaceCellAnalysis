@@ -23,10 +23,9 @@ from neuropy.utils.result_context import IdentifyingContext
 # from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
 
-
-
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
-def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/generated_slurm_scripts/', use_separate_run_directories:bool=True, create_slurm_scripts:bool=False, should_perform_figure_generation_to_file:bool=False, **script_generation_kwargs):
+def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/generated_slurm_scripts/', use_separate_run_directories:bool=True,
+ 		create_slurm_scripts:bool=False, separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, **script_generation_kwargs):
 	""" Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
 	output_directory
@@ -59,9 +58,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	# if script_generation_kwargs is None:
 	# 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
 
-	script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=True, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs # No recomputing at all:
-	script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs
-	script_generation_kwargs = dict(should_force_reload_all=True, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs # Forced Reloading:
+	no_recomputing_script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=True, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs # No recomputing at all:
+	compute_as_needed_script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs
+	forced_full_recompute_script_generation_kwargs = dict(should_force_reload_all=True, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs # Forced Reloading:
 	# script_generation_kwargs
 
 	if included_session_contexts is None:
@@ -76,6 +75,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	slurm_template = env.get_template('slurm_template.sh.j2')
 
 	output_python_scripts = []
+
 	output_slurm_scripts = []
 	# Make sure the output directory exists
 	os.makedirs(output_directory, exist_ok=True)
@@ -88,16 +88,40 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 		else:
 			curr_batch_script_rundir = output_directory
 
-		# Create the Python script
-		python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
-		with open(python_script_path, 'w') as script_file:
-			script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
-													curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-													curr_session_basedir=curr_session_basedir, 
-													**script_generation_kwargs)
-			script_file.write(script_content)
-		output_python_scripts.append(python_script_path)
 
+		if not separate_execute_and_figure_gen_scripts:
+			# Create the Python script
+			python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
+			with open(python_script_path, 'w') as script_file:
+				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
+														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+														curr_session_basedir=curr_session_basedir, 
+														**script_generation_kwargs)
+				script_file.write(script_content)
+			output_python_scripts.append(python_script_path)
+
+		else:
+			# Create two separate scripts:
+			# Create the Execution Python script
+			python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
+			with open(python_script_path, 'w') as script_file:
+				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
+														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+														curr_session_basedir=curr_session_basedir, 
+														**compute_as_needed_script_generation_kwargs)
+				script_file.write(script_content)
+			# output_python_scripts.append(python_script_path)
+
+
+			python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_context}.py')
+			with open(python_figures_script_path, 'w') as script_file:
+				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
+														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+														curr_session_basedir=curr_session_basedir, 
+														**(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
+				script_file.write(script_content)
+			# output_python_display_scripts.append(python_figures_script_path)
+			output_python_scripts.append((python_script_path, python_figures_script_path))
 
 		# Create the SLURM script
 		if create_slurm_scripts:
