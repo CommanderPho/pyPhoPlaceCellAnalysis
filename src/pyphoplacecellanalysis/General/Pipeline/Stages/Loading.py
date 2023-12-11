@@ -18,6 +18,8 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.function_helpers import compose_functions
 from pyphocorehelpers.Filesystem.pickling_helpers import RenameUnpickler, renamed_load
+from pyphocorehelpers.Filesystem.pickling_helpers import ModuleExcludesPickler, custom_dump
+
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
@@ -115,10 +117,12 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
         with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
-                pickle.dump(db, dbfile)
+                # pickle.dump(db, dbfile)
+                custom_dump(db, dbfile) # ModuleExcludesPickler
+
                 dbfile.close()
 
-    
+
 
 # global_move_modules_list: Dict[str, str] - a dict with keys equal to the old full path to a class and values equal to the updated (replacement) full path to the class. Used to update the path to class definitions for loading previously pickled results after refactoring.
 
