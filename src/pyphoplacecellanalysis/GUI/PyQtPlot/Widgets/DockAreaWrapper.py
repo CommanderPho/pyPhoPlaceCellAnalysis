@@ -18,6 +18,9 @@ class PhoDockAreaContainingWindow(DynamicDockDisplayAreaContentMixin, PhoMainApp
     
         Can be used to dynamically create windows composed of multiple separate widgets programmatically.
     
+        pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper.PhoDockAreaContainingWindow
+        
+        
     """
     @property
     def area(self) -> DockArea:
