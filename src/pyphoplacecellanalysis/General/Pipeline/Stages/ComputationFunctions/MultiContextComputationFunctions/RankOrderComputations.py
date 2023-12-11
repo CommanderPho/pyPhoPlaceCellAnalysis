@@ -16,8 +16,6 @@ from neuropy.core import Epoch
 from neuropy.analyses.placefields import PfND
 from neuropy.utils.misc import safe_pandas_get_group
 import pandas as pd
-import pyvista as pv
-import pyvistaqt as pvqt # conda install -c conda-forge pyvistaqt
 from nptyping import NDArray
 import attrs
 from attrs import asdict, define, field, Factory, astuple
@@ -44,10 +42,6 @@ from neuropy.core.epoch import NamedTimerange
 
 from scipy import stats # _recover_samples_per_sec_from_laps_df
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import _build_default_tick, build_scatter_plot_kwargs
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import RasterScatterPlotManager, UnitSortOrderManager, _build_default_tick, _build_scatter_plotting_managers, _prepare_spikes_df_from_filter_epochs, _subfn_build_and_add_scatterplot_row
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multi_sort_raster_browser
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates
 
