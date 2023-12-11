@@ -108,7 +108,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
 														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
 														curr_session_basedir=curr_session_basedir, 
-														**compute_as_needed_script_generation_kwargs)
+														**(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
 				script_file.write(script_content)
 			# output_python_scripts.append(python_script_path)
 
@@ -118,7 +118,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
 														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
 														curr_session_basedir=curr_session_basedir, 
-														**(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
+														**(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)))
+
+
 				script_file.write(script_content)
 			# output_python_display_scripts.append(python_figures_script_path)
 			output_python_scripts.append((python_script_path, python_figures_script_path))
