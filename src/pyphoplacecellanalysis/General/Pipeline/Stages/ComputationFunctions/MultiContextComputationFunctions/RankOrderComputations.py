@@ -746,9 +746,6 @@ class RankOrderAnalyses:
         #TODO 2023-12-08 12:53: - [ ] Drop epochs with fewer than the minimum active aclus
 
         #TODO 2023-12-10 19:40: - [ ] Need to save the epochs that were used to compute.
-        filtered_active_epochs
-
-
         
         # Select and rank spikes
         epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df = cls.select_and_rank_spikes(active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment)

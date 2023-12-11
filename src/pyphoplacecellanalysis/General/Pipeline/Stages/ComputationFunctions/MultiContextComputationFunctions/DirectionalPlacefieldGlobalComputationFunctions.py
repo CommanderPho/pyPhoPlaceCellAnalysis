@@ -73,6 +73,12 @@ class TrackTemplates:
         """ a list of the neuron_IDs for each decoder (independently) """
         return np.sort(union_of_arrays(*self.decoder_neuron_IDs_list)) # neuron_IDs as they appear in any list
 
+    @property
+    def decoder_peak_location_list(self) -> List[NDArray]:
+        """ a list of the peak_tuning_curve_center_of_masses for each decoder (independently) """
+        return [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
+
+
     def __repr__(self):
         """ 
         TrackTemplates(long_LR_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
