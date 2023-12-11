@@ -11,6 +11,8 @@ from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMix
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
@@ -18,7 +20,8 @@ from neuropy.utils.dynamic_container import DynamicContainer # used to build con
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
-
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
@@ -32,7 +35,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 # Define the namedtuple
 DirectionalDecodersTuple = namedtuple('DirectionalDecodersTuple', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
 
-@define(slots=False, repr=False, eq=False)
+@define(slots=False, repr=False, eq=False) # , repr=True
 class TrackTemplates:
     """ Holds the four directional templates for direction placefield analysis.
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
@@ -43,21 +46,21 @@ class TrackTemplates:
         TODO: should be moved into `DirectionalPlacefieldGlobalComputation` instead of RankOrder
 
     """
-    long_LR_decoder: BasePositionDecoder = field()
-    long_RL_decoder: BasePositionDecoder = field()
-    short_LR_decoder: BasePositionDecoder = field()
-    short_RL_decoder: BasePositionDecoder = field()
+    long_LR_decoder: BasePositionDecoder = field(repr=False)
+    long_RL_decoder: BasePositionDecoder = field(repr=False) # keys_only_repr
+    short_LR_decoder: BasePositionDecoder = field(repr=False)
+    short_RL_decoder: BasePositionDecoder = field(repr=False)
 
     # ## Computed properties
-    shared_LR_aclus_only_neuron_IDs: NDArray = field()
-    is_good_LR_aclus: NDArray = field()
+    shared_LR_aclus_only_neuron_IDs: NDArray = field(repr=True)
+    is_good_LR_aclus: NDArray = field(repr=False)
 
-    shared_RL_aclus_only_neuron_IDs: NDArray = field()
-    is_good_RL_aclus: NDArray = field()
+    shared_RL_aclus_only_neuron_IDs: NDArray = field(repr=True)
+    is_good_RL_aclus: NDArray = field(repr=False)
 
     ## Computed properties
-    decoder_LR_pf_peak_ranks_list: List = field()
-    decoder_RL_pf_peak_ranks_list: List = field()
+    decoder_LR_pf_peak_ranks_list: List = field(repr=True)
+    decoder_RL_pf_peak_ranks_list: List = field(repr=True)
 
 
     @property
@@ -70,7 +73,26 @@ class TrackTemplates:
         """ a list of the neuron_IDs for each decoder (independently) """
         return np.sort(union_of_arrays(*self.decoder_neuron_IDs_list)) # neuron_IDs as they appear in any list
 
-        
+    def __repr__(self):
+        """ 
+        TrackTemplates(long_LR_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
+            long_RL_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
+            short_LR_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
+            short_RL_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
+            shared_LR_aclus_only_neuron_IDs: numpy.ndarray,
+            is_good_LR_aclus: NoneType,
+            shared_RL_aclus_only_neuron_IDs: numpy.ndarray,
+            is_good_RL_aclus: NoneType,
+            decoder_LR_pf_peak_ranks_list: list,
+            decoder_RL_pf_peak_ranks_list: list
+        )
+        """
+        # content = ", ".join( [f"{a.name}={v!r}" for a in self.__attrs_attrs__ if (v := getattr(self, a.name)) != a.default] )
+        # content = ", ".join([f"{a.name}:{strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
+        content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
+        # content = ", ".join([f"{a.name}" for a in self.__attrs_attrs__]) # 'TrackTemplates(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, is_good_LR_aclus, shared_RL_aclus_only_neuron_IDs, is_good_RL_aclus, decoder_LR_pf_peak_ranks_list, decoder_RL_pf_peak_ranks_list)'
+        return f"{type(self).__name__}({content}\n)"
+
 
     def filtered_by_frate(self, minimum_inclusion_fr_Hz: float = 5.0) -> "TrackTemplates":
         """ Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
