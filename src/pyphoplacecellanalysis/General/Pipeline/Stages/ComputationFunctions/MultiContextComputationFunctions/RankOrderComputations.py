@@ -1245,7 +1245,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
     @function_attributes(short_name='rank_order_shuffle_analysis', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
-    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1000, minimum_inclusion_fr_Hz:float=2.0, skip_laps=False):
+    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1000, minimum_inclusion_fr_Hz:float=2.0, included_qclu_values=[1,2], skip_laps=False):
         """ 
         
         Requires:
@@ -1265,10 +1265,20 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
         print(f'perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
         
+        qclu_included_aclus = owning_pipeline_reference.determine_good_aclus_by_qclu(included_qclu_values=included_qclu_values) # array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  81,  82,  83,  85,  86,  90,  92,  93,  96, 105, 109])
+
+
+
+
+        directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+        modified_directional_laps_results: DirectionalLapsResult = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
+        track_templates: TrackTemplates = modified_directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+
+        
         # Needs to store the parameters
         # num_shuffles:int=1000
         # minimum_inclusion_fr_Hz:float=12.0
-        
+        # included_qclu_values=[1,2]
         
         if ('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')):
             # initialize
