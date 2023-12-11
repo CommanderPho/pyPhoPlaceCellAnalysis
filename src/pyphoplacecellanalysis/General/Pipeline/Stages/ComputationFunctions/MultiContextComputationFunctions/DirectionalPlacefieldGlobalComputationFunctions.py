@@ -973,8 +973,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 return _out_data
 
             # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
-            def _subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, decoders_dict: Dict):
-                """ captures `root_dockAreaWindow`, `_out_ui` """
+            def _subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, decoders_dict: Dict):
+                """ Builds _out_ui """
                 _out_data = _subfn_rebuild_sort_idxs(decoders_dict, _out_data, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
                 # Unpack the updated _out_data:
                 sort_helper_neuron_id_to_neuron_colors_dicts = _out_data.sort_helper_neuron_id_to_neuron_colors_dicts
@@ -1040,18 +1040,18 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                 for i, (a_decoder_name, a_heatmap) in enumerate(_out_plots.pf1D_heatmaps.items()):
                     if (a_decoder_name == 'short_RL'):
-                        short_LR_dock = root_dockAreaWindow.find_display_dock('short_LR')
+                        short_LR_dock = _out_ui.root_dockAreaWindow.find_display_dock('short_LR')
                         assert short_LR_dock is not None
                         dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
                         print(f'using overriden dock location.')
 
-                    _out_ui.dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_heatmap[0], dockSize=(300,200), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=_out_ui.dock_configs[a_decoder_name])
+                    _out_ui.dock_widgets[a_decoder_name] = _out_ui.root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_heatmap[0], dockSize=(300,200), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=_out_ui.dock_configs[a_decoder_name])
                 # end `for i, (a_decoder_name, a_heatmap)`
 
                 return _out_data, _out_plots, _out_ui
 
 
-            def _subfn_update_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, decoders_dict: Dict):
+            def _subfn_update_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, decoders_dict: Dict):
                 """ Just updates the existing UI, doesn't build new elements.
 
                 ## Needs to update:
@@ -1059,7 +1059,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name]
                 _out_ui.dock_widgets[a_decoder_name] # maybe
 
-                captures `_out_ui
 ` 
                 """
                 _out_data = _subfn_rebuild_sort_idxs(decoders_dict, _out_data, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
@@ -1119,11 +1118,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 return _out_data, _out_plots, _out_ui
 
 
-            _out_data, _out_plots, _out_ui = _subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, decoders_dict=decoders_dict)
+            _out_data, _out_plots, _out_ui = _subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict)
 
-            # _out_data, _out_plots, _out_ui = _subfn_update_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, decoders_dict=decoders_dict)
+            # _out_data, _out_plots, _out_ui = _subfn_update_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict)
 
-            update_callback_fn = (lambda included_neuron_ids: _subfn_update_directional_template_debugger_data(included_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, decoders_dict=decoders_dict))
+            update_callback_fn = (lambda included_neuron_ids: _subfn_update_directional_template_debugger_data(included_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict))
             _out_ui.on_update_callback = update_callback_fn
 
             # Outputs: root_dockAreaWindow, app, epochs_editor, _out_pf1D_heatmaps, _out_dock_widgets
