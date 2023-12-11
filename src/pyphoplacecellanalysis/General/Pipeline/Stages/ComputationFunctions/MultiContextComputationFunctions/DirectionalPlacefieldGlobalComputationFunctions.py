@@ -912,7 +912,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 _out_data.unsorted_included_any_context_neuron_ids = deepcopy(included_any_context_neuron_ids)
                 return _out_data
 
-
             # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
             def _subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, decoders_dict: Dict):
                 """ captures `root_dockAreaWindow`, `_out_ui` """

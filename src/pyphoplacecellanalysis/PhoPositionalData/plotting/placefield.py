@@ -56,6 +56,10 @@ def plot_placefield_tuning_curve(xbin_centers, tuning_curve, ax, is_horizontal:b
 
     Usage:
         axs1 = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, active_epoch_placefields1D.ratemap.normalized_tuning_curves[curr_cell_id, :].squeeze(), axs1)
+        
+    NOTE:
+        The values in tuning_curve can be multiplied by -1 if a flipped plot is desired.
+        
     """
     if border_line_override_color is None:
         border_line_override_color = color # should just equal the fill color, which is typical
