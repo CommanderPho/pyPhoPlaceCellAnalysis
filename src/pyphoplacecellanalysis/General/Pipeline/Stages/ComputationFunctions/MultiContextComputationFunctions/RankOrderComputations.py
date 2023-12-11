@@ -933,8 +933,8 @@ class RankOrderAnalyses:
             odd (LR) = 0, even (RL) = 1
         """
         # ODD: 0, EVEN: 1
-        _ODD_INDEX = 0
-        _EVEN_INDEX = 1
+        _LR_INDEX = 0
+        _RL_INDEX = 1
         
         # Unpack all directional variables:
         ## {"even": "RL", "odd": "LR"}
@@ -1000,9 +1000,6 @@ class RankOrderAnalyses:
                                                 long_best_direction_indices=long_best_direction_indicies,
                                                 short_best_direction_indices=short_best_direction_indicies)
 
-
-
-
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         ## Replays:
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
@@ -1010,16 +1007,39 @@ class RankOrderAnalyses:
             global_replays = Epoch(global_replays.epochs.get_valid_df())
             
         active_epochs = global_replays.to_dataframe().copy()
+        is_included_epoch_LR = np.isin(active_epochs.label.to_numpy(), rank_order_results.LR_ripple.epochs_df.label.to_numpy())
+        is_included_epoch_RL = np.isin(active_epochs.label.to_numpy(), rank_order_results.RL_ripple.epochs_df.label.to_numpy())
+        is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL)
+        active_epochs = active_epochs[is_included_epoch]
+
         ripple_directional_likelihoods_tuple = _compute_best(active_epochs)
         long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
         # now do the shuffle:
 
         #TODO 2023-12-10 18:39: - [ ] The issue is that some epochs are excluded now, and so the number of epochs don't match the rank_order_results.LR_ripple.long_z_score, rank_order_results.RL_ripple.long_z_score
+        
+        # Convert to same epochs:
+        LR_ripple_long_z_score = pd.Series(rank_order_results.LR_ripple.long_z_score, index=rank_order_results.LR_ripple.epochs_df.label.to_numpy())
+        RL_ripple_long_z_score = pd.Series(rank_order_results.RL_ripple.long_z_score, index=rank_order_results.RL_ripple.epochs_df.label.to_numpy())
+
+        LR_ripple_short_z_score = pd.Series(rank_order_results.LR_ripple.short_z_score, index=rank_order_results.LR_ripple.epochs_df.label.to_numpy())
+        RL_ripple_short_z_score = pd.Series(rank_order_results.RL_ripple.short_z_score, index=rank_order_results.RL_ripple.epochs_df.label.to_numpy())
+
+
+        active_LR_ripple_long_z_score = LR_ripple_long_z_score[active_epochs.label.to_numpy()]
+        active_RL_ripple_long_z_score = RL_ripple_long_z_score[active_epochs.label.to_numpy()]
+        active_LR_ripple_short_z_score = LR_ripple_short_z_score[active_epochs.label.to_numpy()]
+        active_RL_ripple_short_z_score = RL_ripple_short_z_score[active_epochs.label.to_numpy()]
 
         ## 2023-11-16 - Finally, get the raw z-score values for the best direction at each epoch and then take the long - short difference of those to get `ripple_evts_long_short_best_dir_z_score_diff_values`:
         # Using NumPy advanced indexing to select from array_a or array_b:
-        ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_ripple.long_z_score, rank_order_results.RL_ripple.long_z_score) # #TODO 2023-12-10 18:35: - [ ] ValueError: operands could not be broadcast together with shapes (611,) (551,) (551,)
-        ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.short_z_score)
+        # ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_ripple.long_z_score, rank_order_results.RL_ripple.long_z_score) # #TODO 2023-12-10 18:35: - [ ] ValueError: operands could not be broadcast together with shapes (611,) (551,) (551,)
+        # ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.short_z_score)
+
+        ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, active_LR_ripple_long_z_score, active_RL_ripple_long_z_score)
+        ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
+
+                                                            
         # print(f'np.shape(ripple_evts_long_best_dir_z_score_values): {np.shape(ripple_evts_long_best_dir_z_score_values)}')
         ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
         # print(f'np.shape(ripple_evts_long_short_best_dir_z_score_diff_values): {np.shape(ripple_evts_long_short_best_dir_z_score_diff_values)}')
@@ -1027,8 +1047,13 @@ class RankOrderAnalyses:
         # preferred order, but not the current standard: (long_odd_mask, long_even_mask, short_odd_mask, short_even_mask)
         # current standard order: (long_odd_mask, short_odd_mask, long_even_mask, short_even_mask)
         #TODO 2023-11-20 22:02: - [ ] ERROR: CORRECTNESS FAULT: I think the two lists zipped over below are out of order.
-        ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((rank_order_results.LR_ripple.long_z_score, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.long_z_score, rank_order_results.RL_ripple.short_z_score),
-                                                                                                            ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
+        # ripple_masked_z_score_values_list: List[ma.masked_array] = [None, None, None, None]
+        # ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((rank_order_results.LR_ripple.long_z_score, rank_order_results.LR_ripple.short_z_score, rank_order_results.RL_ripple.long_z_score, rank_order_results.RL_ripple.short_z_score),
+        #                                                                                                     ((long_best_direction_indicies == _LR_INDEX), (long_best_direction_indicies == _RL_INDEX), (short_best_direction_indicies == _LR_INDEX), (short_best_direction_indicies == _RL_INDEX)))]
+
+        ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score),
+                                                                                                            ((long_best_direction_indicies == _LR_INDEX), (long_best_direction_indicies == _RL_INDEX), (short_best_direction_indicies == _LR_INDEX), (short_best_direction_indicies == _RL_INDEX)))]
+        
         
         # outputs: ripple_evts_long_short_best_dir_z_score_diff_values
         ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
@@ -1052,7 +1077,7 @@ class RankOrderAnalyses:
         # print(f'np.shape(laps_long_short_best_dir_z_score_diff_values): {np.shape(laps_long_short_best_dir_z_score_diff_values)}')
         #TODO 2023-11-20 22:02: - [ ] ERROR: CORRECTNESS FAULT: I think the two lists zipped over below are out of order.
         laps_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((rank_order_results.LR_laps.long_z_score, rank_order_results.LR_laps.short_z_score, rank_order_results.RL_laps.long_z_score, rank_order_results.RL_laps.short_z_score),
-                                                                                                            ((long_best_direction_indicies == _ODD_INDEX), (long_best_direction_indicies == _EVEN_INDEX), (short_best_direction_indicies == _ODD_INDEX), (short_best_direction_indicies == _EVEN_INDEX)))]
+                                                                                                            ((long_best_direction_indicies == _LR_INDEX), (long_best_direction_indicies == _RL_INDEX), (short_best_direction_indicies == _LR_INDEX), (short_best_direction_indicies == _RL_INDEX)))]
 
         laps_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(global_laps, long_best_dir_z_score_values=laps_long_best_dir_z_score_values, short_best_dir_z_score_values=laps_short_best_dir_z_score_values,
                                                                                     long_short_best_dir_z_score_diff_values=laps_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=laps_directional_likelihoods_tuple, 
@@ -1289,8 +1314,8 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
-from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+# from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
+# from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions # used in `plot_z_score_diff_and_raw`
 
