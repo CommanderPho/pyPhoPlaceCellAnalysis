@@ -6,7 +6,9 @@ from attrs import define, field, Factory
 from datetime import datetime
 import pathlib
 from pathlib import Path
-import shutil # for _backup_extant_file(...)
+import shutil
+from nptyping import NDArray
+import numpy as np # for _backup_extant_file(...)
 
 import pandas as pd
 
@@ -16,6 +18,8 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.function_helpers import compose_functions
 from pyphocorehelpers.Filesystem.pickling_helpers import RenameUnpickler, renamed_load
+from pyphocorehelpers.Filesystem.pickling_helpers import ModuleExcludesPickler, custom_dump
+
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import BaseNeuropyPipelineStage, PipelineStage
@@ -113,10 +117,12 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
         with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
-                pickle.dump(db, dbfile)
+                # pickle.dump(db, dbfile)
+                custom_dump(db, dbfile) # ModuleExcludesPickler
+
                 dbfile.close()
 
-    
+
 
 # global_move_modules_list: Dict[str, str] - a dict with keys equal to the old full path to a class and values equal to the updated (replacement) full path to the class. Used to update the path to class definitions for loading previously pickled results after refactoring.
 
@@ -551,3 +557,29 @@ class PipelineWithLoadableStage(RegisteredOutputsMixin):
     def get_session_unique_aclu_information(self) -> pd.DataFrame:
         """  Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns """
         return self.stage.get_session_unique_aclu_information()
+
+
+    def determine_good_aclus_by_qclu(self, included_qclu_values=[1,2,4,9], debug_print:bool=False) -> NDArray:
+        """ 
+        From all neuron_IDs in the session, get the ones that meet the new qclu criteria (their value is in) `included_qclu_values`
+        
+        included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2,4,9])
+        included_aclus # np.array([  2,   3,   4,   5,   7,   8,   9,  10,  11,  13,  14,  15,  16,  17,  19,  21,  23,  24,  25,  26,  27,  28,  31,  32,  33,  34,  35,  36,  37,  41,  45,  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,  66,  67,  68,  69,  70,  71,  73,  74,  75,  76,  78,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  92,  93,  96,  97,  98, 100, 102, 105, 107, 108, 109])
+
+        included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2])
+        included_aclus # np.array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  81,  82,  83,  85,  86,  90,  92,  93,  96, 105, 109])
+
+        """
+        from neuropy.core.neuron_identities import NeuronType
+        
+        neuron_identities: pd.DataFrame = self.get_session_unique_aclu_information()
+        if debug_print:
+            print(f"original {len(neuron_identities)}")
+        filtered_neuron_identities: pd.DataFrame = neuron_identities[neuron_identities.neuron_type == NeuronType.PYRAMIDAL]
+        if debug_print:
+            print(f"post PYRAMIDAL filtering {len(filtered_neuron_identities)}")
+        filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
+        filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
+        if debug_print:
+            print(f"post (qclu != [6, 7]) filtering {len(filtered_neuron_identities)}")
+        return filtered_neuron_identities.aclu.to_numpy()

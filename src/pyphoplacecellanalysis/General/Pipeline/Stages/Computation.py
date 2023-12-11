@@ -1245,6 +1245,7 @@ class PipelineWithComputedPipelineStageMixin:
         return global_computation_results_pickle_path
 
 
+    @function_attributes(short_name=None, tags=['split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=[])
     def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, debug_print:bool=True):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
         Usage:

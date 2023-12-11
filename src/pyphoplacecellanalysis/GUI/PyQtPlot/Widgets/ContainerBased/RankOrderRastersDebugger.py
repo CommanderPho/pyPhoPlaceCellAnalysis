@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Optional, Dict, List, Tuple, Callable, Union
 from attrs import define, field, Factory
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 
@@ -93,7 +94,7 @@ class RankOrderRastersDebugger:
         active_epoch_spikes_df: pd.DataFrame = deepcopy(self.global_spikes_df.spikes.time_sliced(active_epoch_tuple.start, active_epoch_tuple.stop))
         return active_epoch_spikes_df
 
-    def get_epoch_active_aclus(self) -> np.array:
+    def get_epoch_active_aclus(self) -> NDArray:
         """ returns a list of aclus active (having at least one spike) in the current epoch (based on `self.active_epoch`) """
         active_epoch_spikes_df: pd.DataFrame = self.get_active_epoch_spikes_df()
         active_epoch_unique_active_aclus = np.unique(active_epoch_spikes_df['aclu'].to_numpy())
@@ -118,7 +119,7 @@ class RankOrderRastersDebugger:
         name:str = 'RankOrderRastersDebugger'
         
         ## 2023-11-30 - Newest Version using separate rasters:
-        _obj.plots_data, _obj.plots = cls._post_modern_debug_plot_directional_template_rasters(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates, debug_print=True)
+        _obj.plots_data, _obj.plots = cls._build_internal_raster_plots(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates, debug_print=True)
         #TODO 2023-11-30 15:14: - [ ] Unpacking and putting in docks and such not yet finished. Update functions would need to be done separately.
         rasters_display_outputs = _obj.plots.rasters_display_outputs
         all_apps = {a_decoder_name:a_raster_setup_tuple.app for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
@@ -277,7 +278,7 @@ class RankOrderRastersDebugger:
             _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
             _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
 
-        except IndexError:
+        except (IndexError, KeyError):
             print(f'WARN: the selected spikes did not work properly, so none will be shown.')
             pass
 
@@ -452,6 +453,7 @@ class RankOrderRastersDebugger:
     # ==================================================================================================================== #
 
     def write_to_log(self, log_messages):
+        """ logs text to the text widget at the bottom """
         self.ui.logTextEdit.append(log_messages)
 
     def get_ipywidget(self):
@@ -585,11 +587,18 @@ class RankOrderRastersDebugger:
     # ==================================================================================================================== #
 
     @classmethod
-    def _post_modern_debug_plot_directional_template_rasters(cls, spikes_df, active_epochs_df, track_templates, debug_print=True, defer_show=True, **kwargs):
+    def _build_internal_raster_plots(cls, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, debug_print=True, defer_show=True, **kwargs):
         """ 2023-11-30 **DO EM ALL SEPERATELY**
 
+        _out_data, _out_plots = _build_internal_raster_plots(spikes_df, active_epochs_df, track_templates, debug_print=True)
+        
+        History:
+            Called `_post_modern_debug_plot_directional_template_rasters` 
 
-        _out_data, _out_plots = _post_modern_debug_plot_directional_template_rasters(spikes_df, active_epochs_df, track_templates, debug_print=True)
+            
+        Uses:
+            paired_separately_sort_neurons
+        
         """
         from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
         from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
@@ -635,40 +644,9 @@ class RankOrderRastersDebugger:
     
         included_any_context_neuron_ids_dict = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], (LR_neuron_ids, RL_neuron_ids, LR_neuron_ids, RL_neuron_ids)))
 
-        # INDIVIDUAL SORTING:
+        # INDIVIDUAL SORTING for each raster:
         sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts, (unsorted_original_neuron_IDs_lists, unsorted_neuron_IDs_lists, unsorted_sortable_values_lists, unsorted_unit_colors_map) = paired_separately_sort_neurons(decoders_dict, included_any_context_neuron_ids_dict)
-        # sorted_neuron_IDs_lists = [np.array([ 25,  47,  56,  70,  89,  92, 101,  15,  43,  84,  87,  10,  51,  53,  44,  48,  79,  81,  72,  98,   9,  93,  82,  31,  11,  66,  90,  78,  16, 104,  80,  24,  75,  40,  60,  85,  52, 102,  65,  18,  26,  39,  54,  61,  68,  77]),
-        # np.array([ 25,  56,  70,  89,  47,  15,  87,  54,  84,  43,  51,  92,  44,  72,  79,  48,  24,  39,  53,  80,  98,  31,  75,  11,  66,  81,  82,  90, 104,   9,  93,  10,  78, 101,  16,  18,  26,  40,  52,  60,  61,  65,  68,  77,  85, 102]),
-        # np.array([ 11,  47,  87,  25,  56,  70,  92,  15,  89,  43, 104,  10,  84,  81,  24,  44,  48,  79,   9,  72,  93,  31,  98,  66,  90,  82,  16,  51,  61,  75,  53,  80,  65,  78,  40,  60,  85, 102,  39,  52, 101,  26,  68,  18,  54,  77]), 
-        # np.array([ 70,  25,  47,  51,  56,  87,  15,  92,  68,  44,  48,  79,  24,  80,  53,  39,  89,   9,  93,  98,  66,  11,  81,  82, 104,  90,  61,  65,  84,  31,  75,  10,  72, 101,  40,  43,  60,  16,  26,  52,  54,  77,  78,  85, 102,  18])]
-
-        # active_sort_idxs_dict = {a_decoder_name:decoders_dict[a_decoder_name].peak_indicies for a_decoder_name, a_decoder_val in decoders_dict.items()}
-        # active_sort_idxs_list = [decoders_dict[a_decoder_name].peak_indicies for a_decoder_name in ['long_LR', 'long_RL', 'short_LR', 'short_RL']]
         
-        # active_neuron_ids_list = [np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104]),
-        #                      np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104]),
-        #                      np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104]),
-        #                      np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])]
-        
-        # active_sort_idxs_list = [np.array([18, 17, 19,  5, 35, 23, 31,  4, 45, 21, 37, 36, 10,  7, 16,  9,  2, 40, 20, 28, 13, 41, 38, 25, 29, 42,  0, 14, 34, 44, 32, 11, 30, 12, 24,  3, 39,  1,  6, 27,  8, 22, 15, 33, 43, 26]),
-        #                     np.array([33, 26, 21,  2, 43, 36, 17,  1, 44, 29, 20, 34,  9, 13, 10, 14,  4, 30, 22, 12,  6, 40, 37, 32, 28, 35,  0, 19, 27, 45, 38, 11, 16, 31, 15,  7, 39,  3,  5, 23,  8, 25, 18, 41, 42, 24]),
-        #                     np.array([18, 16,  4,  3, 33, 37, 19,  2, 45, 23, 34, 35,  9,  8,  6, 11, 22, 43, 32, 29, 13, 39, 31, 26, 28, 41,  1, 17, 36, 44, 38, 14, 30, 12, 27, 15, 40,  0,  5, 24,  7, 21, 20, 25, 42, 10]),
-        #                     np.array([25, 28, 19,  1, 45, 39, 13,  3, 41, 31, 20, 35, 30,  9,  4, 11,  7, 33, 26, 24,  6, 42, 32, 29, 21, 10,  0, 34, 36, 43, 37,  8, 12, 23, 15, 17, 40,  2, 16, 27,  5, 18, 14, 38, 44, 22])]
-
-        # active_sorted_neuron_ids_list = [active_neuron_ids[active_sort_idxs] for active_neuron_ids, active_sort_idxs in zip(active_neuron_ids_list, active_sort_idxs_list)]
-
-        # active_neuron_ids = np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
-        # active_sort_idxs = np.array([18, 17, 19,  5, 35, 23, 31,  4, 45, 21, 37, 36, 10,  7, 16,  9,  2, 40, 20, 28, 13, 41, 38, 25, 29, 42,  0, 14, 34, 44, 32, 11, 30, 12, 24,  3, 39,  1,  6, 27,  8, 22, 15, 33, 43, 26])
-
-        # active_neuron_ids = np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
-        # active_sort_idxs = np.array([33, 26, 21,  2, 43, 36, 17,  1, 44, 29, 20, 34,  9, 13, 10, 14,  4, 30, 22, 12,  6, 40, 37, 32, 28, 35,  0, 19, 27, 45, 38, 11, 16, 31, 15,  7, 39,  3,  5, 23,  8, 25, 18, 41, 42, 24])
-
-        # active_neuron_ids = np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
-        # active_sort_idxs = np.array([18, 16,  4,  3, 33, 37, 19,  2, 45, 23, 34, 35,  9,  8,  6, 11, 22, 43, 32, 29, 13, 39, 31, 26, 28, 41,  1, 17, 36, 44, 38, 14, 30, 12, 27, 15, 40,  0,  5, 24,  7, 21, 20, 25, 42, 10])
-
-        # active_neuron_ids = np.array([  9,  10,  11,  15,  16,  18,  24,  25,  26,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  54,  56,  60,  61,  65,  66,  68,  70,  72,  75,  77,  78,  79,  80,  81,  82,  84,  85,  87,  89,  90,  92,  93,  98, 101, 102, 104])
-        # active_sort_idxs = np.array([25, 28, 19,  1, 45, 39, 13,  3, 41, 31, 20, 35, 30,  9,  4, 11,  7, 33, 26, 24,  6, 42, 32, 29, 21, 10,  0, 34, 36, 43, 37,  8, 12, 23, 15, 17, 40,  2, 16, 27,  5, 18, 14, 38, 44, 22])
-
         _out_data = RenderPlotsData(name=figure_name, spikes_df=spikes_df, unit_sort_orders_dict=None, included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict,
                                     sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None,
                                     unsorted_original_neuron_IDs_lists=deepcopy(unsorted_original_neuron_IDs_lists), unsorted_neuron_IDs_lists=deepcopy(unsorted_neuron_IDs_lists), unsorted_sortable_values_lists=deepcopy(unsorted_sortable_values_lists), unsorted_unit_colors_map=deepcopy(unsorted_unit_colors_map))
@@ -689,9 +667,6 @@ class RankOrderRastersDebugger:
             # an_included_unsorted_neuron_ids = deepcopy(included_any_context_neuron_ids_dict[a_decoder_name])
             an_included_unsorted_neuron_ids = deepcopy(unsorted_neuron_IDs_lists[i])
             a_sorted_neuron_ids = deepcopy(sorted_neuron_IDs_lists[i])
-            # an_unit_sort_orders = np.arange(len(a_sorted_neuron_ids))
-            # an_unit_sort_orders: Dict = dict(sorted(deepcopy(sort_helper_neuron_id_to_sort_IDX_dicts[i]).items()))
-            # an_unit_sort_orders_list = np.array(list(deepcopy(sort_helper_neuron_id_to_sort_IDX_dicts[i]).values()))
 
             unit_sort_order, desired_sort_arr = find_desired_sort_indicies(an_included_unsorted_neuron_ids, a_sorted_neuron_ids)
             print(f'unit_sort_order: {unit_sort_order}\ndesired_sort_arr: {desired_sort_arr}')
@@ -701,21 +676,9 @@ class RankOrderRastersDebugger:
             a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(an_included_unsorted_neuron_ids)
             a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
 
-            # a_decoder_color_map: Dict = dict(sorted(deepcopy(sort_helper_neuron_id_to_neuron_colors_dicts[i]).items())) # 34 (n_neurons)
-            # a_decoder_color_list = list(a_decoder_color_map.values())
-            # a_decoder_color_list = list(a_decoder_color_map.values())
-
-            # _out_plots.rasters_display_outputs[a_decoder_name] = plot_multi_sort_raster_browser(a_spikes_df, a_sorted_neuron_ids, unit_sort_orders_dict=an_unit_sort_orders, unit_colors_list_dict=a_decoder_color_map, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=False, active_context=None)
-            # _out_plots.rasters_display_outputs[a_decoder_name] = plot_raster_plot(a_spikes_df, a_sorted_neuron_ids, unit_sort_orders_dict=an_unit_sort_orders, unit_colors_list=a_decoder_color_list, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=False, active_context=None)
-            # _out_plots.rasters_display_outputs[a_decoder_name] = new_plot_raster_plot(a_spikes_df, a_sorted_neuron_ids, unit_sort_order=an_unit_sort_orders, unit_colors_list=a_decoder_color_list, scatter_plot_kwargs=None, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=False, active_context=None)
             _out_plots.rasters_display_outputs[a_decoder_name] = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map), scatter_plot_kwargs=None, scatter_app_name=f'pho_directional_laps_rasters_{title_str}', defer_show=defer_show, active_context=None)
-
             # an_app, a_win, a_plots, a_plots_data, an_on_update_active_epoch, an_on_update_active_scatterplot_kwargs = _out_plots.rasters_display_outputs[a_decoder_name]
 
-            # _out_plots.rasters[a_decoder_name]
-
-        # print('oops')
-        # app, win, plots, plots_data, on_update_active_epoch, on_update_active_scatterplot_kwargs = plot_multi_sort_raster_browser(spikes_df, included_neuron_ids, unit_sort_orders_dict=unit_sort_orders_dict, unit_colors_list_dict=unit_colors_list_dict, scatter_app_name='pho_directional_laps_rasters', defer_show=False, active_context=None)
 
         return _out_data, _out_plots
 
