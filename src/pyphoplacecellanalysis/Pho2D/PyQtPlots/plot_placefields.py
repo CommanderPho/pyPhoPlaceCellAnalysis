@@ -187,7 +187,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array
 
 
-@function_attributes(short_name='all_pf_2D_pyqtgraph_binned_image_rendering', tags=['display','pyqtgraph','plot','image','binned','2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-08-16 00:00')
+@function_attributes(short_name='all_pf_2D_pyqtgraph_binned_image_rendering', tags=['display','pyqtgraph','plot','image','binned','2D'], input_requires=[], output_provides=[], uses=['BasicBinnedImageRenderingWindow'], used_by=[], creation_date='2022-08-16 00:00')
 def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config, debug_print=True): # , **kwargs
     """ 2022-08-16 - A fresh implementation of a pf_2D placefield renderer that uses the BasicBinnedImageRenderingWindow subclass. 
     
