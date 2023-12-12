@@ -9,6 +9,10 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
 
@@ -44,6 +48,9 @@ from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
+from pyphoplacecellanalysis.External.pyqtgraph import QtGui
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent, pyqtplot_plot_image
+
 
 __all__ = ['TemplateDebugger']
 
@@ -56,7 +63,7 @@ __all__ = ['TemplateDebugger']
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
 
 @metadata_attributes(short_name=None, tags=['gui', 'incomplete', 'not_used', 'not_implemented'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 10:24', related_items=[])
-@define(slots=False)
+@define(slots=False, repr=False)
 class TemplateDebugger:
     """ TemplateDebugger displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
@@ -72,10 +79,10 @@ class TemplateDebugger:
     # RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame] = field(repr=False)
     # LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame] = field(repr=False)
 
-    plots: RenderPlots = field()
-    plots_data: RenderPlotsData = field(repr=False)
-    ui: PhoUIContainer = field(repr=False)
-    params: VisualizationParameters = field(repr=False)
+    plots: RenderPlots = field(repr=keys_only_repr)
+    plots_data: RenderPlotsData = field(repr=keys_only_repr)
+    ui: PhoUIContainer = field(repr=keys_only_repr)
+    params: VisualizationParameters = field(repr=keys_only_repr)
     
 
     # active_epoch_IDX: int = field(default=0, repr=True)
@@ -102,7 +109,7 @@ class TemplateDebugger:
 
 
     @classmethod
-    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
+    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=False, **kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -134,14 +141,16 @@ class TemplateDebugger:
 
         enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
         use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
-        
+
+        if enable_pf_peak_indicator_lines:
+            print(f'WARN: 2023-12-11 - enable_pf_peak_indicator_lines is not yet implemented and the lines are not correctly aligned.')  
+                  
+
         figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
         _out_data = RenderPlotsData(name=figure_name, track_templates=deepcopy(track_templates), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, sorted_pf_peak_location_list=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
         _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
-        _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates, debug_print=debug_print, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
+        _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates, debug_print=debug_print, use_incremental_sorting=use_incremental_sorting, enable_pf_peak_indicator_lines=enable_pf_peak_indicator_lines, included_any_context_neuron_ids=included_any_context_neuron_ids)
                 
-        # decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
-
 
         # build the window with the dock widget in it:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
@@ -166,6 +175,22 @@ class TemplateDebugger:
         # _out_ui.on_update_callback = update_callback_fn
         
         return _obj
+
+
+    def __repr__(self):
+        """ 
+        TemplateDebugger(plots: pyphocorehelpers.DataStructure.general_parameter_containers.RenderPlots,
+            plots_data: pyphocorehelpers.DataStructure.general_parameter_containers.RenderPlotsData,
+            ui: pyphocorehelpers.gui.PhoUIContainer.PhoUIContainer,
+            params: pyphocorehelpers.DataStructure.general_parameter_containers.VisualizationParameters
+        )
+        """
+        # content = ", ".join( [f"{a.name}={v!r}" for a in self.__attrs_attrs__ if (v := getattr(self, a.name)) != a.default] )
+        # content = ", ".join([f"{a.name}:{strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
+        content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
+        # content = ", ".join([f"{a.name}" for a in self.__attrs_attrs__]) # 'TrackTemplates(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, is_good_LR_aclus, shared_RL_aclus_only_neuron_IDs, is_good_RL_aclus, decoder_LR_pf_peak_ranks_list, decoder_RL_pf_peak_ranks_list)'
+        return f"{type(self).__name__}({content}\n)"
+
 
     # Saving/Exporting to file ___________________________________________________________________________________________ #
     #TODO 2023-11-16 22:16: - [ ] Figure out how to save
@@ -240,6 +265,10 @@ class TemplateDebugger:
         sorted_pf_peak_location_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values()))] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
         # track_templates.decoder_peak_location_list
 
+        # sorted_pf_image_bounds_list = [pyqtplot_build_image_bounds_extent(a_decoder.pf.ratemap.xbins, a_decoder.pf.ratemap.ybins, margin=0.0, debug_print=False) for a_decoder in decoders_dict.values()]
+        # pf_xbins_list = [a_decoder.pf.ratemap.xbin for a_decoder in decoders_dict.values()]
+
+
         # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
         _out_data.ref_decoder_name = ref_decoder_name
         _out_data.sorted_neuron_IDs_lists = sorted_neuron_IDs_lists
@@ -252,7 +281,7 @@ class TemplateDebugger:
 
     # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
     @classmethod
-    def _subfn_buildUI_directional_template_debugger_data(cls, included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, decoders_dict: Dict):
+    def _subfn_buildUI_directional_template_debugger_data(cls, included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict):
         """ Builds UI """
         _out_data = cls._subfn_rebuild_sort_idxs(decoders_dict, _out_data, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
         # Unpack the updated _out_data:
@@ -272,8 +301,9 @@ class TemplateDebugger:
                 title_str = f'{a_decoder_name}_pf1Ds'
 
             curr_curves = sorted_pf_tuning_curves[i]
-            curr__pf_peak_locations = sorted_pf_peak_location_list[i]
-
+            curr_pf_peak_locations = sorted_pf_peak_location_list[i]
+            curr_xbins = deepcopy(a_decoder.pf.ratemap.xbin)
+            
             _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
 
             # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
@@ -304,14 +334,28 @@ class TemplateDebugger:
                 _temp_curr_out_colors_heatmap_image.append(out_colors_row)
                 
                 # Add vertical lines
-                x_offset = curr__pf_peak_locations[cell_i]
-                line_height = 1.0
-                line = pg.InfiniteLine(pos=(x_offset, float(cell_i+1)), angle=90, movable=False)
-                line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
-                curr_win.addItem(line)
-                line.setPos(pg.Point(x_offset, line_height / 2.0)) # Adjust the height of the line if needed
-                _out_ui.order_location_lines_dict[a_decoder_name][aclu] = line # add the TextItem to the map
+                if _out_params.enable_pf_peak_indicator_lines:
+                    x_offset = curr_pf_peak_locations[cell_i]
+                    y_offset = float(cell_i+1)
+                    line_height = 1.0
+                    half_line_height = line_height / 2.0
+                    line = QtGui.QGraphicsLineItem(x_offset, (y_offset - half_line_height), x_offset, (y_offset + half_line_height)) # (xstart, ystart, xend, yend)
+                    # line = pg.InfiniteLine(pos=(x_offset, float(cell_i+1)), angle=90, movable=False)
+                    line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
+                    curr_win.addItem(line)
+                    # line.setPos(pg.Point(x_offset, (y_offset + (line_height / 2.0)))) # Adjust the height of the line if needed
+                    _out_ui.order_location_lines_dict[a_decoder_name][aclu] = line # add the TextItem to the map
 
+
+            # for x_offset, height in vertical_lines:
+            #     line = pg.InfiniteLine(pos=(x_offset, 0), angle=90, movable=False)
+            #     line.setPen(pg.mkPen('r', width=2))  # Set color and width of the line
+            #     win.addItem(line)
+
+            #     # Adjust the height of the line if needed
+            #     # Note: This is a basic implementation. Adjust according to your coordinate system and needs.
+            #     line.setPos(pg.Point(x_offset, height / 2.0)) # Adjust the height of the line if needed
+                
 
             ## Build the colored heatmap:
             out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
@@ -321,7 +365,7 @@ class TemplateDebugger:
                 # Ensure the data is in the correct range [0, 1]
             out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
             if enable_cell_colored_heatmap_rows:
-                curr_img.updateImage(out_colors_heatmap_image_matrix) # use the color image only if `enable_cell_colored_heatmap_rows==True`
+                curr_img.updateImage(out_colors_heatmap_image_matrix, xvals=curr_xbins) # use the color image only if `enable_cell_colored_heatmap_rows==True`
             _out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name] = out_colors_heatmap_image_matrix
 
         # end `for i, (a_decoder_name, a_decoder)`
@@ -346,7 +390,7 @@ class TemplateDebugger:
         return _out_data, _out_plots, _out_ui
 
     @classmethod
-    def _subfn_update_directional_template_debugger_data(cls, included_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, decoders_dict: Dict):
+    def _subfn_update_directional_template_debugger_data(cls, included_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict):
         """ Just updates the existing UI, doesn't build new elements.
 
         ## Needs to update:
@@ -359,6 +403,7 @@ class TemplateDebugger:
         # Unpack the updated _out_data:
         sort_helper_neuron_id_to_neuron_colors_dicts = _out_data.sort_helper_neuron_id_to_neuron_colors_dicts
         sorted_pf_tuning_curves = _out_data.sorted_pf_tuning_curves
+        sorted_pf_peak_location_list = _out_data.sorted_pf_peak_location_list
 
         ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
         assert _out_plots.pf1D_heatmaps is not None
@@ -369,6 +414,9 @@ class TemplateDebugger:
                 title_str = f'{a_decoder_name}_pf1Ds'
 
             curr_curves = sorted_pf_tuning_curves[i]
+            curr_pf_peak_locations = sorted_pf_peak_location_list[i]
+            curr_xbins = deepcopy(a_decoder.pf.ratemap.xbin)
+            
             # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
             curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
             a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
@@ -398,6 +446,18 @@ class TemplateDebugger:
                 heatmap_base_color = pg.mkColor(a_color_vector)
                 out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
                 _temp_curr_out_colors_heatmap_image.append(out_colors_row)
+
+                # Add vertical lines
+                if _out_params.enable_pf_peak_indicator_lines:
+                    x_offset = curr_pf_peak_locations[cell_i]
+                    y_offset = float(cell_i+1)
+                    line_height = 1.0
+                    line = _out_ui.order_location_lines_dict[a_decoder_name][aclu] # QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, line_height)
+                    # line = pg.InfiniteLine(pos=(x_offset, float(cell_i+1)), angle=90, movable=False)
+                    # line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
+                    # line.setPos(pg.Point(x_offset, (y_offset + (line_height / 2.0)))) # Adjust the height of the line if needed
+                
+
             # end `for cell_i, (aclu, a_color_vector)`
 
             ## Build the colored heatmap:
@@ -405,7 +465,7 @@ class TemplateDebugger:
             # Ensure the data is in the correct range [0, 1]
             out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
             if enable_cell_colored_heatmap_rows:
-                curr_img.updateImage(out_colors_heatmap_image_matrix) # use the color image only if `enable_cell_colored_heatmap_rows==True`
+                curr_img.updateImage(out_colors_heatmap_image_matrix, xvals=curr_xbins) # use the color image only if `enable_cell_colored_heatmap_rows==True`
             _out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name] = out_colors_heatmap_image_matrix
         # end `for i, (a_decoder_name, a_decoder)`
 
@@ -414,11 +474,11 @@ class TemplateDebugger:
 
     def buildUI_directional_template_debugger_data(self):
         """Calls `_subfn_buildUI_directional_template_debugger_data` to build the UI and then updates the member variables."""
-        self.plots_data, self.plots, self.ui = self._subfn_buildUI_directional_template_debugger_data(self.params.included_any_context_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, self.decoders_dict)
+        self.plots_data, self.plots, self.ui = self._subfn_buildUI_directional_template_debugger_data(self.params.included_any_context_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, _out_params=self.params, decoders_dict=self.decoders_dict)
 
     def update_directional_template_debugger_data(self, included_neuron_ids):
         """Calls `_subfn_update_directional_template_debugger_data` to build the UI and then updates the member variables."""
-        self.plots_data, self.plots, self.ui = self._subfn_update_directional_template_debugger_data(included_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, self.decoders_dict)
+        self.plots_data, self.plots, self.ui = self._subfn_update_directional_template_debugger_data(included_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, _out_params=self.params, decoders_dict=self.decoders_dict)
 
 
 
