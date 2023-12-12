@@ -556,11 +556,17 @@ class NewSimpleRaster:
         if neuron_colors is None:	
             neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(np.arange(n_cells), mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS, provided_cell_colors=None)
         else:
-            assert len(neuron_colors) == n_cells
+            
             if isinstance(neuron_colors, dict):
                 assert np.all(np.isin(neuron_IDs, np.array(list(neuron_colors.keys())))), f" if colors dict is provided, all neuron_ids must be present in the neuron_color's keys."
-                _obj.neuron_colors = neuron_colors
+                if len(neuron_colors) > n_cells:
+                    print(f'WARN: len(neuron_colors): {len(neuron_colors)} > n_cells: {n_cells}: restricting neuron_colors to the correct aclus, but if colors ever get off this is where it is happening!')
+                    _obj.neuron_colors = {k:deepcopy(v) for k,v in neuron_colors.items() if k in neuron_IDs} # only include colors that correspond to active neuron_ids. #TODO 2023-12-11 17:17: - [ ] This might break things!
+                else:
+                    assert len(neuron_colors) == n_cells
+                    _obj.neuron_colors = neuron_colors
             else:
+                assert len(neuron_colors) == n_cells
                 neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(np.arange(n_cells), mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS, provided_cell_colors=neuron_colors)	
                 _obj.neuron_colors = dict(zip(_obj.neuron_IDs, neuron_qcolors_list))
                 
