@@ -24,6 +24,8 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ScrollBarWithSpinBox.ScrollBarWithSpinBox import ScrollBarWithSpinBox
+from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 __all__ = ['RankOrderRastersDebugger']
 
@@ -144,6 +146,9 @@ class RankOrderRastersDebugger:
         # Embedding in docks:
         # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(RL_win, LR_win, title='Pho Debug Plot Directional Template Rasters')
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Debug Plot Directional Template Rasters')
+        icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
+        if icon is not None:
+            root_dockAreaWindow.setWindowIcon(icon)
 
         ## Build Dock Widgets:
         def get_utility_dock_colors(orientation, is_dim):

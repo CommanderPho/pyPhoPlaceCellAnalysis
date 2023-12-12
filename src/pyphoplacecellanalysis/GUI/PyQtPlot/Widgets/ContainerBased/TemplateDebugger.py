@@ -42,24 +42,13 @@ from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
 from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
-# a_win.setWindowIcon(pg.QtGui.QIcon(r"C:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\Resources\Icons\visualizations\template_1D_debugger.ico"))
 
 __all__ = ['TemplateDebugger']
 
 
 
-
-def try_get_icon(icon_path):
-    """ 
-    action_item.setIcon(icon)
-    """
-    if icon_path is not None:
-        icon = pg.QtGui.QIcon()
-        icon.addPixmap(pg.QtGui.QPixmap(icon_path), pg.QtGui.QIcon.Normal, pg.QtGui.QIcon.Off)
-        return icon
-    else:
-        return None
     
 # ==================================================================================================================== #
 # Helper functions                                                                                                     #
@@ -156,9 +145,11 @@ class TemplateDebugger:
 
         # build the window with the dock widget in it:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
-        
-        icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico"
-        root_dockAreaWindow.setWindowIcon(pg.QtGui.QIcon(icon_path))
+        icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
+        if icon is not None:
+            root_dockAreaWindow.setWindowIcon(icon)
+        # icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico"
+        # root_dockAreaWindow.setWindowIcon(pg.QtGui.QIcon(icon_path))
 
         _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
         
