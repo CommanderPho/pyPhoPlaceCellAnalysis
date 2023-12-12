@@ -331,9 +331,35 @@ DirectionalRankOrderResultBase = namedtuple('DirectionalRankOrderResultBase', ['
                                                            'long_short_best_dir_z_score_diff_values', 
                                                            'directional_likelihoods_tuple', "masked_z_score_values_list"])
 
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram
+
 class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
-    def plot_histogram(self):
-        return pd.DataFrame({'long_z_scores': self.long_best_dir_z_score_values, 'short_z_scores': self.short_best_dir_z_score_values}).hist()
+
+    def plot_histograms(self) -> MatplotlibRenderPlots:
+        fig = plt.figure(layout="constrained", num='RipplesRankOrderZscore')
+        ax_dict = fig.subplot_mosaic(
+            [
+                ["long_short_best_z_score_diff", "long_short_best_z_score_diff"],
+                ["long_best_z_scores", "short_best_z_scores"],
+            ],
+            # set the height ratios between the rows
+            # height_ratios=[8, 1],
+            # height_ratios=[1, 1],
+            # set the width ratios between the columns
+            # width_ratios=[1, 8, 8, 1],
+            # sharey=True,
+            # gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        )
+        # pd.DataFrame({'long_best_z_scores': ripple_result_tuple.long_best_dir_z_score_values, 'short_best_z_scores': ripple_result_tuple.short_best_dir_z_score_values}).hist(ax=(ax_dict['long_best_z_scores'], ax_dict['short_best_z_scores']))
+        
+        # MatplotLibResultContainer(
+        plots = (pd.DataFrame({'long_best_z_scores': self.long_best_dir_z_score_values}).hist(ax=ax_dict['long_best_z_scores'], bins=21, alpha=0.8),
+            pd.DataFrame({'short_best_z_scores': self.short_best_dir_z_score_values}).hist(ax=ax_dict['short_best_z_scores'], bins=21, alpha=0.8),
+            pd.DataFrame({'long_short_best_z_score_diff': self.long_short_best_dir_z_score_diff_values}).hist(ax=ax_dict['long_short_best_z_score_diff'], bins=21, alpha=0.8),
+        )
+        # return pd.DataFrame({'long_z_scores': self.long_best_dir_z_score_values, 'short_z_scores': self.short_best_dir_z_score_values}).hist()
+        return MatplotlibRenderPlots(name='plot_histogram_figure', figures=[fig], axes=ax_dict) 
+        
     
 
 
@@ -1421,6 +1447,73 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
 
 # 	# Return plot objects
 # 	return (app, win, p1, (even_out_plot_1D, odd_out_plot_1D), long_epoch_indicator_region_items, short_epoch_indicator_region_items), (raw_app, raw_win, raw_p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D), long_epoch_indicator_region_items_raw, short_epoch_indicator_region_items_raw)
+
+
+def plot_new(ripple_result_tuple: DirectionalRankOrderResult):
+    # ripple_result_tuple: DirectionalRankOrderResult
+    fig = plt.figure(layout="constrained", num='RipplesRankOrderZscore')
+    ax_dict = fig.subplot_mosaic(
+        [
+            ["long_short_best_z_score_diff", "long_short_best_z_score_diff"],
+            ["long_best_z_scores", "short_best_z_scores"],
+        ],
+        # set the height ratios between the rows
+        # height_ratios=[8, 1],
+        # height_ratios=[1, 1],
+        # set the width ratios between the columns
+        # width_ratios=[1, 8, 8, 1],
+        # sharey=True,
+        # gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+    )
+    # pd.DataFrame({'long_best_z_scores': ripple_result_tuple.long_best_dir_z_score_values, 'short_best_z_scores': ripple_result_tuple.short_best_dir_z_score_values}).hist(ax=(ax_dict['long_best_z_scores'], ax_dict['short_best_z_scores']))
+    pd.DataFrame({'long_best_z_scores': ripple_result_tuple.long_best_dir_z_score_values}).hist(ax=ax_dict['long_best_z_scores'], bins=21, alpha=0.8)
+    pd.DataFrame({'short_best_z_scores': ripple_result_tuple.short_best_dir_z_score_values}).hist(ax=ax_dict['short_best_z_scores'], bins=21, alpha=0.8)
+    pd.DataFrame({'long_short_best_z_score_diff': ripple_result_tuple.long_short_best_dir_z_score_diff_values}).hist(ax=ax_dict['long_short_best_z_score_diff'], bins=21, alpha=0.8)
+
+    # plt.suptitle('Ripple Rank-Order')
+
+
+@function_attributes(short_name=None, tags=['histogram', '1D', 'rank-order'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-12 09:20', related_items=[])
+def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContainer, number_of_bins: int = 21, post_title_info: str = '') -> Tuple:
+    """ plots 1D histograms from the rank-order shuffled data during the ripples. 
+    
+    https://pandas.pydata.org/pandas-docs/version/0.24.1/user_guide/visualization.html
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_rank_order_histograms
+
+        # Plot histograms:
+        post_title_info: str = f'{minimum_inclusion_fr_Hz} Hz\n{curr_active_pipeline.get_session_context().get_description()}'
+        _out_z_score, _out_real, _out_most_likely_z = plot_rank_order_histograms(rank_order_results, post_title_info=post_title_info)
+    
+    """
+    
+    # fig = build_or_reuse_figure(fignum=f'1D Histograms')
+    # ax1 = fig.add_subplot(3, 1, 1)
+    # ax2 = fig.add_subplot(3, 1, 2)
+    # ax3 = fig.add_subplot(3, 1, 3)
+
+    LR_results_real_values = np.array([(long_stats_z_scorer.real_value, short_stats_z_scorer.real_value) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+    RL_results_real_values = np.array([(long_stats_z_scorer.real_value, short_stats_z_scorer.real_value) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+
+    LR_results_long_short_z_diffs = np.array([long_short_z_diff for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+    RL_results_long_short_z_diff = np.array([long_short_z_diff for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+
+    ax1, ax2, ax3 = None, None, None
+    
+    _out_z_score = pd.DataFrame({'LR_long_z_scores': rank_order_results.LR_ripple.long_z_score, 'LR_short_z_scores': rank_order_results.LR_ripple.short_z_score,
+              'RL_long_z_scores': rank_order_results.RL_ripple.long_z_score, 'RL_short_z_scores': rank_order_results.RL_ripple.short_z_score}).hist(bins=number_of_bins, ax=ax1, sharex=True, sharey=True)
+    plt.suptitle(': '.join([f'Ripple Z-scores', post_title_info]))
+
+    _out_real = pd.DataFrame({'LR_long_real_corr': np.squeeze(LR_results_real_values[:,0]), 'LR_short_real_corr': np.squeeze(LR_results_real_values[:,1]),
+              'RL_long_real_corr': np.squeeze(RL_results_real_values[:,0]), 'RL_short_real_corr': np.squeeze(RL_results_real_values[:,1])}).hist(bins=number_of_bins, ax=ax2, sharex=True, sharey=True)
+    plt.suptitle(': '.join([f'Ripple real correlations', post_title_info]))
+
+    _out_most_likely_z = pd.DataFrame({'most_likely_long_z_scores': rank_order_results.ripple_most_likely_result_tuple.long_best_dir_z_score_values, 'most_likely_short_z_scores': rank_order_results.ripple_most_likely_result_tuple.short_best_dir_z_score_values}).hist(bins=number_of_bins, ax=ax3, sharex=True, sharey=True)
+    plt.suptitle(': '.join([f'Ripple Most-likely z-scores', post_title_info]))
+
+    return _out_z_score, _out_real, _out_most_likely_z
+
 
 
 @function_attributes(short_name=None, tags=['rank-order', 'inst_fr', 'epoch', 'lap', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-16 18:42', related_items=['most_likely_directional_rank_order_shuffling'])
