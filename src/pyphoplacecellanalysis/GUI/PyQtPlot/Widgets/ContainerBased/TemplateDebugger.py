@@ -136,7 +136,7 @@ class TemplateDebugger:
         use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
         
         figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
-        _out_data = RenderPlotsData(name=figure_name, track_templates=deepcopy(track_templates), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
+        _out_data = RenderPlotsData(name=figure_name, track_templates=deepcopy(track_templates), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, sorted_pf_peak_location_list=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
         _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
         _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates, debug_print=debug_print, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
                 
@@ -151,9 +151,8 @@ class TemplateDebugger:
         # icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico"
         # root_dockAreaWindow.setWindowIcon(pg.QtGui.QIcon(icon_path))
 
-        _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
+        _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, order_location_lines_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
         
-
         root_dockAreaWindow.resize(900, 700)
 
         _obj = cls(plots=_out_plots, plots_data=_out_data, ui=_out_ui, params=_out_params)
@@ -237,14 +236,18 @@ class TemplateDebugger:
 
         sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
         # sorted_pf_tuning_curves_dict = {a_decoder_name:a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_decoder_name, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts.keys(), sort_helper_neuron_id_to_sort_IDX_dicts.values())}
+        # Get the peak locations for the tuning curves:
+        sorted_pf_peak_location_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values()))] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
+        # track_templates.decoder_peak_location_list
 
-            # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
+        # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
         _out_data.ref_decoder_name = ref_decoder_name
         _out_data.sorted_neuron_IDs_lists = sorted_neuron_IDs_lists
         _out_data.sort_helper_neuron_id_to_neuron_colors_dicts = sort_helper_neuron_id_to_neuron_colors_dicts
         _out_data.sort_helper_neuron_id_to_sort_IDX_dicts = sort_helper_neuron_id_to_sort_IDX_dicts
         _out_data.sorted_pf_tuning_curves = sorted_pf_tuning_curves
         _out_data.unsorted_included_any_context_neuron_ids = deepcopy(included_any_context_neuron_ids)
+        _out_data.sorted_pf_peak_location_list = deepcopy(sorted_pf_peak_location_list)
         return _out_data
 
     # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
@@ -255,11 +258,13 @@ class TemplateDebugger:
         # Unpack the updated _out_data:
         sort_helper_neuron_id_to_neuron_colors_dicts = _out_data.sort_helper_neuron_id_to_neuron_colors_dicts
         sorted_pf_tuning_curves = _out_data.sorted_pf_tuning_curves
+        sorted_pf_peak_location_list = _out_data.sorted_pf_peak_location_list
 
         ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
         _out_plots.pf1D_heatmaps = {}
         _out_ui.text_items_dict = {}
-
+        _out_ui.order_location_lines_dict = {}
+        
         for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
             if use_incremental_sorting:
                 title_str = f'{a_decoder_name}_pf1Ds [sort: {_out_data.ref_decoder_name}]'
@@ -267,6 +272,8 @@ class TemplateDebugger:
                 title_str = f'{a_decoder_name}_pf1Ds'
 
             curr_curves = sorted_pf_tuning_curves[i]
+            curr__pf_peak_locations = sorted_pf_peak_location_list[i]
+
             _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
 
             # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
@@ -282,6 +289,8 @@ class TemplateDebugger:
             _temp_curr_out_colors_heatmap_image = [] # used to accumulate the rows so they can be built into a color image in `out_colors_heatmap_image_matrix`
 
             _out_ui.text_items_dict[a_decoder_name] = {} # new dict to hold these items.
+            _out_ui.order_location_lines_dict[a_decoder_name] = {} # new dict to hold these items.
+            
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
                 # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
                 text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
@@ -293,6 +302,16 @@ class TemplateDebugger:
                 heatmap_base_color = pg.mkColor(a_color_vector)
                 out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
                 _temp_curr_out_colors_heatmap_image.append(out_colors_row)
+                
+                # Add vertical lines
+                x_offset = curr__pf_peak_locations[cell_i]
+                line_height = 1.0
+                line = pg.InfiniteLine(pos=(x_offset, float(cell_i+1)), angle=90, movable=False)
+                line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
+                curr_win.addItem(line)
+                line.setPos(pg.Point(x_offset, line_height / 2.0)) # Adjust the height of the line if needed
+                _out_ui.order_location_lines_dict[a_decoder_name][aclu] = line # add the TextItem to the map
+
 
             ## Build the colored heatmap:
             out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
