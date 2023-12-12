@@ -1,9 +1,8 @@
 import sys
-from typing import Dict, List, Tuple, Optional
+from copy import deepcopy
+from typing import Callable, Dict, List, Tuple, Optional
 from pathlib import Path
-
-# required to enable non-blocking interaction:
-%gui qt5
+from attrs import define, field, Factory, asdict, astuple
 
 import matplotlib.pyplot as plt
 from nptyping.ndarray import NDArray
@@ -14,15 +13,31 @@ from IPython.display import display
 import scipy
 import scipy.stats
 
-%matplotlib widget
+# %matplotlib widget
+import matplotlib
+import matplotlib.text
 import matplotlib.patches as patches
 from matplotlib.widgets import Button
-
 
 from neuropy.core.user_annotations import metadata_attributes, function_attributes
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
 
+@define(slots=False)
+class Metric:
+    """ 
+    Used to store a metric value and its associated metadata.
+    
+    History copied from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations.RankOrderAnalyses.compute_shuffled_rankorder_analyses`
+        On 2023-12-08 
+    
+    """
+    name: str = field()
+    calculate_fn: Callable = field() # calculate_spearman_correlation(self.spikes_df, shared_aclus_only_neuron_IDs=self.shared_aclus_only_neuron_IDs, active_aclu_to_fragile_linear_neuron_IDX_dict=self.active_aclu_to_fragile_linear_neuron_IDX_dict, long_pf_peak_ranks=self.long_pf_peak_ranks, epoch_id=self.epoch_id)
+    last_value: Optional[float] = field(default=None)
+    associated_label: matplotlib.text.Text = field(init=False, default=None) # matplotlib.text.Text
+
+# matplotlib.text.Text
 
 @function_attributes(short_name=None, tags=['spearman', 'rank-order'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-08 12:33', related_items=[])
 def calculate_spearman_correlation(spikes_df, shared_aclus_only_neuron_IDs, active_aclu_to_fragile_linear_neuron_IDX_dict, long_pf_peak_ranks, epoch_id:int=0, rank_alignment: str = 'first'):
@@ -124,45 +139,58 @@ class InteractiveRasterBuilderWidget:
         self.long_pf_peak_ranks = np.arange(self.num_neurons)+1 # ranks are 1-indexed
         
         self.spikes_df = pd.DataFrame(columns=['t', 'aclu', 'Probe_Epoch_id', 'added_order'])
-        self.fig, self.ax = plt.subplots()
-        self.neuron_lines = [self.ax.plot([], [], 'o', color=plt.cm.jet(i / self.num_neurons))[0] for i in range(self.num_neurons)]
+        
+        self.metrics_dict = {'spearman': Metric(name='spearman', calculate_fn=calculate_spearman_correlation)}
+
         self.setup_plot()
         self.connect_events()
 
     def setup_plot(self):
+        """ builds the plot and graphical output widgets."""
+        # Output widgets
+        self.main_interactive_output = widgets.Output(layout={'border': '3px solid red'})
+        # display(self.main_interactive_output, display_id='main_interactive_output')
+        self.accumulated_saved_output = widgets.Output(layout={'border': '1px solid brown'})
+        # display(self.accumulated_saved_output, display_id='accumulated_saved_output')
+
+        self.fig, self.ax = plt.subplots() # size=(30, 8)
+        self.fig.set_size_inches(5, 2)
+        self.single_neuron_spike_raster = [self.ax.plot([], [], 'o', color=plt.cm.jet(i / self.num_neurons))[0] for i in range(self.num_neurons)]
+
         self.ax.set_xlim(0, self.time_window)
         self.ax.set_ylim(0, self.num_neurons)
         self.ax.set_xlabel('Time (ms)')
         self.ax.set_ylabel('Neuron')
-        self.correlation_text = self.ax.text(0.5, 1.05, '', transform=self.ax.transAxes, ha='center')
+        
+        ## Build Metrics Labels:
+        self.metrics_dict['spearman'].associated_label = self.ax.text(0.5, 1.05, '', transform=self.ax.transAxes, ha='center')
+        
 
         self.colors = plt.cm.jet(np.linspace(0, 1, self.num_neurons))
-        self.neuron_lines = [self.ax.plot([], [], 'o', color=self.colors[i])[0] for i in range(self.num_neurons)]
-        self.highlight_rect = patches.Rectangle((0, -0.5), self.time_window, 1, color='gray', alpha=0.3, visible=False) # used to highlight the currently hovered line
-        self.ax.add_patch(self.highlight_rect)
+        self.single_neuron_spike_raster = [self.ax.plot([], [], 'o', color=self.colors[i])[0] for i in range(self.num_neurons)]
+        self.hovered_cell_highlight_rect = patches.Rectangle((0, -0.5), self.time_window, 1, color='gray', alpha=0.3, visible=False) # used to highlight the currently hovered line
+        self.ax.add_patch(self.hovered_cell_highlight_rect)
         
         # had cell line hover rects:
         for i in range(self.num_neurons):
             line, = self.ax.plot([], [], 'o', color=self.colors[i], label=f'Neuron {i+1}')
-            self.neuron_lines.append(line)
+            self.single_neuron_spike_raster.append(line)
     
         # Add buttons
         ax_clear = plt.axes([0.7, 0.05, 0.1, 0.075])
         ax_save = plt.axes([0.81, 0.05, 0.1, 0.075])
         ax_erase = plt.axes([0.1, 0.05, 0.1, 0.075])
-        
         self.btn_clear = Button(ax_clear, 'Clear')
+        self.btn_clear.on_clicked(self.clear_spikes)
         self.btn_save = Button(ax_save, 'Save')
+        self.btn_save.on_clicked(self.save_figure)
         self.btn_erase = Button(ax_erase, 'Erase')  # create erase button
         self.btn_erase.on_clicked(self.toggle_erase_mode)  # connect erase button to toggle_erase_mode function
-        self.btn_clear.on_clicked(self.clear_spikes)
-        self.btn_save.on_clicked(self.save_figure)
+        
+        # self.main_interactive_output.append_display_data(display(self.fig))
+        # widgets.HBox([widgets.VBox([self.main_interactive_output, self.main_interactive_output]), out])
+        _out_widget = widgets.VBox([self.main_interactive_output, self.accumulated_saved_output])
 
-        # Output widgets
-        self.click_catcher = widgets.Output()
-        display(self.click_catcher)
-        self.accumulated_saved_output = widgets.Output()
-        display(self.accumulated_saved_output)
 
     def connect_events(self):
         self.fig.canvas.mpl_connect('button_press_event', self.on_click)
@@ -183,6 +211,7 @@ class InteractiveRasterBuilderWidget:
             self.update_plot({'type': 'change', 'name': 'value', 'new': (event.xdata, event.ydata)})
         
     def erase_spike(self, event):
+        """ removes the clicked spike from the raster and updates the metrics. """
         x, y = event.xdata, event.ydata
         neuron_index = int(y)
         if 0 <= neuron_index < self.num_neurons:
@@ -190,13 +219,13 @@ class InteractiveRasterBuilderWidget:
             self.spikes_df = self.spikes_df.sort_values(['t', 'aclu'])
             for i in range(self.num_neurons):
                 neuron_data = self.spikes_df[self.spikes_df['aclu'] == i]
-                self.neuron_lines[i].set_data(neuron_data['t'], neuron_data['aclu'])
+                self.single_neuron_spike_raster[i].set_data(neuron_data['t'], neuron_data['aclu'])
             
             correlation = calculate_spearman_correlation(self.spikes_df, shared_aclus_only_neuron_IDs=self.shared_aclus_only_neuron_IDs, active_aclu_to_fragile_linear_neuron_IDX_dict=self.active_aclu_to_fragile_linear_neuron_IDX_dict, long_pf_peak_ranks=self.long_pf_peak_ranks, epoch_id=self.epoch_id)
             if correlation is not None:
-                self.correlation_text.set_text(f'Spearman Correlation: {correlation:.2f}')
+                self.metrics_dict['spearman'].associated_label.set_text(f'Spearman Correlation: {correlation:.2f}')
             else:
-                self.correlation_text.set_text('Insufficient data for Spearman Correlation')
+                self.metrics_dict['spearman'].associated_label.set_text('Insufficient data for Spearman Correlation')
 
             self.fig.canvas.draw()
             
@@ -206,13 +235,24 @@ class InteractiveRasterBuilderWidget:
         if event.inaxes == self.ax:
             neuron_index = int(event.ydata)
             if 0 <= neuron_index < self.num_neurons:
-                self.highlight_rect.set_y(neuron_index - 0.5)
-                self.highlight_rect.set_facecolor(self.colors[neuron_index])
-                self.highlight_rect.set_visible(True)
+                self.hovered_cell_highlight_rect.set_y(neuron_index - 0.5)
+                self.hovered_cell_highlight_rect.set_facecolor(self.colors[neuron_index])
+                self.hovered_cell_highlight_rect.set_visible(True)
                 self.fig.canvas.draw_idle()
             else:
-                self.highlight_rect.set_visible(False)
+                self.hovered_cell_highlight_rect.set_visible(False)
                 self.fig.canvas.draw_idle()
+
+
+    def update_metrics(self):
+        """ calculates the metrics for the given spikes and updates the metric labels. """
+        for a_metric_name, a_metric_obj in self.metrics_dict.items():
+            a_metric_obj.last_value = a_metric_obj.calculate_fn(self.spikes_df, shared_aclus_only_neuron_IDs=self.shared_aclus_only_neuron_IDs, active_aclu_to_fragile_linear_neuron_IDX_dict=self.active_aclu_to_fragile_linear_neuron_IDX_dict, long_pf_peak_ranks=self.long_pf_peak_ranks, epoch_id=self.epoch_id)
+            # correlation = calculate_spearman_correlation(self.spikes_df, shared_aclus_only_neuron_IDs=self.shared_aclus_only_neuron_IDs, active_aclu_to_fragile_linear_neuron_IDX_dict=self.active_aclu_to_fragile_linear_neuron_IDX_dict, long_pf_peak_ranks=self.long_pf_peak_ranks, epoch_id=self.epoch_id)
+            if a_metric_obj.last_value is not None:
+                a_metric_obj.associated_label.set_text(f'Spearman Correlation: {a_metric_obj.last_value:.2f}')
+            else:
+                a_metric_obj.associated_label.set_text('Insufficient data for Spearman Correlation')
 
 
     def update_plot(self, change):
@@ -225,26 +265,31 @@ class InteractiveRasterBuilderWidget:
                 self.spikes_df = self.spikes_df.sort_values(['t', 'aclu'])
                 for i in range(self.num_neurons):
                     neuron_data = self.spikes_df[self.spikes_df['aclu'] == i]
-                    self.neuron_lines[i].set_data(neuron_data['t'], neuron_data['aclu'])
+                    self.single_neuron_spike_raster[i].set_data(neuron_data['t'], neuron_data['aclu'])
                 
-                correlation = calculate_spearman_correlation(self.spikes_df, shared_aclus_only_neuron_IDs=self.shared_aclus_only_neuron_IDs, active_aclu_to_fragile_linear_neuron_IDX_dict=self.active_aclu_to_fragile_linear_neuron_IDX_dict, long_pf_peak_ranks=self.long_pf_peak_ranks, epoch_id=self.epoch_id)
-                if correlation is not None:
-                    self.correlation_text.set_text(f'Spearman Correlation: {correlation:.2f}')
-                else:
-                    self.correlation_text.set_text('Insufficient data for Spearman Correlation')
+                self.update_metrics()
 
                 self.fig.canvas.draw()
 
     def clear_spikes(self, event):
+        """ removes all spikes from the raster and updates the metrics."""
         self.spikes_df = pd.DataFrame(columns=['t', 'aclu', 'Probe_Epoch_id', 'added_order'])
-        for line in self.neuron_lines:
+        for line in self.single_neuron_spike_raster:
             line.set_data([], [])
+        self.update_metrics()
         self.fig.canvas.draw()
 
     def save_figure(self, event):
-        with self.accumulated_saved_output:
-            self.accumulated_saved_output.clear_output(wait=True)
-            display(self.fig)
+        """ appends the current state of the interactive widget to the accumulated output widget."""
+        # with self.accumulated_saved_output:
+        #     self.accumulated_saved_output.clear_output(wait=True)
+        #     display(self.fig)
+            
+        # self.fig
+        # Save Current Values:
+        curr_spikes_df = deepcopy(self.spikes_df)
+
+        self.accumulated_saved_output.append_display_data(display(self.fig))
 
 
 
