@@ -412,25 +412,25 @@ class RankOrderComputationsContainer(ComputedResult):
             if isinstance(global_replays, pd.DataFrame):
                 global_replays = Epoch(global_replays.epochs.get_valid_df())
             # get the aligned epochs and the z-scores aligned to them:
-            active_replay_epochs, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_replays.to_dataframe().copy(), is_laps=False)
+            active_replay_epochs, ripple_rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_replays.to_dataframe().copy(), is_laps=False)
             
         ## Laps:
             long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
             global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
-            active_laps_epochs, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_laps.copy(), is_laps=True)
+            active_laps_epochs, laps_rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_laps.copy(), is_laps=True)
 
         """
-        def _subfn_compute(LR_values, RL_values, active_epochs_df):
+        def _subfn_compute(LR_values, RL_values, all_epochs_df):
             """ gets the values for either the laps or the ripples 
             
             is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL)
             
             """
-            bak_active_epochs_df = deepcopy(active_epochs_df)
-            is_included_epoch_LR = np.isin(active_epochs_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy())
-            is_included_epoch_RL = np.isin(active_epochs_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy())
+            # bak_active_epochs_df = deepcopy(active_epochs_df)
+            is_included_epoch_LR = np.isin(all_epochs_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy())
+            is_included_epoch_RL = np.isin(all_epochs_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy())
             is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL)
-            active_epochs_df = active_epochs_df[is_included_epoch] # cuts down to only those included by one or the other. Should this be AND?
+            active_epochs_df = all_epochs_df[is_included_epoch] # cuts down to only those included by one or the other. Should this be AND?
 
             # Convert to same epochs:
             LR_values_long_z_score = pd.Series(LR_values.long_z_score, index=LR_values.epochs_df.label.to_numpy())
@@ -445,21 +445,24 @@ class RankOrderComputationsContainer(ComputedResult):
             active_RL_ripple_short_z_score = RL_values_short_z_score[active_epochs_df.label.to_numpy()]
             
             # Creating a new DataFrame with the reset series
-            new_df = pd.DataFrame({
-                'Active_LR_Long_Z': LR_values_long_z_score,
-                'Active_RL_Long_Z': RL_values_long_z_score,
-                'Active_LR_Short_Z': LR_values_short_z_score,
-                'Active_RL_Short_Z': RL_values_short_z_score
-            })
-            new_df
-            return (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
+            rank_order_z_score_df: pd.DataFrame = deepcopy(all_epochs_df)
+            # Adding four new float columns filled with np.nans in a single line
+            rank_order_z_score_df[['LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=rank_order_z_score_df.index)
+            rank_order_z_score_df.loc[np.isin(rank_order_z_score_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy()), 'LR_Long_Z'] = LR_values.long_z_score
+            rank_order_z_score_df.loc[np.isin(rank_order_z_score_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy()), 'RL_Long_Z'] = RL_values.long_z_score
+            rank_order_z_score_df.loc[np.isin(rank_order_z_score_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy()), 'LR_Short_Z'] = LR_values.short_z_score
+            rank_order_z_score_df.loc[np.isin(rank_order_z_score_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy()), 'RL_Short_Z'] = RL_values.short_z_score
+            
+            return active_epochs_df, rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
         
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         if is_laps:
-            _out_tuple = _subfn_compute(self.LR_laps, self.RL_laps, active_epochs_df)
+            assert ((self.LR_laps is not None) and (self.RL_laps is not None)), f"self.LR_laps or self.RL_laps is None - Rank-order was not computed for Laps?"
+            active_epochs_df, rank_order_z_score_df, _out_tuple = _subfn_compute(self.LR_laps, self.RL_laps, epochs_df)
         else:
-            _out_tuple = _subfn_compute(self.LR_ripple, self.RL_ripple, active_epochs_df)
-        return active_epochs_df, _out_tuple
+            assert ((self.LR_ripple is not None) and (self.RL_ripple is not None)), f"self.LR_ripple or self.RL_ripple is None - Rank-order was not computed for Laps?"
+            active_epochs_df, rank_order_z_score_df, _out_tuple = _subfn_compute(self.LR_ripple, self.RL_ripple, epochs_df)
+        return active_epochs_df, rank_order_z_score_df, _out_tuple
 
 
     def to_dict(self) -> Dict:
