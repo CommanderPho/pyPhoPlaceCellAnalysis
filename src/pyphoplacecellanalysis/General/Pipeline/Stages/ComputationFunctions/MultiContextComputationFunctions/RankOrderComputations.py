@@ -1447,12 +1447,12 @@ class RankOrderAnalyses:
         
     
         _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
-        selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=selected_spikes_df.index)
+        active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
 
-        selected_spikes_df['LR_Long_pf_peak_x'] = selected_spikes_df.aclu.map(long_LR_aclu_peak_map)
-        selected_spikes_df['RL_Long_pf_peak_x'] = selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
-        selected_spikes_df['LR_Short_pf_peak_x'] = selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
-        selected_spikes_df['RL_Short_pf_peak_x'] = selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
+        active_selected_spikes_df['LR_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_LR_aclu_peak_map)
+        active_selected_spikes_df['RL_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
+        active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
+        active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
 
         ## Restrict to only the relevant columns:
         # active_selected_spikes_df = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id', *_pf_peak_x_column_names]])
