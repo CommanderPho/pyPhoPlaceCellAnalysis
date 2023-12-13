@@ -186,7 +186,7 @@ class ShuffleHelper(HDFMixin):
         """ computes the rank template from a decoder such as `long_shared_aclus_only_decoder` """
         return scipy.stats.rankdata(compute_placefield_center_of_masses(a_decoder.pf.ratemap.pdf_normalized_tuning_curves), method='dense')
 
-    def generate_shuffle(self, shared_aclus_only_neuron_IDs: NDArray, num_shuffles: Optional[int]=None, seed:int=1337) -> Tuple[NDArray, NDArray]:
+    def generate_shuffle(self, shared_aclus_only_neuron_IDs: NDArray, num_shuffles: Optional[int]=None, seed:Optional[int]=None) -> Tuple[NDArray, NDArray]:
         """ 
         shuffled_aclus, shuffle_IDXs = shuffle_helper.generate_shuffle(shared_aclus_only_neuron_IDs)
         """
@@ -210,7 +210,7 @@ class ShuffleHelper(HDFMixin):
         is_good_aclus = np.logical_not(np.isin(shared_aclus_only_neuron_IDs, bimodal_exclude_aclus))
         shared_aclus_only_neuron_IDs = shared_aclus_only_neuron_IDs[is_good_aclus]
 
-        shuffled_aclus, shuffle_IDXs = build_shuffled_ids(shared_aclus_only_neuron_IDs, num_shuffles=num_shuffles, seed=1337)
+        shuffled_aclus, shuffle_IDXs = build_shuffled_ids(shared_aclus_only_neuron_IDs, num_shuffles=num_shuffles, seed=None)
         # shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs 
 
         ## 2023-10-11 - Get the long/short peak locations
