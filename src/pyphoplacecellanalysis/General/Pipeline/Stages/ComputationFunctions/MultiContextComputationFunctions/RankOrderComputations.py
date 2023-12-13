@@ -400,6 +400,7 @@ class RankOrderComputationsContainer(ComputedResult):
         return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global, self.__attrs_attrs__.ripple_most_likely_result_tuple, self.__attrs_attrs__.laps_most_likely_result_tuple, self.__attrs_attrs__.minimum_inclusion_fr_Hz))) #  'is_global'
 
 
+    @function_attributes(short_name=None, tags=['aligned', 'epochs', 'filtering'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-13 12:16', related_items=[])
     def get_aligned_events(self, epochs_df: pd.DataFrame, is_laps: bool = False):
         """ gets the values for both directions alligned to the same epochs for the given epoch_name and direction.
 
