@@ -23,6 +23,8 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 # from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDialog
+from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget
+
 
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
 
@@ -176,15 +178,7 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
     return button_executor
 
 
-def fullwidth_path_widget(a_path):
-    left_label = widgets.Label("session path:", layout=widgets.Layout(width='auto'))
-    right_label = widgets.Label(a_path, layout=widgets.Layout(width='auto', flex='1 1 auto', margin='0px'))
-    reveal_button = widgets.Button(description='Reveal', layout=widgets.Layout(flex='0 1 auto', width='auto', margin='0px'), disabled=(not Path(a_path).resolve().exists()), button_style='info', tooltip='Reveal in System Explorer', icon='folder-tree')
-    reveal_button.on_click(lambda _: reveal_in_system_file_manager(a_path))
-    box_layout = widgets.Layout(display='flex', flex_flow='row', align_items='stretch', width='70%')
-    hbox = widgets.Box(children=[left_label, right_label, reveal_button], layout=box_layout)
-    # hbox = widgets.HBox([left_label, right_label, reveal_button], layout=box_layout)
-    return hbox
+
 
 
 # def interactive_pipeline_figure_widget(curr_active_pipeline):
@@ -228,7 +222,7 @@ def interactive_pipeline_widget(curr_active_pipeline):
 
     """
     session_path = str(curr_active_pipeline.get_output_path())
-    _session_path_widget = fullwidth_path_widget(a_path=session_path)
+    _session_path_widget = fullwidth_path_widget(a_path=session_path, file_name_label="session path:")
     _button_executor = interactive_pipeline_files(curr_active_pipeline, defer_display=True)
 
     updating_button_defns = [("Reload display functions...", lambda _: curr_active_pipeline.reload_default_display_functions()),
@@ -269,4 +263,4 @@ def interactive_pipeline_widget(curr_active_pipeline):
     # _out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget])
     _out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget, updating_button_executor.root_widget, figure_display_toggle_button])
 
-    return _out_widget
+    return _out_widget        
