@@ -400,7 +400,7 @@ class RankOrderComputationsContainer(ComputedResult):
         return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global, self.__attrs_attrs__.ripple_most_likely_result_tuple, self.__attrs_attrs__.laps_most_likely_result_tuple, self.__attrs_attrs__.minimum_inclusion_fr_Hz))) #  'is_global'
 
 
-    def get_aligned_events(self, active_epochs_df: pd.DataFrame, is_laps: bool = False):
+    def get_aligned_events(self, epochs_df: pd.DataFrame, is_laps: bool = False):
         """ gets the values for both directions alligned to the same epochs for the given epoch_name and direction. 
 
         Pure, does not modify self.
@@ -1149,8 +1149,9 @@ class RankOrderAnalyses:
             global_replays = Epoch(global_replays.epochs.get_valid_df())
 
         # get the aligned epochs and the z-scores aligned to them:
-        active_replay_epochs, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_replays.to_dataframe().copy(), is_laps=False)
-        ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_epochs=active_replay_epochs)
+        active_replay_epochs, ripple_rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_replays.to_dataframe().copy(), is_laps=False)
+        ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_epochs=active_replay_epochs, active_LR_long_z_score=active_LR_ripple_long_z_score, active_RL_long_z_score=active_RL_ripple_long_z_score,
+                                                                                                                                        active_LR_short_z_score=active_LR_ripple_short_z_score, active_RL_short_z_score=active_RL_ripple_short_z_score)
         long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
 
 
@@ -1185,15 +1186,16 @@ class RankOrderAnalyses:
         # outputs: ripple_evts_long_short_best_dir_z_score_diff_values
         ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_replay_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
                                                                                     long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple,
-                                                                                    masked_z_score_values_list=ripple_masked_z_score_values_list)
+                                                                                    masked_z_score_values_list=ripple_masked_z_score_values_list, rank_order_z_score_df=ripple_rank_order_z_score_df)
 
 
         ## Laps:
         try:
             long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
             global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
-            active_laps_epochs, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_laps, is_laps=True)
-            laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_epochs=active_laps_epochs)
+            active_laps_epochs, laps_rank_order_z_score_df, (active_LR_laps_long_z_score, active_RL_laps_long_z_score, active_LR_laps_short_z_score, active_RL_laps_short_z_score) = rank_order_results.get_aligned_events(global_laps, is_laps=True)
+            laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_epochs=active_laps_epochs, active_LR_long_z_score=active_LR_laps_long_z_score, active_RL_long_z_score=active_RL_laps_long_z_score,
+                                                                                                                                        active_LR_short_z_score=active_LR_laps_short_z_score, active_RL_short_z_score=active_RL_laps_short_z_score)
             long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = laps_directional_likelihoods_tuple
 
             # Using NumPy advanced indexing to select from array_a or array_b:
@@ -1208,7 +1210,7 @@ class RankOrderAnalyses:
 
             laps_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_laps_epochs, long_best_dir_z_score_values=laps_long_best_dir_z_score_values, short_best_dir_z_score_values=laps_short_best_dir_z_score_values,
                                                                                         long_short_best_dir_z_score_diff_values=laps_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=laps_directional_likelihoods_tuple, 
-                                                                                        masked_z_score_values_list=laps_masked_z_score_values_list)
+                                                                                        masked_z_score_values_list=laps_masked_z_score_values_list, rank_order_z_score_df=laps_rank_order_z_score_df)
 
         except (AttributeError, KeyError, IndexError):
             laps_result_tuple = None
