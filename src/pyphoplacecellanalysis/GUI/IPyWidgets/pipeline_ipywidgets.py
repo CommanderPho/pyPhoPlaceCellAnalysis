@@ -10,7 +10,7 @@ from silx.gui.dialog.DataFileDialog import DataFileDialog
 import silx.io
 
 
-from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
+
 from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
 from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
 from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default
@@ -221,6 +221,8 @@ def interactive_pipeline_widget(curr_active_pipeline):
         display(_out_widget)
 
     """
+    from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update # needed for toggle_figure_displaying_function
+    
     session_path = str(curr_active_pipeline.get_output_path())
     _session_path_widget = fullwidth_path_widget(a_path=session_path, file_name_label="session path:")
     _button_executor = interactive_pipeline_files(curr_active_pipeline, defer_display=True)
@@ -237,6 +239,9 @@ def interactive_pipeline_widget(curr_active_pipeline):
 
     
     def toggle_figure_displaying_function(change):
+        """ toggles between showing matplotlib figures or rendering them in background 
+        captures: matplotlib_configuration_update
+        """
         if change['new']:
             print("Figure windows enabled")
             # Showing
