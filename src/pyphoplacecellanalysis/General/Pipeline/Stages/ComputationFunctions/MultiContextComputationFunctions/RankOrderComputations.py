@@ -1,6 +1,6 @@
 
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import concurrent.futures
 from functools import partial
 from itertools import repeat
@@ -739,8 +739,8 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['subfn', 'preprocess', 'spikes_df'], input_requires=[], output_provides=[], uses=[], used_by=['compute_shuffled_rankorder_analyses'], creation_date='2023-11-22 11:04', related_items=[])
-    def preprocess_spikes_df(cls, active_spikes_df: pd.DataFrame, active_epochs, shuffle_helper: ShuffleHelper, no_interval_fill_value=-1, min_num_unique_aclu_inclusions: int=5):
+    @function_attributes(short_name=None, tags=['subfn', 'preprocess', 'spikes_df'], input_requires=[], output_provides=[], uses=['add_epochs_id_identity'], used_by=['compute_shuffled_rankorder_analyses'], creation_date='2023-11-22 11:04', related_items=[])
+    def preprocess_spikes_df(cls, active_spikes_df: pd.DataFrame, active_epochs: Epoch, shuffle_helper: ShuffleHelper, no_interval_fill_value=-1, min_num_unique_aclu_inclusions: int=5):
         """Preprocesses the active spikes DataFrame and the active_epochs dataframe by extracting shuffle helper data, deep copying, and adding epoch IDs and dropping epochs with fewer than minimum aclus.
         
         # 2023-12-08 12:53: - [X] Drop epochs with fewer than the minimum active aclus
@@ -1300,7 +1300,8 @@ class RankOrderAnalyses:
 
     @classmethod
     def validate_has_rank_order_results(cls, curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
-        """ 
+        """ Returns True if the pipeline has a valid RankOrder results set of the latest version
+        
         TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
         
         """

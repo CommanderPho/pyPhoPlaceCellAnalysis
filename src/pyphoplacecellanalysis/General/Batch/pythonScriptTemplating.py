@@ -24,7 +24,7 @@ from neuropy.utils.result_context import IdentifyingContext
 
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
-def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/generated_slurm_scripts/', use_separate_run_directories:bool=True,
+def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
  		create_slurm_scripts:bool=False, separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, **script_generation_kwargs):
 	""" Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 

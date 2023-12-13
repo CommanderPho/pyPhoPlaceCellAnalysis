@@ -65,7 +65,7 @@ __all__ = ['TemplateDebugger']
 @metadata_attributes(short_name=None, tags=['gui', 'incomplete', 'not_used', 'not_implemented'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 10:24', related_items=[])
 @define(slots=False, repr=False)
 class TemplateDebugger:
-    """ TemplateDebugger displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
+    """ TemplateDebugger displays four 1D heatmaps colored by cell for the tuning curves of PfND. Each shows the same tuning curves but they are sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
 
     _out = TemplateDebugger.init_rank_order_debugger(global_spikes_df, active_epochs_dfe, track_templates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
