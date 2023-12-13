@@ -1450,10 +1450,13 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         global_computation_results.computed_data['RankOrder'].RL_ripple = RL_ripple_outputs
 
         # Set the global result:
-        print(f'\tdone. building global result.')
-        global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference, decoding_time_bin_size=0.006) # 6ms bins
+        try:
+            print(f'\tdone. building global result.')
+            global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference, decoding_time_bin_size=0.006) # 6ms bins
 
-
+        except (AssertionError, BaseException) as e:
+            print(f'e: {e}')
+            pass
 
         """ Usage:
         
