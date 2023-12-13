@@ -449,11 +449,25 @@ class RankOrderComputationsContainer(ComputedResult):
             rank_order_z_score_df: pd.DataFrame = deepcopy(all_epochs_df)
             # Adding four new float columns filled with np.nans in a single line
             rank_order_z_score_df[['LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=rank_order_z_score_df.index)
-            rank_order_z_score_df.loc[np.isin(rank_order_z_score_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy()), 'LR_Long_Z'] = LR_values.long_z_score
-            rank_order_z_score_df.loc[np.isin(rank_order_z_score_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy()), 'RL_Long_Z'] = RL_values.long_z_score
-            rank_order_z_score_df.loc[np.isin(rank_order_z_score_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy()), 'LR_Short_Z'] = LR_values.short_z_score
-            rank_order_z_score_df.loc[np.isin(rank_order_z_score_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy()), 'RL_Short_Z'] = RL_values.short_z_score
-            
+                        
+            # Assert statements to ensure shapes match
+            assert (np.shape(LR_values.epochs_df.label.to_numpy()) == np.shape(LR_values.long_z_score))
+            assert (np.shape(RL_values.epochs_df.label.to_numpy()) == np.shape(RL_values.long_z_score))
+            assert (np.shape(LR_values.epochs_df.label.to_numpy()) == np.shape(LR_values.short_z_score))
+            assert (np.shape(RL_values.epochs_df.label.to_numpy()) == np.shape(RL_values.short_z_score))
+
+            # Creating mapping dictionaries for each set of values
+            label_to_LR_long_z_score_mapping = dict(zip(LR_values.epochs_df.label.to_numpy(), LR_values.long_z_score)) # Creating a mapping dictionary
+            label_to_RL_long_z_score_mapping = dict(zip(RL_values.epochs_df.label.to_numpy(), RL_values.long_z_score))
+            label_to_LR_short_z_score_mapping = dict(zip(LR_values.epochs_df.label.to_numpy(), LR_values.short_z_score))
+            label_to_RL_short_z_score_mapping = dict(zip(RL_values.epochs_df.label.to_numpy(), RL_values.short_z_score))
+
+            # Updating the DataFrame using the mapping
+            rank_order_z_score_df['LR_Long_Z'] = rank_order_z_score_df['label'].map(label_to_LR_long_z_score_mapping) # Updating the DataFrame
+            rank_order_z_score_df['RL_Long_Z'] = rank_order_z_score_df['label'].map(label_to_RL_long_z_score_mapping)
+            rank_order_z_score_df['LR_Short_Z'] = rank_order_z_score_df['label'].map(label_to_LR_short_z_score_mapping)
+            rank_order_z_score_df['RL_Short_Z'] = rank_order_z_score_df['label'].map(label_to_RL_short_z_score_mapping)
+
             return active_epochs_df, rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
         
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
