@@ -1438,14 +1438,12 @@ class RankOrderAnalyses:
         desired_df_label_column_data_type: str = 'uint64'
         # desired_df_label_column_data_type: str = 'string'
 
-
         ## Adding the pf_peak_x locations for all four templates:
         long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
         
-        ## Initialize the dataframe columns to np.nan:
-        active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+        ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
+        active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': desired_df_label_column_data_type}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
         
-    
         _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
         active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
 
@@ -1453,21 +1451,13 @@ class RankOrderAnalyses:
         active_selected_spikes_df['RL_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
         active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
         active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
-
-        ## Restrict to only the relevant columns:
-        # active_selected_spikes_df = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id', *_pf_peak_x_column_names]])
+        
         # active_selected_spikes_df = active_selected_spikes_df.groupby(['Probe_Epoch_id']).agg(aclu_count=('aclu', 'count'), aclu_nunique=('aclu', 'nunique'), LR_Long_pf_peak_x_var=('LR_Long_pf_peak_x', 'var')).reset_index()
-
-        # # Performed 1 aggregation grouped on columns: 'Probe_Epoch_id', 'aclu'
         # active_selected_spikes_df = active_selected_spikes_df.groupby(['Probe_Epoch_id', 'aclu']).agg(LR_Long_pf_peak_x_mean=('LR_Long_pf_peak_x', 'mean')).reset_index()
 
-        # # Reset index on selected_spikes to make 'Probe_Epoch_id' and 'aclu' as columns
-        # _selected_spikes_reset = deepcopy(active_selected_spikes_df).reset_index()
-        # # Merge with original DataFrame to filter only the selected spikes
-        # selected_spikes_only_df: pd.DataFrame = pd.merge(active_spikes_df, _selected_spikes_reset, on=['Probe_Epoch_id', 'aclu', time_variable_name_override])
-
-        spearman_correlations = active_selected_spikes_df.groupby('Probe_Epoch_id').apply(lambda group: cls._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index().astype({'Probe_Epoch_id': desired_df_label_column_data_type}) # Reset index to make 'Probe_Epoch_id' a column
-        pearson_correlations = active_selected_spikes_df.groupby('Probe_Epoch_id').apply(lambda group: cls._subfn_calculate_correlations(group, method='pearson', enable_shuffle=False)).reset_index().astype({'Probe_Epoch_id': desired_df_label_column_data_type}) # Reset index to make 'Probe_Epoch_id' a column
+        epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id')
+        spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: cls._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+        pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: cls._subfn_calculate_correlations(group, method='pearson', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
 
         # active_epochs_merged_correlations_df = spearman_correlations_reset.merge(pearson_correlations_reset, on='Probe_Epoch_id', how='left')
 
