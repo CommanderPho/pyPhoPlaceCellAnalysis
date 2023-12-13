@@ -335,7 +335,7 @@ DirectionalRankOrderResultBase = namedtuple('DirectionalRankOrderResultBase', ['
                                                                        'long_best_dir_z_score_values', 
                                                            'short_best_dir_z_score_values', 
                                                            'long_short_best_dir_z_score_diff_values', 
-                                                           'directional_likelihoods_tuple', "masked_z_score_values_list"])
+                                                           'directional_likelihoods_tuple', "masked_z_score_values_list", "rank_order_z_score_df"])
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram
 
