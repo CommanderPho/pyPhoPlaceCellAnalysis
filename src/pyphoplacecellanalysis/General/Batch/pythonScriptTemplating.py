@@ -25,7 +25,7 @@ from neuropy.utils.result_context import IdentifyingContext
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
- 		create_slurm_scripts:bool=False, separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, **script_generation_kwargs):
+ 		create_slurm_scripts:bool=False, separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, batch_session_completion_handler_kwargs=None, **renderer_script_generation_kwargs):
 	""" Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
 	output_directory
@@ -33,6 +33,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
 	included_session_contexts
 	session_batch_basedirs: Dict[IdentifyingContext, Path]
+
+	batch_session_completion_handler_kwargs: Optional[Dict] - the values to be passed to batch_session_completion_handler
 	
 	Usage:
 	
@@ -58,9 +60,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	# if script_generation_kwargs is None:
 	# 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
 
-	no_recomputing_script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=True, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs # No recomputing at all:
-	compute_as_needed_script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs
-	forced_full_recompute_script_generation_kwargs = dict(should_force_reload_all=True, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | script_generation_kwargs # Forced Reloading:
+	no_recomputing_script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=True, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | renderer_script_generation_kwargs # No recomputing at all:
+	compute_as_needed_script_generation_kwargs = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | renderer_script_generation_kwargs
+	forced_full_recompute_script_generation_kwargs = dict(should_force_reload_all=True, should_freeze_pipeline_updates=False, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file) | renderer_script_generation_kwargs # Forced Reloading:
 	# script_generation_kwargs
 
 	if included_session_contexts is None:
@@ -96,7 +98,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
 														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
 														curr_session_basedir=curr_session_basedir, 
-														**script_generation_kwargs)
+														batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+														**renderer_script_generation_kwargs)
 				script_file.write(script_content)
 			output_python_scripts.append(python_script_path)
 
@@ -108,6 +111,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
 														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
 														curr_session_basedir=curr_session_basedir, 
+														batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
 														**(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
 				script_file.write(script_content)
 			# output_python_scripts.append(python_script_path)
@@ -117,7 +121,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 			with open(python_figures_script_path, 'w') as script_file:
 				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
 														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-														curr_session_basedir=curr_session_basedir, 
+														curr_session_basedir=curr_session_basedir,
+														batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
 														**(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)))
 
 
