@@ -426,23 +426,24 @@ class RankOrderComputationsContainer(ComputedResult):
             is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL)
             
             """
+            # all_epochs_df: (611,)
             # bak_active_epochs_df = deepcopy(active_epochs_df)
-            is_included_epoch_LR = np.isin(all_epochs_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy())
-            is_included_epoch_RL = np.isin(all_epochs_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy())
-            is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL)
-            active_epochs_df = all_epochs_df[is_included_epoch] # cuts down to only those included by one or the other. Should this be AND?
+            is_included_epoch_LR = np.isin(all_epochs_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy()) # (611,)
+            is_included_epoch_RL = np.isin(all_epochs_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy()) # (611,)
+            is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL) # (611,)
+            active_epochs_df = all_epochs_df[is_included_epoch] # cuts down to only those included by one or the other. Should this be AND? # (586, )
 
             # Convert to same epochs:
-            LR_values_long_z_score = pd.Series(LR_values.long_z_score, index=LR_values.epochs_df.label.to_numpy())
-            RL_values_long_z_score = pd.Series(RL_values.long_z_score, index=RL_values.epochs_df.label.to_numpy())
+            LR_values_long_z_score = pd.Series(LR_values.long_z_score, index=LR_values.epochs_df.label.to_numpy()) # (608,)
+            RL_values_long_z_score = pd.Series(RL_values.long_z_score, index=RL_values.epochs_df.label.to_numpy()) # (608,)
 
-            LR_values_short_z_score = pd.Series(LR_values.short_z_score, index=LR_values.epochs_df.label.to_numpy())
-            RL_values_short_z_score = pd.Series(RL_values.short_z_score, index=RL_values.epochs_df.label.to_numpy())
+            LR_values_short_z_score = pd.Series(LR_values.short_z_score, index=LR_values.epochs_df.label.to_numpy()) # (608,)
+            RL_values_short_z_score = pd.Series(RL_values.short_z_score, index=RL_values.epochs_df.label.to_numpy()) # (608,)
 
-            active_LR_ripple_long_z_score = LR_values_long_z_score[active_epochs_df.label.to_numpy()]
-            active_RL_ripple_long_z_score = RL_values_long_z_score[active_epochs_df.label.to_numpy()]
-            active_LR_ripple_short_z_score = LR_values_short_z_score[active_epochs_df.label.to_numpy()]
-            active_RL_ripple_short_z_score = RL_values_short_z_score[active_epochs_df.label.to_numpy()]
+            active_LR_ripple_long_z_score = LR_values_long_z_score[active_epochs_df.label.to_numpy()] # 586
+            active_RL_ripple_long_z_score = RL_values_long_z_score[active_epochs_df.label.to_numpy()] # 586
+            active_LR_ripple_short_z_score = LR_values_short_z_score[active_epochs_df.label.to_numpy()] # 586
+            active_RL_ripple_short_z_score = RL_values_short_z_score[active_epochs_df.label.to_numpy()] # 586
             
             # Creating a new DataFrame with the reset series
             rank_order_z_score_df: pd.DataFrame = deepcopy(all_epochs_df)
