@@ -1306,7 +1306,7 @@ class RankOrderAnalyses:
         """
         # Unpacking:
         rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-        oripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+        ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
 
         # Extract the real spearman-values/p-values:
         LR_long_relative_real_p_values = np.array([x[0].real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
@@ -1335,7 +1335,12 @@ class RankOrderAnalyses:
 
         # make sure result is for the current minimimum:
         results_minimum_inclusion_fr_Hz = rank_order_results.minimum_inclusion_fr_Hz
-        # included_qclu_values = rank_order_results.included_qclu_values
+        included_qclu_values = rank_order_results.included_qclu_values
+
+        ## TODO: require same `included_qclu_values` values
+        rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
+        if rank_order_z_score_df is None:
+            return False
 
         if minimum_inclusion_fr_Hz is not None:
             return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
