@@ -77,6 +77,20 @@ class TrackTemplates(HDFMixin):
     def decoder_peak_location_list(self) -> List[NDArray]:
         """ a list of the peak_tuning_curve_center_of_masses for each decoder (independently) """
         return [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
+    
+
+    def get_decoder_aclu_peak_maps(self) -> DirectionalDecodersTuple:
+        """ returns a tuple of dicts, each containing a mapping between aclu:peak_pf_x for a given decoder. 
+         
+        # Naievely:
+        long_LR_aclu_peak_map = deepcopy(dict(zip(self.long_LR_decoder.neuron_IDs, self.long_LR_decoder.peak_locations)))
+        long_RL_aclu_peak_map = deepcopy(dict(zip(self.long_RL_decoder.neuron_IDs, self.long_RL_decoder.peak_locations)))
+        short_LR_aclu_peak_map = deepcopy(dict(zip(self.short_LR_decoder.neuron_IDs, self.short_LR_decoder.peak_locations)))
+        short_RL_aclu_peak_map = deepcopy(dict(zip(self.short_RL_decoder.neuron_IDs, self.short_RL_decoder.peak_locations)))
+        
+        """
+        return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_locations))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
+
 
 
     def __repr__(self):
