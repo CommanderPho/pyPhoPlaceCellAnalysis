@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 # from pyphoplacecellanalysis.PhoPositionalData.analysis.interactive_placeCell_config import print_subsession_neuron_differences
-from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for display_all_pf_2D_pyqtgraph_binned_image_rendering
+# from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for display_all_pf_2D_pyqtgraph_binned_image_rendering
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 ## Laps Stuff:
@@ -523,7 +523,7 @@ class RankOrderAnalyses:
 
     """
     # Plotting/Figure Helper Functions ___________________________________________________________________________________ #
-    def _perform_plot_z_score_raw(epoch_idx_list, odd_long_z_score_values, odd_short_z_score_values, even_long_z_score_values, even_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
+    def _perform_plot_z_score_raw(epoch_idx_list, LR_long_z_score_values, RL_long_z_score_values, LR_short_z_score_values, RL_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
         """ plots the raw z-scores for each of the four templates
 
         Usage:
@@ -539,17 +539,22 @@ class RankOrderAnalyses:
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
+        ## Add table:
+        # layoutWidget = pg.LayoutWidget()
+        # win.addItem(layoutWidget)
+        # layoutWidget.addWidget(
+
         # epoch_idx_list = np.arange(len(even_laps_long_short_z_score_diff_values))
         # epoch_idx_list = deepcopy(global_laps).lap_id # np.arange(len(even_laps_long_short_z_score_diff_values))
         n_x_points = len(epoch_idx_list)
-        n_y_points = np.shape(even_long_z_score_values)[0]
+        n_y_points = np.shape(RL_long_z_score_values)[0]
         if n_y_points > n_x_points:
             num_missing_points: int = n_y_points - n_x_points
             print(f'WARNING: trimming y-data to [{num_missing_points}:]')
-            even_long_z_score_values = even_long_z_score_values[num_missing_points:]
-            odd_long_z_score_values = odd_long_z_score_values[num_missing_points:]
-            even_short_z_score_values = even_short_z_score_values[num_missing_points:]
-            odd_short_z_score_values = odd_short_z_score_values[num_missing_points:]
+            RL_long_z_score_values = RL_long_z_score_values[num_missing_points:]
+            LR_long_z_score_values = LR_long_z_score_values[num_missing_points:]
+            RL_short_z_score_values = RL_short_z_score_values[num_missing_points:]
+            LR_short_z_score_values = LR_short_z_score_values[num_missing_points:]
 
 
         # Need to modify the symbol for each one, to emphasize the correct one?
@@ -568,17 +573,50 @@ class RankOrderAnalyses:
 
         # for masked arrays:
         # when using pg.ScatterPlotItem(...) compared to p1.plot(...), you must use the non-'symbol' prefixed argument names: {'symbolBrush':'brush', 'symbolPen':'pen'}
-        long_even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~even_long_z_score_values.mask], even_long_z_score_values[~even_long_z_score_values.mask], brush=pg.mkBrush('orange'), pen=pg.mkPen('#FFFFFF11'), symbol='t2', name='long_even', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~even_long_z_score_values.mask]) ## setting pen=None disables line drawing
-        long_odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~odd_long_z_score_values.mask], odd_long_z_score_values[~odd_long_z_score_values.mask], brush=pg.mkBrush('red'), pen=pg.mkPen('#FFFFFF11'), symbol='t3', name='long_odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~odd_long_z_score_values.mask]) ## setting pen=None disables line drawing
-        short_even_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~even_short_z_score_values.mask], even_short_z_score_values[~even_short_z_score_values.mask], brush=pg.mkBrush('blue'), pen=pg.mkPen('#FFFFFF11'), symbol='t2', name='short_even', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~even_short_z_score_values.mask]) ## setting pen=None disables line drawing
-        short_odd_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~odd_short_z_score_values.mask], odd_short_z_score_values[~odd_short_z_score_values.mask], brush=pg.mkBrush('teal'), pen=pg.mkPen('#FFFFFF11'), symbol='t3', name='short_odd', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~odd_short_z_score_values.mask]) ## setting pen=None disables line drawing
+        long_LR_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~LR_long_z_score_values.mask], LR_long_z_score_values[~LR_long_z_score_values.mask], brush=pg.mkBrush('red'), pen=pg.mkPen('#FFFFFF11'), symbol='t3', name='long_LR', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~LR_long_z_score_values.mask]) ## setting pen=None disables line drawing
+        long_RL_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~RL_long_z_score_values.mask], RL_long_z_score_values[~RL_long_z_score_values.mask], brush=pg.mkBrush('orange'), pen=pg.mkPen('#FFFFFF11'), symbol='t2', name='long_RL', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~RL_long_z_score_values.mask]) ## setting pen=None disables line drawing
+        short_LR_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~LR_short_z_score_values.mask], LR_short_z_score_values[~LR_short_z_score_values.mask], brush=pg.mkBrush('teal'), pen=pg.mkPen('#FFFFFF11'), symbol='t3', name='short_LR', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~LR_short_z_score_values.mask]) ## setting pen=None disables line drawing
+        short_RL_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~RL_short_z_score_values.mask], RL_short_z_score_values[~RL_short_z_score_values.mask], brush=pg.mkBrush('blue'), pen=pg.mkPen('#FFFFFF11'), symbol='t2', name='short_RL', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~RL_short_z_score_values.mask]) ## setting pen=None disables line drawing
+        
+        p1.addItem(long_LR_out_plot_1D)
+        p1.addItem(long_RL_out_plot_1D)
+        p1.addItem(short_LR_out_plot_1D)
+        p1.addItem(short_RL_out_plot_1D)
 
-        p1.addItem(long_even_out_plot_1D)
-        p1.addItem(long_odd_out_plot_1D)
-        p1.addItem(short_even_out_plot_1D)
-        p1.addItem(short_odd_out_plot_1D)
+        def find_closest(array, value):
+            array = np.asarray(array)
+            idx = (np.abs(array - value)).argmin()
+            return idx
 
-        return app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D)
+        # Function to connect points vertically
+        def connect_vertical_points(x, y_values):
+            for y in y_values:
+                if not np.ma.is_masked(y):  # Check if the value is not masked
+                    line = pg.PlotDataItem([x, x], [y, 0], pen=pg.mkPen('#FFFFFF33', width=0.5), hoverable=True, hoverPen=pg.mkPen('#FFFFFF55', width=0.75))
+                    p1.addItem(line)
+
+        # Connecting points
+        for x in epoch_idx_list:
+            # y_values = [
+            #     LR_long_z_score_values[epoch_idx_list.index(x)] if x in epoch_idx_list and not LR_long_z_score_values.mask[epoch_idx_list.index(x)] else np.ma.masked,
+            #     RL_long_z_score_values[epoch_idx_list.index(x)] if x in epoch_idx_list and not RL_long_z_score_values.mask[epoch_idx_list.index(x)] else np.ma.masked,
+            #     LR_short_z_score_values[epoch_idx_list.index(x)] if x in epoch_idx_list and not LR_short_z_score_values.mask[epoch_idx_list.index(x)] else np.ma.masked,
+            #     RL_short_z_score_values[epoch_idx_list.index(x)] if x in epoch_idx_list and not RL_short_z_score_values.mask[epoch_idx_list.index(x)] else np.ma.masked,
+            # ]
+                    
+            idx = find_closest(epoch_idx_list, x)
+            y_values = [
+                LR_long_z_score_values[idx] if not LR_long_z_score_values.mask[idx] else np.ma.masked,
+                RL_long_z_score_values[idx] if not RL_long_z_score_values.mask[idx] else np.ma.masked,
+                LR_short_z_score_values[idx] if not LR_short_z_score_values.mask[idx] else np.ma.masked,
+                RL_short_z_score_values[idx] if not RL_short_z_score_values.mask[idx] else np.ma.masked,
+            ]
+            connect_vertical_points(x, y_values)
+            
+
+        return app, win, (layoutWidget, p1), (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D)
+    
+
 
     def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
         """ plots the z-score differences
@@ -1762,7 +1800,8 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
         is_epoch_significant = np.arange(global_events.n_epochs)
 
 
-    epoch_identifiers = np.arange(global_events.n_epochs)
+    # epoch_identifiers = np.arange(global_events.n_epochs) # these should be labels!
+    epoch_identifiers = global_events._df.label.astype({'label': 'uint64'}).values #.labels
     x_values = global_events.midtimes
     x_axis_name_suffix = 'Mid-time (Sec)'
 
