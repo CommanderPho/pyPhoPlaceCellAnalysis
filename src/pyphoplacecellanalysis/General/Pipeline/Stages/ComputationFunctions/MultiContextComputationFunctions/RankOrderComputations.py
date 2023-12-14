@@ -799,7 +799,7 @@ class RankOrderAnalyses:
 
         active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
         # Add epoch IDs to the spikes DataFrame
-        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
+        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name='label', override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
         active_spikes_df.drop(active_spikes_df.loc[active_spikes_df['Probe_Epoch_id'] == no_interval_fill_value].index, inplace=True)
         # Sort by columns: 't_rel_seconds' (ascending), 'aclu' (ascending)
         active_spikes_df = active_spikes_df.sort_values(['t_rel_seconds', 'aclu'])
@@ -812,7 +812,7 @@ class RankOrderAnalyses:
         # Now that we have `filtered_active_epochs`, we need to update the 'Probe_Epoch_id' because the epoch id's might have changed
         active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
         # Add epoch IDs to the spikes DataFrame
-        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=filtered_active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
+        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=filtered_active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name='label', override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
         active_spikes_df.drop(active_spikes_df.loc[active_spikes_df['Probe_Epoch_id'] == no_interval_fill_value].index, inplace=True)
         # Sort by columns: 't_rel_seconds' (ascending), 'aclu' (ascending)
         active_spikes_df = active_spikes_df.sort_values(['t_rel_seconds', 'aclu'])
