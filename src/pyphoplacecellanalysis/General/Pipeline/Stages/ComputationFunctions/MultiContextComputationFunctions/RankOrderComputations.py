@@ -1534,8 +1534,10 @@ class RankOrderAnalyses:
 
     @classmethod
     @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
-    def pandas_df_based_correlation_computations(cls, selected_spikes_df: pd.DataFrame, track_templates: TrackTemplates, num_shuffles:int=100, debug_print=True):
-        """ 
+    def pandas_df_based_correlation_computations(cls, selected_spikes_df: pd.DataFrame, active_epochs: pd.DataFrame, track_templates: TrackTemplates, num_shuffles:int=100, debug_print=True):
+        """ 2023-12-15 - Absolute newest complete Rank-Order shuffle implementation. Does both Pearson and Spearman.
+        
+        
         selected_spikes_df: pd.DataFrame - spikes dataframe containing only the first spike (the "selected one") for each cell within the periods of interest.
         
 
