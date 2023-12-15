@@ -1465,7 +1465,7 @@ class RankOrderAnalyses:
     # 2023-12-13 - New pd.DataFrame simplified correlations: Spearman and Pearson ________________________________________ #
 
     @classmethod
-    @function_attributes(short_name=None, tags=['subfn', 'correlation', 'spearman', 'rank-order', 'pearson'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-13 03:47', related_items=[])
+    @function_attributes(short_name=None, tags=['subfn', 'correlation', 'spearman', 'rank-order', 'pearson'], input_requires=[], output_provides=[], uses=[], used_by=['pandas_df_based_correlation_computations'], creation_date='2023-12-13 03:47', related_items=[])
     def _subfn_calculate_correlations(cls, group, method='spearman', enable_shuffle: bool=False) -> pd.Series:
         """ computes the pearson correlations between the spiketimes during a specific epoch (identified by each 'Probe_Epoch_id' group) and that spike's pf_peak_x location in the template.
 
@@ -1487,64 +1487,64 @@ class RankOrderAnalyses:
         }
         return pd.Series(correlations)
 
+    # @classmethod
+    # @function_attributes(short_name=None, tags=['DEPRICATED', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=['LongShortStatsTuple'], uses=['_subfn_calculate_correlations', 'cls.select_and_rank_spikes', 'LongShortStatsTuple'], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
+    # def new_compute_correlations(cls, selected_spikes_df: pd.DataFrame, active_epochs: pd.DataFrame, track_templates: TrackTemplates, debug_print=True):
+    #     """ 2023-12-13 new method of computing the correlations (spearman rank-order and pearson)
+
+    #     Adds Columns:
+    #         selected_spikes_df: ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
+    #         active_epochs: [f'LR_Long_{method}', f'RL_Long_{method}', f'LR_Short_{method}', f'RL_Short_{method}'] where method in ['spearman', 'pearson']
+
+
+    #     Usage:
+    #         selected_spikes_df: pd.DataFrame = deepcopy(rank_order_results.LR_ripple.selected_spikes_df) #TODO 2023-12-13 01:32: - [ ] WARN: this is just the LR_ripple's selected_spikes_df, I might need to merge with RL_ripple's selected_spikes_df?? `ripple_result_tuple.active_epochs.label`
+    #         active_epochs = ripple_result_tuple.active_epochs
+    #         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+    #         active_selected_spikes_df, active_epochs_df = RanklOrderAnalyses.new_compute_correlations(cls, selected_spikes_df=selected_spikes_df, active_epochs=active_epochs, track_templates=track_templates)
+
+
+    #     """
+    #     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+    #     desired_df_label_column_data_type: str = 'int'
+    #     # desired_df_label_column_data_type: str = 'string'
+
+    #     ## Adding the pf_peak_x locations for all four templates:
+    #     long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
+        
+    #     ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
+    #     active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': desired_df_label_column_data_type}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+        
+    #     _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
+    #     active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
+
+    #     active_selected_spikes_df['LR_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_LR_aclu_peak_map)
+    #     active_selected_spikes_df['RL_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
+    #     active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
+    #     active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
+        
+    #     # active_selected_spikes_df = active_selected_spikes_df.groupby(['Probe_Epoch_id']).agg(aclu_count=('aclu', 'count'), aclu_nunique=('aclu', 'nunique'), LR_Long_pf_peak_x_var=('LR_Long_pf_peak_x', 'var')).reset_index()
+    #     # active_selected_spikes_df = active_selected_spikes_df.groupby(['Probe_Epoch_id', 'aclu']).agg(LR_Long_pf_peak_x_mean=('LR_Long_pf_peak_x', 'mean')).reset_index()
+
+    #     epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id')
+    #     spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: cls._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+    #     pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: cls._subfn_calculate_correlations(group, method='pearson', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+
+    #     # active_epochs_merged_correlations_df = spearman_correlations_reset.merge(pearson_correlations_reset, on='Probe_Epoch_id', how='left')
+
+    #     # Merge with the active_epochs DataFrame
+    #     active_epochs_df: pd.DataFrame = deepcopy(active_epochs)
+    #     # Change column type to uint64 for column: 'label'
+    #     active_epochs_df = active_epochs_df.astype({'label': desired_df_label_column_data_type})
+    #     active_epochs_df = active_epochs_df.merge(spearman_correlations, left_on='label', right_on='Probe_Epoch_id', how='left', suffixes=('', '_spearman'))
+    #     active_epochs_df = active_epochs_df.merge(pearson_correlations, left_on='label', right_on='Probe_Epoch_id', how='left', suffixes=('', '_pearson'))
+    #     active_epochs_df.drop(['Probe_Epoch_id', 'Probe_Epoch_id_pearson'], axis=1, inplace=True) # Drop the extra 'Probe_Epoch_id' columns
+
+    #     return active_selected_spikes_df, active_epochs_df
+
+
     @classmethod
-    @function_attributes(short_name=None, tags=['shuffle', 'rank_order', 'main'], input_requires=[], output_provides=['LongShortStatsTuple'], uses=['_subfn_calculate_correlations', 'cls.select_and_rank_spikes', 'LongShortStatsTuple'], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
-    def new_compute_correlations(cls, selected_spikes_df: pd.DataFrame, active_epochs: pd.DataFrame, track_templates: TrackTemplates, debug_print=True):
-        """ 2023-12-13 new method of computing the correlations (spearman rank-order and pearson)
-
-        Adds Columns:
-            selected_spikes_df: ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
-            active_epochs: [f'LR_Long_{method}', f'RL_Long_{method}', f'LR_Short_{method}', f'RL_Short_{method}'] where method in ['spearman', 'pearson']
-
-
-        Usage:
-            selected_spikes_df: pd.DataFrame = deepcopy(rank_order_results.LR_ripple.selected_spikes_df) #TODO 2023-12-13 01:32: - [ ] WARN: this is just the LR_ripple's selected_spikes_df, I might need to merge with RL_ripple's selected_spikes_df?? `ripple_result_tuple.active_epochs.label`
-            active_epochs = ripple_result_tuple.active_epochs
-            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-            active_selected_spikes_df, active_epochs_df = RanklOrderAnalyses.new_compute_correlations(cls, selected_spikes_df=selected_spikes_df, active_epochs=active_epochs, track_templates=track_templates)
-
-
-        """
-        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        desired_df_label_column_data_type: str = 'int'
-        # desired_df_label_column_data_type: str = 'string'
-
-        ## Adding the pf_peak_x locations for all four templates:
-        long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
-        
-        ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
-        active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': desired_df_label_column_data_type}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
-        
-        _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
-        active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
-
-        active_selected_spikes_df['LR_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_LR_aclu_peak_map)
-        active_selected_spikes_df['RL_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
-        active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
-        active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
-        
-        # active_selected_spikes_df = active_selected_spikes_df.groupby(['Probe_Epoch_id']).agg(aclu_count=('aclu', 'count'), aclu_nunique=('aclu', 'nunique'), LR_Long_pf_peak_x_var=('LR_Long_pf_peak_x', 'var')).reset_index()
-        # active_selected_spikes_df = active_selected_spikes_df.groupby(['Probe_Epoch_id', 'aclu']).agg(LR_Long_pf_peak_x_mean=('LR_Long_pf_peak_x', 'mean')).reset_index()
-
-        epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id')
-        spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: cls._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
-        pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: cls._subfn_calculate_correlations(group, method='pearson', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
-
-        # active_epochs_merged_correlations_df = spearman_correlations_reset.merge(pearson_correlations_reset, on='Probe_Epoch_id', how='left')
-
-        # Merge with the active_epochs DataFrame
-        active_epochs_df: pd.DataFrame = deepcopy(active_epochs)
-        # Change column type to uint64 for column: 'label'
-        active_epochs_df = active_epochs_df.astype({'label': desired_df_label_column_data_type})
-        active_epochs_df = active_epochs_df.merge(spearman_correlations, left_on='label', right_on='Probe_Epoch_id', how='left', suffixes=('', '_spearman'))
-        active_epochs_df = active_epochs_df.merge(pearson_correlations, left_on='label', right_on='Probe_Epoch_id', how='left', suffixes=('', '_pearson'))
-        active_epochs_df.drop(['Probe_Epoch_id', 'Probe_Epoch_id_pearson'], axis=1, inplace=True) # Drop the extra 'Probe_Epoch_id' columns
-
-        return active_selected_spikes_df, active_epochs_df
-
-
-    @classmethod
-    @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
+    @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['_subfn_calculate_correlations'], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
     def pandas_df_based_correlation_computations(cls, selected_spikes_df: pd.DataFrame, active_epochs_df: Optional[pd.DataFrame], track_templates: TrackTemplates, num_shuffles:int=1000, debug_print=True):
         """ 2023-12-15 - Absolute newest complete Rank-Order shuffle implementation. Does both Pearson and Spearman.
         
@@ -1557,6 +1557,7 @@ class RankOrderAnalyses:
         
         combined_variable_names: ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman', 'LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
         combined_variable_z_score_column_names: ['LR_Long_spearman_Z', 'RL_Long_spearman_Z', 'LR_Short_spearman_Z', 'RL_Short_spearman_Z', 'LR_Long_pearson_Z', 'RL_Long_pearson_Z', 'LR_Short_pearson_Z', 'RL_Short_pearson_Z']
+        
         
         
         
@@ -1587,8 +1588,6 @@ class RankOrderAnalyses:
         active_selected_spikes_df['RL_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
         active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
         active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
-
-
 
         ## Compute real values here:
         epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
