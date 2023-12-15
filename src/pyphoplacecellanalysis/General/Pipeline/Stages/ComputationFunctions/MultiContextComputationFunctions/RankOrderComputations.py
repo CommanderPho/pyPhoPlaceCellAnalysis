@@ -1761,7 +1761,6 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             # initialize
             global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=None, RL_ripple=None, LR_laps=None, RL_laps=None, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, is_global=True)
 
-
         global_computation_results.computed_data['RankOrder'].included_qclu_values = included_qclu_values
 
         ## Laps Rank-Order Analysis:
@@ -1790,7 +1789,24 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         except (AssertionError, BaseException) as e:
             print(f'e: {e}')
             pass
+        
 
+        # New method 2023-12-15:
+                # Set the global result:
+        try:
+            print(f'\tdone. building global result.')
+            directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+            selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
+            active_epochs = global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple.active_epochs
+            track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+            combined_epoch_stats_df, new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=1000)
+            # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = new_output_tuple
+            global_computation_results.computed_data['RankOrder'].combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].new_output_tuple = combined_epoch_stats_df, new_output_tuple
+        except (AssertionError, BaseException) as e:
+            print(f'New method 2023-12-15: e: {e}')
+            pass
+        
+        
         """ Usage:
         
         rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
