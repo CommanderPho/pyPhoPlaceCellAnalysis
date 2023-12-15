@@ -627,7 +627,7 @@ class RankOrderAnalyses:
             connect_vertical_points(x, y_values)
             
 
-        return app, win, (layoutWidget, p1), (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D)
+        return app, win, p1, (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D)
     
 
 
