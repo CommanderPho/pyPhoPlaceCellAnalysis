@@ -141,3 +141,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 			output_slurm_scripts.append(slurm_script_path)
 	
 	return included_session_contexts, output_python_scripts, output_slurm_scripts
+
+
+
+def symlink_output_files():
+	# should_symlink_output_pickles
+	
