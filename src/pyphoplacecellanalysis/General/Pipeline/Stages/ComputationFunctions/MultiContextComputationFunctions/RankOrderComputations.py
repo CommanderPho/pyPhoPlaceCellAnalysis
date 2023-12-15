@@ -231,7 +231,15 @@ class ShuffleHelper(HDFMixin):
 
 @define(slots=False, repr=False, eq=False)
 class Zscorer(HDFMixin):
-    original_values: NDArray = serialized_field(repr=False, is_computable=False)
+    """ 
+    Zscorer recieves the list of raw metric values, one for each shuffle, which is stores in .original_values
+    
+    It also receives the "real" non-shuffled value, which is stores in .real_value
+    
+    
+    
+    """
+    original_values: NDArray = serialized_field(repr=False, is_computable=False, )
     mean: float = serialized_attribute_field(repr=True, is_computable=True)
     std_dev: float = serialized_attribute_field(repr=True, is_computable=True)
     n_values: int = serialized_attribute_field(repr=True, is_computable=True)
@@ -1487,7 +1495,7 @@ class RankOrderAnalyses:
 
         """
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        desired_df_label_column_data_type: str = 'uint64'
+        desired_df_label_column_data_type: str = 'int'
         # desired_df_label_column_data_type: str = 'string'
 
         ## Adding the pf_peak_x locations for all four templates:
@@ -1522,6 +1530,172 @@ class RankOrderAnalyses:
         active_epochs_df.drop(['Probe_Epoch_id', 'Probe_Epoch_id_pearson'], axis=1, inplace=True) # Drop the extra 'Probe_Epoch_id' columns
 
         return active_selected_spikes_df, active_epochs_df
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
+    def pandas_df_based_correlation_computations(cls, selected_spikes_df: pd.DataFrame, track_templates: TrackTemplates, num_shuffles:int=100, debug_print=True):
+        """ 
+        selected_spikes_df: pd.DataFrame - spikes dataframe containing only the first spike (the "selected one") for each cell within the periods of interest.
+        
+
+
+        Outputs:
+        
+        combined_variable_names: ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman', 'LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
+        combined_variable_z_score_column_names: ['LR_Long_spearman_Z', 'RL_Long_spearman_Z', 'LR_Short_spearman_Z', 'RL_Short_spearman_Z', 'LR_Long_pearson_Z', 'RL_Long_pearson_Z', 'LR_Short_pearson_Z', 'RL_Short_pearson_Z']
+        
+        
+        
+        Usage:
+        
+            from PendingNotebookCode import pandas_df_based_correlation_computations
+            
+            combined_epoch_stats_df, (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = pandas_df_based_correlation_computations(selected_spikes_df, track_templates, num_shuffles=1000)
+
+        
+        
+        """
+        ## Shuffle each map's aclus, takes `selected_spikes_df`
+
+        # LongShortStatsTuple: Tuple[Zscorer, Zscorer, float, float, bool]
+
+        
+        rng = np.random.default_rng() # seed=13378 #TODO 2023-12-13 05:13: - [ ] DO NOT SET THE SEED! This makes the random permutation/shuffle the same every time!!!
+        long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
+
+        ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
+        active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': 'int'}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+        _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
+        active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
+
+        ## Normal:
+        active_selected_spikes_df['LR_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_LR_aclu_peak_map)
+        active_selected_spikes_df['RL_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
+        active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
+        active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
+
+
+
+        ## Compute real values here:
+        epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
+        spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+        pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='pearson', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+
+        real_stats_tuple = (spearman_correlations, pearson_correlations)
+
+        names0 = ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman']
+        dfs0 = [real_stats_tuple[0]] # [0] is just spearman_correlations
+        stacked_arrays0 = np.array([df[names0].values for df in dfs0])
+        names1 = ['LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
+        dfs1 = [real_stats_tuple[1]] # [1] is pearson_correlations
+        stacked_arrays1 = np.array([df[names1].values for df in dfs1])
+        real_stacked_arrays = np.squeeze(np.concatenate((stacked_arrays0, stacked_arrays1), axis=-1)[0,:,:]) # .shape: (412, 8) # (n_epochs, n_columns)
+        
+        ## Combined column names:
+        combined_variable_names = names0 + names1
+        
+
+        # active_epochs = deepcopy(ripple_result_tuple.active_epochs)
+
+        # ==================================================================================================================== #
+        # PERFORM SHUFFLE HERE:                                                                                                #
+        # ==================================================================================================================== #
+        # On-the-fly shuffling mode using shuffle_helper:
+        # epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = build_shuffled_ids(list(long_LR_aclu_peak_map.keys()), num_shuffles=num_shuffles, seed=None) # .shape: ((num_shuffles, n_neurons), (num_shuffles, n_neurons))
+
+        ## USES selected_spikes_df
+        all_decoder_aclus_map_keys_list = [np.array(list(a_map.keys())) for a_map in (long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map)] # list of four elements
+        all_shuffled_decoder_aclus_map_keys_list = [build_shuffled_ids(a_map_keys, num_shuffles=num_shuffles, seed=None)[0] for a_map_keys in all_decoder_aclus_map_keys_list] # [0] only gets the shuffled_aclus themselves, which are of shape .shape: ((num_shuffles, n_neurons[i]) where i is the decoder_index
+
+        long_LR_epoch_specific_shuffled_aclus, long_RL_epoch_specific_shuffled_aclus, short_LR_epoch_specific_shuffled_aclus, short_RL_epoch_specific_shuffled_aclus = all_shuffled_decoder_aclus_map_keys_list
+
+        ## Shuffle a single map, but will eventually need one for each of the four decoders::
+        # epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = build_shuffled_ids(list(long_LR_aclu_peak_map.keys()), num_shuffles=num_shuffles, seed=None) # .shape: ((num_shuffles, n_neurons), (num_shuffles, n_neurons))
+
+        output_active_epoch_computed_values = []
+
+        for shuffle_IDX in np.arange(num_shuffles):
+            """ within the loop we modify: 
+                active_selected_spikes_df, active_epochs 
+                
+                From active_selected_spikes_df I only need: ['t_rel_seconds', 'aclu', 'Probe_Epoch_id', 'label']
+                
+            """
+            
+            active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
+            # assert len(epoch_specific_shuffled_aclus_tuple) == 4, f"len(epoch_specific_shuffled_aclus_tuple): {len(epoch_specific_shuffled_aclus_tuple)}"
+            
+            #TODO 2023-11-22 12:50: - [X] Are the sizes correct since `a_shuffled_IDXs` doesn't know the size of the template?
+            # epoch_specific_shuffled_long_LR_aclu_peak_map = dict(zip(epoch_specific_shuffled_aclus, long_LR_aclu_peak_map.values()))
+            # print(f'epoch_specific_shuffled_long_LR_aclu_peak_map: {epoch_specific_shuffled_long_LR_aclu_peak_map}')
+
+            # selected_spikes_df: pd.DataFrame = deepcopy(rank_order_results.LR_ripple.selected_spikes_df) #TODO 2023-12-13 01:32: - [ ] WARN: this is just the LR_ripple's selected_spikes_df, I might need to merge with RL_ripple's selected_spikes_df?? `ripple_result_tuple.active_epochs.label`
+            
+            # for a_name in _pf_peak_x_column_names:
+            # 	epoch_specific_shuffled_long_LR_aclu_peak_map = dict(zip(epoch_specific_shuffled_aclus, long_LR_aclu_peak_map.values()))
+            # 	active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(epoch_specific_shuffled_long_LR_aclu_peak_map)
+
+            a_name = 'LR_Long_pf_peak_x'
+            active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(long_LR_epoch_specific_shuffled_aclus[shuffle_IDX], long_LR_aclu_peak_map.values())))
+
+            a_name = 'RL_Long_pf_peak_x'
+            active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(long_RL_epoch_specific_shuffled_aclus[shuffle_IDX], long_RL_aclu_peak_map.values())))
+            
+            a_name = 'LR_Short_pf_peak_x'
+            active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(short_LR_epoch_specific_shuffled_aclus[shuffle_IDX], short_LR_aclu_peak_map.values())))
+            
+            a_name = 'RL_Short_pf_peak_x'
+            active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(short_RL_epoch_specific_shuffled_aclus[shuffle_IDX], short_RL_aclu_peak_map.values())))
+            
+
+            epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
+            spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+            pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='pearson', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+
+            output_active_epoch_computed_values.append((spearman_correlations, pearson_correlations))
+            # active_epochs_merged_correlations_df = spearman_correlations_reset.merge(pearson_correlations_reset, on='Probe_Epoch_id', how='left')
+
+            
+
+        # Build the output `stacked_arrays`: _________________________________________________________________________________ #
+        # Convert each DataFrame to a NumPy array and stack them # shape of this array will be (n, m, p) where n is the number of DataFrames, m is the number of rows, and p is the number of columns in each DataFrame.
+        names0 = ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman']
+        dfs0 = [a_tuple[0] for a_tuple in output_active_epoch_computed_values] # [0] is just spearman_correlations
+        stacked_arrays0 = np.array([df[names0].values for df in dfs0])
+        names1 = ['LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
+        dfs1 = [a_tuple[1] for a_tuple in output_active_epoch_computed_values] # [1] is pearson_correlations
+        stacked_arrays1 = np.array([df[names1].values for df in dfs1])
+        stacked_arrays = np.concatenate((stacked_arrays0, stacked_arrays1), axis=-1) # .shape: (100, 412, 8) # (n_shuffles, n_epochs, n_columns)
+
+        ## Drop any shuffle indicies where NaNs are returned for any of the stats values.
+        is_valid_row = np.logical_not(np.isnan(stacked_arrays)).all(axis=(1,2))
+        n_valid_shuffles = np.sum(is_valid_row)
+        if debug_print:
+            print(f'n_valid_shuffles: {n_valid_shuffles}')
+        valid_stacked_arrays = stacked_arrays[is_valid_row] ## Get only the rows where all elements along both axis (1, 2) are True    
+
+        # Need: valid_stacked_arrays, real_stacked_arrays, combined_variable_names
+        combined_epoch_stats_df: pd.DataFrame = pd.DataFrame(real_stacked_arrays, columns=combined_variable_names)
+        combined_variable_z_score_column_names = [f"{a_name}_Z" for a_name in combined_variable_names] # combined_variable_z_score_column_names: ['LR_Long_spearman_Z', 'RL_Long_spearman_Z', 'LR_Short_spearman_Z', 'RL_Short_spearman_Z', 'LR_Long_pearson_Z', 'RL_Long_pearson_Z', 'LR_Short_pearson_Z', 'RL_Short_pearson_Z']
+
+        ## Extract the stats values for each shuffle from `valid_stacked_arrays`:
+        n_epochs = np.shape(real_stacked_arrays)[0]
+        n_variables = np.shape(real_stacked_arrays)[1]
+
+        assert n_epochs == np.shape(valid_stacked_arrays)[-2]
+        assert n_variables == np.shape(valid_stacked_arrays)[-1]
+
+        for variable_IDX, a_column_name in enumerate(combined_variable_z_score_column_names):
+            z_scorer_list = [Zscorer.init_from_values(stats_corr_values=np.squeeze(valid_stacked_arrays[:, :, variable_IDX]), real_value=real_stacked_arrays[epoch_IDX, variable_IDX]) for epoch_IDX in np.arange(n_epochs)]
+            z_score_values = np.array([a_zscorer.z_score_value for a_zscorer in z_scorer_list])
+            combined_epoch_stats_df[a_column_name] = z_score_values
+
+        if debug_print:
+            print(f'combined_variable_names: {combined_variable_names}')
+            print(f'combined_variable_z_score_column_names: {combined_variable_z_score_column_names}')
+
+        return combined_epoch_stats_df, (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
 
 
 
