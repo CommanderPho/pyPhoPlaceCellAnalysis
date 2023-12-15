@@ -149,8 +149,8 @@ def determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2
 @define(slots=False, repr=False, eq=False)
 class ShuffleHelper(HDFMixin):
     """ holds the result of shuffling templates. Used for rank-order analyses """
-    shared_aclus_only_neuron_IDs: NDArray = serialized_field()
-    is_good_aclus: NDArray = serialized_field(repr=False)
+    shared_aclus_only_neuron_IDs: NDArray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
+    is_good_aclus: NDArray = serialized_field(repr=False, eq=attrs.cmp_using(eq=np.array_equal))
 
     num_shuffles: int = serialized_attribute_field(repr=True) # default=1000
     shuffled_aclus = non_serialized_field(repr=False, is_computable=True)
@@ -231,7 +231,7 @@ class ShuffleHelper(HDFMixin):
 
 @define(slots=False, repr=False, eq=False)
 class Zscorer(HDFMixin):
-    original_values: NDArray = serialized_field(repr=False, is_computable=False)
+    original_values: NDArray = serialized_field(repr=False, is_computable=False, eq=attrs.cmp_using(eq=np.array_equal))
     mean: float = serialized_attribute_field(repr=True, is_computable=True)
     std_dev: float = serialized_attribute_field(repr=True, is_computable=True)
     n_values: int = serialized_attribute_field(repr=True, is_computable=True)
@@ -287,9 +287,9 @@ class RankOrderResult(ComputedResult):
     ranked_aclus_stats_dict: Dict[int, LongShortStatsTuple] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v))) # , serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v))
     selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v)))
 
-    long_z_score: NDArray = serialized_field()
-    short_z_score: NDArray = serialized_field()
-    long_short_z_score_diff: NDArray = serialized_field()
+    long_z_score: NDArray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
+    short_z_score: NDArray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
+    long_short_z_score_diff: NDArray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
 
     spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
     epochs_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
@@ -825,11 +825,12 @@ class RankOrderAnalyses:
     def select_and_rank_spikes(cls, active_spikes_df: pd.DataFrame, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment: str, time_variable_name_override: Optional[str]=None):
         """Selects and ranks spikes based on rank_alignment, and organizes them into structured dictionaries.
 
+
+        Returns:
         epoch_ranked_aclus_dict: Dict[int, Dict[int, float]]: a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
         epoch_ranked_fragile_linear_neuron_IDX_dict: Dict[int, NDArray]:
         epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray]:
         selected_spikes_only_df: pd.DataFrame: an output dataframe containing only the select (e.g. .first(), .median(), etc) spike from each template.
-
 
         """
         if time_variable_name_override is None:
@@ -857,7 +858,7 @@ class RankOrderAnalyses:
         # Rank the aclu values by their first t value in each Probe_Epoch_id
         ranked_aclus = selected_spikes.groupby('Probe_Epoch_id').rank(method='dense')  # Resolve ties in ranking
 
-        # Create structured dictionaries
+        # Create structured OUTPUT dictionaries
         epoch_ranked_aclus_dict: Dict[int, Dict[int, float]] = {} # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
         epoch_ranked_fragile_linear_neuron_IDX_dict: Dict[int, NDArray] = {}
         epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray] = {}
