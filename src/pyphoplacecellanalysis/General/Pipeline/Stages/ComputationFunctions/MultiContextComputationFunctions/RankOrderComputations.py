@@ -780,7 +780,7 @@ class RankOrderAnalyses:
 
     @classmethod
     @function_attributes(short_name=None, tags=['subfn', 'preprocess', 'spikes_df'], input_requires=[], output_provides=[], uses=['add_epochs_id_identity'], used_by=['compute_shuffled_rankorder_analyses'], creation_date='2023-11-22 11:04', related_items=[])
-    def preprocess_spikes_df(cls, active_spikes_df: pd.DataFrame, active_epochs: Epoch, shuffle_helper: ShuffleHelper, no_interval_fill_value=-1, min_num_unique_aclu_inclusions: int=5):
+    def preprocess_spikes_df(cls, active_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, shuffle_helper: ShuffleHelper, no_interval_fill_value=-1, min_num_unique_aclu_inclusions: int=5):
         """Preprocesses the active spikes DataFrame and the active_epochs dataframe by extracting shuffle helper data, deep copying, and adding epoch IDs and dropping epochs with fewer than minimum aclus.
 
         # 2023-12-08 12:53: - [X] Drop epochs with fewer than the minimum active aclus
@@ -799,26 +799,26 @@ class RankOrderAnalyses:
 
         active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
         # Add epoch IDs to the spikes DataFrame
-        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name='label', override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
+        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=active_epochs_df, epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name='label', override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
         active_spikes_df.drop(active_spikes_df.loc[active_spikes_df['Probe_Epoch_id'] == no_interval_fill_value].index, inplace=True)
         # Sort by columns: 't_rel_seconds' (ascending), 'aclu' (ascending)
         active_spikes_df = active_spikes_df.sort_values(['t_rel_seconds', 'aclu'])
 
         # now filter epochs based on the number of included aclus:
-        filtered_active_epochs = Epoch.filter_epochs(active_epochs, pos_df=None, spikes_df=active_spikes_df, min_epoch_included_duration=None, max_epoch_included_duration=None, maximum_speed_thresh=None,
-                                                     min_inclusion_fr_active_thresh=None, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions)
-
+        filtered_active_epochs_df = Epoch.filter_epochs(active_epochs_df, pos_df=None, spikes_df=active_spikes_df, min_epoch_included_duration=None, max_epoch_included_duration=None, maximum_speed_thresh=None,
+                                                     min_inclusion_fr_active_thresh=None, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions).to_dataframe() # convert back to dataframe when done.
+        filtered_active_epochs_df['label'] = filtered_active_epochs_df['label'].astype('int')
 
         # Now that we have `filtered_active_epochs`, we need to update the 'Probe_Epoch_id' because the epoch id's might have changed
         active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
         # Add epoch IDs to the spikes DataFrame
-        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=filtered_active_epochs.to_dataframe(), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name='label', override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
+        active_spikes_df = add_epochs_id_identity(active_spikes_df, epochs_df=filtered_active_epochs_df, epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name='label', override_time_variable_name='t_rel_seconds', no_interval_fill_value=no_interval_fill_value)
         active_spikes_df.drop(active_spikes_df.loc[active_spikes_df['Probe_Epoch_id'] == no_interval_fill_value].index, inplace=True)
         # Sort by columns: 't_rel_seconds' (ascending), 'aclu' (ascending)
         active_spikes_df = active_spikes_df.sort_values(['t_rel_seconds', 'aclu'])
         active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict = active_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()
 
-        return shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, long_pf_peak_ranks, short_pf_peak_ranks, active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, filtered_active_epochs.to_dataframe()
+        return shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, long_pf_peak_ranks, short_pf_peak_ranks, active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, filtered_active_epochs_df
 
 
     @classmethod
@@ -898,6 +898,16 @@ class RankOrderAnalyses:
         """
         # post_process_statistic_value_fn = lambda x: np.abs(x)
         post_process_statistic_value_fn = lambda x: float(x) # basically NO-OP
+
+
+        if not isinstance(active_epochs, pd.DataFrame):
+            active_epochs = active_epochs.to_dataframe()
+
+
+        assert isinstance(active_epochs, pd.DataFrame), f"active_epochs should be a dataframe but it is: {type(active_epochs)}"
+        # CAST the labels into the correct format
+        active_epochs['label'] = active_epochs['label'].astype('int')
+
 
         # Preprocess the spikes DataFrame
         (shared_aclus_only_neuron_IDs, is_good_aclus, shuffled_aclus, shuffle_IDXs, long_pf_peak_ranks, short_pf_peak_ranks, active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, filtered_active_epochs) = cls.preprocess_spikes_df(active_spikes_df, active_epochs, shuffle_helper, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions)
@@ -1286,6 +1296,7 @@ class RankOrderAnalyses:
 
         global_replays = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
         if isinstance(global_replays, pd.DataFrame):
+            ## why do we convert to Epoch before passing in? this doesn't make sense to me. Just to use the .get_valid_df()?
             global_replays = Epoch(global_replays.epochs.get_valid_df())
 
         ## Replay Epochs:
@@ -1324,6 +1335,11 @@ class RankOrderAnalyses:
 
         # curr_active_pipeline.sess.config.preprocessing_parameters
         min_num_unique_aclu_inclusions: int = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions
+
+        
+        if not isinstance(global_laps, pd.DataFrame):
+            global_laps_df = deepcopy(global_laps).to_dataframe()
+            global_laps_df['label'] = global_laps_df['label'].astype('int')
 
         # TODO: CenterOfMass for Laps instead of median spike
         # laps_rank_alignment = 'center_of_mass'
