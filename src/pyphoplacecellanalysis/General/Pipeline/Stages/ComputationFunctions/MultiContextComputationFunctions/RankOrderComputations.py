@@ -399,6 +399,11 @@ class RankOrderComputationsContainer(ComputedResult):
     ripple_most_likely_result_tuple: Optional[DirectionalRankOrderResult] = serialized_field(default=None, repr=False)
     laps_most_likely_result_tuple: Optional[DirectionalRankOrderResult] = serialized_field(default=None, repr=False)
 
+    ripple_combined_epoch_stats_df: Optional[pd.DataFrame] = serialized_field(default=None, repr=False)
+    ripple_new_output_tuple: Optional[Tuple] = non_serialized_field(default=None, repr=False)
+    # ripple_n_valid_shuffles: Optional[int] = serialized_attribute_field(default=None, repr=False)
+    
+
     minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=2.0, repr=True)
     included_qclu_values: Optional[List] = serialized_attribute_field(default=None, repr=True)
 
@@ -1404,6 +1409,9 @@ class RankOrderAnalyses:
         rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
         if rank_order_z_score_df is None:
             return False
+        
+        # 2023-12-15 - Newest method:
+        ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
 
         if minimum_inclusion_fr_Hz is not None:
             return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
@@ -1707,7 +1715,7 @@ class RankOrderAnalyses:
                 else:
                     print(f'failed to add label column, shapes differ! np.shape(active_epochs_df)[0] : {np.shape(active_epochs_df)[0] }, np.shape(combined_epoch_stats_df)[0]): {np.shape(combined_epoch_stats_df)[0]}')
 
-                combined_epoch_stats_df.set_index('label')
+                combined_epoch_stats_df = combined_epoch_stats_df.set_index('label')
             else:
                 print('invalid active_epochs_df. skipping adding labels')
         except BaseException as e:
@@ -1799,9 +1807,11 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
             active_epochs = global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple.active_epochs
             track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-            combined_epoch_stats_df, new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=1000)
-            # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = new_output_tuple
-            global_computation_results.computed_data['RankOrder'].combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].new_output_tuple = combined_epoch_stats_df, new_output_tuple
+            ripple_combined_epoch_stats_df, ripple_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
+            # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = ripple_new_output_tuple
+            global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].ripple_new_output_tuple = ripple_combined_epoch_stats_df, ripple_new_output_tuple
+            print(f'done!')
+            
         except (AssertionError, BaseException) as e:
             print(f'New method 2023-12-15: e: {e}')
             pass
