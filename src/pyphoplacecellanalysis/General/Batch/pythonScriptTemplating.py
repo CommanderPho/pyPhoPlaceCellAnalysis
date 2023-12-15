@@ -144,6 +144,6 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
 
 
-def symlink_output_files():
-	# should_symlink_output_pickles
+# def symlink_output_files():
+# 	# should_symlink_output_pickles
 	
