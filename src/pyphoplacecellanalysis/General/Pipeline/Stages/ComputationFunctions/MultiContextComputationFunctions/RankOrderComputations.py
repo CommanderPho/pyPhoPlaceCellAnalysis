@@ -1534,7 +1534,7 @@ class RankOrderAnalyses:
 
     @classmethod
     @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
-    def pandas_df_based_correlation_computations(cls, selected_spikes_df: pd.DataFrame, active_epochs: pd.DataFrame, track_templates: TrackTemplates, num_shuffles:int=100, debug_print=True):
+    def pandas_df_based_correlation_computations(cls, selected_spikes_df: pd.DataFrame, active_epochs_df: Optional[pd.DataFrame], track_templates: TrackTemplates, num_shuffles:int=1000, debug_print=True):
         """ 2023-12-15 - Absolute newest complete Rank-Order shuffle implementation. Does both Pearson and Spearman.
         
         
@@ -1696,6 +1696,22 @@ class RankOrderAnalyses:
         if debug_print:
             print(f'combined_variable_names: {combined_variable_names}')
             print(f'combined_variable_z_score_column_names: {combined_variable_z_score_column_names}')
+
+        # Try to add epoch labels. Only used at the very end: active_epochs_df
+        try:
+            if (active_epochs_df is not None) and ('label' in active_epochs_df.columns):
+                active_epochs_df['label'] = active_epochs_df['label'].astype('int')
+                if (np.shape(active_epochs_df)[0] == np.shape(combined_epoch_stats_df)[0]):
+                    combined_epoch_stats_df['label'] = active_epochs_df['label'].copy()
+                else:
+                    print(f'failed to add label column, shapes differ! np.shape(active_epochs_df)[0] : {np.shape(active_epochs_df)[0] }, np.shape(combined_epoch_stats_df)[0]): {np.shape(combined_epoch_stats_df)[0]}')
+
+                combined_epoch_stats_df.set_index('label')
+            else:
+                print('invalid active_epochs_df. skipping adding labels')
+        except BaseException as e:
+            print(f'Not giving up: e: {e}')
+            pass
 
         return combined_epoch_stats_df, (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
 
