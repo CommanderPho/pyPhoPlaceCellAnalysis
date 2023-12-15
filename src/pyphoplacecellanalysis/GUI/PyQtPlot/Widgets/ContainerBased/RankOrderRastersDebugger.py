@@ -355,6 +355,10 @@ class RankOrderRastersDebugger:
 
         self.on_update_active_epoch(an_epoch_idx, curr_epoch)
 
+        ## Update scrollbar:
+        
+
+        ## perform callbacks:
         for a_callback_name, a_callback_fn in self.on_idx_changed_callback_function_dict.items():
             a_callback_fn(self, an_epoch_idx)
 
