@@ -1412,7 +1412,9 @@ class RankOrderAnalyses:
         
         # 2023-12-15 - Newest method:
         ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
-
+        if ripple_combined_epoch_stats_df is None:
+            return False
+        
         if minimum_inclusion_fr_Hz is not None:
             return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
         else:
