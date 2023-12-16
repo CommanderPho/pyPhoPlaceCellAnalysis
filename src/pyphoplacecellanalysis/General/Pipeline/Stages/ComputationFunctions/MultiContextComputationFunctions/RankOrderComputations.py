@@ -1472,61 +1472,6 @@ class RankOrderAnalyses:
         }
         return pd.Series(correlations)
 
-    # @classmethod
-    # @function_attributes(short_name=None, tags=['DEPRICATED', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=['LongShortStatsTuple'], uses=['_subfn_calculate_correlations', 'cls.select_and_rank_spikes', 'LongShortStatsTuple'], used_by=[], creation_date='2023-10-21 00:23', related_items=[])
-    # def new_compute_correlations(cls, selected_spikes_df: pd.DataFrame, active_epochs: pd.DataFrame, track_templates: TrackTemplates, debug_print=True):
-    #     """ 2023-12-13 new method of computing the correlations (spearman rank-order and pearson)
-
-    #     Adds Columns:
-    #         selected_spikes_df: ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
-    #         active_epochs: [f'LR_Long_{method}', f'RL_Long_{method}', f'LR_Short_{method}', f'RL_Short_{method}'] where method in ['spearman', 'pearson']
-
-
-    #     Usage:
-    #         selected_spikes_df: pd.DataFrame = deepcopy(rank_order_results.LR_ripple.selected_spikes_df) #TODO 2023-12-13 01:32: - [ ] WARN: this is just the LR_ripple's selected_spikes_df, I might need to merge with RL_ripple's selected_spikes_df?? `ripple_result_tuple.active_epochs.label`
-    #         active_epochs = ripple_result_tuple.active_epochs
-    #         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-    #         active_selected_spikes_df, active_epochs_df = RanklOrderAnalyses.new_compute_correlations(cls, selected_spikes_df=selected_spikes_df, active_epochs=active_epochs, track_templates=track_templates)
-
-
-    #     """
-    #     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-    #     desired_df_label_column_data_type: str = 'int'
-    #     # desired_df_label_column_data_type: str = 'string'
-
-    #     ## Adding the pf_peak_x locations for all four templates:
-    #     long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
-        
-    #     ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
-    #     active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': desired_df_label_column_data_type}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
-        
-    #     _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
-    #     active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
-
-    #     active_selected_spikes_df['LR_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_LR_aclu_peak_map)
-    #     active_selected_spikes_df['RL_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
-    #     active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
-    #     active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
-        
-    #     # active_selected_spikes_df = active_selected_spikes_df.groupby(['Probe_Epoch_id']).agg(aclu_count=('aclu', 'count'), aclu_nunique=('aclu', 'nunique'), LR_Long_pf_peak_x_var=('LR_Long_pf_peak_x', 'var')).reset_index()
-    #     # active_selected_spikes_df = active_selected_spikes_df.groupby(['Probe_Epoch_id', 'aclu']).agg(LR_Long_pf_peak_x_mean=('LR_Long_pf_peak_x', 'mean')).reset_index()
-
-    #     epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id')
-    #     spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: cls._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
-    #     pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: cls._subfn_calculate_correlations(group, method='pearson', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
-
-    #     # active_epochs_merged_correlations_df = spearman_correlations_reset.merge(pearson_correlations_reset, on='Probe_Epoch_id', how='left')
-
-    #     # Merge with the active_epochs DataFrame
-    #     active_epochs_df: pd.DataFrame = deepcopy(active_epochs)
-    #     # Change column type to uint64 for column: 'label'
-    #     active_epochs_df = active_epochs_df.astype({'label': desired_df_label_column_data_type})
-    #     active_epochs_df = active_epochs_df.merge(spearman_correlations, left_on='label', right_on='Probe_Epoch_id', how='left', suffixes=('', '_spearman'))
-    #     active_epochs_df = active_epochs_df.merge(pearson_correlations, left_on='label', right_on='Probe_Epoch_id', how='left', suffixes=('', '_pearson'))
-    #     active_epochs_df.drop(['Probe_Epoch_id', 'Probe_Epoch_id_pearson'], axis=1, inplace=True) # Drop the extra 'Probe_Epoch_id' columns
-
-    #     return active_selected_spikes_df, active_epochs_df
-
 
     @classmethod
     @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['_subfn_calculate_correlations'], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
@@ -1699,7 +1644,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
     @function_attributes(short_name='rank_order_shuffle_analysis', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
     def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1000, minimum_inclusion_fr_Hz:float=2.0, included_qclu_values=[1,2], skip_laps=False):
-        """
+        """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Requires:
             ['sess']
@@ -1717,11 +1662,6 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         print(f'perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
-
-        # qclu_included_aclus = owning_pipeline_reference.determine_good_aclus_by_qclu(included_qclu_values=included_qclu_values) # array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  81,  82,  83,  85,  86,  90,  92,  93,  96, 105, 109])
-        # directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
-        # modified_directional_laps_results: DirectionalLapsResult = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
-        # track_templates: TrackTemplates = modified_directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
 
         # Needs to store the parameters
         # num_shuffles:int=1000
