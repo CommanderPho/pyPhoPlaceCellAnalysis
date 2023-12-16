@@ -960,26 +960,43 @@ def print_formatted_active_epochs_df(curr_epoch_label, corresponding_epoch_value
 def debug_update_plot_titles(a_plotter, an_idx: int):
     """ Updates the titles of each of the four rasters with the appropriate spearman rho value.
     captures: rank_order_results_debug_values || active_epochs_df, formatted_title_strings_dict
+    
+    
+    Usages:
+        a_plotter.params.enable_show_spearman
+        a_plotter.params.enable_show_pearson
+        a_plotter.params.enable_show_Z_values
+        
     """
     is_laps: bool = a_plotter.params.is_laps
     use_plaintext_title: bool = a_plotter.params.use_plaintext_title
     if not use_plaintext_title:
         formatted_title_strings_dict = DisplayColorsEnum.get_pyqtgraph_formatted_title_dict()
 
-    curr_epoch_label = a_plotter.lookup_label_from_index(an_idx)
-    
-    ripple_combined_epoch_stats_df = a_plotter.rank_order_results.ripple_combined_epoch_stats_df
-    curr_new_results_df = ripple_combined_epoch_stats_df[ripple_combined_epoch_stats_df.index == curr_epoch_label]
+    # curr_epoch_label = a_plotter.lookup_label_from_index(an_idx)    
+    # ripple_combined_epoch_stats_df = a_plotter.rank_order_results.ripple_combined_epoch_stats_df
+    # curr_new_results_df = ripple_combined_epoch_stats_df[ripple_combined_epoch_stats_df.index == curr_epoch_label]
 
-
-    curr_new_results_df = a_plotter.
+    curr_new_results_df = a_plotter.active_epoch_result_df
     for a_decoder_name, a_root_plot in a_plotter.plots.root_plots.items():
         # a_real_value = rank_order_results_debug_values[a_decoder_name][0][an_idx]
         a_std_column_name: str = a_plotter.decoder_name_to_column_name_prefix_map[a_decoder_name]
         
-        active_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
+        all_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
+        active_column_names = []
         # print(active_column_names)
-
+        if a_plotter.params.enable_show_spearman:
+            active_column_names = [col for col in all_column_names if col.endswith("_spearman")]
+            if a_plotter.params.enable_show_Z_values:
+                active_column_names += [col for col in all_column_names if col.endswith("_spearman_Z")]
+                
+                
+        if a_plotter.params.enable_show_pearson:
+            active_column_names += [col for col in all_column_names if col.endswith("_pearson")]
+            if a_plotter.params.enable_show_Z_values:
+                active_column_names += [col for col in all_column_names if col.endswith("_pearson_Z")]
+            
+        
         active_column_values = curr_new_results_df[active_column_names]
         active_values_dict = active_column_values.iloc[0].to_dict() # {'LR_Long_spearman': -0.34965034965034975, 'LR_Long_pearson': -0.5736588716389961, 'LR_Long_spearman_Z': -0.865774983083525, 'LR_Long_pearson_Z': -1.4243571733839517}
         active_raw_col_val_dict = {k.replace(f'{a_std_column_name}_', ''):v for k,v in active_values_dict.items()} # remove the "LR_Long" prefix so it's just the variable names
