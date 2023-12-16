@@ -490,5 +490,22 @@ class TemplateDebugger:
 
 
 
+#TODO 2023-12-15 22:39: - [ ] Factored out of notebook
 
 
+# ### TemplateDebugger adding lines:
+# aclu_to_idx: Dict = self.rdf.aclu_to_idx
+# aclu_to_idx_df: pd.DataFrame = pd.DataFrame({'aclu': list(aclu_to_idx.keys()), 'fragile_linear_idx': list(aclu_to_idx.values())})
+# aclu_to_idx_df.to_hdf(file_path, key=f'{key}/rdf/aclu_to_idx_df', format='table', data_columns=True)
+# roi = pg.LineSegmentROI([[10, 64], [120,64]], pen='r')
+# imv1.addItem(roi)
+# directional_laps_results
+# ## 2023-10-11 - Get the long/short peak locations
+# decoder_peak_coms_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[is_good_aclus] for a_decoder in decoder_args]
+
+# # decoders_list = [directional_laps_results.long_LR_one_step_decoder_1D, directional_laps_results.long_RL_one_step_decoder_1D, directional_laps_results.short_LR_one_step_decoder_1D, directional_laps_results.short_RL_one_step_decoder_1D]
+# decoders_list = [directional_laps_results.long_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.long_RL_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_RL_shared_aclus_only_one_step_decoder_1D]
+
+# # directional_laps_results.long_LR_one_step_decoder_1D, directional_laps_results.long_RL_one_step_decoder_1D, directional_laps_results.short_LR_one_step_decoder_1D, directional_laps_results.short_RL_one_step_decoder_1D = modified_decoders_list
+# directional_laps_results.long_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.long_RL_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_RL_shared_aclus_only_one_step_decoder_1D = modified_decoders_list
+# rank_order_results.LR_laps.long_z_score

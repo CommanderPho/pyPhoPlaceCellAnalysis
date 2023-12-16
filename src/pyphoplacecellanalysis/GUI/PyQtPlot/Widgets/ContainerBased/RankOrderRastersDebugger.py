@@ -4,6 +4,8 @@ from attrs import define, field, Factory
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
+import io
+from contextlib import redirect_stdout # used by DocumentationFilePrinter to capture print output
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -823,5 +825,23 @@ class RankOrderRastersDebugger:
         a_scatter_plot.addPoints(plots_data.all_selected_spots_dict[_active_plot_identifier])
 
 
+    # ==================================================================================================================== #
+    # Registering Output Signals                                                                                           #
+    # ==================================================================================================================== #
+    def a_debug_callback_fn(self, an_idx: int, an_epoch=None):
+        out = io.StringIO()
 
+        curr_epoch_label = self.lookup_label_from_index(an_idx)
+
+        with redirect_stdout(out):
+            print(f'=====================================================================================\n\tactive_epoch_IDX: {an_idx} :::', end='\t')
+
+            ## Registered printing functions are called here, and anything they print is written to the textarea at the bottom of the widget.
+            
+
+            print(f'______________________________________________________________________________________________________________________\n')
+
+        self.write_to_log(str(out.getvalue()))
+        
+        
 ## Adding callbacks to `RankOrderRastersDebugger` when the slider changes:
