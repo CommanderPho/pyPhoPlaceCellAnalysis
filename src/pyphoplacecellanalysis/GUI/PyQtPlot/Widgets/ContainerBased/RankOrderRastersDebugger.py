@@ -141,8 +141,8 @@ class RankOrderRastersDebugger:
         # print(f'curr_redundant_label_lookup_label: {curr_redundant_label_lookup_label} :::') ## end line
         assert str(curr_redundant_label_lookup_label) == str(curr_epoch_label), f"curr_epoch_label: {str(curr_epoch_label)} != str(curr_redundant_label_lookup_label): {str(curr_redundant_label_lookup_label)}"
         return curr_epoch_label
-
-
+    
+    
 
     @classmethod
     def init_from_rank_order_results(cls, rank_order_results: RankOrderComputationsContainer):
@@ -376,7 +376,7 @@ class RankOrderRastersDebugger:
         return _obj
 
 
-
+    
 
 
 

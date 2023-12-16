@@ -2027,7 +2027,7 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
 
 
     # epoch_identifiers = np.arange(global_events.n_epochs) # these should be labels!
-    epoch_identifiers = global_events._df.label.astype({'label': 'uint64'}).values #.labels
+    epoch_identifiers = global_events._df.label.astype({'label': 'int'}).values #.labels
     x_values = global_events.midtimes
     x_axis_name_suffix = 'Mid-time (Sec)'
 
