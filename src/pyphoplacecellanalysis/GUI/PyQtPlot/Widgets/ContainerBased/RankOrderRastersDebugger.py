@@ -283,7 +283,7 @@ class RankOrderRastersDebugger:
             _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
             _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
 
-        except (IndexError, KeyError):
+        except (IndexError, KeyError, ValueError):
             print(f'WARN: the selected spikes did not work properly, so none will be shown.')
             pass
 
@@ -809,4 +809,4 @@ class RankOrderRastersDebugger:
 
 
 
-
+## Adding callbacks to `RankOrderRastersDebugger` when the slider changes:

@@ -1730,7 +1730,10 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
         if ('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')):
             # initialize
-            global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=None, RL_ripple=None, LR_laps=None, RL_laps=None, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, is_global=True)
+            global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=None, RL_ripple=None, LR_laps=None, RL_laps=None,
+                                                                                                   minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
+                                                                                                   included_qclu_values=included_qclu_values,
+                                                                                                   is_global=True)
 
         global_computation_results.computed_data['RankOrder'].included_qclu_values = included_qclu_values
 
