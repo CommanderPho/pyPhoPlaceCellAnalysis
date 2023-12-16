@@ -418,6 +418,8 @@ class RankOrderComputationsContainer(ComputedResult):
     ripple_new_output_tuple: Optional[Tuple] = non_serialized_field(default=None, repr=False)
     # ripple_n_valid_shuffles: Optional[int] = serialized_attribute_field(default=None, repr=False)
     
+    laps_combined_epoch_stats_df: Optional[pd.DataFrame] = serialized_field(default=None, repr=False)
+    laps_new_output_tuple: Optional[Tuple] = non_serialized_field(default=None, repr=False)
 
     minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=2.0, repr=True)
     included_qclu_values: Optional[List] = serialized_attribute_field(default=None, repr=True)
@@ -1241,33 +1243,35 @@ class RankOrderAnalyses:
             return DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=None, short_relative_direction_likelihoods=None, long_best_direction_indices=long_best_direction_indicies, short_best_direction_indices=short_best_direction_indicies)
 
         ## Replays:
+        try:
+            ## Post-process Z-scores with their most likely directions:
+            rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
 
+            ripple_combined_epoch_stats_df = deepcopy(rank_order_results.ripple_combined_epoch_stats_df)
+            active_replay_epochs = deepcopy(rank_order_results.LR_ripple.epochs_df)
 
-        ## Post-process Z-scores with their most likely directions:
-        rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+            _traditional_arg_dict_key_names = ('active_LR_long_z_score', 'active_RL_long_z_score', 'active_LR_short_z_score', 'active_RL_short_z_score')
+            _traditional_arg_dict_values_tuple = (ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z)
+            active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score = ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z
 
-        ripple_combined_epoch_stats_df = deepcopy(rank_order_results.ripple_combined_epoch_stats_df)
-        active_replay_epochs = deepcopy(rank_order_results.LR_ripple.epochs_df)
+            _arg_dict_from_ripple_combined_epoch_stats_df = dict(zip(_traditional_arg_dict_key_names, _traditional_arg_dict_values_tuple))
+            ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_replay_epochs, **_arg_dict_from_ripple_combined_epoch_stats_df)
+            long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
 
-        _traditional_arg_dict_key_names = ('active_LR_long_z_score', 'active_RL_long_z_score', 'active_LR_short_z_score', 'active_RL_short_z_score')
-        _traditional_arg_dict_values_tuple = (ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z)
-        active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score = ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z
+            ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, active_LR_ripple_long_z_score, active_RL_ripple_long_z_score)
+            ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
+            ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
+            ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score),
+                                                                                                                ((long_best_direction_indicies == _LR_INDEX), (long_best_direction_indicies == _RL_INDEX), (short_best_direction_indicies == _LR_INDEX), (short_best_direction_indicies == _RL_INDEX)))]
 
-        _arg_dict_from_ripple_combined_epoch_stats_df = dict(zip(_traditional_arg_dict_key_names, _traditional_arg_dict_values_tuple))
-        ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_replay_epochs, **_arg_dict_from_ripple_combined_epoch_stats_df)
-        long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
-
-        ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, active_LR_ripple_long_z_score, active_RL_ripple_long_z_score)
-        ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
-        ripple_evts_long_short_best_dir_z_score_diff_values = ripple_evts_long_best_dir_z_score_values - ripple_evts_short_best_dir_z_score_values
-        ripple_masked_z_score_values_list: List[ma.masked_array] = [ma.masked_array(x, mask=np.logical_not(a_mask)) for x, a_mask in zip((active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score),
-                                                                                                            ((long_best_direction_indicies == _LR_INDEX), (long_best_direction_indicies == _RL_INDEX), (short_best_direction_indicies == _LR_INDEX), (short_best_direction_indicies == _RL_INDEX)))]
-
-        # outputs: ripple_evts_long_short_best_dir_z_score_diff_values
-        ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_replay_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
-                                                                                    long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple,
-                                                                                    masked_z_score_values_list=ripple_masked_z_score_values_list, rank_order_z_score_df=None)
-
+            # outputs: ripple_evts_long_short_best_dir_z_score_diff_values
+            ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_replay_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
+                                                                                        long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple,
+                                                                                        masked_z_score_values_list=ripple_masked_z_score_values_list, rank_order_z_score_df=None)
+        except (AttributeError, KeyError, IndexError, ValueError):
+                    raise # fail for ripples, but not for laps currently
+                    ripple_result_tuple = None
+            
 
         ## Laps:
         try:
@@ -1431,6 +1435,12 @@ class RankOrderAnalyses:
         ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
         if ripple_combined_epoch_stats_df is None:
             return False
+        
+        
+        laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
+        if laps_combined_epoch_stats_df is None:
+            return False
+        
         
         if minimum_inclusion_fr_Hz is not None:
             return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
@@ -1720,6 +1730,25 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             global_computation_results.computed_data['RankOrder'].LR_laps = LR_laps_outputs
             global_computation_results.computed_data['RankOrder'].RL_laps = RL_laps_outputs
 
+            try:
+                print(f'\tdone. building global result.')
+                directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+                selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_laps.selected_spikes_df) # WARNING: this is only using the `selected_spikes_df` from LR_laps!! This would miss spikes of any RL-specific cells?
+                # active_epochs = global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple.active_epochs
+                active_epochs = deepcopy(LR_laps_outputs.epochs_df)
+                track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                laps_combined_epoch_stats_df, laps_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
+                # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = laps_new_output_tuple
+                global_computation_results.computed_data['RankOrder'].laps_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].laps_new_output_tuple = laps_combined_epoch_stats_df, laps_new_output_tuple
+                print(f'done!')
+                            
+            except (AssertionError, BaseException) as e:
+                print(f'Issue with Laps computation in new method 2023-12-15: e: {e}')
+                raise
+        
+        ## END `if not skip_laps`
+        
+
         ## Ripple Rank-Order Analysis:
         print(f'\tcomputing Ripple rank-order shuffles:')
         _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
@@ -1727,34 +1756,35 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         global_computation_results.computed_data['RankOrder'].LR_ripple = LR_ripple_outputs
         global_computation_results.computed_data['RankOrder'].RL_ripple = RL_ripple_outputs
 
+        # New method 2023-12-15:
+        try:
+            print(f'\tdone. building global result.')
+            directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+            selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
+            # active_epochs = global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple.active_epochs
+            active_epochs = deepcopy(LR_ripple_outputs.epochs_df)
+            track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+            ripple_combined_epoch_stats_df, ripple_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
+            # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = ripple_new_output_tuple
+            global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].ripple_new_output_tuple = ripple_combined_epoch_stats_df, ripple_new_output_tuple
+            print(f'done!')
+                        
+        except (AssertionError, BaseException) as e:
+            print(f'New method 2023-12-15: e: {e}')
+            raise
+
+        
+        ## Requires "New method 2023-12-15" result
         # Set the global result:
         try:
             print(f'\tdone. building global result.')
             global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference, decoding_time_bin_size=0.006) # 6ms bins
 
         except (AssertionError, BaseException) as e:
-            print(f'e: {e}')
-            pass
-        
+            print(f'Issue with `RankOrderAnalyses.most_likely_directional_rank_order_shuffling(...)` e: {e}')
+            raise
 
-        # New method 2023-12-15:
-                # Set the global result:
-        try:
-            print(f'\tdone. building global result.')
-            directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
-            selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
-            active_epochs = global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple.active_epochs
-            track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-            ripple_combined_epoch_stats_df, ripple_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
-            # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = ripple_new_output_tuple
-            global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].ripple_new_output_tuple = ripple_combined_epoch_stats_df, ripple_new_output_tuple
-            print(f'done!')
             
-        except (AssertionError, BaseException) as e:
-            print(f'New method 2023-12-15: e: {e}')
-            pass
-        
-        
         """ Usage:
         
         rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
@@ -1812,7 +1842,7 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             _out_rank_order_event_raster_debugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, rank_order_results.RL_ripple.selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.LR_ripple.selected_spikes_fragile_linear_neuron_IDX_dict)
 
             return _out_rank_order_event_raster_debugger
-
+    
 
     @function_attributes(short_name='rank_order_z_stats', tags=['rank-order','debugger','shuffle'], input_requires=[], output_provides=[], uses=['plot_rank_order_epoch_inst_fr_result_tuples'], used_by=[], creation_date='2023-12-15 21:46', related_items=[],
         validate_computation_test=RankOrderAnalyses._validate_can_display_RankOrderRastersDebugger, is_global=True)
