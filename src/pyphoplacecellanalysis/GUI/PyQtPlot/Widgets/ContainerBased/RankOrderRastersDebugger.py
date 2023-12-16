@@ -103,6 +103,21 @@ class RankOrderRastersDebugger:
         return active_epoch_unique_active_aclus
 
 
+    def lookup_label_from_index(self, an_idx: int) -> int:
+        """ Looks of the proper epoch "label", as in the value in the 'label' column of active_epochs_df, from a linear index such as that provided by the slider control.
+        
+        curr_epoch_label = lookup_label_from_index(a_plotter, an_idx)
+        print(f'curr_epoch_label: {curr_epoch_label} :::') ## end line
+
+        """
+        curr_epoch_label = self.active_epochs_df['label'].iloc[an_idx] # gets the correct epoch label for the linear IDX
+        curr_redundant_label_lookup_label = self.active_epochs_df.label.to_numpy()[an_idx]
+        # print(f'curr_redundant_label_lookup_label: {curr_redundant_label_lookup_label} :::') ## end line
+        assert str(curr_redundant_label_lookup_label) == str(curr_epoch_label), f"curr_epoch_label: {str(curr_epoch_label)} != str(curr_redundant_label_lookup_label): {str(curr_redundant_label_lookup_label)}"
+        return curr_epoch_label
+
+
+
     @classmethod
     def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame]):
         """
