@@ -305,6 +305,21 @@ class RankOrderResult(ComputedResult):
     selected_spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
     extra_info_dict: Dict = non_serialized_field(default=Factory(dict), repr=False)
 
+    @property
+    def epoch_template_active_aclus(self) -> Dict[int, NDArray]:
+        """ 
+        
+        Usage:
+            label_column_type = 'int'
+            active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.LR_ripple.epoch_template_active_aclus[x])
+
+        """
+        return {k:v[1] for k, v in self.extra_info_dict.items()} # [1] corresponds to `template_epoch_actually_included_aclus`
+
+        
+
+
+
     @classmethod
     def init_from_analysis_output_tuple(cls, a_tuple):
         """
