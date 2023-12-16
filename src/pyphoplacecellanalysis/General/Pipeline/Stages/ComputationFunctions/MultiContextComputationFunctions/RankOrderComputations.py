@@ -1814,6 +1814,29 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             return _out_rank_order_event_raster_debugger
 
 
+    @function_attributes(short_name='rank_order_z_stats', tags=['rank-order','debugger','shuffle'], input_requires=[], output_provides=[], uses=['plot_rank_order_epoch_inst_fr_result_tuples'], used_by=[], creation_date='2023-12-15 21:46', related_items=[],
+        validate_computation_test=RankOrderAnalyses._validate_can_display_RankOrderRastersDebugger, is_global=True)
+    def _display_rank_order_z_stats_results(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+            """ Plots the z-scores differences and their raw-values
+
+            """
+            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+            
+
+            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+            assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
+            rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+
+            ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, rank_order_results.ripple_most_likely_result_tuple, 'Ripple')
+            lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, rank_order_results.laps_most_likely_result_tuple, 'Lap')
+
+            return ripple_outputs, lap_outputs
+
+
+
+
 # def plot_z_score_diff_and_raw(x_values: np.ndarray, long_short_best_dir_z_score_diff_values: np.ndarray, masked_z_score_values_list: List[np.ma.core.MaskedArray], variable_name: str, x_axis_name_suffix: str, point_data_values: np.ndarray, long_epoch=None, short_epoch=None) -> Tuple:
 # 	"""
 # 	Plots the z-score diff and raw plots for either ripple or lap data.
