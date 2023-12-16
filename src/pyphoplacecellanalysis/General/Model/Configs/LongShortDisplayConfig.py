@@ -63,6 +63,9 @@ class DisplayColorsEnum:
     
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
     
+    RL_fg_color, RL_bg_color, RL_border_color = DisplayColorsEnum.Laps.get_RL_dock_colors(None, is_dim=False)
+    LR_fg_color, LR_bg_color, LR_border_color = DisplayColorsEnum.Laps.get_LR_dock_colors(None, is_dim=False)
+    
     """
     class Laps:
         RL = '#5522de' # a purplish-royal-blue
@@ -77,7 +80,9 @@ class DisplayColorsEnum:
                 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
                 
                 even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors())
-            
+                
+                RL_fg_color, RL_bg_color, RL_border_color = DisplayColorsEnum.Laps.get_RL_dock_colors(None, is_dim=False)
+                LR_fg_color, LR_bg_color, LR_border_color = DisplayColorsEnum.Laps.get_LR_dock_colors(None, is_dim=False)
             
             """
             # DisplayColorsEnum.Laps.even
@@ -125,11 +130,43 @@ class DisplayColorsEnum:
 
             return fg_color, bg_color, border_color
 
-
     class Epochs:
         long = '#0b0049' # a dark blue
         short = '#490000' # a dark red
         
+        long_dark_bg = '#1f02c2' # a lighter blue for use on dark backgrounds
+        short_dark_bg = '#c70000' # a lighter red for use on dark backgrounds
+        
+
+    @classmethod
+    def get_pyqtgraph_formatted_title_dict(cls, is_dark_bg: bool = True) -> Dict:
+        """ 
+        
+        formatted_title_strings_dict = DisplayColorsEnum.get_pyqtgraph_formatted_title_dict()
+
+        """
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
+
+        if is_dark_bg:
+            Long_color = DisplayColorsEnum.Epochs.long_dark_bg
+            Short_color = DisplayColorsEnum.Epochs.short_dark_bg
+        else:
+            Long_color = long_epoch_config.mpl_color
+            Short_color = short_epoch_config.mpl_color
+
+
+        RL_fg_color, RL_bg_color, RL_border_color = DisplayColorsEnum.Laps.get_RL_dock_colors(None, is_dim=False)
+        LR_fg_color, LR_bg_color, LR_border_color = DisplayColorsEnum.Laps.get_LR_dock_colors(None, is_dim=False)
+
+        formatted_title_strings_dict = {"LR_Long":(generate_html_string("LR", color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+                                "RL_Long":(generate_html_string("RL", color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Long", color=Long_color, bold=True, font_size=14)),
+                                "LR_Short":(generate_html_string("LR", color=LR_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+                                "RL_Short":(generate_html_string("RL", color=RL_bg_color, bold=True, font_size=14) + '_' + generate_html_string("Short", color=Short_color, bold=True, font_size=14)),
+                                }
+        return formatted_title_strings_dict
+
 
 @define(slots=False, repr=False)
 class DisplayConfig:
