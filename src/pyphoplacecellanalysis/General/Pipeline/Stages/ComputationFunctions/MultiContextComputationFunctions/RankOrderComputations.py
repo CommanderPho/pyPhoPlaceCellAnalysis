@@ -828,17 +828,20 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    def select_and_rank_spikes(cls, active_spikes_df: pd.DataFrame, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment: str, time_variable_name_override: Optional[str]=None):
+    def select_chosen_spikes(cls, active_spikes_df: pd.DataFrame, rank_alignment: str, time_variable_name_override: Optional[str]=None):
         """Selects and ranks spikes based on rank_alignment, and organizes them into structured dictionaries.
 
-
+        Usage:
+        
+                # Determine which spikes to use to represent the order
+                selected_spikes, selected_spikes_only_df = cls.select_chosen_spikes(active_spikes_df=active_spikes_df, rank_alignment=rank_alignment, time_variable_name_override=time_variable_name_override)
+        
         Returns:
-        epoch_ranked_aclus_dict: Dict[int, Dict[int, float]]: a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
-        epoch_ranked_fragile_linear_neuron_IDX_dict: Dict[int, NDArray]:
-        epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray]:
+        selected_spikes: pandas groupby object?:
         selected_spikes_only_df: pd.DataFrame: an output dataframe containing only the select (e.g. .first(), .median(), etc) spike from each template.
 
         """
+        assert (rank_alignment in ['first', 'median', 'center_of_mass']), f"rank_alignment must be either ['first', 'median', 'center_of_mass'], but it is: {rank_alignment}"
         if time_variable_name_override is None:
             time_variable_name_override = active_spikes_df.spikes.time_variable_name
         # Determine which spikes to use to represent the order
@@ -859,8 +862,26 @@ class RankOrderAnalyses:
         _selected_spikes_reset = deepcopy(selected_spikes).reset_index()
         # Merge with original DataFrame to filter only the selected spikes
         selected_spikes_only_df: pd.DataFrame = pd.merge(active_spikes_df, _selected_spikes_reset, on=['Probe_Epoch_id', 'aclu', time_variable_name_override])
+        return selected_spikes, selected_spikes_only_df
 
 
+    @classmethod
+    def select_and_rank_spikes(cls, active_spikes_df: pd.DataFrame, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment: str, time_variable_name_override: Optional[str]=None):
+        """Selects and ranks spikes based on rank_alignment, and organizes them into structured dictionaries.
+
+
+        Returns:
+        epoch_ranked_aclus_dict: Dict[int, Dict[int, float]]: a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
+        epoch_ranked_fragile_linear_neuron_IDX_dict: Dict[int, NDArray]:
+        epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray]:
+        selected_spikes_only_df: pd.DataFrame: an output dataframe containing only the select (e.g. .first(), .median(), etc) spike from each template.
+
+        """
+        if time_variable_name_override is None:
+            time_variable_name_override = active_spikes_df.spikes.time_variable_name
+        # Determine which spikes to use to represent the order
+        selected_spikes, selected_spikes_only_df = cls.select_chosen_spikes(active_spikes_df=active_spikes_df, rank_alignment=rank_alignment, time_variable_name_override=time_variable_name_override)
+        
         # Rank the aclu values by their first t value in each Probe_Epoch_id
         ranked_aclus = selected_spikes.groupby('Probe_Epoch_id').rank(method='dense')  # Resolve ties in ranking
 

@@ -23,8 +23,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState
 
-from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
-
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ScrollBarWithSpinBox.ScrollBarWithSpinBox import ScrollBarWithSpinBox
 
