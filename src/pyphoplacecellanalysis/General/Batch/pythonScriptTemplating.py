@@ -144,6 +144,22 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
 
 
-# def symlink_output_files():
-# 	# should_symlink_output_pickles
+def symlink_output_files():
+	""" serves to create symbolic links between the results of the batch script executions and the main folder directories. """
+	raise NotImplementedError
+	# should_symlink_output_pickles
 	
+	src_path = whl_file
+	dst_path = 'current.whl'
+	# Create the symbolic link
+	try:
+		print(f'\t symlinking {src_path} to {dst_path}')
+		os.symlink(src_path, dst_path)
+	except FileExistsError as e:
+		print(f'\t WARNING: symlink {dst_path} already exists. Removing it.')
+		# Remove the symlink
+		os.unlink(dst_path)
+		# Create the symlink
+		os.symlink(src_path, dst_path)
+	except Exception as e:
+		raise e
