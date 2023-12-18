@@ -1555,6 +1555,10 @@ class RankOrderAnalyses:
         active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
         active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
 
+
+        #TODO 2023-12-18 13:20: - [ ] This assumes that `'Probe_Epoch_id'` is correct and consistent for both directions, yeah?
+        
+        
         ## Compute real values here:
         epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
         spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
@@ -1665,7 +1669,7 @@ class RankOrderAnalyses:
                 else:
                     print(f'failed to add label column, shapes differ! np.shape(active_epochs_df)[0] : {np.shape(active_epochs_df)[0] }, np.shape(combined_epoch_stats_df)[0]): {np.shape(combined_epoch_stats_df)[0]}')
 
-                combined_epoch_stats_df = combined_epoch_stats_df.set_index('label')
+                # combined_epoch_stats_df = combined_epoch_stats_df.set_index('label')
             else:
                 print('invalid active_epochs_df. skipping adding labels')
         except BaseException as e:
