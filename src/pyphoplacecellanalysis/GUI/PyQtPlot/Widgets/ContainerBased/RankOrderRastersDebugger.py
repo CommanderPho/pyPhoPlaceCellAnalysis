@@ -588,7 +588,8 @@ class RankOrderRastersDebugger:
             # anchor=(1,0.5) should be its upper-middle point.
             text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0.5)) # , angle=15
             # text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
-            text.setPos(x2, aclu_y_values_dict[aclu])
+            text.setPos(x2, aclu_y_values_dict[aclu]) # the x2 part indicates that we want it aligned to the end of the window (the right-hand-side)
+            
             a_plot_item.addItem(text)
 
             # ## Mode 2: stillItem

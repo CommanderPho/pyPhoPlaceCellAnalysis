@@ -57,6 +57,12 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	if not isinstance(output_directory, Path):
 		output_directory = Path(output_directory).resolve()
 
+
+	separate_execute_and_figure_gen_scripts = renderer_script_generation_kwargs.pop('separate_execute_and_figure_gen_scripts', True)
+	assert separate_execute_and_figure_gen_scripts, f"Old non-separate mode not supported"
+ 
+ 
+ 
 	# if script_generation_kwargs is None:
 	# 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
 
@@ -90,45 +96,31 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 		else:
 			curr_batch_script_rundir = output_directory
 
-
-		if not separate_execute_and_figure_gen_scripts:
-			# Create the Python script
-			python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
-			with open(python_script_path, 'w') as script_file:
-				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
-														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-														curr_session_basedir=curr_session_basedir, 
-														batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
-														**renderer_script_generation_kwargs)
-				script_file.write(script_content)
-			output_python_scripts.append(python_script_path)
-
-		else:
-			# Create two separate scripts:
-			# Create the Execution Python script
-			python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
-			with open(python_script_path, 'w') as script_file:
-				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
-														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-														curr_session_basedir=curr_session_basedir, 
-														batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
-														**(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
-				script_file.write(script_content)
-			# output_python_scripts.append(python_script_path)
+		# Create two separate scripts:
+		# Create the Execution Python script
+		python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
+		with open(python_script_path, 'w') as script_file:
+			script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
+													curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+													curr_session_basedir=curr_session_basedir, 
+													batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+													**(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
+			script_file.write(script_content)
+		# output_python_scripts.append(python_script_path)
 
 
-			python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_context}.py')
-			with open(python_figures_script_path, 'w') as script_file:
-				script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
-														curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-														curr_session_basedir=curr_session_basedir,
-														batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
-														**(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)))
+		python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_context}.py')
+		with open(python_figures_script_path, 'w') as script_file:
+			script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
+													curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+													curr_session_basedir=curr_session_basedir,
+													batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+													**(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)))
 
 
-				script_file.write(script_content)
-			# output_python_display_scripts.append(python_figures_script_path)
-			output_python_scripts.append((python_script_path, python_figures_script_path))
+			script_file.write(script_content)
+		# output_python_display_scripts.append(python_figures_script_path)
+		output_python_scripts.append((python_script_path, python_figures_script_path))
 
 		# Create the SLURM script
 		if create_slurm_scripts:

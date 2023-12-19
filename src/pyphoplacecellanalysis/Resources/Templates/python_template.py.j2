@@ -101,9 +101,9 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=False,
 
 
 
-should_force_reload_all = {{should_force_reload_all}}
-should_freeze_pipeline_updates = {{should_freeze_pipeline_updates}}
-should_symlink_output_pickles = {{should_symlink_output_pickles}}
+should_force_reload_all = {{should_force_reload_all|default('False')}}
+should_freeze_pipeline_updates = {{should_freeze_pipeline_updates|default('False')}}
+should_symlink_output_pickles = {{should_symlink_output_pickles|default('False')}}
 
 
 
