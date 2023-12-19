@@ -39,7 +39,7 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
     
-    @function_attributes(short_name='1d_placefields', tags=['display', 'placefields', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='1d_placefields', tags=['display', 'placefields', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['Pf1D.plot_ratemaps_1D(...)'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_1d_placefields(computation_result, active_config, owning_pipeline=None, active_context=None, defer_display=False, **kwargs):
         from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
         assert active_context is not None

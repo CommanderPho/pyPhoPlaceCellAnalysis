@@ -177,6 +177,7 @@ class RankOrderRastersDebugger:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
+
         _obj = cls(global_spikes_df=global_spikes_df, active_epochs_df=active_epochs_df.copy(), track_templates=track_templates, rank_order_results=rank_order_results,
              RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
@@ -206,7 +207,6 @@ class RankOrderRastersDebugger:
         all_separate_debug_header_labels = {a_decoder_name:a_raster_setup_tuple.plots.debug_header_label for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
         
         # Embedding in docks:
-        # root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(RL_win, LR_win, title='Pho Debug Plot Directional Template Rasters')
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Debug Plot Directional Template Rasters')
         icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
         if icon is not None:
@@ -271,6 +271,7 @@ class RankOrderRastersDebugger:
                 # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
 
 
+        ## Build the utility controls at the bottom:
         ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
 
         ctrls_widget = ScrollBarWithSpinBox()
@@ -330,6 +331,8 @@ class RankOrderRastersDebugger:
         _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs)
         _obj.params = VisualizationParameters(name=name, is_laps=False, enable_show_spearman=True, enable_show_pearson=False, enable_show_Z_values=True, use_plaintext_title=False)  
 
+
+        ## Add Selected Spikes:
         try:
             ## rank_order_results.LR_ripple.selected_spikes_df mode:
             if isinstance(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
@@ -376,6 +379,7 @@ class RankOrderRastersDebugger:
         return _obj
 
 
+        _obj.register_internal_callbacks()
     
 
 

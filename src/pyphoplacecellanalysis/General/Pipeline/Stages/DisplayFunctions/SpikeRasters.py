@@ -824,6 +824,7 @@ def _build_default_tick(tick_width: float = 0.1, tick_height: float = 1.0) -> Qt
         vtick.addRect(-half_tick_width, -half_tick_height, tick_width, half_tick_height) # x, y, width, height
     return vtick
 
+
 def build_scatter_plot_kwargs(scatter_plot_kwargs=None):
     """build the default scatter plot kwargs, and merge them with the provided kwargs"""
     # Common Tick Label 
