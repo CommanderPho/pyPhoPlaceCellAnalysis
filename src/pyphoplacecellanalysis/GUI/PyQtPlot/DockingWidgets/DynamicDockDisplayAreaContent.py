@@ -112,8 +112,28 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     #             font-size: %s;
     #         }""" % (bg_color, fg_color, self.corner_radius, self.corner_radius, border_color, self.fontSize)
 
+
+## Build Dock Widgets:
+def get_utility_dock_colors(orientation, is_dim):
+    """ used for CustomDockDisplayConfig for non-specialized utility docks """
+    # Common to all:
+    if is_dim:
+        fg_color = '#aaa' # Grey
+    else:
+        fg_color = '#fff' # White
+        
+    # a purplish-royal-blue 
+    if is_dim:
+        bg_color = '#d8d8d8' 
+        border_color = '#717171' 
+    else:
+        bg_color = '#9d9d9d' 
+        border_color = '#3a3a3a' 
+
+    return fg_color, bg_color, border_color
+
     
-NamedColorScheme = Enum('NamedColorScheme', 'blue green red')
+NamedColorScheme = Enum('NamedColorScheme', 'blue green red grey')
 # NamedColorScheme.blue  # returns <Animal.ant: 1>
 # NamedColorScheme['blue']  # returns <Animal.ant: 1> (string lookup)
 # NamedColorScheme.blue.name  # returns 'ant' (inverse lookup)
@@ -167,6 +187,14 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
             else:
                 bg_color = '#cc6666' # (0°, 50, 80)
                 border_color = '#ba5454' # (0°, 55%, 73%)
+        elif self._named_color_scheme.name == NamedColorScheme.grey.name:
+            # Grey-based:
+            if is_dim:
+                bg_color = '#d8d8d8' 
+                border_color = '#717171' 
+            else:
+                bg_color = '#9d9d9d' 
+                border_color = '#3a3a3a' 
         else:
             raise NotImplementedError
 
