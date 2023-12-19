@@ -375,14 +375,21 @@ class RankOrderRastersDebugger:
             # a_label.setText('NEW')
             a_label.hide() # hide the labels unless we need them.
 
-
+        _obj.register_internal_callbacks()
+        
         return _obj
 
 
-        _obj.register_internal_callbacks()
     
 
 
+
+    def register_internal_callbacks(self):
+        """ registers all internally-owned callback functions. """
+        # self.on_idx_changed_callback_function_dict['update_plot_titles_with_stats'] = self.update_plot_titles_with_stats
+        pass
+        
+                
 
     # ==================================================================================================================== #
     # Update Active Epoch Functions                                                                                        #
@@ -423,7 +430,8 @@ class RankOrderRastersDebugger:
         self.on_update_active_epoch(an_epoch_idx, curr_epoch)
 
         ## Update scrollbar:
-        
+        self.update_plot_titles_with_stats(an_epoch_idx)
+
 
         ## perform callbacks:
         for a_callback_name, a_callback_fn in self.on_idx_changed_callback_function_dict.items():
@@ -582,6 +590,9 @@ class RankOrderRastersDebugger:
         """
         [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range for initial position
 
+
+            
+            
         _out_text_items = {}
         for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
             # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
@@ -590,6 +601,22 @@ class RankOrderRastersDebugger:
             # text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
             text.setPos(x2, aclu_y_values_dict[aclu]) # the x2 part indicates that we want it aligned to the end of the window (the right-hand-side)
             
+            # # Function to handle click event
+            # def on_text_item_clicked(evt):
+            #     # Your custom logic here
+            #     print("TextItem clicked!")
+            #     print(f'\tevt: {evt}')
+                
+
+            # def on_name_clicked(self, q_textitem):
+            #     print(q_textitem.text())
+                
+            # Connect the click signal to the custom function
+            # text.sigMouseClicked.connect(on_text_item_clicked)
+            # Connect the click signal to the custom function
+            # text.mouseClickEvent = on_text_item_clicked
+            # text.mousePressEvent = lambda e: on_name_clicked(text)
+
             a_plot_item.addItem(text)
 
             # ## Mode 2: stillItem
@@ -650,11 +677,15 @@ class RankOrderRastersDebugger:
                 text.setPos(x2, aclu_y_values_dict[aclu])
                 is_aclu_active: bool = aclu in curr_active_aclus
                 if is_aclu_active:
-                    text.setColor(pg.mkColor(a_decoder_color_map[aclu]))
+                    active_color = pg.mkColor(a_decoder_color_map[aclu])
+                    active_color.setAlphaF(0.95)
+                    text.setColor(active_color)
+                    # text.setOpacity(0.95/255.)
                 else:
                     inactive_color = pg.mkColor("#666666")
-                    inactive_color.setAlpha(0.5)
+                    inactive_color.setAlphaF(0.5)
                     text.setColor(inactive_color) # dark grey (inactive)
+                    # text.setOpacity(0.5/255.)
                 # text.setVisible(is_aclu_active)
 
 
@@ -709,9 +740,9 @@ class RankOrderRastersDebugger:
         # Get only the spikes for the shared_aclus:
         spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(included_neuron_ids)
         # spikes_df = spikes_df.spikes.adding_lap_identity_column(active_epochs_df, epoch_id_key_name='new_lap_IDX')
-        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='new_lap_IDX', epoch_label_column_name=None) # , override_time_variable_name='t_seconds'
+        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='new_epoch_IDX', epoch_label_column_name='label') # , override_time_variable_name='t_seconds'
         # spikes_df = spikes_df[spikes_df['ripple_id'] != -1]
-        spikes_df = spikes_df[(spikes_df['new_lap_IDX'] != -1)] # ['lap', 'maze_relative_lap', 'maze_id']
+        spikes_df = spikes_df[(spikes_df['new_epoch_IDX'] != -1)] # ['lap', 'maze_relative_lap', 'maze_id']
         spikes_df, neuron_id_to_new_IDX_map = spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
 
 
@@ -893,6 +924,68 @@ class RankOrderRastersDebugger:
             print(f'______________________________________________________________________________________________________________________\n')
 
         self.write_to_log(str(out.getvalue()))
+
+
+    def update_plot_titles_with_stats(self, an_idx: int):
+        """ Updates the titles of each of the four rasters with the appropriate spearman rho value.
+        captures: rank_order_results_debug_values || active_epochs_df, formatted_title_strings_dict
+        
+        
+        Usages:
+            self.params.enable_show_spearman
+            self.params.enable_show_pearson
+            self.params.enable_show_Z_values
+            
+            self.active_epoch_result_df
+            
+            
+        """
+        is_laps: bool = self.params.is_laps
+        use_plaintext_title: bool = self.params.use_plaintext_title
+        if not use_plaintext_title:
+            formatted_title_strings_dict = DisplayColorsEnum.get_pyqtgraph_formatted_title_dict()
+
+        # curr_epoch_label = a_plotter.lookup_label_from_index(an_idx)    
+        # ripple_combined_epoch_stats_df = a_plotter.rank_order_results.ripple_combined_epoch_stats_df
+        # curr_new_results_df = ripple_combined_epoch_stats_df[ripple_combined_epoch_stats_df.index == curr_epoch_label]
+
+        curr_new_results_df = self.active_epoch_result_df
+        for a_decoder_name, a_root_plot in self.plots.root_plots.items():
+            # a_real_value = rank_order_results_debug_values[a_decoder_name][0][an_idx]
+            a_std_column_name: str = self.decoder_name_to_column_name_prefix_map[a_decoder_name]
+            
+            all_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
+            active_column_names = []
+            # print(active_column_names)
+            if self.params.enable_show_spearman:
+                active_column_names = [col for col in all_column_names if col.endswith("_spearman")]
+                if self.params.enable_show_Z_values:
+                    active_column_names += [col for col in all_column_names if col.endswith("_spearman_Z")]
+                    
+                    
+            if self.params.enable_show_pearson:
+                active_column_names += [col for col in all_column_names if col.endswith("_pearson")]
+                if self.params.enable_show_Z_values:
+                    active_column_names += [col for col in all_column_names if col.endswith("_pearson_Z")]
+                
+            
+            active_column_values = curr_new_results_df[active_column_names]
+            active_values_dict = active_column_values.iloc[0].to_dict() # {'LR_Long_spearman': -0.34965034965034975, 'LR_Long_pearson': -0.5736588716389961, 'LR_Long_spearman_Z': -0.865774983083525, 'LR_Long_pearson_Z': -1.4243571733839517}
+            active_raw_col_val_dict = {k.replace(f'{a_std_column_name}_', ''):v for k,v in active_values_dict.items()} # remove the "LR_Long" prefix so it's just the variable names
+            
+            active_formatted_col_val_list = [':'.join([generate_html_string(str(k), color='grey', bold=False), generate_html_string(f'{v:0.3f}', color='white', bold=True)]) for k,v in active_raw_col_val_dict.items()]
+            final_values_string: str = '; '.join(active_formatted_col_val_list)
+
+            if use_plaintext_title:
+                title_str = generate_html_string(f"{a_std_column_name}: {final_values_string}")
+            else:
+                # Color formatted title:
+                a_formatted_title_string_prefix: str = formatted_title_strings_dict[a_std_column_name]
+                title_str = generate_html_string(f"{a_formatted_title_string_prefix}: {final_values_string}")
+            
+            a_root_plot.setTitle(title=title_str)
+
+
         
         
 ## Adding callbacks to `RankOrderRastersDebugger` when the slider changes:
@@ -1061,7 +1154,6 @@ def debug_update_long_short_info_titles(a_plotter, an_idx: int):
     else:
         print(f'WARN: debug_update_long_short_info_titles(...) but plotter does not have the `a_plotter.ui.long_info_label`')
         
-
 def a_debug_callback_fn(a_plotter, an_idx: int, an_epoch=None):
     global epoch_active_aclus, _out_directional_template_pfs_debugger
     out = io.StringIO()
@@ -1153,7 +1245,6 @@ def a_debug_callback_fn(a_plotter, an_idx: int, an_epoch=None):
     # rank_order_results.ripple_most_likely_result_tuple.long_short_best_dir_z_score_diff_values[an_idx]
     # display(LR_template_epoch_actually_included_aclus[an_idx])
     # display(RL_template_epoch_actually_included_aclus[an_idx])
-
 
 
 

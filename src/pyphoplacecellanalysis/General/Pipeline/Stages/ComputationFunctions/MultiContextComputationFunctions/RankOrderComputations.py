@@ -231,13 +231,13 @@ class ShuffleHelper(HDFMixin):
 
 @define(slots=False, repr=False, eq=False)
 class Zscorer(HDFMixin):
-    """ 
+    """
     Zscorer recieves the list of raw metric values, one for each shuffle, which is stores in .original_values
-    
+
     It also receives the "real" non-shuffled value, which is stores in .real_value
-    
-    
-    
+
+
+
     """
     original_values: NDArray = serialized_field(repr=False, is_computable=False, eq=attrs.cmp_using(eq=np.array_equal))
     mean: float = serialized_attribute_field(repr=True, is_computable=True)
@@ -307,8 +307,8 @@ class RankOrderResult(ComputedResult):
 
     @property
     def epoch_template_active_aclus(self) -> Dict[int, NDArray]:
-        """ 
-        
+        """
+
         Usage:
             label_column_type = 'int'
             active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.LR_ripple.epoch_template_active_aclus[x])
@@ -316,7 +316,7 @@ class RankOrderResult(ComputedResult):
         """
         return {k:v[1] for k, v in self.extra_info_dict.items()} # [1] corresponds to `template_epoch_actually_included_aclus`
 
-        
+
 
 
 
@@ -417,7 +417,7 @@ class RankOrderComputationsContainer(ComputedResult):
     ripple_combined_epoch_stats_df: Optional[pd.DataFrame] = serialized_field(default=None, repr=False)
     ripple_new_output_tuple: Optional[Tuple] = non_serialized_field(default=None, repr=False)
     # ripple_n_valid_shuffles: Optional[int] = serialized_attribute_field(default=None, repr=False)
-    
+
     laps_combined_epoch_stats_df: Optional[pd.DataFrame] = serialized_field(default=None, repr=False)
     laps_new_output_tuple: Optional[Tuple] = non_serialized_field(default=None, repr=False)
 
@@ -607,7 +607,7 @@ class RankOrderAnalyses:
         long_RL_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~RL_long_z_score_values.mask], RL_long_z_score_values[~RL_long_z_score_values.mask], brush=pg.mkBrush('orange'), pen=pg.mkPen('#FFFFFF11'), symbol='t2', name='long_RL', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~RL_long_z_score_values.mask]) ## setting pen=None disables line drawing
         short_LR_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~LR_short_z_score_values.mask], LR_short_z_score_values[~LR_short_z_score_values.mask], brush=pg.mkBrush('teal'), pen=pg.mkPen('#FFFFFF11'), symbol='t3', name='short_LR', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~LR_short_z_score_values.mask]) ## setting pen=None disables line drawing
         short_RL_out_plot_1D: pg.ScatterPlotItem = pg.ScatterPlotItem(epoch_idx_list[~RL_short_z_score_values.mask], RL_short_z_score_values[~RL_short_z_score_values.mask], brush=pg.mkBrush('blue'), pen=pg.mkPen('#FFFFFF11'), symbol='t2', name='short_RL', hoverable=True, hoverPen=pg.mkPen('w', width=2), hoverBrush=pg.mkBrush('#FFFFFF'), data=point_data_values.copy()[~RL_short_z_score_values.mask]) ## setting pen=None disables line drawing
-        
+
         p1.addItem(long_LR_out_plot_1D)
         p1.addItem(long_RL_out_plot_1D)
         p1.addItem(short_LR_out_plot_1D)
@@ -626,7 +626,7 @@ class RankOrderAnalyses:
                     p1.addItem(line)
 
         # Connecting points
-        for x in epoch_idx_list:         
+        for x in epoch_idx_list:
             idx = find_closest(epoch_idx_list, x)
             y_values = [
                 LR_long_z_score_values[idx] if not LR_long_z_score_values.mask[idx] else np.ma.masked,
@@ -635,10 +635,10 @@ class RankOrderAnalyses:
                 RL_short_z_score_values[idx] if not RL_short_z_score_values.mask[idx] else np.ma.masked,
             ]
             connect_vertical_points(x, y_values)
-            
+
 
         return app, win, p1, (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D)
-    
+
 
 
     def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
@@ -849,10 +849,10 @@ class RankOrderAnalyses:
         """Selects and ranks spikes based on rank_alignment, and organizes them into structured dictionaries.
 
         Usage:
-        
+
                 # Determine which spikes to use to represent the order
                 selected_spikes, selected_spikes_only_df = cls.select_chosen_spikes(active_spikes_df=active_spikes_df, rank_alignment=rank_alignment, time_variable_name_override=time_variable_name_override)
-        
+
         Returns:
         selected_spikes: pandas groupby object?:
         selected_spikes_only_df: pd.DataFrame: an output dataframe containing only the select (e.g. .first(), .median(), etc) spike from each template.
@@ -898,7 +898,7 @@ class RankOrderAnalyses:
             time_variable_name_override = active_spikes_df.spikes.time_variable_name
         # Determine which spikes to use to represent the order
         selected_spikes, selected_spikes_only_df = cls.select_chosen_spikes(active_spikes_df=active_spikes_df, rank_alignment=rank_alignment, time_variable_name_override=time_variable_name_override)
-        
+
         # Rank the aclu values by their first t value in each Probe_Epoch_id
         ranked_aclus = selected_spikes.groupby('Probe_Epoch_id').rank(method='dense')  # Resolve ties in ranking
 
@@ -1271,7 +1271,7 @@ class RankOrderAnalyses:
         except (AttributeError, KeyError, IndexError, ValueError):
                     raise # fail for ripples, but not for laps currently
                     ripple_result_tuple = None
-            
+
 
         ## Laps:
         try:
@@ -1279,7 +1279,7 @@ class RankOrderAnalyses:
             global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
             active_laps_epochs = global_laps
             laps_combined_epoch_stats_df = deepcopy(rank_order_results.laps_combined_epoch_stats_df)
-            
+
             _traditional_arg_dict_key_names = ('active_LR_long_z_score', 'active_RL_long_z_score', 'active_LR_short_z_score', 'active_RL_short_z_score')
             _traditional_arg_dict_values_tuple = (laps_combined_epoch_stats_df.LR_Long_spearman_Z, laps_combined_epoch_stats_df.RL_Long_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z)
             active_LR_laps_long_z_score, active_RL_laps_long_z_score, active_LR_laps_short_z_score, active_RL_laps_short_z_score = laps_combined_epoch_stats_df.LR_Long_spearman_Z, laps_combined_epoch_stats_df.RL_Long_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z
@@ -1371,7 +1371,7 @@ class RankOrderAnalyses:
         # curr_active_pipeline.sess.config.preprocessing_parameters
         min_num_unique_aclu_inclusions: int = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions
 
-        
+
         if not isinstance(global_laps, pd.DataFrame):
             global_laps_df = deepcopy(global_laps).to_dataframe()
             global_laps_df['label'] = global_laps_df['label'].astype('int')
@@ -1430,18 +1430,18 @@ class RankOrderAnalyses:
         rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
         if rank_order_z_score_df is None:
             return False
-        
+
         # 2023-12-15 - Newest method:
         ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
         if ripple_combined_epoch_stats_df is None:
             return False
-        
-        
+
+
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
         if laps_combined_epoch_stats_df is None:
             return False
-        
-        
+
+
         if minimum_inclusion_fr_Hz is not None:
             return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
         else:
@@ -1514,33 +1514,45 @@ class RankOrderAnalyses:
         }
         return pd.Series(correlations)
 
-
     @classmethod
-    @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['_subfn_calculate_correlations'], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
+    def build_stacked_arrays(cls, output_active_epoch_computed_values):
+        # Convert each DataFrame to a NumPy array and stack them # shape of this array will be (n, m, p) where n is the number of DataFrames, m is the number of rows, and p is the number of columns in each DataFrame.
+        names0 = ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman']
+        dfs0 = [a_tuple[0] for a_tuple in output_active_epoch_computed_values] # [0] is just spearman_correlations
+        stacked_arrays0 = np.array([df[names0].values for df in dfs0])
+        names1 = ['LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
+        dfs1 = [a_tuple[1] for a_tuple in output_active_epoch_computed_values] # [1] is pearson_correlations
+        stacked_arrays1 = np.array([df[names1].values for df in dfs1])
+        stacked_arrays = np.concatenate((stacked_arrays0, stacked_arrays1), axis=-1) # .shape: (100, 412, 8) # (n_shuffles, n_epochs, n_columns)
+        return stacked_arrays
+    
+    
+    @classmethod
+    @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['_subfn_calculate_correlations', 'build_stacked_arrays'], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
     def pandas_df_based_correlation_computations(cls, selected_spikes_df: pd.DataFrame, active_epochs_df: Optional[pd.DataFrame], track_templates: TrackTemplates, num_shuffles:int=1000, debug_print=True):
         """ 2023-12-15 - Absolute newest complete Rank-Order shuffle implementation. Does both Pearson and Spearman.
-        
+
         selected_spikes_df: pd.DataFrame - spikes dataframe containing only the first spike (the "selected one") for each cell within the periods of interest.
-        
+
 
         Outputs:
-            
+
             combined_variable_names: ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman', 'LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
             combined_variable_z_score_column_names: ['LR_Long_spearman_Z', 'RL_Long_spearman_Z', 'LR_Short_spearman_Z', 'RL_Short_spearman_Z', 'LR_Long_pearson_Z', 'RL_Long_pearson_Z', 'LR_Short_pearson_Z', 'RL_Short_pearson_Z']
-                   
+
         Usage:
-        
+
             from PendingNotebookCode import pandas_df_based_correlation_computations
-            
+
             combined_epoch_stats_df, (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = pandas_df_based_correlation_computations(selected_spikes_df, track_templates, num_shuffles=1000)
 
-        
+
         """
         ## Shuffle each map's aclus, takes `selected_spikes_df`
 
         # LongShortStatsTuple: Tuple[Zscorer, Zscorer, float, float, bool]
 
-        
+
         rng = np.random.default_rng() # seed=13378 #TODO 2023-12-13 05:13: - [ ] DO NOT SET THE SEED! This makes the random permutation/shuffle the same every time!!!
         long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
 
@@ -1555,10 +1567,8 @@ class RankOrderAnalyses:
         active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
         active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
 
-
         #TODO 2023-12-18 13:20: - [ ] This assumes that `'Probe_Epoch_id'` is correct and consistent for both directions, yeah?
-        
-        
+
         ## Compute real values here:
         epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
         spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
@@ -1573,7 +1583,7 @@ class RankOrderAnalyses:
         dfs1 = [real_stats_tuple[1]] # [1] is pearson_correlations
         stacked_arrays1 = np.array([df[names1].values for df in dfs1])
         real_stacked_arrays = np.squeeze(np.concatenate((stacked_arrays0, stacked_arrays1), axis=-1)[0,:,:]) # .shape: (412, 8) # (n_epochs, n_columns)
-        
+
         ## Combined column names:
         combined_variable_names = names0 + names1
 
@@ -1598,22 +1608,22 @@ class RankOrderAnalyses:
             """ within the loop we modify: 
                 active_selected_spikes_df, active_epochs 
                 
-                From active_selected_spikes_df I only need: ['t_rel_seconds', 'aclu', 'Probe_Epoch_id', 'label']
+                From active_selected_spikes_df I only need: ['t_rel_seconds', 'aclu', 'Probe_Epoch_id', 'label']  ## 'Probe_Epoch_id' goes up to 610 for some reason?!?!? It does NOT seem to be 'label'
                 
             """
             active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
             # assert len(epoch_specific_shuffled_aclus_tuple) == 4, f"len(epoch_specific_shuffled_aclus_tuple): {len(epoch_specific_shuffled_aclus_tuple)}"
-            
+
             #TODO 2023-11-22 12:50: - [X] Are the sizes correct since `a_shuffled_IDXs` doesn't know the size of the template?
             a_name = 'LR_Long_pf_peak_x'
             active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(long_LR_epoch_specific_shuffled_aclus[shuffle_IDX], long_LR_aclu_peak_map.values())))
 
             a_name = 'RL_Long_pf_peak_x'
             active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(long_RL_epoch_specific_shuffled_aclus[shuffle_IDX], long_RL_aclu_peak_map.values())))
-            
+
             a_name = 'LR_Short_pf_peak_x'
             active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(short_LR_epoch_specific_shuffled_aclus[shuffle_IDX], short_LR_aclu_peak_map.values())))
-            
+
             a_name = 'RL_Short_pf_peak_x'
             active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(short_RL_epoch_specific_shuffled_aclus[shuffle_IDX], short_RL_aclu_peak_map.values())))
 
@@ -1624,21 +1634,14 @@ class RankOrderAnalyses:
             output_active_epoch_computed_values.append((spearman_correlations, pearson_correlations))
 
         # Build the output `stacked_arrays`: _________________________________________________________________________________ #
-        # Convert each DataFrame to a NumPy array and stack them # shape of this array will be (n, m, p) where n is the number of DataFrames, m is the number of rows, and p is the number of columns in each DataFrame.
-        names0 = ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman']
-        dfs0 = [a_tuple[0] for a_tuple in output_active_epoch_computed_values] # [0] is just spearman_correlations
-        stacked_arrays0 = np.array([df[names0].values for df in dfs0])
-        names1 = ['LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
-        dfs1 = [a_tuple[1] for a_tuple in output_active_epoch_computed_values] # [1] is pearson_correlations
-        stacked_arrays1 = np.array([df[names1].values for df in dfs1])
-        stacked_arrays = np.concatenate((stacked_arrays0, stacked_arrays1), axis=-1) # .shape: (100, 412, 8) # (n_shuffles, n_epochs, n_columns)
+        stacked_arrays = cls.build_stacked_arrays(output_active_epoch_computed_values)
 
         ## Drop any shuffle indicies where NaNs are returned for any of the stats values.
         is_valid_row = np.logical_not(np.isnan(stacked_arrays)).all(axis=(1,2))
         n_valid_shuffles = np.sum(is_valid_row)
         if debug_print:
             print(f'n_valid_shuffles: {n_valid_shuffles}')
-        valid_stacked_arrays = stacked_arrays[is_valid_row] ## Get only the rows where all elements along both axis (1, 2) are True    
+        valid_stacked_arrays = stacked_arrays[is_valid_row] ## Get only the rows where all elements along both axis (1, 2) are True
 
         # Need: valid_stacked_arrays, real_stacked_arrays, combined_variable_names
         combined_epoch_stats_df: pd.DataFrame = pd.DataFrame(real_stacked_arrays, columns=combined_variable_names)
@@ -1677,6 +1680,8 @@ class RankOrderAnalyses:
             pass
 
         return combined_epoch_stats_df, (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
+    
+
 
 
 
@@ -1745,17 +1750,17 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
                 # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = laps_new_output_tuple
                 global_computation_results.computed_data['RankOrder'].laps_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].laps_new_output_tuple = laps_combined_epoch_stats_df, laps_new_output_tuple
                 print(f'done!')
-                            
+
             except (AssertionError, BaseException) as e:
                 print(f'Issue with Laps computation in new method 2023-12-15: e: {e}')
                 raise
-        
+
         ## END `if not skip_laps`
-        
+
 
         ## Ripple Rank-Order Analysis:
         print(f'\tcomputing Ripple rank-order shuffles:')
-        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # rank_alignment='first'
+        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # rank_alignment='first'
         (LR_ripple_outputs, RL_ripple_outputs, ripple_evts_paired_tests) = _ripples_outputs
         global_computation_results.computed_data['RankOrder'].LR_ripple = LR_ripple_outputs
         global_computation_results.computed_data['RankOrder'].RL_ripple = RL_ripple_outputs
@@ -1772,12 +1777,12 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = ripple_new_output_tuple
             global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].ripple_new_output_tuple = ripple_combined_epoch_stats_df, ripple_new_output_tuple
             print(f'done!')
-                        
+
         except (AssertionError, BaseException) as e:
             print(f'New method 2023-12-15: e: {e}')
             raise
 
-        
+
         ## Requires "New method 2023-12-15" result
         # Set the global result:
         try:
@@ -1788,7 +1793,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             print(f'Issue with `RankOrderAnalyses.most_likely_directional_rank_order_shuffling(...)` e: {e}')
             raise
 
-            
+
         """ Usage:
         
         rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
@@ -1846,7 +1851,7 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             _out_rank_order_event_raster_debugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, rank_order_results.RL_ripple.selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.LR_ripple.selected_spikes_fragile_linear_neuron_IDX_dict)
 
             return _out_rank_order_event_raster_debugger
-    
+
 
     @function_attributes(short_name='rank_order_z_stats', tags=['rank-order','debugger','shuffle'], input_requires=[], output_provides=[], uses=['plot_rank_order_epoch_inst_fr_result_tuples'], used_by=[], creation_date='2023-12-15 21:46', related_items=[],
         validate_computation_test=RankOrderAnalyses._validate_can_display_RankOrderRastersDebugger, is_global=True)
@@ -1856,7 +1861,7 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             """
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
-            
+
 
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
             assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
