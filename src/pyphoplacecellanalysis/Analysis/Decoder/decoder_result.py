@@ -1,7 +1,8 @@
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, Union
-from attrs import define, field, Factory # used for several things
+from attrs import define, field, Factory
+import attrs # used for several things
 import matplotlib.pyplot as plt
 from matplotlib import cm # used for plot_kourosh_activity_style_figure version too to get a good colormap 
 import numpy as np
@@ -305,16 +306,16 @@ class TimebinnedNeuronActivity(HDFMixin):
     
     """
     n_timebins: int = serialized_attribute_field()
-    active_IDXs: np.ndarray = serialized_field() # a ragged list of different length np.ndarrays, each containing the neuron_IDXs that are active in that timebin
-    active_aclus: np.ndarray = serialized_field()
-    inactive_IDXs: np.ndarray = serialized_field()
-    inactive_aclus: np.ndarray = serialized_field()
+    active_IDXs: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal)) # a ragged list of different length np.ndarrays, each containing the neuron_IDXs that are active in that timebin
+    active_aclus: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
+    inactive_IDXs: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
+    inactive_aclus: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
     
-    time_bin_centers: np.ndarray = serialized_field() # the timebin center times that each time bin corresponds to
+    time_bin_centers: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal)) # the timebin center times that each time bin corresponds to
 
     # derived
-    num_timebin_active_aclus: np.ndarray = non_serialized_field(default=None, is_computable=True) # int ndarray, the number of active aclus in each timebin
-    is_timebin_valid: np.ndarray = non_serialized_field(default=None, is_computable=True) # bool ndarray, whether there is at least one aclu active in each timebin
+    num_timebin_active_aclus: np.ndarray = non_serialized_field(default=None, is_computable=True, eq=attrs.cmp_using(eq=np.array_equal)) # int ndarray, the number of active aclus in each timebin
+    is_timebin_valid: np.ndarray = non_serialized_field(default=None, is_computable=True, eq=attrs.cmp_using(eq=np.array_equal)) # bool ndarray, whether there is at least one aclu active in each timebin
 
     def __attrs_post_init__(self):
         """ called after initializer built by `attrs` library. """
@@ -355,21 +356,21 @@ class LeaveOneOutDecodingAnalysisResult(HDFMixin):
     original_1D_decoder: BasePositionDecoder = serialized_field() # BayesianPlacemapPositionDecoder
     all_included_filter_epochs_decoder_result: DynamicContainer = non_serialized_field()
     
-    flat_all_epochs_measured_cell_spike_counts: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'measured')})
-    flat_all_epochs_measured_cell_firing_rates: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'measured')})
-    flat_all_epochs_decoded_epoch_time_bins: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
-    flat_all_epochs_computed_surprises: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
-    flat_all_epochs_computed_expected_cell_firing_rates: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
-    flat_all_epochs_difference_from_expected_cell_spike_counts: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
-    flat_all_epochs_difference_from_expected_cell_firing_rates: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
-    all_epochs_decoded_epoch_time_bins_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs', 'n_neurons')})
-    all_epochs_computed_cell_surprises_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs', 'n_neurons')})
-    all_epochs_all_cells_computed_surprises_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)})
-    flat_all_epochs_computed_one_left_out_to_global_surprises: np.ndarray = serialized_field(metadata={'shape': ('n_neurons', 'n_total_time_bins')})
-    all_epochs_computed_cell_one_left_out_to_global_surprises_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs', 'n_neurons')})
-    all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)})
-    one_left_out_omitted_aclu_distance_df: pd.DataFrame = serialized_field(metadata={'shape': ('n_neurons', 3)})
-    most_contributing_aclus: np.ndarray = serialized_field(metadata={'shape': ('n_neurons',)})
+    flat_all_epochs_measured_cell_spike_counts: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'measured')})
+    flat_all_epochs_measured_cell_firing_rates: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'measured')})
+    flat_all_epochs_decoded_epoch_time_bins: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_computed_surprises: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    flat_all_epochs_computed_expected_cell_firing_rates: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
+    flat_all_epochs_difference_from_expected_cell_spike_counts: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
+    flat_all_epochs_difference_from_expected_cell_firing_rates: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 'n_total_time_bins'), 'tags': ('firing_rate', 'computed', 'expected')})
+    all_epochs_decoded_epoch_time_bins_mean: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_computed_cell_surprises_mean: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_all_cells_computed_surprises_mean: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_epochs',)})
+    flat_all_epochs_computed_one_left_out_to_global_surprises: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 'n_total_time_bins')})
+    all_epochs_computed_cell_one_left_out_to_global_surprises_mean: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_epochs', 'n_neurons')})
+    all_epochs_all_cells_computed_one_left_out_to_global_surprises_mean: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_epochs',)})
+    one_left_out_omitted_aclu_distance_df: pd.DataFrame = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons', 3)})
+    most_contributing_aclus: np.ndarray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal), metadata={'shape': ('n_neurons',)})
     
     result: LeaveOneOutDecodingResult = non_serialized_field(default=None)
 

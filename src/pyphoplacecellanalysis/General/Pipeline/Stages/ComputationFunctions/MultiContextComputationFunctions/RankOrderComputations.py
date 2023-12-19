@@ -362,6 +362,7 @@ DirectionalRankOrderResultBase = namedtuple('DirectionalRankOrderResultBase', ['
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram
 
+
 class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
 
     def plot_histograms(self) -> MatplotlibRenderPlots:
