@@ -4,6 +4,7 @@ from attrs import define, field, Factory
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
+from pathlib import Path
 import io
 from contextlib import redirect_stdout # used by DocumentationFilePrinter to capture print output
 
@@ -34,9 +35,11 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import DirectionalRankOrderLikelihoods, RankOrderComputationsContainer, RankOrderResult ## Circular import?
 
 from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot, ExportFiletype
+
+
 
 __all__ = ['RankOrderRastersDebugger']
-
 
 
 """ 2023-11-03 - Debugger for directional laps shuffles
@@ -101,36 +104,16 @@ class RankOrderRastersDebugger:
     def active_epoch_tuple(self) -> tuple:
         """ returns a namedtuple describing the single epoch corresponding to `self.active_epoch_IDX`. """
         a_df_idx = self.active_epochs_df.index.to_numpy()[self.active_epoch_IDX]
-        curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)] # this +1 here makes zero sense
+        curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)]
         curr_epoch = list(curr_epoch_df.itertuples(name='EpochTuple'))[0]
         return curr_epoch
-
-    @property
-    def combined_epoch_stats_df(self) -> pd.DataFrame:
-        """ returns combined_epoch_stats_df. """
-        is_laps: bool = self.params.is_laps
-        if is_laps:
-            return self.rank_order_results.laps_combined_epoch_stats_df
-        else:
-            return self.rank_order_results.ripple_combined_epoch_stats_df
 
     @property
     def active_epoch_result_df(self) -> pd.DataFrame:
         """ returns a the combined_epoch_stats_df describing the single epoch corresponding to `self.active_epoch_IDX`. """
         curr_epoch_label = self.lookup_label_from_index(self.active_epoch_IDX)
-        return self.combined_epoch_stats_df[self.combined_epoch_stats_df.index == curr_epoch_label]
-
-
-    def get_active_epoch_spikes_df(self) -> pd.DataFrame:
-        active_epoch_tuple = self.active_epoch_tuple
-        active_epoch_spikes_df: pd.DataFrame = deepcopy(self.global_spikes_df.spikes.time_sliced(active_epoch_tuple.start, active_epoch_tuple.stop))
-        return active_epoch_spikes_df
-
-    def get_epoch_active_aclus(self) -> NDArray:
-        """ returns a list of aclus active (having at least one spike) in the current epoch (based on `self.active_epoch`) """
-        active_epoch_spikes_df: pd.DataFrame = self.get_active_epoch_spikes_df()
-        active_epoch_unique_active_aclus = np.unique(active_epoch_spikes_df['aclu'].to_numpy())
-        return active_epoch_unique_active_aclus
+        return self.combined_epoch_stats_df[self.combined_epoch_stats_df.label == curr_epoch_label]
+        # return self.combined_epoch_stats_df[self.combined_epoch_stats_df.index == curr_epoch_label]
 
     def lookup_label_from_index(self, an_idx: int) -> int:
         """ Looks of the proper epoch "label", as in the value in the 'label' column of active_epochs_df, from a linear index such as that provided by the slider control.
@@ -145,7 +128,50 @@ class RankOrderRastersDebugger:
         assert str(curr_redundant_label_lookup_label) == str(curr_epoch_label), f"curr_epoch_label: {str(curr_epoch_label)} != str(curr_redundant_label_lookup_label): {str(curr_redundant_label_lookup_label)}"
         return curr_epoch_label
 
+    @property
+    def active_epoch_label(self):
+        """ returns the epoch 'label' value corresponding to the currently selected `self.active_epoch_IDX`. """
+        return self.lookup_label_from_index(an_idx=self.active_epoch_IDX)
+    
+    
+    # Data Convenience Accessors _________________________________________________________________________________________ #
+    @property
+    def combined_epoch_stats_df(self) -> pd.DataFrame:
+        """ returns combined_epoch_stats_df. """
+        is_laps: bool = self.params.is_laps
+        if is_laps:
+            return self.rank_order_results.laps_combined_epoch_stats_df
+        else:
+            return self.rank_order_results.ripple_combined_epoch_stats_df
+        
+    def get_active_epoch_spikes_df(self) -> pd.DataFrame:
+        active_epoch_tuple = self.active_epoch_tuple
+        active_epoch_spikes_df: pd.DataFrame = deepcopy(self.global_spikes_df.spikes.time_sliced(active_epoch_tuple.start, active_epoch_tuple.stop))
+        return active_epoch_spikes_df
 
+    def get_epoch_active_aclus(self) -> NDArray:
+        """ returns a list of aclus active (having at least one spike) in the current epoch (based on `self.active_epoch`) """
+        active_epoch_spikes_df: pd.DataFrame = self.get_active_epoch_spikes_df()
+        active_epoch_unique_active_aclus = np.unique(active_epoch_spikes_df['aclu'].to_numpy())
+        return active_epoch_unique_active_aclus
+    
+    @property
+    def max_n_neurons(self) -> int:
+        return np.max([len(v) for v in self.plots_data.unsorted_original_neuron_IDs_lists])
+
+
+
+    # Plot Convenience Accessors _________________________________________________________________________________________ #
+    @property
+    def seperate_new_sorted_rasters_dict(self) -> Dict[str, NewSimpleRaster]:
+        return self.plots_data.seperate_new_sorted_rasters_dict
+
+
+    @property
+    def root_plots_dict(self) -> Dict[str, pg.PlotItem]:
+        return {k:v['root_plot'] for k,v in self.plots.all_separate_plots.items()} # PlotItem 
+    
+    
 
     @classmethod
     def init_from_rank_order_results(cls, rank_order_results: RankOrderComputationsContainer):
@@ -269,6 +295,7 @@ class RankOrderRastersDebugger:
             for _active_plot_identifier in main_plot_identifiers_list:
                 new_ax = all_separate_root_plots[_active_plot_identifier]
                 new_ax.setXRange(an_epoch.start, an_epoch.stop)
+                new_ax.setAutoPan(False)
                 # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
 
                 # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
@@ -389,6 +416,8 @@ class RankOrderRastersDebugger:
             # a_root_plot.hideAxis('bottom')
             # a_root_plot.hideAxis('bottom')
             a_root_plot.hideAxis('left')
+            a_root_plot.setYRange(-0.5, float(_obj.max_n_neurons))
+            
 
         # for a_decoder_name, a_scatter_plot_item in _obj.plots.scatter_plots.items():
         #     a_scatter_plot_item.hideAxis('left')
@@ -469,6 +498,9 @@ class RankOrderRastersDebugger:
         print(f'a_df_idx: {a_df_idx}')
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == (a_df_idx+1))] # this +1 here makes zero sense
         curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)] # this +1 here makes zero sense
+        
+        an_epoch_label = self.lookup_label_from_index(an_idx=an_epoch_idx)
+        
 
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.lap_id == (an_epoch_idx+1))]
         curr_epoch = list(curr_epoch_df.itertuples())[0]
@@ -627,6 +659,28 @@ class RankOrderRastersDebugger:
         # display(slider)
 
 
+
+    def save_figure(self, export_path: Path):
+        """ Exports all four rasters to a specified file path        
+        
+        """
+        save_paths = []
+        # root_plots_dict = {k:v['root_plot'] for k,v in _out_rank_order_event_raster_debugger.plots.all_separate_plots.items()} # PlotItem 
+
+        root_plots_dict = self.root_plots_dict
+        root_plots_dict['long_LR'].setYRange(-0.5, float(self.max_n_neurons))
+
+        for a_decoder, a_plot in root_plots_dict.items():
+            a_plot.setYRange(-0.5, float(self.max_n_neurons))
+            self.get_epoch_active_aclus()
+            out_path = export_path.joinpath(f'{a_decoder}_plot.png').resolve()
+            export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0))
+            save_paths.append(out_path)
+    
+        return save_paths
+
+
+
     # ==================================================================================================================== #
     # Cell y-axis Labels                                                                                                   #
     # ==================================================================================================================== #
@@ -748,11 +802,13 @@ class RankOrderRastersDebugger:
         
         """
         if row_index is not None:
+            model_idx = self.ui.tableView.model().index(row_index, 0)
             # Scroll to the specified row
-            self.ui.tableView.scrollTo(self.ui.tableView.model().index(row_index, 0))
+            self.ui.tableView.scrollTo(model_idx) # not sure this is the right one
 
             # Select the entire row
-            self.ui.tableView.selectRow(row_index)
+            self.ui.tableView.selectRow(model_idx.row())
+            # self.ui.tableView.selectRow(row_index)
 
 
     # ==================================================================================================================== #
