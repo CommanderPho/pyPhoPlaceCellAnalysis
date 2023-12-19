@@ -33,6 +33,8 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import DirectionalRankOrderLikelihoods, RankOrderComputationsContainer, RankOrderResult ## Circular import?
 
+from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel
+
 __all__ = ['RankOrderRastersDebugger']
 
 
@@ -73,8 +75,9 @@ class RankOrderRastersDebugger:
     active_epochs_df: pd.DataFrame = field(repr=False)
     track_templates: TrackTemplates = field(repr=False)
     rank_order_results: Optional[RankOrderComputationsContainer] = field(repr=False)
-    RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame] = field(repr=False)
     LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame] = field(repr=False)
+    RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame] = field(repr=False)
+
 
     plots: RenderPlots = field(init=False)
     plots_data: RenderPlotsData = field(init=False, repr=False)
@@ -110,7 +113,7 @@ class RankOrderRastersDebugger:
             return self.rank_order_results.laps_combined_epoch_stats_df
         else:
             return self.rank_order_results.ripple_combined_epoch_stats_df
-        
+
     @property
     def active_epoch_result_df(self) -> pd.DataFrame:
         """ returns a the combined_epoch_stats_df describing the single epoch corresponding to `self.active_epoch_IDX`. """
@@ -131,7 +134,7 @@ class RankOrderRastersDebugger:
 
     def lookup_label_from_index(self, an_idx: int) -> int:
         """ Looks of the proper epoch "label", as in the value in the 'label' column of active_epochs_df, from a linear index such as that provided by the slider control.
-        
+
         curr_epoch_label = lookup_label_from_index(a_plotter, an_idx)
         print(f'curr_epoch_label: {curr_epoch_label} :::') ## end line
 
@@ -141,12 +144,12 @@ class RankOrderRastersDebugger:
         # print(f'curr_redundant_label_lookup_label: {curr_redundant_label_lookup_label} :::') ## end line
         assert str(curr_redundant_label_lookup_label) == str(curr_epoch_label), f"curr_epoch_label: {str(curr_epoch_label)} != str(curr_redundant_label_lookup_label): {str(curr_redundant_label_lookup_label)}"
         return curr_epoch_label
-    
-    
+
+
 
     @classmethod
     def init_from_rank_order_results(cls, rank_order_results: RankOrderComputationsContainer):
-        """ 
+        """
             directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
             rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -157,7 +160,7 @@ class RankOrderRastersDebugger:
 
         active_epochs_df = deepcopy(rank_order_results.LR_ripple.epochs_df)
 
-        
+
         """
         raise NotImplementedError
         # active_epochs_df = deepcopy(rank_order_results.LR_ripple.epochs_df)
@@ -182,7 +185,7 @@ class RankOrderRastersDebugger:
              RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
         name:str = 'RankOrderRastersDebugger'
-        
+
         ## 2023-11-30 - Newest Version using separate rasters:
         _obj.plots_data, _obj.plots = cls._build_internal_raster_plots(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates, debug_print=True)
         #TODO 2023-11-30 15:14: - [ ] Unpacking and putting in docks and such not yet finished. Update functions would need to be done separately.
@@ -205,7 +208,7 @@ class RankOrderRastersDebugger:
         all_separate_grids = {a_decoder_name:a_raster_setup_tuple.plots.grid for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
         all_separate_scatter_plots = {a_decoder_name:a_raster_setup_tuple.plots.scatter_plot for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
         all_separate_debug_header_labels = {a_decoder_name:a_raster_setup_tuple.plots.debug_header_label for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        
+
         # Embedding in docks:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho Debug Plot Directional Template Rasters')
         icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
@@ -220,14 +223,14 @@ class RankOrderRastersDebugger:
                 fg_color = '#aaa' # Grey
             else:
                 fg_color = '#fff' # White
-                
-            # a purplish-royal-blue 
+
+            # a purplish-royal-blue
             if is_dim:
-                bg_color = '#d8d8d8' 
-                border_color = '#717171' 
+                bg_color = '#d8d8d8'
+                border_color = '#717171'
             else:
-                bg_color = '#9d9d9d' 
-                border_color = '#3a3a3a' 
+                bg_color = '#9d9d9d'
+                border_color = '#3a3a3a'
 
             return fg_color, bg_color, border_color
 
@@ -246,11 +249,11 @@ class RankOrderRastersDebugger:
                 assert short_LR_dock is not None
                 dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
                 print(f'using overriden dock location.')
-                
-            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name])
+
+            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name], autoOrientation=False)
 
 
-       
+
         # Build callback functions:
         def on_update_active_scatterplot_kwargs(override_scatter_plot_kwargs):
             """ captures: main_plot_identifiers_list, plots, plots_data """
@@ -267,7 +270,7 @@ class RankOrderRastersDebugger:
                 new_ax = all_separate_root_plots[_active_plot_identifier]
                 new_ax.setXRange(an_epoch.start, an_epoch.stop)
                 # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
-                
+
                 # a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
 
 
@@ -285,16 +288,34 @@ class RankOrderRastersDebugger:
 
         ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
         ctrl_layout = pg.LayoutWidget()
-        ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1)
+        ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
         ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
+
+        # Step 4: Create DataFrame and QTableView
+        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
+        # model = PandasModel(df)
+        pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
+
+        tableView = pg.QtWidgets.QTableView()
+        tableView.setModel(pandasDataFrameTableModel)
+        tableView.setObjectName("pandasTablePreview")
+        # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
+        ctrl_widgets_dict['tableView'] = tableView
+
+        # Step 5: Add TableView to LayoutWidget
+        ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
+
 
         logTextEdit = pg.QtWidgets.QTextEdit()
         logTextEdit.setReadOnly(True)
         logTextEdit.setObjectName("logTextEdit")
+        # logTextEdit.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
 
-        ctrl_layout.addWidget(logTextEdit, row=2, rowspan=3, col=0, colspan=1)
+        ctrl_layout.addWidget(logTextEdit, row=2, rowspan=1, col=2, colspan=1)
 
-        _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,100), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
+        _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
 
         ## Add two labels in the top row that show the Long/Short column values:
         long_short_info_layout = pg.LayoutWidget()
@@ -309,7 +330,7 @@ class RankOrderRastersDebugger:
         short_info_label.setObjectName('lblShortInfo')
         # short_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
         short_info_label.setAlignment(pg.QtCore.Qt.AlignRight)
-        
+
         _out_dock_widgets['LongShortColumnsInfo_dock'] = root_dockAreaWindow.add_display_dock(identifier='LongShortColumnsInfo_dock', widget=long_short_info_layout, dockSize=(600,60), dockAddLocationOpts=['top'], display_config=CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False, corner_radius='0px'))
         _out_dock_widgets['LongShortColumnsInfo_dock'][1].hideTitleBar() # hide the dock title bar
 
@@ -327,31 +348,33 @@ class RankOrderRastersDebugger:
                                   dock_widgets=_out_dock_widgets, text_items_dict=None) # , ctrl_widgets={'slider': slider}
         _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
                                            seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
-                                           on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})                
+                                           on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})
         _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs)
-        _obj.params = VisualizationParameters(name=name, is_laps=False, enable_show_spearman=True, enable_show_pearson=False, enable_show_Z_values=True, use_plaintext_title=False)  
+        _obj.params = VisualizationParameters(name=name, is_laps=False, enable_show_spearman=True, enable_show_pearson=False, enable_show_Z_values=True, use_plaintext_title=False)
 
 
         ## Add Selected Spikes:
-        try:
-            ## rank_order_results.LR_ripple.selected_spikes_df mode:
-            if isinstance(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
-                # already a selected_spikes_df! Use it raw!
-                _obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map = deepcopy(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-                _obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map = deepcopy(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-            else:
-                ## Build the selected spikes df:
-                (_obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map), (_obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map) = _obj.build_selected_spikes_df(_obj.track_templates, _obj.active_epochs_df,
-                                                                                                                                                                                                                    _obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict,                                                                                                                                                                                                                _obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict)
-            ## Add the spikes
-            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
-            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
-            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
-            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
+        # try:
+        #     ## rank_order_results.LR_ripple.selected_spikes_df mode:
+        #     if isinstance(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
+        #         # already a selected_spikes_df! Use it raw!
+        #         _obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map = deepcopy(RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+        #         _obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map = deepcopy(LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+        #     else:
+        #         ## Build the selected spikes df:
+        #         (_obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map), (_obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map) = _obj.build_selected_spikes_df(_obj.track_templates, _obj.active_epochs_df,
+        #                                                                                                                                                                                                             _obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict,                                                                                                                                                                                                                _obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict)
+        #     ## Add the spikes
+        #     _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
+        #     _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
+        #     _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
+        #     _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
 
-        except (IndexError, KeyError, ValueError, TypeError):
-            print(f'WARN: the selected spikes did not work properly, so none will be shown.')
-            pass
+        # except (IndexError, KeyError, ValueError, TypeError):
+        #     print(f'WARN: the selected spikes did not work properly, so none will be shown.')
+        #     pass
+
+        cls.try_build_selected_spikes(_obj)
 
         _obj._build_cell_y_labels() # builds the cell labels
 
@@ -376,11 +399,38 @@ class RankOrderRastersDebugger:
             a_label.hide() # hide the labels unless we need them.
 
         _obj.register_internal_callbacks()
-        
+
         return _obj
 
 
-    
+
+    @classmethod
+    def try_build_selected_spikes(cls, _obj) -> bool:
+        ## Add Selected Spikes:
+        try:
+            ## rank_order_results.LR_ripple.selected_spikes_df mode:
+            if isinstance(_obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(_obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
+                # already a selected_spikes_df! Use it raw!
+                _obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map = deepcopy(_obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+                _obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map = deepcopy(_obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+            else:
+                ## Build the selected spikes df:
+                (_obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map), (_obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map) = _obj.build_selected_spikes_df(_obj.track_templates, _obj.active_epochs_df,
+                                                                                                                                                                                                                    _obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict,                                                                                                                                                                                                                _obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict)
+            ## Add the spikes
+            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
+            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
+            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
+            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
+
+            return True
+        except (IndexError, KeyError, ValueError, TypeError):
+            print(f'WARN: the selected spikes did not work properly, so none will be shown.')
+            return False
 
 
 
@@ -388,8 +438,8 @@ class RankOrderRastersDebugger:
         """ registers all internally-owned callback functions. """
         # self.on_idx_changed_callback_function_dict['update_plot_titles_with_stats'] = self.update_plot_titles_with_stats
         pass
-        
-                
+
+
 
     # ==================================================================================================================== #
     # Update Active Epoch Functions                                                                                        #
@@ -400,13 +450,13 @@ class RankOrderRastersDebugger:
         self.plots_data.on_update_active_epoch(an_epoch_idx, an_epoch=an_epoch)
         # Update window titles:
         an_epoch_string: str = f'idx: {an_epoch.Index}, t: {an_epoch.start:0.2f}, {an_epoch.stop:0.2f}, lbl: {str(an_epoch.label)}'
-        
+
         # for i, (a_decoder_name, a_dock_widget) in enumerate(self.plots.dock_widgets.items()):
         for i, (a_decoder_name, a_win) in enumerate(self.plots.all_windows.items()):
             a_dock_widget = self.plots.dock_widgets[a_decoder_name]
             a_dock_widget[1].setTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
             a_win.setWindowTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
-        
+
         self.update_cell_y_labels()
 
 
@@ -422,7 +472,7 @@ class RankOrderRastersDebugger:
 
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.lap_id == (an_epoch_idx+1))]
         curr_epoch = list(curr_epoch_df.itertuples())[0]
-        
+
         # Update the widget if needed, but block changes
         # self.ui.ctrls_widget
         # self.ui.ctrls_widget.setValue(an_epoch_idx, False)
@@ -431,7 +481,9 @@ class RankOrderRastersDebugger:
 
         ## Update scrollbar:
         self.update_plot_titles_with_stats(an_epoch_idx)
-
+        ## Update Table:
+        self.scroll_df_table_view(an_epoch_idx)
+        
 
         ## perform callbacks:
         for a_callback_name, a_callback_fn in self.on_idx_changed_callback_function_dict.items():
@@ -582,17 +634,17 @@ class RankOrderRastersDebugger:
     @classmethod
     def _build_neuron_y_labels(cls, a_plot_item, a_decoder_color_map, aclu_y_values_dict: Dict):
         """ 2023-11-29 - builds the y-axis text labels for a single one of the four raster plots.
-        
-        
+
+
         Uses:
             a_decoder_color_map, aclu_y_values_dict
-        
+
         """
         [[x1, x2], [y1, y2]] = a_plot_item.getViewBox().viewRange() # get the x-axis range for initial position
 
 
-            
-            
+
+
         _out_text_items = {}
         for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
             # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
@@ -600,17 +652,17 @@ class RankOrderRastersDebugger:
             text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0.5)) # , angle=15
             # text.setPos(x2, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
             text.setPos(x2, aclu_y_values_dict[aclu]) # the x2 part indicates that we want it aligned to the end of the window (the right-hand-side)
-            
+
             # # Function to handle click event
             # def on_text_item_clicked(evt):
             #     # Your custom logic here
             #     print("TextItem clicked!")
             #     print(f'\tevt: {evt}')
-                
+
 
             # def on_name_clicked(self, q_textitem):
             #     print(q_textitem.text())
-                
+
             # Connect the click signal to the custom function
             # text.sigMouseClicked.connect(on_text_item_clicked)
             # Connect the click signal to the custom function
@@ -643,6 +695,8 @@ class RankOrderRastersDebugger:
         if self.plots.text_items_dict is not None:
             #TODO 2023-11-30 08:33: - [ ] Remove the old labels here if they exist.
             print(f'TODO 2023-11-30 08:33: - [ ] Remove the old labels here if they exist.')
+            for a_plot_item, a_text_item in self.plots.text_items_dict.items():
+                a_text_item.scene().removeItem(a_text_item) # example from https://stackoverflow.com/questions/46791395/pyqtgraph-get-text-of-node-and-change-color-on-mouseclick
 
         self.plots.text_items_dict = {}
 
@@ -689,6 +743,17 @@ class RankOrderRastersDebugger:
                 # text.setVisible(is_aclu_active)
 
 
+    def scroll_df_table_view(self, row_index: Optional[int]):
+        """ scrolls the table to the selected index. 
+        
+        """
+        if row_index is not None:
+            # Scroll to the specified row
+            self.ui.tableView.scrollTo(self.ui.tableView.model().index(row_index, 0))
+
+            # Select the entire row
+            self.ui.tableView.selectRow(row_index)
+
 
     # ==================================================================================================================== #
     # Core Component Building Classmethods                                                                                 #
@@ -699,14 +764,14 @@ class RankOrderRastersDebugger:
         """ 2023-11-30 **DO EM ALL SEPERATELY**
 
         _out_data, _out_plots = _build_internal_raster_plots(spikes_df, active_epochs_df, track_templates, debug_print=True)
-        
-        History:
-            Called `_post_modern_debug_plot_directional_template_rasters` 
 
-            
+        History:
+            Called `_post_modern_debug_plot_directional_template_rasters`
+
+
         Uses:
             paired_separately_sort_neurons
-        
+
         """
         from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
         from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
@@ -749,12 +814,12 @@ class RankOrderRastersDebugger:
         # CORRECT: Even: RL, Odd: LR
         RL_neuron_ids = track_templates.shared_RL_aclus_only_neuron_IDs.copy() # (69, )
         LR_neuron_ids = track_templates.shared_LR_aclus_only_neuron_IDs.copy() # (64, )
-    
+
         included_any_context_neuron_ids_dict = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], (LR_neuron_ids, RL_neuron_ids, LR_neuron_ids, RL_neuron_ids)))
 
         # INDIVIDUAL SORTING for each raster:
         sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts, (unsorted_original_neuron_IDs_lists, unsorted_neuron_IDs_lists, unsorted_sortable_values_lists, unsorted_unit_colors_map) = paired_separately_sort_neurons(decoders_dict, included_any_context_neuron_ids_dict)
-        
+
         _out_data = RenderPlotsData(name=figure_name, spikes_df=spikes_df, unit_sort_orders_dict=None, included_any_context_neuron_ids_dict=included_any_context_neuron_ids_dict,
                                     sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None,
                                     unsorted_original_neuron_IDs_lists=deepcopy(unsorted_original_neuron_IDs_lists), unsorted_neuron_IDs_lists=deepcopy(unsorted_neuron_IDs_lists), unsorted_sortable_values_lists=deepcopy(unsorted_sortable_values_lists), unsorted_unit_colors_map=deepcopy(unsorted_unit_colors_map))
@@ -779,7 +844,7 @@ class RankOrderRastersDebugger:
             unit_sort_order, desired_sort_arr = find_desired_sort_indicies(an_included_unsorted_neuron_ids, a_sorted_neuron_ids)
             print(f'unit_sort_order: {unit_sort_order}\ndesired_sort_arr: {desired_sort_arr}')
             _out_data.unit_sort_orders_dict[a_decoder_name] = deepcopy(unit_sort_order)
-            
+
             # Get only the spikes for the shared_aclus:
             a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(an_included_unsorted_neuron_ids)
             a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
@@ -878,8 +943,8 @@ class RankOrderRastersDebugger:
         return (RL_selected_spike_df, RL_neuron_id_to_new_IDX_map), (LR_selected_spike_df, LR_neuron_id_to_new_IDX_map)
 
     @classmethod
-    def add_selected_spikes_df_points_to_scatter_plot(cls, plots_data, plots, selected_spikes_df, _active_plot_identifier = 'long_RL'):
-        """ Called after above `build_selected_spikes_df`
+    def DEP_add_selected_spikes_df_points_to_scatter_plot(cls, plots_data, plots, selected_spikes_df, _active_plot_identifier = 'long_RL'):
+        """ OLD Called after above `build_selected_spikes_df`
 
         Usage:
             add_selected_spikes_df_points_to_scatter_plot(plots_data=LR_plots_data, plots=LR_plots, selected_spikes_df=deepcopy(LR_selected_spike_df), _active_plot_identifier = 'long_LR')
@@ -907,6 +972,43 @@ class RankOrderRastersDebugger:
         a_scatter_plot.addPoints(plots_data.all_selected_spots_dict[_active_plot_identifier])
 
 
+
+    @classmethod
+    def add_selected_spikes_df_points_to_scatter_plot(cls, plots_data, plots, selected_spikes_df, _active_plot_identifier = 'long_RL'):
+        """ Called after above `build_selected_spikes_df`
+
+        Usage:
+            add_selected_spikes_df_points_to_scatter_plot(plots_data=LR_plots_data, plots=LR_plots, selected_spikes_df=deepcopy(LR_selected_spike_df), _active_plot_identifier = 'long_LR')
+            add_selected_spikes_df_points_to_scatter_plot(plots_data=LR_plots_data, plots=LR_plots, selected_spikes_df=deepcopy(LR_selected_spike_df), _active_plot_identifier = 'short_LR')
+            add_selected_spikes_df_points_to_scatter_plot(plots_data=RL_plots_data, plots=RL_plots, selected_spikes_df=deepcopy(RL_selected_spike_df), _active_plot_identifier = 'long_RL')
+            add_selected_spikes_df_points_to_scatter_plot(plots_data=RL_plots_data, plots=RL_plots, selected_spikes_df=deepcopy(RL_selected_spike_df), _active_plot_identifier = 'short_RL')
+
+        """
+        ## Initialize global selected spikes stuff:
+        plots_data.all_selected_spots_dict = {}
+        plots_data.all_selected_scatterplot_tooltips_kwargs_dict = {}
+        # plots_data_dict = plots_data.plots_data_dict # derived
+        new_sorted_raster = plots_data['seperate_new_sorted_rasters_dict'][_active_plot_identifier]
+        selected_spikes_df = new_sorted_raster.update_spikes_df_visualization_columns(spikes_df=selected_spikes_df)
+
+        ## Build the spots for the raster plot:
+        plots_data.all_selected_spots_dict[_active_plot_identifier], plots_data.all_selected_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] = new_sorted_raster.build_spikes_all_spots_from_df(spikes_df=selected_spikes_df, should_return_data_tooltips_kwargs=True, generate_debug_tuples=False) # Render2DScrollWindowPlotMixin.build_spikes_all_spots_from_df(selected_spikes_df, plots_data_dict[_active_plot_identifier].raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=True)
+        # Override the pen for the selected spots, the default renders them looking exactly like normal spikes which is no good:
+        for a_point in plots_data.all_selected_spots_dict[_active_plot_identifier]:
+            a_point['pen'] = pg.mkPen('#ffffff8e', width=3.5)
+            a_point['brush'] = pg.mkBrush('#ffffff2f')
+
+
+        ## Add the median spikes to the plots:
+        a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
+        a_scatter_plot.addPoints(plots_data.all_selected_spots_dict[_active_plot_identifier])
+
+
+
+
+        # _out_plots.rasters_display_outputs[a_decoder_name]
+
+
     # ==================================================================================================================== #
     # Registering Output Signals                                                                                           #
     # ==================================================================================================================== #
@@ -919,7 +1021,7 @@ class RankOrderRastersDebugger:
             print(f'=====================================================================================\n\tactive_epoch_IDX: {an_idx} :::', end='\t')
 
             ## Registered printing functions are called here, and anything they print is written to the textarea at the bottom of the widget.
-            
+
 
             print(f'______________________________________________________________________________________________________________________\n')
 
@@ -929,23 +1031,23 @@ class RankOrderRastersDebugger:
     def update_plot_titles_with_stats(self, an_idx: int):
         """ Updates the titles of each of the four rasters with the appropriate spearman rho value.
         captures: rank_order_results_debug_values || active_epochs_df, formatted_title_strings_dict
-        
-        
+
+
         Usages:
             self.params.enable_show_spearman
             self.params.enable_show_pearson
             self.params.enable_show_Z_values
-            
+
             self.active_epoch_result_df
-            
-            
+
+
         """
         is_laps: bool = self.params.is_laps
         use_plaintext_title: bool = self.params.use_plaintext_title
         if not use_plaintext_title:
             formatted_title_strings_dict = DisplayColorsEnum.get_pyqtgraph_formatted_title_dict()
 
-        # curr_epoch_label = a_plotter.lookup_label_from_index(an_idx)    
+        # curr_epoch_label = a_plotter.lookup_label_from_index(an_idx)
         # ripple_combined_epoch_stats_df = a_plotter.rank_order_results.ripple_combined_epoch_stats_df
         # curr_new_results_df = ripple_combined_epoch_stats_df[ripple_combined_epoch_stats_df.index == curr_epoch_label]
 
@@ -953,7 +1055,7 @@ class RankOrderRastersDebugger:
         for a_decoder_name, a_root_plot in self.plots.root_plots.items():
             # a_real_value = rank_order_results_debug_values[a_decoder_name][0][an_idx]
             a_std_column_name: str = self.decoder_name_to_column_name_prefix_map[a_decoder_name]
-            
+
             all_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
             active_column_names = []
             # print(active_column_names)
@@ -961,18 +1063,18 @@ class RankOrderRastersDebugger:
                 active_column_names = [col for col in all_column_names if col.endswith("_spearman")]
                 if self.params.enable_show_Z_values:
                     active_column_names += [col for col in all_column_names if col.endswith("_spearman_Z")]
-                    
-                    
+
+
             if self.params.enable_show_pearson:
                 active_column_names += [col for col in all_column_names if col.endswith("_pearson")]
                 if self.params.enable_show_Z_values:
                     active_column_names += [col for col in all_column_names if col.endswith("_pearson_Z")]
-                
-            
+
+
             active_column_values = curr_new_results_df[active_column_names]
             active_values_dict = active_column_values.iloc[0].to_dict() # {'LR_Long_spearman': -0.34965034965034975, 'LR_Long_pearson': -0.5736588716389961, 'LR_Long_spearman_Z': -0.865774983083525, 'LR_Long_pearson_Z': -1.4243571733839517}
             active_raw_col_val_dict = {k.replace(f'{a_std_column_name}_', ''):v for k,v in active_values_dict.items()} # remove the "LR_Long" prefix so it's just the variable names
-            
+
             active_formatted_col_val_list = [':'.join([generate_html_string(str(k), color='grey', bold=False), generate_html_string(f'{v:0.3f}', color='white', bold=True)]) for k,v in active_raw_col_val_dict.items()]
             final_values_string: str = '; '.join(active_formatted_col_val_list)
 
@@ -982,12 +1084,12 @@ class RankOrderRastersDebugger:
                 # Color formatted title:
                 a_formatted_title_string_prefix: str = formatted_title_strings_dict[a_std_column_name]
                 title_str = generate_html_string(f"{a_formatted_title_string_prefix}: {final_values_string}")
-            
+
             a_root_plot.setTitle(title=title_str)
 
 
-        
-        
+
+
 ## Adding callbacks to `RankOrderRastersDebugger` when the slider changes:
 
 
@@ -1019,7 +1121,7 @@ spikes_df
 # def debug_plot_epoch_label_row(a_plotter, an_idx: int):
 # 	a_row, a_label = get_epoch_label_row(an_idx=an_idx)
 # 	print(f'debug_plot_epoch_label_row(an_idx: {an_idx}):\n\t{print_formatted_active_epochs_df(a_label, a_row)}')
-    
+
 
 def debug_print_dict_row(a_dict) -> str:
     return '\t'.join([': '.join([str(k), f'{float(v):0.3f}']) for k, v in a_dict.items()])
@@ -1029,10 +1131,10 @@ def print_formatted_active_epochs_df(curr_epoch_label, corresponding_epoch_value
         ['start', 'stop', 'label', 'duration']
         ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman']
         ['LR_Long_Old_Spearman', 'RL_Long_Old_Spearman', 'LR_Short_Old_Spearman', 'RL_Short_Old_Spearman']
-        
+
         ['LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']
         ['LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
-        
+
         ['LR_Long_ActuallyIncludedAclus', 'LR_Long_rel_num_cells', 'RL_Long_ActuallyIncludedAclus', 'RL_Long_rel_num_cells']
         ['LR_Long_ActuallyIncludedAclus', 'LR_Long_rel_num_cells', 'RL_Long_ActuallyIncludedAclus', 'RL_Long_rel_num_cells']
     """
@@ -1048,30 +1150,30 @@ def print_formatted_active_epochs_df(curr_epoch_label, corresponding_epoch_value
         # debug_print_dict_row({field: getattr(corresponding_epoch_values_tuple, field) for field in ['LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']}),
         # f'LR_relative_num_cells: {LR_relative_num_cells[an_idx]},\t\t RL_relative_num_cells: {RL_relative_num_cells[an_idx]}',
         # f'LR_template_epoch_actually_included_aclus: {corresponding_epoch_values_tuple.a[an_idx]},\nRL_template_epoch_actually_included_aclus: {RL_template_epoch_actually_included_aclus[an_idx]}',
-        f'LR_Long rel: num_cells: {corresponding_epoch_values_tuple.LR_Long_rel_num_cells}, \t aclus: {corresponding_epoch_values_tuple.LR_Long_ActuallyIncludedAclus}', 
-        f'RL_Long rel: num_cells: {corresponding_epoch_values_tuple.RL_Long_rel_num_cells}, \t aclus: {corresponding_epoch_values_tuple.RL_Long_ActuallyIncludedAclus}', 
+        f'LR_Long rel: num_cells: {corresponding_epoch_values_tuple.LR_Long_rel_num_cells}, \t aclus: {corresponding_epoch_values_tuple.LR_Long_ActuallyIncludedAclus}',
+        f'RL_Long rel: num_cells: {corresponding_epoch_values_tuple.RL_Long_rel_num_cells}, \t aclus: {corresponding_epoch_values_tuple.RL_Long_ActuallyIncludedAclus}',
     ))
     print(out_str)
-    
+
 
 
 def debug_update_plot_titles(a_plotter, an_idx: int):
     """ Updates the titles of each of the four rasters with the appropriate spearman rho value.
     captures: rank_order_results_debug_values || active_epochs_df, formatted_title_strings_dict
-    
-    
+
+
     Usages:
         a_plotter.params.enable_show_spearman
         a_plotter.params.enable_show_pearson
         a_plotter.params.enable_show_Z_values
-        
+
     """
     is_laps: bool = a_plotter.params.is_laps
     use_plaintext_title: bool = a_plotter.params.use_plaintext_title
     if not use_plaintext_title:
         formatted_title_strings_dict = DisplayColorsEnum.get_pyqtgraph_formatted_title_dict()
 
-    # curr_epoch_label = a_plotter.lookup_label_from_index(an_idx)    
+    # curr_epoch_label = a_plotter.lookup_label_from_index(an_idx)
     # ripple_combined_epoch_stats_df = a_plotter.rank_order_results.ripple_combined_epoch_stats_df
     # curr_new_results_df = ripple_combined_epoch_stats_df[ripple_combined_epoch_stats_df.index == curr_epoch_label]
 
@@ -1079,7 +1181,7 @@ def debug_update_plot_titles(a_plotter, an_idx: int):
     for a_decoder_name, a_root_plot in a_plotter.plots.root_plots.items():
         # a_real_value = rank_order_results_debug_values[a_decoder_name][0][an_idx]
         a_std_column_name: str = a_plotter.decoder_name_to_column_name_prefix_map[a_decoder_name]
-        
+
         all_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
         active_column_names = []
         # print(active_column_names)
@@ -1087,18 +1189,18 @@ def debug_update_plot_titles(a_plotter, an_idx: int):
             active_column_names = [col for col in all_column_names if col.endswith("_spearman")]
             if a_plotter.params.enable_show_Z_values:
                 active_column_names += [col for col in all_column_names if col.endswith("_spearman_Z")]
-                
-                
+
+
         if a_plotter.params.enable_show_pearson:
             active_column_names += [col for col in all_column_names if col.endswith("_pearson")]
             if a_plotter.params.enable_show_Z_values:
                 active_column_names += [col for col in all_column_names if col.endswith("_pearson_Z")]
-            
-        
+
+
         active_column_values = curr_new_results_df[active_column_names]
         active_values_dict = active_column_values.iloc[0].to_dict() # {'LR_Long_spearman': -0.34965034965034975, 'LR_Long_pearson': -0.5736588716389961, 'LR_Long_spearman_Z': -0.865774983083525, 'LR_Long_pearson_Z': -1.4243571733839517}
         active_raw_col_val_dict = {k.replace(f'{a_std_column_name}_', ''):v for k,v in active_values_dict.items()} # remove the "LR_Long" prefix so it's just the variable names
-        
+
         active_formatted_col_val_list = [':'.join([generate_html_string(str(k), color='grey', bold=False), generate_html_string(f'{v:0.3f}', color='white', bold=True)]) for k,v in active_raw_col_val_dict.items()]
         final_values_string: str = '; '.join(active_formatted_col_val_list)
 
@@ -1108,15 +1210,15 @@ def debug_update_plot_titles(a_plotter, an_idx: int):
             # Color formatted title:
             a_formatted_title_string_prefix: str = formatted_title_strings_dict[a_std_column_name]
             title_str = generate_html_string(f"{a_formatted_title_string_prefix}: {final_values_string}")
-        
+
         a_root_plot.setTitle(title=title_str)
 
 
 def debug_update_long_short_info_titles(a_plotter, an_idx: int):
     """ Updates the titles of each of the four rasters with the appropriate spearman rho value.
-    captures: ripple_result_tuple, 
+    captures: ripple_result_tuple,
     """
-    
+
     has_long_short_info_labels = (hasattr(a_plotter.ui, 'long_info_label') and hasattr(a_plotter.ui, 'short_info_label'))
     if has_long_short_info_labels:
         ripple_result_tuple = a_plotter.rank_order_results.ripple_most_likely_result_tuple
@@ -1136,14 +1238,14 @@ def debug_update_long_short_info_titles(a_plotter, an_idx: int):
             long_info_string_list.append(generate_html_string(f'LONG RL likelihood: {_long_RL_likelihood_str}'))
 
         if directional_likelihoods_tuple.long_best_direction_indices is not None:
-            _long_best_dir_IDX = directional_likelihoods_tuple.long_best_direction_indices[an_idx]		
+            _long_best_dir_IDX = directional_likelihoods_tuple.long_best_direction_indices[an_idx]
             _long_best_dir_IDX_str = generate_html_string(f'{int(_long_best_dir_IDX)}', color='black', bold=True)
             long_info_string_list.append(generate_html_string(f'LONG best dir IDX: {_long_best_dir_IDX_str}'))
-            
+
         # original:
         ripple_result_tuple.rank_order_z_score_df
         ripple_result_tuple.active_epochs
-        
+
         long_best_dir_z_score_value_str = generate_html_string(f'{float(ripple_result_tuple.long_best_dir_z_score_values[an_idx]):0.3f}', color='black', bold=True)
         long_info_string_list.append(generate_html_string(f'LONG best_dir_z_score_value: {long_best_dir_z_score_value_str}'))
 
@@ -1153,7 +1255,7 @@ def debug_update_long_short_info_titles(a_plotter, an_idx: int):
         a_plotter.ui.short_info_label.setText(generate_html_string(f'SHORT best_dir_z_score_value: {short_best_dir_z_score_value_str}'))
     else:
         print(f'WARN: debug_update_long_short_info_titles(...) but plotter does not have the `a_plotter.ui.long_info_label`')
-        
+
 def a_debug_callback_fn(a_plotter, an_idx: int, an_epoch=None):
     global epoch_active_aclus, _out_directional_template_pfs_debugger
     out = io.StringIO()
@@ -1165,14 +1267,14 @@ def a_debug_callback_fn(a_plotter, an_idx: int, an_epoch=None):
     # DO LR only:
     LR_ranked_aclus_stats = rank_order_results.LR_ripple.ranked_aclus_stats_dict[curr_epoch_label]
     LR_extra_info = rank_order_results.LR_ripple.extra_info_dict[curr_epoch_label]
-    
+
     RL_ranked_aclus_stats = rank_order_results.LR_ripple.ranked_aclus_stats_dict[curr_epoch_label]
     RL_extra_info = rank_order_results.RL_ripple.extra_info_dict[curr_epoch_label]
 
 
     # ripple_combined_epoch_stats_df = deepcopy(curr_active_pipeline.global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df)
     curr_new_results_df = a_plotter.rank_order_results.ripple_combined_epoch_stats_df[a_plotter.rank_order_results.ripple_combined_epoch_stats_df.index == curr_epoch_label]
-    
+
     # RL_extra_info_dict = rank_order_results.RL_ripple.extra_info_dict[curr_epoch_label]
 
     with redirect_stdout(out):
@@ -1186,11 +1288,11 @@ def a_debug_callback_fn(a_plotter, an_idx: int, an_epoch=None):
         # print(f'RL_ripple.long_z_score: {rank_order_results.RL_ripple.long_z_score[an_idx]:.4f},\t\t RL_ripple.short_z_score: {rank_order_results.RL_ripple.short_z_score[an_idx]:.4f}')
         # print(f'LR_relative_num_cells: {LR_relative_num_cells[an_idx]},\t\t RL_relative_num_cells: {RL_relative_num_cells[an_idx]}')
         # print(f'LR_template_epoch_actually_included_aclus: {LR_template_epoch_actually_included_aclus[an_idx]},\nRL_template_epoch_actually_included_aclus: {RL_template_epoch_actually_included_aclus[an_idx]}')
-        
+
 
         ## Simple key-based indexing:
         print(f'')
-        
+
         lr_long_columns = curr_new_results_df.filter(regex='^LR_Long').columns.tolist()
         # print(lr_long_columns)
         lr_long_columns_stripped = [col.replace('LR_Long_', '') for col in lr_long_columns]
@@ -1211,7 +1313,7 @@ def a_debug_callback_fn(a_plotter, an_idx: int, an_epoch=None):
 
         # 'LR_Long_spearman', 'LR_Long_spearman_Z'
         ## Extract Z-score variables:
-        
+
 
         # """ captures: active_epochs_df, """
         # # corresponding_epoch_value = active_epochs_df.to_records()[active_epochs_df['label'] == curr_epoch_label]
@@ -1225,7 +1327,7 @@ def a_debug_callback_fn(a_plotter, an_idx: int, an_epoch=None):
         # 	print(f'ERR\n\ta_debug_callback_fn(...): e: {e}')
         # 	raise e
         # 	# pass
-        
+
 
         # a_row, a_label = get_epoch_label_row(an_idx=an_idx)
         # print(f'!!!! debug_plot_epoch_label_row(an_idx: {an_idx}):\n\ta_label: {a_label}\n\ta_row: {a_row}')
@@ -1235,13 +1337,13 @@ def a_debug_callback_fn(a_plotter, an_idx: int, an_epoch=None):
         # epoch_active_aclus = np.sort(union_of_arrays(LR_template_epoch_actually_included_aclus[an_idx], RL_template_epoch_actually_included_aclus[an_idx]))
         # print(f'epoch_active_aclus: {epoch_active_aclus}')
         print(f'______________________________________________________________________________________________________________________\n')
-        
+
     a_plotter.write_to_log(str(out.getvalue()))
     # # update the displayed cells:
     # directional_template_pfs_debugger_on_update_callback = _out_directional_template_pfs_debugger.get('ui').on_update_callback
     # directional_template_pfs_debugger_on_update_callback(epoch_active_aclus)
     # _out_directional_template_pfs_debugger = curr_active_pipeline.display(DirectionalPlacefieldGlobalDisplayFunctions._display_directional_template_debugger, included_any_context_neuron_ids=epoch_active_aclus)
-    
+
     # rank_order_results.ripple_most_likely_result_tuple.long_short_best_dir_z_score_diff_values[an_idx]
     # display(LR_template_epoch_actually_included_aclus[an_idx])
     # display(RL_template_epoch_actually_included_aclus[an_idx])
