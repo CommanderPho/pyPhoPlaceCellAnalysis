@@ -430,85 +430,143 @@ class RankOrderComputationsContainer(ComputedResult):
         return iter(astuple(self, filter=attrs.filters.exclude(self.__attrs_attrs__.is_global, self.__attrs_attrs__.ripple_most_likely_result_tuple, self.__attrs_attrs__.laps_most_likely_result_tuple, self.__attrs_attrs__.minimum_inclusion_fr_Hz))) #  'is_global'
 
 
-    @function_attributes(short_name=None, tags=['aligned', 'epochs', 'filtering'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-13 12:16', related_items=[])
-    def get_aligned_events(self, epochs_df: pd.DataFrame, is_laps: bool = False):
-        """ gets the values for both directions alligned to the same epochs for the given epoch_name and direction.
+    # @function_attributes(short_name=None, tags=['aligned', 'epochs', 'filtering'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-13 12:16', related_items=[])
+    # def get_aligned_events(self, epochs_df: pd.DataFrame, is_laps: bool = False):
+    #     """ gets the values for both directions alligned to the same epochs for the given epoch_name and direction.
 
-        Pure, does not modify self.
+    #     Pure, does not modify self.
 
-        Usage:
-        ## Replays:
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-            global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-            if isinstance(global_replays, pd.DataFrame):
-                global_replays = Epoch(global_replays.epochs.get_valid_df())
-            # get the aligned epochs and the z-scores aligned to them:
-            active_replay_epochs, ripple_rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_replays.to_dataframe().copy(), is_laps=False)
+    #     Usage:
+    #     ## Replays:
+    #         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    #         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
+    #         if isinstance(global_replays, pd.DataFrame):
+    #             global_replays = Epoch(global_replays.epochs.get_valid_df())
+    #         # get the aligned epochs and the z-scores aligned to them:
+    #         active_replay_epochs, ripple_rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_replays.to_dataframe().copy(), is_laps=False)
 
-        ## Laps:
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-            global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
-            active_laps_epochs, laps_rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_laps.copy(), is_laps=True)
+    #     ## Laps:
+    #         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    #         global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
+    #         active_laps_epochs, laps_rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score) = rank_order_results.get_aligned_events(global_laps.copy(), is_laps=True)
 
+    #     """
+    #     def _subfn_compute(LR_values, RL_values, all_epochs_df):
+    #         """ gets the values for either the laps or the ripples
+
+    #         is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL)
+
+    #         """
+    #         # all_epochs_df: (611,)
+    #         # bak_active_epochs_df = deepcopy(active_epochs_df)
+    #         is_included_epoch_LR = np.isin(all_epochs_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy()) # (611,)
+    #         is_included_epoch_RL = np.isin(all_epochs_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy()) # (611,)
+    #         is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL) # (611,)
+    #         active_epochs_df = all_epochs_df[is_included_epoch] # cuts down to only those included by one or the other. Should this be AND? # (586, )
+
+    #         # Convert to same epochs:
+    #         LR_values_long_z_score = pd.Series(LR_values.long_z_score, index=LR_values.epochs_df.label.to_numpy()) # (608,)
+    #         RL_values_long_z_score = pd.Series(RL_values.long_z_score, index=RL_values.epochs_df.label.to_numpy()) # (608,)
+
+    #         LR_values_short_z_score = pd.Series(LR_values.short_z_score, index=LR_values.epochs_df.label.to_numpy()) # (608,)
+    #         RL_values_short_z_score = pd.Series(RL_values.short_z_score, index=RL_values.epochs_df.label.to_numpy()) # (608,)
+
+    #         active_LR_ripple_long_z_score = LR_values_long_z_score[active_epochs_df.label.to_numpy()] # 586
+    #         active_RL_ripple_long_z_score = RL_values_long_z_score[active_epochs_df.label.to_numpy()] # 586
+    #         active_LR_ripple_short_z_score = LR_values_short_z_score[active_epochs_df.label.to_numpy()] # 586
+    #         active_RL_ripple_short_z_score = RL_values_short_z_score[active_epochs_df.label.to_numpy()] # 586
+
+    #         # Creating a new DataFrame with the reset series
+    #         rank_order_z_score_df: pd.DataFrame = deepcopy(all_epochs_df)
+    #         # Adding four new float columns filled with np.nans in a single line
+    #         rank_order_z_score_df[['LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=rank_order_z_score_df.index)
+
+    #         # Assert statements to ensure shapes match
+    #         assert (np.shape(LR_values.epochs_df.label.to_numpy()) == np.shape(LR_values.long_z_score))
+    #         assert (np.shape(RL_values.epochs_df.label.to_numpy()) == np.shape(RL_values.long_z_score))
+    #         assert (np.shape(LR_values.epochs_df.label.to_numpy()) == np.shape(LR_values.short_z_score))
+    #         assert (np.shape(RL_values.epochs_df.label.to_numpy()) == np.shape(RL_values.short_z_score))
+
+    #         # Creating mapping dictionaries for each set of values
+    #         label_to_LR_long_z_score_mapping = dict(zip(LR_values.epochs_df.label.to_numpy(), LR_values.long_z_score)) # Creating a mapping dictionary
+    #         label_to_RL_long_z_score_mapping = dict(zip(RL_values.epochs_df.label.to_numpy(), RL_values.long_z_score))
+    #         label_to_LR_short_z_score_mapping = dict(zip(LR_values.epochs_df.label.to_numpy(), LR_values.short_z_score))
+    #         label_to_RL_short_z_score_mapping = dict(zip(RL_values.epochs_df.label.to_numpy(), RL_values.short_z_score))
+
+    #         # Updating the DataFrame using the mapping
+    #         rank_order_z_score_df['LR_Long_Z'] = rank_order_z_score_df['label'].map(label_to_LR_long_z_score_mapping) # Updating the DataFrame
+    #         rank_order_z_score_df['RL_Long_Z'] = rank_order_z_score_df['label'].map(label_to_RL_long_z_score_mapping)
+    #         rank_order_z_score_df['LR_Short_Z'] = rank_order_z_score_df['label'].map(label_to_LR_short_z_score_mapping)
+    #         rank_order_z_score_df['RL_Short_Z'] = rank_order_z_score_df['label'].map(label_to_RL_short_z_score_mapping)
+
+    #         return active_epochs_df, rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
+
+    #     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+    #     if is_laps:
+    #         assert ((self.LR_laps is not None) and (self.RL_laps is not None)), f"self.LR_laps or self.RL_laps is None - Rank-order was not computed for Laps?"
+    #         active_epochs_df, rank_order_z_score_df, _out_tuple = _subfn_compute(self.LR_laps, self.RL_laps, epochs_df)
+    #     else:
+    #         assert ((self.LR_ripple is not None) and (self.RL_ripple is not None)), f"self.LR_ripple or self.RL_ripple is None - Rank-order was not computed for Laps?"
+    #         active_epochs_df, rank_order_z_score_df, _out_tuple = _subfn_compute(self.LR_ripple, self.RL_ripple, epochs_df)
+    #     return active_epochs_df, rank_order_z_score_df, _out_tuple
+
+    def adding_active_aclus_info(self):
         """
-        def _subfn_compute(LR_values, RL_values, all_epochs_df):
-            """ gets the values for either the laps or the ripples
+        Updates the `epochs_df` of each of its members.
+        
+        # ['LR_Long_ActuallyIncludedAclus', 'RL_Long_ActuallyIncludedAclus', 'LR_Short_ActuallyIncludedAclus', 'RL_Short_ActuallyIncludedAclus']
+        """
+        self.LR_laps.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.LR_laps.epochs_df, is_laps=True)
+        self.RL_laps.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.RL_laps.epochs_df, is_laps=True)
 
-            is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL)
+        self.LR_ripple.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.LR_ripple.epochs_df, is_laps=False)
+        self.RL_ripple.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.RL_ripple.epochs_df, is_laps=False)
 
-            """
-            # all_epochs_df: (611,)
-            # bak_active_epochs_df = deepcopy(active_epochs_df)
-            is_included_epoch_LR = np.isin(all_epochs_df.label.to_numpy(), LR_values.epochs_df.label.to_numpy()) # (611,)
-            is_included_epoch_RL = np.isin(all_epochs_df.label.to_numpy(), RL_values.epochs_df.label.to_numpy()) # (611,)
-            is_included_epoch = np.logical_or(is_included_epoch_LR, is_included_epoch_RL) # (611,)
-            active_epochs_df = all_epochs_df[is_included_epoch] # cuts down to only those included by one or the other. Should this be AND? # (586, )
 
-            # Convert to same epochs:
-            LR_values_long_z_score = pd.Series(LR_values.long_z_score, index=LR_values.epochs_df.label.to_numpy()) # (608,)
-            RL_values_long_z_score = pd.Series(RL_values.long_z_score, index=RL_values.epochs_df.label.to_numpy()) # (608,)
-
-            LR_values_short_z_score = pd.Series(LR_values.short_z_score, index=LR_values.epochs_df.label.to_numpy()) # (608,)
-            RL_values_short_z_score = pd.Series(RL_values.short_z_score, index=RL_values.epochs_df.label.to_numpy()) # (608,)
-
-            active_LR_ripple_long_z_score = LR_values_long_z_score[active_epochs_df.label.to_numpy()] # 586
-            active_RL_ripple_long_z_score = RL_values_long_z_score[active_epochs_df.label.to_numpy()] # 586
-            active_LR_ripple_short_z_score = LR_values_short_z_score[active_epochs_df.label.to_numpy()] # 586
-            active_RL_ripple_short_z_score = RL_values_short_z_score[active_epochs_df.label.to_numpy()] # 586
-
-            # Creating a new DataFrame with the reset series
-            rank_order_z_score_df: pd.DataFrame = deepcopy(all_epochs_df)
-            # Adding four new float columns filled with np.nans in a single line
-            rank_order_z_score_df[['LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=rank_order_z_score_df.index)
-
-            # Assert statements to ensure shapes match
-            assert (np.shape(LR_values.epochs_df.label.to_numpy()) == np.shape(LR_values.long_z_score))
-            assert (np.shape(RL_values.epochs_df.label.to_numpy()) == np.shape(RL_values.long_z_score))
-            assert (np.shape(LR_values.epochs_df.label.to_numpy()) == np.shape(LR_values.short_z_score))
-            assert (np.shape(RL_values.epochs_df.label.to_numpy()) == np.shape(RL_values.short_z_score))
-
-            # Creating mapping dictionaries for each set of values
-            label_to_LR_long_z_score_mapping = dict(zip(LR_values.epochs_df.label.to_numpy(), LR_values.long_z_score)) # Creating a mapping dictionary
-            label_to_RL_long_z_score_mapping = dict(zip(RL_values.epochs_df.label.to_numpy(), RL_values.long_z_score))
-            label_to_LR_short_z_score_mapping = dict(zip(LR_values.epochs_df.label.to_numpy(), LR_values.short_z_score))
-            label_to_RL_short_z_score_mapping = dict(zip(RL_values.epochs_df.label.to_numpy(), RL_values.short_z_score))
-
-            # Updating the DataFrame using the mapping
-            rank_order_z_score_df['LR_Long_Z'] = rank_order_z_score_df['label'].map(label_to_LR_long_z_score_mapping) # Updating the DataFrame
-            rank_order_z_score_df['RL_Long_Z'] = rank_order_z_score_df['label'].map(label_to_RL_long_z_score_mapping)
-            rank_order_z_score_df['LR_Short_Z'] = rank_order_z_score_df['label'].map(label_to_LR_short_z_score_mapping)
-            rank_order_z_score_df['RL_Short_Z'] = rank_order_z_score_df['label'].map(label_to_RL_short_z_score_mapping)
-
-            return active_epochs_df, rank_order_z_score_df, (active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
-
-        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+    @classmethod
+    def add_active_aclus_info(cls, rank_order_results, active_epochs_df: pd.DataFrame, is_laps: bool = False):
+        """ adds the columns about the number of cells in each epoch to the epochs_df """
+        label_column_type = 'int'
+    
         if is_laps:
-            assert ((self.LR_laps is not None) and (self.RL_laps is not None)), f"self.LR_laps or self.RL_laps is None - Rank-order was not computed for Laps?"
-            active_epochs_df, rank_order_z_score_df, _out_tuple = _subfn_compute(self.LR_laps, self.RL_laps, epochs_df)
+            # Laps:
+            ## LARGE columns (lists of actually active number of cells, etc):
+            active_epochs_df['LR_Long_ActuallyIncludedAclus'] = active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.LR_laps.extra_info_dict[x][1]) # corresponds to `template_epoch_actually_included_aclus`
+            active_epochs_df['LR_Long_rel_num_cells'] = 0
+            active_epochs_df['LR_Long_rel_num_cells'] = active_epochs_df.label.astype(label_column_type).map(lambda x: len(rank_order_results.LR_laps.extra_info_dict[x][1]))
+
+            active_epochs_df['RL_Long_ActuallyIncludedAclus'] = active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.RL_laps.extra_info_dict[x][1]) # corresponds to `template_epoch_actually_included_aclus`
+            active_epochs_df['RL_Long_rel_num_cells'] = 0
+            active_epochs_df['RL_Long_rel_num_cells'] = active_epochs_df.label.astype(label_column_type).map(lambda x: len(rank_order_results.RL_laps.extra_info_dict[x][1]))
+            ## Short
+            active_epochs_df['LR_Short_ActuallyIncludedAclus'] = active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.LR_laps.extra_info_dict[x][1]) # corresponds to `template_epoch_actually_included_aclus`
+            active_epochs_df['LR_Short_rel_num_cells'] = 0
+            active_epochs_df['LR_Short_rel_num_cells'] = active_epochs_df.label.astype(label_column_type).map(lambda x: len(rank_order_results.LR_laps.extra_info_dict[x][1]))
+
+            active_epochs_df['RL_Short_ActuallyIncludedAclus'] = active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.RL_laps.extra_info_dict[x][1]) # corresponds to `template_epoch_actually_included_aclus`
+            active_epochs_df['RL_Short_rel_num_cells'] = 0
+            active_epochs_df['RL_Short_rel_num_cells'] = active_epochs_df.label.astype(label_column_type).map(lambda x: len(rank_order_results.RL_laps.extra_info_dict[x][1]))
+
         else:
-            assert ((self.LR_ripple is not None) and (self.RL_ripple is not None)), f"self.LR_ripple or self.RL_ripple is None - Rank-order was not computed for Laps?"
-            active_epochs_df, rank_order_z_score_df, _out_tuple = _subfn_compute(self.LR_ripple, self.RL_ripple, epochs_df)
-        return active_epochs_df, rank_order_z_score_df, _out_tuple
+            # Ripples:
+            ## LARGE columns (lists of actually active number of cells, etc):
+            active_epochs_df['LR_Long_ActuallyIncludedAclus'] = active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.LR_ripple.extra_info_dict[x][1]) # corresponds to `template_epoch_actually_included_aclus`
+            active_epochs_df['LR_Long_rel_num_cells'] = 0
+            active_epochs_df['LR_Long_rel_num_cells'] = active_epochs_df.label.astype(label_column_type).map(lambda x: len(rank_order_results.LR_ripple.extra_info_dict[x][1]))
+
+            active_epochs_df['RL_Long_ActuallyIncludedAclus'] = active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.RL_ripple.extra_info_dict[x][1]) # corresponds to `template_epoch_actually_included_aclus`
+            active_epochs_df['RL_Long_rel_num_cells'] = 0
+            active_epochs_df['RL_Long_rel_num_cells'] = active_epochs_df.label.astype(label_column_type).map(lambda x: len(rank_order_results.RL_ripple.extra_info_dict[x][1]))
+            ## Short
+            active_epochs_df['LR_Short_ActuallyIncludedAclus'] = active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.LR_ripple.extra_info_dict[x][1]) # corresponds to `template_epoch_actually_included_aclus`
+            active_epochs_df['LR_Short_rel_num_cells'] = 0
+            active_epochs_df['LR_Short_rel_num_cells'] = active_epochs_df.label.astype(label_column_type).map(lambda x: len(rank_order_results.LR_ripple.extra_info_dict[x][1]))
+
+            active_epochs_df['RL_Short_ActuallyIncludedAclus'] = active_epochs_df.label.astype(label_column_type).map(lambda x: rank_order_results.RL_ripple.extra_info_dict[x][1]) # corresponds to `template_epoch_actually_included_aclus`
+            active_epochs_df['RL_Short_rel_num_cells'] = 0
+            active_epochs_df['RL_Short_rel_num_cells'] = active_epochs_df.label.astype(label_column_type).map(lambda x: len(rank_order_results.RL_ripple.extra_info_dict[x][1]))
+
+        return active_epochs_df
 
 
     def to_dict(self) -> Dict:
@@ -1128,6 +1186,142 @@ class RankOrderAnalyses:
 
 
 
+    # ==================================================================================================================== #
+    # Directional Determination                                                                                            #
+    # ==================================================================================================================== #
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['subfn', 'rank-order', 'active_set', 'directional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-14 13:40', related_items=[])
+    def epoch_directionality_active_set_evidence(cls, decoders_dict, epochs_df: pd.DataFrame):
+        """ 2023-12-14 - Replay Direction Active Set FR Classification - A method I came up with Kamran as a super quick way of using the active set (of cells) to determine the likelihood that a given epoch belongs to a certain direction.
+        Used to classify replays as LR/RL
+        
+        Returns:
+            epoch_rate_dfs
+            epoch_accumulated_evidence
+
+        Usage:    
+        
+        from PendingNotebookCode import epoch_directionality_active_set_evidence
+
+        # recieves lists of identities (such as cell aclus) and a function that returns a sortable value for each identity:
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=None) # non-shared-only
+        decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_
+        # LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+
+        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
+        active_replay_epochs, active_epochs_df, active_selected_spikes_df = combine_rank_order_results(rank_order_results, global_replays, track_templates=track_templates)
+
+        # 
+        # ['start', 'stop', 'label', 'duration', 'LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman', 'LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson', 'LR_Long_Old_Spearman', 'RL_Long_Old_Spearman', 'LR_Short_Old_Spearman', 'RL_Short_Old_Spearman', 'LR_Long_ActuallyIncludedAclus', 'LR_Long_rel_num_cells', 'RL_Long_ActuallyIncludedAclus', 'RL_Long_rel_num_cells', 'LR_Short_ActuallyIncludedAclus', 'LR_Short_rel_num_cells', 'RL_Short_ActuallyIncludedAclus', 'RL_Short_rel_num_cells', 'LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']
+        active_epochs_df.columns
+        # accumulated_evidence_df = pd.DataFrame({'LR_evidence': accumulated_evidence['Normed_LR_rate'], 'RL_evidence': accumulated_evidence['Normed_LR_rate']}) epoch_accumulated_evidence.items()
+        epoch_accumulated_evidence, epoch_rate_dfs, epochs_df_L = epoch_directionality_active_set_evidence(decoders_dict, active_epochs_df)
+        epochs_df_L
+
+
+        """
+        def _subfn_compute_evidence_for_epoch(epoch_rate_df):
+            """ 
+            
+            """
+            epoch_rate_df['norm_term'] = epoch_rate_df.sum(axis=1)
+
+
+            # epoch_rate_df.update({'Normed_LR_rate': epoch_rate_df['LR_rate']/epoch_rate_df['norm_term'], 'Normed_RL_rate': epoch_rate_df['RL_rate']/epoch_rate_df['norm_term']})
+
+            # Update DataFrame with new columns
+            epoch_rate_df = epoch_rate_df.assign(
+                Normed_LR_rate=epoch_rate_df['LR_rate'] / epoch_rate_df['norm_term'],
+                Normed_RL_rate=epoch_rate_df['RL_rate'] / epoch_rate_df['norm_term']
+            )
+
+
+            # Drop missing rows, not sure why these emerge (where there are cells with 0.0 fr for both directions.
+            epoch_rate_df = epoch_rate_df[~((epoch_rate_df['Normed_LR_rate'].isna()) | (epoch_rate_df['Normed_RL_rate'].isna()))]
+
+            ## Accumulate over all cells in the event:
+            accumulated_evidence_by_sum: pd.Series = epoch_rate_df.sum(axis=0)
+                    
+            # Transpose the DataFrame to have columns as rows
+            # accumulated_evidence_df = accumulated_evidence_df.transpose()
+
+            # Rename the columns if necessary
+            # accumulated_evidence_df.columns = ['Accumulated_LR_rate', 'Accumulated_RL_rate'] # , 'Product_Accumulated_LR_rate', 'Product_Accumulated_RL_rate'
+
+            accumulated_evidence_by_product: pd.Series = epoch_rate_df.product(axis=0)
+            accumulated_evidence = {
+                'Sum_Accumulated_LR_rate': accumulated_evidence_by_sum['Normed_LR_rate'],
+                'Sum_Accumulated_RL_rate': accumulated_evidence_by_sum['Normed_RL_rate'],
+                'Product_Accumulated_LR_rate': accumulated_evidence_by_product['Normed_LR_rate'],
+                'Product_Accumulated_RL_rate': accumulated_evidence_by_product['Normed_RL_rate']
+            }
+
+            return accumulated_evidence, epoch_rate_df
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        decoders_aclu_peak_fr_dict = {a_decoder_name:dict(zip(np.array(a_decoder.pf.ratemap.neuron_ids), a_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates)) for a_decoder_name, a_decoder in decoders_dict.items()}
+
+        long_LR_aclu_peak_fr_map = decoders_aclu_peak_fr_dict['long_LR']
+        long_RL_aclu_peak_fr_map = decoders_aclu_peak_fr_dict['long_RL']
+
+        epoch_rate_dfs = {}
+        epoch_accumulated_evidence = {}
+
+        for row in epochs_df.itertuples(name="EpochRow"):
+            try:
+                ## This never seems to do anything anymore.
+                active_unique_aclus = row.active_unique_aclus
+
+            except (KeyError, AttributeError):    
+                ## Make map exhaustive
+                either_direction_aclus = np.sort(np.union1d(row.LR_Long_ActuallyIncludedAclus, row.RL_Long_ActuallyIncludedAclus)) #TODO 2023-12-18 16:56: - [ ] Note only uses 'LONG' to make decisions. I think SHORT are constrained to be equal, but this test should be explicitly performed.
+                active_unique_aclus = either_direction_aclus
+                # LR_Long_ActuallyIncludedAclus
+                # RL_Long_ActuallyIncludedAclus
+                pass
+
+            epoch_LR_rates = []
+            epoch_RL_rates = []
+
+            for an_aclu in active_unique_aclus:
+                LR_rate = long_LR_aclu_peak_fr_map.get(an_aclu, 0.0)
+                RL_rate = long_RL_aclu_peak_fr_map.get(an_aclu, 0.0)
+                epoch_LR_rates.append(LR_rate)
+                epoch_RL_rates.append(RL_rate)
+                
+                # _norm_term = (LR_rate + RL_rate)
+                
+                
+            epoch_LR_rates = np.array(epoch_LR_rates)
+            epoch_RL_rates = np.array(epoch_RL_rates)
+            
+            epoch_rate_df = pd.DataFrame({'LR_rate': epoch_LR_rates, 'RL_rate': epoch_RL_rates})
+            accumulated_evidence, epoch_rate_df = _subfn_compute_evidence_for_epoch(epoch_rate_df)
+
+            # Update the LR_evidence and RL_evidence columns in epochs_df_L
+            epochs_df.at[row.Index, 'LR_evidence'] = accumulated_evidence['Sum_Accumulated_LR_rate']
+            epochs_df.at[row.Index, 'RL_evidence'] = accumulated_evidence['Sum_Accumulated_RL_rate']
+            epochs_df.at[row.Index, 'LR_product_evidence'] = accumulated_evidence['Product_Accumulated_LR_rate']
+            epochs_df.at[row.Index, 'RL_product_evidence'] = accumulated_evidence['Product_Accumulated_RL_rate']
+
+            ## add to the output dicts:
+            epoch_rate_dfs[int(row.label)] = epoch_rate_df
+            epoch_accumulated_evidence[int(row.label)] = accumulated_evidence
+
+        
+        epochs_df['normed_LR_evidence'] = epochs_df['LR_evidence']/epochs_df[['LR_evidence', 'RL_evidence']].sum(axis=1)
+        epochs_df['normed_RL_evidence'] = epochs_df['RL_evidence']/epochs_df[['LR_evidence', 'RL_evidence']].sum(axis=1)
+        
+        epochs_df['normed_product_LR_evidence'] = epochs_df['LR_product_evidence']/epochs_df[['LR_product_evidence', 'RL_product_evidence']].sum(axis=1)
+        epochs_df['normed_product_RL_evidence'] = epochs_df['RL_product_evidence']/epochs_df[['LR_product_evidence', 'RL_product_evidence']].sum(axis=1)
+
+        return epoch_accumulated_evidence, epoch_rate_dfs, epochs_df
+
+
+
     @classmethod
     @function_attributes(short_name=None, tags=['subfn', 'rank-order'], input_requires=[], output_provides=[], uses=[], used_by=['cls.most_likely_directional_rank_order_shuffling'], creation_date='2023-12-12 10:49', related_items=[])
     def _compute_best_direction_likelihoods(cls, active_epochs, long_LR_results, long_RL_results, short_LR_results, short_RL_results, spikes_df, decoding_time_bin_size) -> DirectionalRankOrderLikelihoods:
@@ -1210,52 +1404,92 @@ class RankOrderAnalyses:
 
         ## Extract the rank_order_results:
         rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        rank_order_results.adding_active_aclus_info()
+        
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=rank_order_results.minimum_inclusion_fr_Hz) # non-shared-only
+        decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_
+        # LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
-        def _perform_compute_directional_likelihoods_tuple_methods(active_epochs, active_LR_long_z_score=None, active_RL_long_z_score=None, active_LR_short_z_score=None, active_RL_short_z_score=None) -> DirectionalRankOrderLikelihoods:
-            """ Used to switch between three different temporary methods of determining the proper direction.
-            captures curr_active_pipeline, global_epoch_name """
-            # ALT_METHOD : main `_compute_best_direction_likelihoods`
-            # #TODO 2023-12-12 11:56: - [ ] Should these be saved to the ripple result?
-            # spikes_df = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df)
-            # # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-            # (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-            # return cls._compute_best_direction_likelihoods(active_epochs, long_LR_results, long_RL_results, short_LR_results, short_RL_results, spikes_df, decoding_time_bin_size)
+        # def _perform_compute_directional_likelihoods_tuple_methods(active_epochs, active_LR_long_z_score=None, active_RL_long_z_score=None, active_LR_short_z_score=None, active_RL_short_z_score=None) -> DirectionalRankOrderLikelihoods:
+        #     """ Used to switch between three different temporary methods of determining the proper direction.
+        #     captures curr_active_pipeline, global_epoch_name """
+        #     # ALT_METHOD : main `_compute_best_direction_likelihoods`
+        #     # #TODO 2023-12-12 11:56: - [ ] Should these be saved to the ripple result?
+        #     # spikes_df = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df)
+        #     # # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        #     # (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        #     # return cls._compute_best_direction_likelihoods(active_epochs, long_LR_results, long_RL_results, short_LR_results, short_RL_results, spikes_df, decoding_time_bin_size)
 
-            ## ALT 2023-12-12 - APPROXIMATE best-direction without using the decoder as a workaround since `cls._compute_best_direction_likelihoods` isn't working yet:
-            print(f'WARNING: approximating best-direction without using the decoder as a workaround.')
+        #     ## ALT 2023-12-12 - APPROXIMATE best-direction without using the decoder as a workaround since `cls._compute_best_direction_likelihoods` isn't working yet:
+        #     print(f'WARNING: approximating best-direction without using the decoder as a workaround.')
 
-            # ALT_METHOD: mean_determined_epoch_dir: `mean_determined_epoch_dir`
-            # mean_LR_z_scores = ((np.abs(rank_order_results.LR_ripple.long_z_score) + np.abs(rank_order_results.LR_ripple.short_z_score)) / 2.0)
-            # mean_RL_z_scores = ((np.abs(rank_order_results.RL_ripple.long_z_score) + np.abs(rank_order_results.RL_ripple.short_z_score)) / 2.0)
-            # mean_determined_epoch_dir = (mean_LR_z_scores >= mean_RL_z_scores).astype(int)
-            # long_best_direction_indicies = mean_determined_epoch_dir.copy()
-            # short_best_direction_indicies = mean_determined_epoch_dir.copy()
+        #     # ALT_METHOD: mean_determined_epoch_dir: `mean_determined_epoch_dir`
+        #     # mean_LR_z_scores = ((np.abs(rank_order_results.LR_ripple.long_z_score) + np.abs(rank_order_results.LR_ripple.short_z_score)) / 2.0)
+        #     # mean_RL_z_scores = ((np.abs(rank_order_results.RL_ripple.long_z_score) + np.abs(rank_order_results.RL_ripple.short_z_score)) / 2.0)
+        #     # mean_determined_epoch_dir = (mean_LR_z_scores >= mean_RL_z_scores).astype(int)
+        #     # long_best_direction_indicies = mean_determined_epoch_dir.copy()
+        #     # short_best_direction_indicies = mean_determined_epoch_dir.copy()
 
-            # ALT_METHOD: best max method:
-            # filtered_active_epochs, (active_LR_long_z_score, active_RL_long_z_score, active_LR_short_z_score, active_RL_short_z_score) = rank_order_results.get_aligned_events(active_epochs)
-            long_best_direction_indicies = np.argmax(np.vstack([np.abs(active_LR_long_z_score), np.abs(active_RL_long_z_score)]), axis=0).astype(int)
-            short_best_direction_indicies = np.argmax(np.vstack([np.abs(active_LR_short_z_score), np.abs(active_RL_short_z_score)]), axis=0).astype(int)
+        #     # # ALT_METHOD: best max method:
+        #     # # filtered_active_epochs, (active_LR_long_z_score, active_RL_long_z_score, active_LR_short_z_score, active_RL_short_z_score) = rank_order_results.get_aligned_events(active_epochs)
+        #     # long_best_direction_indicies = np.argmax(np.vstack([np.abs(active_LR_long_z_score), np.abs(active_RL_long_z_score)]), axis=0).astype(int)
+        #     # short_best_direction_indicies = np.argmax(np.vstack([np.abs(active_LR_short_z_score), np.abs(active_RL_short_z_score)]), axis=0).astype(int)
 
-            ## build the new directional_likelihods_tuple:
-            #TODO 2023-12-12 13:50: - [ ] Add `filtered_active_epochs` to the DirectionalRankOrderLikelihoods?
-            return DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=None, short_relative_direction_likelihoods=None, long_best_direction_indices=long_best_direction_indicies, short_best_direction_indices=short_best_direction_indicies)
+        #     # ## build the new directional_likelihods_tuple:
+        #     # #TODO 2023-12-12 13:50: - [ ] Add `filtered_active_epochs` to the DirectionalRankOrderLikelihoods?
+        #     # return DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=None, short_relative_direction_likelihoods=None, long_best_direction_indices=long_best_direction_indicies, short_best_direction_indices=short_best_direction_indicies)
+
+
+        #     # ALT_METHOD: best max method:
+        #     # filtered_active_epochs, (active_LR_long_z_score, active_RL_long_z_score, active_LR_short_z_score, active_RL_short_z_score) = rank_order_results.get_aligned_events(active_epochs)
+        #     long_best_direction_indicies = np.argmax(np.vstack([np.abs(active_LR_long_z_score), np.abs(active_RL_long_z_score)]), axis=0).astype(int)
+        #     short_best_direction_indicies = np.argmax(np.vstack([np.abs(active_LR_short_z_score), np.abs(active_RL_short_z_score)]), axis=0).astype(int)
+
+
+        #     LR_laps_epoch_accumulated_evidence, LR_laps_epoch_rate_dfs, LR_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, rank_order_results.LR_laps.epochs_df)
+        #     RL_laps_epoch_accumulated_evidence, RL_laps_epoch_rate_dfs, RL_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, rank_order_results.RL_laps.epochs_df)
+
+        #     rank_order_results.laps_most_likely_result_tuple.directional_likelihoods_tuple = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=LR_laps_epochs_df['normed_LR_evidence'], short_relative_direction_likelihoods=LR_laps_epochs_df['normed_RL_evidence'],
+        #                                     long_best_direction_indices=(LR_laps_epochs_df['normed_LR_evidence']>=LR_laps_epochs_df['normed_RL_evidence']), 
+        #                                     short_best_direction_indices=(LR_laps_epochs_df['normed_LR_evidence']>=LR_laps_epochs_df['normed_RL_evidence']))
+
+
+        #     ## build the new directional_likelihods_tuple:
+        #     #TODO 2023-12-12 13:50: - [ ] Add `filtered_active_epochs` to the DirectionalRankOrderLikelihoods?
+        #     return DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=None, short_relative_direction_likelihoods=None, long_best_direction_indices=long_best_direction_indicies, short_best_direction_indices=short_best_direction_indicies)
+
+
 
         ## Replays:
         try:
             ## Post-process Z-scores with their most likely directions:
-            rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+            # rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
 
             ripple_combined_epoch_stats_df = deepcopy(rank_order_results.ripple_combined_epoch_stats_df)
             active_replay_epochs = deepcopy(rank_order_results.LR_ripple.epochs_df)
 
-            _traditional_arg_dict_key_names = ('active_LR_long_z_score', 'active_RL_long_z_score', 'active_LR_short_z_score', 'active_RL_short_z_score')
-            _traditional_arg_dict_values_tuple = (ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z)
+            # _traditional_arg_dict_key_names = ('active_LR_long_z_score', 'active_RL_long_z_score', 'active_LR_short_z_score', 'active_RL_short_z_score')
+            # _traditional_arg_dict_values_tuple = (ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z)
             active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score = ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z
 
-            _arg_dict_from_ripple_combined_epoch_stats_df = dict(zip(_traditional_arg_dict_key_names, _traditional_arg_dict_values_tuple))
-            ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_replay_epochs, **_arg_dict_from_ripple_combined_epoch_stats_df)
+            # _arg_dict_from_ripple_combined_epoch_stats_df = dict(zip(_traditional_arg_dict_key_names, _traditional_arg_dict_values_tuple))
+            # ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_replay_epochs, **_arg_dict_from_ripple_combined_epoch_stats_df)
+            
+            LR_ripple_epoch_accumulated_evidence, LR_ripple_epoch_rate_dfs, LR_ripple_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_replay_epochs)
+            # RL_ripple_epoch_accumulated_evidence, RL_ripple_epoch_rate_dfs, RL_ripple_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, rank_order_results.RL_ripple.epochs_df)
+
+            long_best_direction_indicies = np.argmax(np.vstack([np.abs(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()), np.abs(LR_ripple_epochs_df['normed_RL_evidence'].to_numpy())]), axis=0).astype(int)
+            short_best_direction_indicies = np.argmax(np.vstack([np.abs(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()), np.abs(LR_ripple_epochs_df['normed_RL_evidence'].to_numpy())]), axis=0).astype(int)
+
+            ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=LR_ripple_epochs_df['normed_LR_evidence'].to_numpy(),
+                                                                                                                   short_relative_direction_likelihoods=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy(),
+                                            long_best_direction_indices=long_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int), 
+                                            short_best_direction_indices=short_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int)
+                                            )
+
             long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
 
             ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, active_LR_ripple_long_z_score, active_RL_ripple_long_z_score)
@@ -1268,24 +1502,51 @@ class RankOrderAnalyses:
             ripple_result_tuple: DirectionalRankOrderResult = DirectionalRankOrderResult(active_replay_epochs, long_best_dir_z_score_values=ripple_evts_long_best_dir_z_score_values, short_best_dir_z_score_values=ripple_evts_short_best_dir_z_score_values,
                                                                                         long_short_best_dir_z_score_diff_values=ripple_evts_long_short_best_dir_z_score_diff_values, directional_likelihoods_tuple=ripple_directional_likelihoods_tuple,
                                                                                         masked_z_score_values_list=ripple_masked_z_score_values_list, rank_order_z_score_df=None)
+
+
+            active_laps_epochs = deepcopy(rank_order_results.LR_laps.epochs_df)
+
+            LR_laps_epoch_accumulated_evidence, LR_laps_epoch_rate_dfs, LR_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, rank_order_results.LR_laps.epochs_df)
+            # RL_laps_epoch_accumulated_evidence, RL_laps_epoch_rate_dfs, RL_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, rank_order_results.RL_laps.epochs_df)
+
+            laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=LR_laps_epochs_df['normed_LR_evidence'].to_numpy(),
+                                                                                                                   short_relative_direction_likelihoods=LR_laps_epochs_df['normed_RL_evidence'].to_numpy(),
+                                            long_best_direction_indices=(LR_laps_epochs_df['normed_LR_evidence'].to_numpy()>=LR_laps_epochs_df['normed_RL_evidence'].to_numpy()).astype(int), 
+                                            short_best_direction_indices=(LR_laps_epochs_df['normed_LR_evidence'].to_numpy()>=LR_laps_epochs_df['normed_RL_evidence'].to_numpy()).astype(int))
+
+
+
+
+
         except (AttributeError, KeyError, IndexError, ValueError):
-                    raise # fail for ripples, but not for laps currently
-                    ripple_result_tuple = None
+            raise # fail for ripples, but not for laps currently
+            ripple_result_tuple = None
 
 
         ## Laps:
         try:
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-            global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
-            active_laps_epochs = global_laps
+            # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            # global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
+            # active_laps_epochs = global_laps
             laps_combined_epoch_stats_df = deepcopy(rank_order_results.laps_combined_epoch_stats_df)
 
-            _traditional_arg_dict_key_names = ('active_LR_long_z_score', 'active_RL_long_z_score', 'active_LR_short_z_score', 'active_RL_short_z_score')
-            _traditional_arg_dict_values_tuple = (laps_combined_epoch_stats_df.LR_Long_spearman_Z, laps_combined_epoch_stats_df.RL_Long_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z)
+            # _traditional_arg_dict_key_names = ('active_LR_long_z_score', 'active_RL_long_z_score', 'active_LR_short_z_score', 'active_RL_short_z_score')
+            # _traditional_arg_dict_values_tuple = (laps_combined_epoch_stats_df.LR_Long_spearman_Z, laps_combined_epoch_stats_df.RL_Long_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z)
             active_LR_laps_long_z_score, active_RL_laps_long_z_score, active_LR_laps_short_z_score, active_RL_laps_short_z_score = laps_combined_epoch_stats_df.LR_Long_spearman_Z, laps_combined_epoch_stats_df.RL_Long_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z
 
-            _arg_dict_from_laps_combined_epoch_stats_df = dict(zip(_traditional_arg_dict_key_names, _traditional_arg_dict_values_tuple))
-            laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_replay_epochs, **_arg_dict_from_laps_combined_epoch_stats_df)
+            # _arg_dict_from_laps_combined_epoch_stats_df = dict(zip(_traditional_arg_dict_key_names, _traditional_arg_dict_values_tuple))
+            # laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_laps_epochs, **_arg_dict_from_laps_combined_epoch_stats_df)
+            active_laps_epochs = deepcopy(rank_order_results.LR_laps.epochs_df)
+
+            LR_laps_epoch_accumulated_evidence, LR_laps_epoch_rate_dfs, LR_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, rank_order_results.LR_laps.epochs_df)
+            RL_laps_epoch_accumulated_evidence, RL_laps_epoch_rate_dfs, RL_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, rank_order_results.RL_laps.epochs_df)
+
+            laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=LR_laps_epochs_df['normed_LR_evidence'].to_numpy(),
+                                                                                                                   short_relative_direction_likelihoods=LR_laps_epochs_df['normed_RL_evidence'].to_numpy(),
+                                            long_best_direction_indices=(LR_laps_epochs_df['normed_LR_evidence'].to_numpy()>=LR_laps_epochs_df['normed_RL_evidence'].to_numpy()), 
+                                            short_best_direction_indices=(LR_laps_epochs_df['normed_LR_evidence'].to_numpy()>=LR_laps_epochs_df['normed_RL_evidence'].to_numpy()))
+            
+
 
             ## OLD METHOD:
             # active_laps_epochs, laps_rank_order_z_score_df, (active_LR_laps_long_z_score, active_RL_laps_long_z_score, active_LR_laps_short_z_score, active_RL_laps_short_z_score) = rank_order_results.get_aligned_events(global_laps, is_laps=True)
@@ -1293,7 +1554,7 @@ class RankOrderAnalyses:
             #                                                                                                                             active_LR_short_z_score=active_LR_laps_short_z_score, active_RL_short_z_score=active_RL_laps_short_z_score)
 
             ## Common between both:
-            long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = laps_directional_likelihoods_tuple
+            long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = laps_directional_likelihoods_tuple.long_relative_direction_likelihoods, laps_directional_likelihoods_tuple.short_relative_direction_likelihoods, laps_directional_likelihoods_tuple.long_best_direction_indices, laps_directional_likelihoods_tuple.short_best_direction_indices
 
             # Using NumPy advanced indexing to select from array_a or array_b:
             laps_long_best_dir_z_score_values = np.where(long_best_direction_indicies, rank_order_results.LR_laps.long_z_score, rank_order_results.RL_laps.long_z_score)
@@ -1790,8 +2051,9 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         # Set the global result:
         try:
             print(f'\tdone. building global result.')
+            global_computation_results.computed_data['RankOrder'].adding_active_aclus_info()
             global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference, decoding_time_bin_size=0.006) # 6ms bins
-
+        
         except (AssertionError, BaseException) as e:
             print(f'Issue with `RankOrderAnalyses.most_likely_directional_rank_order_shuffling(...)` e: {e}')
             raise
