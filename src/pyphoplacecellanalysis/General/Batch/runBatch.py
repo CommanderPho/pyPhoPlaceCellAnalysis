@@ -240,7 +240,9 @@ class ConcreteSessionFolder:
 
         ## get specifics using the known properties:
         output_session_basedir_dict = active_data_mode_registered_class.build_session_basedirs_dict(global_data_root_parent_path, debug_print=debug_print)
-        good_session_concrete_folders = [ConcreteSessionFolder(a_context, a_basedir) for a_context, a_basedir in output_session_basedir_dict.items()]
+        included_output_session_basedir_dict = {a_context:a_basedir for a_context, a_basedir in output_session_basedir_dict.items() if a_context in included_session_contexts}
+        
+        good_session_concrete_folders = [ConcreteSessionFolder(a_context, a_basedir) for a_context, a_basedir in included_output_session_basedir_dict.items()]
         return good_session_concrete_folders
 
 
