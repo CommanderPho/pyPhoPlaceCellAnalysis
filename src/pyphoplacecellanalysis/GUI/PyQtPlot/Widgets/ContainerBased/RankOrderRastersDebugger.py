@@ -60,6 +60,43 @@ __all__ = ['RankOrderRastersDebugger']
 # ==================================================================================================================== #
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
 
+def create_tabbed_table_widget(dataframes_dict):
+    """
+    Creates a tabbed widget with three tables within the given layout.
+
+    Args:
+    ctrl_layout: The layout to add the tab widget to.
+    dataframes: A list of three pandas.DataFrame objects to populate the tables.
+
+    Returns:
+    A QTabWidget containing the three tables.
+    """
+
+    # Create the tab widget and dictionaries
+    tab_widget = pg.QtWidgets.QTabWidget()
+    models_dict = {}
+    views_dict = {}
+
+    # Define tab names
+    
+    # Add tabs and corresponding views
+    for i, (a_name, df) in enumerate(dataframes_dict.items()):
+        # Create SimplePandasModel for each DataFrame
+        models_dict[a_name] = SimplePandasModel(df.copy())
+
+        # Create and associate view with model
+        view = pg.QtWidgets.QTableView()
+        view.setModel(models_dict[a_name])
+        views_dict[a_name] = view
+
+        # Add tab with view
+        tab_widget.addTab(view, a_name)
+
+    return tab_widget, views_dict, models_dict
+
+
+
+
 
 @metadata_attributes(short_name=None, tags=['gui'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
 @define(slots=False)
@@ -100,21 +137,6 @@ class RankOrderRastersDebugger:
     def n_epochs(self) -> int:
         return np.shape(self.active_epochs_df)[0]
 
-    @property
-    def active_epoch_tuple(self) -> tuple:
-        """ returns a namedtuple describing the single epoch corresponding to `self.active_epoch_IDX`. """
-        a_df_idx = self.active_epochs_df.index.to_numpy()[self.active_epoch_IDX]
-        curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)]
-        curr_epoch = list(curr_epoch_df.itertuples(name='EpochTuple'))[0]
-        return curr_epoch
-
-    @property
-    def active_epoch_result_df(self) -> pd.DataFrame:
-        """ returns a the combined_epoch_stats_df describing the single epoch corresponding to `self.active_epoch_IDX`. """
-        curr_epoch_label = self.lookup_label_from_index(self.active_epoch_IDX)
-        return self.combined_epoch_stats_df[self.combined_epoch_stats_df.label == curr_epoch_label]
-        # return self.combined_epoch_stats_df[self.combined_epoch_stats_df.index == curr_epoch_label]
-
     def lookup_label_from_index(self, an_idx: int) -> int:
         """ Looks of the proper epoch "label", as in the value in the 'label' column of active_epochs_df, from a linear index such as that provided by the slider control.
 
@@ -133,7 +155,21 @@ class RankOrderRastersDebugger:
         """ returns the epoch 'label' value corresponding to the currently selected `self.active_epoch_IDX`. """
         return self.lookup_label_from_index(an_idx=self.active_epoch_IDX)
     
-    
+    @property
+    def active_epoch_df(self) -> pd.DataFrame:
+        """ returns a the single row of the epoch_df corresponding to `self.active_epoch_IDX`. """
+        curr_epoch_label = self.lookup_label_from_index(self.active_epoch_IDX)
+        return self.active_epochs_df[self.active_epochs_df.label == curr_epoch_label]
+
+    @property
+    def active_epoch_tuple(self) -> tuple:
+        """ returns a namedtuple describing the single epoch corresponding to `self.active_epoch_IDX`. """
+        # a_df_idx = self.active_epochs_df.index.to_numpy()[self.active_epoch_IDX]
+        # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)]
+        curr_epoch = list(self.active_epoch_df.itertuples(name='EpochTuple'))[0]
+        return curr_epoch
+
+
     # Data Convenience Accessors _________________________________________________________________________________________ #
     @property
     def combined_epoch_stats_df(self) -> pd.DataFrame:
@@ -144,6 +180,13 @@ class RankOrderRastersDebugger:
         else:
             return self.rank_order_results.ripple_combined_epoch_stats_df
         
+    @property
+    def active_epoch_result_df(self) -> pd.DataFrame:
+        """ returns a the combined_epoch_stats_df describing the single epoch corresponding to `self.active_epoch_IDX`. """
+        curr_epoch_label = self.lookup_label_from_index(self.active_epoch_IDX)
+        return self.combined_epoch_stats_df[self.combined_epoch_stats_df.label == curr_epoch_label]
+
+
     def get_active_epoch_spikes_df(self) -> pd.DataFrame:
         active_epoch_tuple = self.active_epoch_tuple
         active_epoch_spikes_df: pd.DataFrame = deepcopy(self.global_spikes_df.spikes.time_sliced(active_epoch_tuple.start, active_epoch_tuple.stop))
@@ -158,7 +201,6 @@ class RankOrderRastersDebugger:
     @property
     def max_n_neurons(self) -> int:
         return np.max([len(v) for v in self.plots_data.unsorted_original_neuron_IDs_lists])
-
 
 
     # Plot Convenience Accessors _________________________________________________________________________________________ #
@@ -288,12 +330,13 @@ class RankOrderRastersDebugger:
                 # new_ax = plots.ax[_active_plot_identifier]
                 a_scatter_plot = all_separate_scatter_plots[_active_plot_identifier]
                 plots_data = all_separate_plots_data[_active_plot_identifier]
-                a_scatter_plot.setData(plots_data.all_spots_dict[_active_plot_identifier], **(plots_data.all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {}), **override_scatter_plot_kwargs)
+                a_scatter_plot.setData(plots_data.seperate_all_spots_dict[_active_plot_identifier], **(plots_data.seperate_all_scatterplot_tooltips_kwargs_dict[_active_plot_identifier] or {}), **override_scatter_plot_kwargs)
 
         def on_update_active_epoch(an_epoch_idx, an_epoch):
             """ captures: main_plot_identifiers_list, all_separate_root_plots """
             for _active_plot_identifier in main_plot_identifiers_list:
                 new_ax = all_separate_root_plots[_active_plot_identifier]
+                print(f'an_epoch: {an_epoch}')
                 new_ax.setXRange(an_epoch.start, an_epoch.stop)
                 new_ax.setAutoPan(False)
                 # new_ax.getAxis('left').setLabel(f'[{an_epoch.label}]')
@@ -321,19 +364,33 @@ class RankOrderRastersDebugger:
         # Step 4: Create DataFrame and QTableView
         # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
         # model = PandasModel(df)
-        pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
+        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
 
-        tableView = pg.QtWidgets.QTableView()
-        tableView.setModel(pandasDataFrameTableModel)
-        tableView.setObjectName("pandasTablePreview")
-        # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+        # tableView = pg.QtWidgets.QTableView()
+        # tableView.setModel(pandasDataFrameTableModel)
+        # tableView.setObjectName("pandasTablePreview")
+        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
 
-        ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
-        ctrl_widgets_dict['tableView'] = tableView
+        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
+        # ctrl_widgets_dict['tableView'] = tableView
 
-        # Step 5: Add TableView to LayoutWidget
-        ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
+        # # Step 5: Add TableView to LayoutWidget
+        # ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
 
+
+        # Tabbled table widget:
+        tab_widget, views_dict, models_dict = create_tabbed_table_widget(dataframes_dict={'epochs': active_epochs_df.copy(),
+                                                                                                        'spikes': global_spikes_df.copy(), 
+                                                                                                        'combined_epoch_stats': pd.DataFrame()})
+        ctrl_widgets_dict['tables_tab_widget'] = tab_widget
+        ctrl_widgets_dict['views_dict'] = views_dict
+        ctrl_widgets_dict['models_dict'] = models_dict
+        
+
+        
+        # Add the tab widget to the layout
+        ctrl_layout.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=1)
+    
 
         logTextEdit = pg.QtWidgets.QTextEdit()
         logTextEdit.setReadOnly(True)
@@ -429,38 +486,19 @@ class RankOrderRastersDebugger:
 
         _obj.register_internal_callbacks()
 
+
+        ctrl_widgets_dict['models_dict']['combined_epoch_stats'] = SimplePandasModel(_obj.combined_epoch_stats_df.copy())
+
+        # Create and associate view with model
+        # view = pg.QtWidgets.QTableView()
+        ctrl_widgets_dict['views_dict']['combined_epoch_stats'].setModel(ctrl_widgets_dict['models_dict']['combined_epoch_stats'])
+        
+
         return _obj
 
 
 
-    @classmethod
-    def try_build_selected_spikes(cls, _obj) -> bool:
-        ## Add Selected Spikes:
-        try:
-            ## rank_order_results.LR_ripple.selected_spikes_df mode:
-            if isinstance(_obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(_obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
-                # already a selected_spikes_df! Use it raw!
-                _obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map = deepcopy(_obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-                _obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map = deepcopy(_obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
-            else:
-                ## Build the selected spikes df:
-                (_obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map), (_obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map) = _obj.build_selected_spikes_df(_obj.track_templates, _obj.active_epochs_df,
-                                                                                                                                                                                                                    _obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict,                                                                                                                                                                                                                _obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict)
-            ## Add the spikes
-            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
-            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
-            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
-            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
-            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
-            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
-            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
-            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
-
-            return True
-        except (IndexError, KeyError, ValueError, TypeError):
-            print(f'WARN: the selected spikes did not work properly, so none will be shown.')
-            return False
-
+    
 
 
     def register_internal_callbacks(self):
@@ -494,27 +532,26 @@ class RankOrderRastersDebugger:
 
         captures on_update_active_epoch, active_epochs_df to extract the epoch time range and call `on_update_active_epoch` """
         self.active_epoch_IDX = an_epoch_idx # set the active_epoch_IDX, not the index value
-        a_df_idx = self.active_epochs_df.index.to_numpy()[an_epoch_idx]
-        print(f'a_df_idx: {a_df_idx}')
-        # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == (a_df_idx+1))] # this +1 here makes zero sense
-        curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)] # this +1 here makes zero sense
+        # a_df_idx = self.active_epochs_df.index.to_numpy()[an_epoch_idx]
+        # print(f'a_df_idx: {a_df_idx}')
+        # # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == (a_df_idx+1))] # this +1 here makes zero sense
+        # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.index == a_df_idx)] # this +1 here makes zero sense
         
-        an_epoch_label = self.lookup_label_from_index(an_idx=an_epoch_idx)
+        # an_epoch_label = self.lookup_label_from_index(an_idx=an_epoch_idx)
         
-
         # curr_epoch_df = self.active_epochs_df[(self.active_epochs_df.lap_id == (an_epoch_idx+1))]
-        curr_epoch = list(curr_epoch_df.itertuples())[0]
+        # curr_epoch = list(curr_epoch_df.itertuples())[0]
 
         # Update the widget if needed, but block changes
         # self.ui.ctrls_widget
         # self.ui.ctrls_widget.setValue(an_epoch_idx, False)
 
-        self.on_update_active_epoch(an_epoch_idx, curr_epoch)
+        self.on_update_active_epoch(an_epoch_idx, an_epoch=self.active_epoch_tuple)
 
         ## Update scrollbar:
         self.update_plot_titles_with_stats(an_epoch_idx)
         ## Update Table:
-        self.scroll_df_table_view(an_epoch_idx)
+        # self.scroll_df_table_view(an_epoch_idx)
         
 
         ## perform callbacks:
@@ -917,6 +954,37 @@ class RankOrderRastersDebugger:
     # ==================================================================================================================== #
     # Selected Spikes                                                                                                      #
     # ==================================================================================================================== #
+
+    @classmethod
+    def try_build_selected_spikes(cls, _obj) -> bool:
+        ## Add Selected Spikes:
+        try:
+            ## rank_order_results.LR_ripple.selected_spikes_df mode:
+            if isinstance(_obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame) and isinstance(_obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict, pd.DataFrame):
+                # already a selected_spikes_df! Use it raw!
+                _obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map = deepcopy(_obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+                _obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map = deepcopy(_obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict).reset_index(drop=True).spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+            else:
+                ## Build the selected spikes df:
+                (_obj.plots_data.RL_selected_spike_df, _obj.plots_data.RL_neuron_id_to_new_IDX_map), (_obj.plots_data.LR_selected_spike_df, _obj.plots_data.LR_neuron_id_to_new_IDX_map) = _obj.build_selected_spikes_df(_obj.track_templates, _obj.active_epochs_df,
+                                                                                                                                                                                                                    _obj.RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict,                                                                                                                                                                                                                _obj.LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict)
+            ## Add the spikes
+            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
+            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.LR_plots_data, plots=_obj.plots.LR_plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
+            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
+            # _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data.RL_plots_data, plots=_obj.plots.RL_plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'long_LR')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.LR_selected_spike_df), _active_plot_identifier = 'short_LR')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'long_RL')
+            _obj.add_selected_spikes_df_points_to_scatter_plot(plots_data=_obj.plots_data, plots=_obj.plots, selected_spikes_df=deepcopy(_obj.plots_data.RL_selected_spike_df), _active_plot_identifier = 'short_RL')
+
+            return True
+        except (IndexError, KeyError, ValueError, TypeError):
+            print(f'WARN: the selected spikes did not work properly, so none will be shown.')
+            return False
+
+
+
     @classmethod
     def build_selected_spikes_df(cls, track_templates, active_epochs_df, RL_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict):
         """ "selected" in this sense means those spikes/spots that were used for the rank-order analysis, such as 'first' for the ripples or 'median' for the laps.
@@ -1057,7 +1125,7 @@ class RankOrderRastersDebugger:
 
         ## Add the median spikes to the plots:
         a_scatter_plot = plots.scatter_plots[_active_plot_identifier]
-        a_scatter_plot.addPoints(plots_data.all_selected_spots_dict[_active_plot_identifier])
+        a_scatter_plot.addPoints(plots_data.all_selected_spots_dict[_active_plot_identifier], dataSet='selected_spikes')
 
 
 
