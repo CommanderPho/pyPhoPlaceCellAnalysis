@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import Optional, List, Dict
 from contextlib import redirect_stdout
 
+import numpy as np
+import pandas as pd
+pd.options.mode.chained_assignment = None  # default='warn'
+
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
 from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
