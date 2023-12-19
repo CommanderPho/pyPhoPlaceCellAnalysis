@@ -1436,6 +1436,9 @@ class RankOrderAnalyses:
         if ripple_combined_epoch_stats_df is None:
             return False
 
+        if np.isnan(rank_order_results.ripple_combined_epoch_stats_df.index).any():
+            return False # can't have dataframe index that is missing values.
+
 
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
         if laps_combined_epoch_stats_df is None:
