@@ -1746,6 +1746,7 @@ class RankOrderAnalyses:
         if laps_combined_epoch_stats_df is None:
             return False
 
+        # rank_order_results.included_qclu_values
 
         if minimum_inclusion_fr_Hz is not None:
             return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
