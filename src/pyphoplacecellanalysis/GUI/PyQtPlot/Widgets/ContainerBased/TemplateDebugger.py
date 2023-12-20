@@ -1,4 +1,5 @@
 from copy import deepcopy
+from pathlib import Path
 from typing import Optional, Dict, List, Tuple, Callable, Union
 from attrs import define, field, Factory
 from nptyping import NDArray
@@ -131,6 +132,7 @@ class TemplateDebugger:
 
         defer_render = kwargs.pop('defer_render', False)
         debug_print: bool = kwargs.pop('debug_print', False)
+        debug_draw: bool = kwargs.pop('debug_draw', False)
 
         enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
         use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
@@ -140,11 +142,11 @@ class TemplateDebugger:
                   
 
         figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
-        _out_data = RenderPlotsData(name=figure_name, track_templates=deepcopy(track_templates), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, sorted_pf_peak_location_list=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
+        _out_data = RenderPlotsData(name=figure_name, track_templates=deepcopy(track_templates), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, sorted_pf_peak_location_list=None, active_pfs_img_extents_dict=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
         _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
-        _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates, debug_print=debug_print, use_incremental_sorting=use_incremental_sorting, enable_pf_peak_indicator_lines=enable_pf_peak_indicator_lines, included_any_context_neuron_ids=included_any_context_neuron_ids)
+        _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
+                                             debug_print=debug_print, debug_draw=debug_draw, use_incremental_sorting=use_incremental_sorting, enable_pf_peak_indicator_lines=enable_pf_peak_indicator_lines, included_any_context_neuron_ids=included_any_context_neuron_ids, **kwargs)
                 
-
         # build the window with the dock widget in it:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
         icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
@@ -236,7 +238,7 @@ class TemplateDebugger:
     # Extracted Functions:                                                                                                 #
     # ==================================================================================================================== #
     @classmethod
-    def _subfn_rebuild_sort_idxs(cls, decoders_dict: Dict, _out_data: RenderPlotsData, use_incremental_sorting: bool, included_any_context_neuron_ids) -> RenderPlotsData:
+    def _subfn_rebuild_sort_idxs(cls, decoders_dict: Dict, _out_data: RenderPlotsData, use_incremental_sorting: bool, included_any_context_neuron_ids: NDArray) -> RenderPlotsData:
         """ captures decoders_dict
 
         Updates RenderPlotsData
@@ -261,7 +263,7 @@ class TemplateDebugger:
         # sorted_pf_image_bounds_list = [pyqtplot_build_image_bounds_extent(a_decoder.pf.ratemap.xbins, a_decoder.pf.ratemap.ybins, margin=0.0, debug_print=False) for a_decoder in decoders_dict.values()]
         # pf_xbins_list = [a_decoder.pf.ratemap.xbin for a_decoder in decoders_dict.values()]
 
-
+        
         # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
         _out_data.ref_decoder_name = ref_decoder_name
         _out_data.sorted_neuron_IDs_lists = sorted_neuron_IDs_lists
@@ -301,7 +303,10 @@ class TemplateDebugger:
 
             # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
             curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
-
+            if _out_params.debug_draw:
+                # Shows the axes if debug_print == true
+                curr_win.showAxes(True)
+                
             a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
 
             # Coloring the heatmap data for each row of the 1D heatmap:
@@ -332,7 +337,8 @@ class TemplateDebugger:
                     y_offset = float(cell_i) 
                     line_height = 1.0
                     half_line_height = line_height / 2.0 # to compensate for middle
-                    line = QtGui.QGraphicsLineItem(x_offset, (y_offset - half_line_height), x_offset, (y_offset + half_line_height)) # (xstart, ystart, xend, yend)
+                    # line = QtGui.QGraphicsLineItem(x_offset, (y_offset - half_line_height), x_offset, (y_offset + half_line_height)) # (xstart, ystart, xend, yend)
+                    line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height)) # (xstart, ystart, xend, yend)
                     # line = pg.InfiniteLine(pos=(x_offset, float(cell_i+1)), angle=90, movable=False)
                     line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
                     curr_win.addItem(line)
@@ -426,6 +432,14 @@ class TemplateDebugger:
                 curr_win.removeItem(a_text_item)
                 a_text_item.deleteLater()
             _out_ui.text_items_dict[a_decoder_name] = {} # clear the dictionary
+            
+
+            ## Remove all lines and re-add:
+            for aclu, a_line_item in _out_ui.order_location_lines_dict[a_decoder_name].items():
+                curr_win.removeItem(a_line_item)
+                # a_line_item.deleteLater()
+            _out_ui.order_location_lines_dict[a_decoder_name] = {} # clear the dictionary
+            
 
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):                        
                 # text = _out_ui.text_items_dict[a_decoder_name][aclu] # pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
@@ -445,11 +459,14 @@ class TemplateDebugger:
                     x_offset = curr_pf_peak_locations[cell_i]
                     y_offset = float(cell_i) 
                     line_height = 1.0
-                    half_line_height = line_height / 2.0 # to compensate for middle
-                    line = _out_ui.order_location_lines_dict[a_decoder_name][aclu] # QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, line_height)
+                    line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height)) # (xstart, ystart, xend, yend)
                     # line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
-                    # line.setPos(pg.Point(x_offset, (y_offset + (line_height / 2.0)))) # Adjust the height of the line if needed
-                    line.setLine(x_offset, (y_offset - half_line_height), x_offset, (y_offset + half_line_height)) # (xstart, ystart, xend, yend)
+                    line.setPen(pg.mkPen(pg.mkColor(a_color_vector), width=2))  # Set color and width of the line
+                    curr_win.addItem(line)
+                    _out_ui.order_location_lines_dict[a_decoder_name][aclu] = line # add to the map
+                    # # Old update-based way:
+                    # line = _out_ui.order_location_lines_dict[a_decoder_name][aclu] # QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, line_height)
+                    # line.setLine(x_offset, y_offset, x_offset, (y_offset + line_height)) # (xstart, ystart, xend, yend)
 
             # end `for cell_i, (aclu, a_color_vector)`
 
