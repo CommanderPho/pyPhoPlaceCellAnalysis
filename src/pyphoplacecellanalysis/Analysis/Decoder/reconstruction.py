@@ -1,6 +1,7 @@
 from copy import deepcopy
 from pathlib import Path
-from attrs import define, field, Factory # for DecodedFilterEpochsResult
+from attrs import define, field, Factory
+from nptyping import NDArray # for DecodedFilterEpochsResult
 # import pathlib
 
 import numpy as np
@@ -26,7 +27,7 @@ from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpe
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
-from neuropy.utils.mixins.peak_location_representing import PeakLocationRepresentingMixin
+from neuropy.utils.mixins.peak_location_representing import ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin
     
 
 # cut_bins = np.linspace(59200, 60800, 9)
@@ -505,7 +506,7 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
 # ==================================================================================================================== #
 
 @custom_define(slots=False)
-class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol):
+class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
 
@@ -566,13 +567,19 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, PeakLocationRepr
         """The flat_position_size property."""
         return np.shape(self.F)[0] # like 288
 
-    # PeakLocationRepresentingMixin conformances:
+    # PeakLocationRepresentingMixin + ContinuousPeakLocationRepresentingMixin conformances:
     @property
-    def PeakLocationRepresentingMixin_peak_curves_variable(self) -> np.array:
+    def PeakLocationRepresentingMixin_peak_curves_variable(self) -> NDArray:
         """ the variable that the peaks are calculated and returned for """
         return self.ratemap.PeakLocationRepresentingMixin_peak_curves_variable
     
-
+    @property
+    def ContinuousPeakLocationRepresentingMixin_peak_curves_variable(self) -> NDArray:
+        """ the variable that the peaks are calculated and returned for """
+        return self.ratemap.ContinuousPeakLocationRepresentingMixin_peak_curves_variable
+    
+    
+    
     # ==================================================================================================================== #
     # Initialization                                                                                                       #
     # ==================================================================================================================== #
