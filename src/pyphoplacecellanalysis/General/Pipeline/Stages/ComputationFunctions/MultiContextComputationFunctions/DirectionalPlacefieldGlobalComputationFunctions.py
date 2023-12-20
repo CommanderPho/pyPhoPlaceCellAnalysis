@@ -62,6 +62,8 @@ class TrackTemplates(HDFMixin):
     decoder_LR_pf_peak_ranks_list: List = serialized_field(repr=True)
     decoder_RL_pf_peak_ranks_list: List = serialized_field(repr=True)
 
+    rank_method: str = serialized_attribute_field(default="average", is_computable=False, repr=True)
+
 
     @property
     def decoder_neuron_IDs_list(self) -> List[NDArray]:
@@ -78,6 +80,18 @@ class TrackTemplates(HDFMixin):
         """ a list of the peak_tuning_curve_center_of_masses for each decoder (independently) """
         return [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
     
+    @property
+    def decoder_peak_rank_list_dict(self) -> Dict[str, NDArray]:
+        """ a dict (one for each decoder) of the rank_lists for each decoder (independently) """
+        return {a_decoder_name:scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=self.rank_method) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
+    
+    @property
+    def decoder_aclu_peak_rank_dict_dict(self) -> Dict[str, Dict[int, float]]:
+        """ a Dict (one for each decoder) of aclu-to-rank maps for each decoder (independently) """
+        return {a_decoder_name:dict(zip(a_decoder.pf.ratemap.neuron_ids, scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=self.rank_method))) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
+    
+    
+    
 
     def get_decoder_aclu_peak_maps(self) -> DirectionalDecodersTuple:
         """ returns a tuple of dicts, each containing a mapping between aclu:peak_pf_x for a given decoder. 
@@ -92,7 +106,8 @@ class TrackTemplates(HDFMixin):
         # return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_locations))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
         return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_tuning_curve_center_of_masses))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
 
-
+    def get_decoder_aclu_peak_map_dict(self) -> Dict[str, Dict]:
+        return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps()))
 
 
     def __repr__(self):
@@ -128,7 +143,7 @@ class TrackTemplates(HDFMixin):
         """
         filtered_decoder_list, filtered_direction_shared_aclus_list, is_aclu_included_list, individual_decoder_filtered_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate(self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
         long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack
-        _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder))
+        _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=self.rank_method)
         assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
         assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
         assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
@@ -141,6 +156,9 @@ class TrackTemplates(HDFMixin):
         """
         return DirectionalDecodersTuple(self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)
 
+    def get_decoder_names(self) -> Tuple[str]:
+        return ('long_LR','long_RL','short_LR','short_RL')
+        
 
     def get_decoders_dict(self) -> Dict[str, BasePositionDecoder]:
         return {'long_LR': self.long_LR_decoder,
@@ -150,7 +168,7 @@ class TrackTemplates(HDFMixin):
         }
 
     @classmethod
-    def init_from_paired_decoders(cls, LR_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], RL_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder]) -> "TrackTemplates":
+    def init_from_paired_decoders(cls, LR_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], RL_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], rank_method:str='average') -> "TrackTemplates":
         """ 2023-10-31 - Extract from pairs
 
         """
@@ -175,8 +193,9 @@ class TrackTemplates(HDFMixin):
 
 
         return cls(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, None, shared_RL_aclus_only_neuron_IDs, None,
-                    decoder_LR_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method='dense') for a_decoder in (long_LR_decoder, short_LR_decoder)],
-                    decoder_RL_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method='dense') for a_decoder in (long_RL_decoder, short_RL_decoder)] )
+                    decoder_LR_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_LR_decoder, short_LR_decoder)],
+                    decoder_RL_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_RL_decoder, short_RL_decoder)],
+                    rank_method=rank_method)
 
     @classmethod
     def determine_decoder_aclus_filtered_by_frate(cls, long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, minimum_inclusion_fr_Hz: float = 5.0):

@@ -1798,6 +1798,50 @@ class RankOrderAnalyses:
     # 2023-12-13 - New pd.DataFrame simplified correlations: Spearman and Pearson ________________________________________ #
 
     @classmethod
+    def pho_compute_rank_order(cls, track_templates, curr_epoch_spikes_df: pd.DataFrame, rank_method="average", stats_nan_policy='omit') -> Dict[str, Tuple]:
+        """ 2023-12-20 - Actually working spearman rank-ordering!! 
+
+        # rank_method: str = "dense"
+        # rank_method: str = "average"
+        
+        
+        Usage:
+            curr_epoch_spikes_df = deepcopy(active_plotter.get_active_epoch_spikes_df())[['t_rel_seconds', 'aclu', 'shank', 'cluster', 'qclu', 'maze_id', 'flat_spike_idx', 'Probe_Epoch_id']]
+            curr_epoch_spikes_df["spike_rank"] = curr_epoch_spikes_df["t_rel_seconds"].rank(method="average")
+            # Sort by column: 'aclu' (ascending)
+            curr_epoch_spikes_df = curr_epoch_spikes_df.sort_values(['aclu'])
+            curr_epoch_spikes_df
+
+        """
+        curr_epoch_spikes_df["spike_rank"] = curr_epoch_spikes_df["t_rel_seconds"].rank(method=rank_method)
+        # curr_epoch_spikes_df = curr_epoch_spikes_df.sort_values(['aclu'], inplace=False) # Sort by column: 'aclu' (ascending)
+
+        n_spikes = np.shape(curr_epoch_spikes_df)[0]
+        curr_epoch_spikes_aclus = deepcopy(curr_epoch_spikes_df.aclu.to_numpy())
+        curr_epoch_spikes_aclu_ranks = deepcopy(curr_epoch_spikes_df.spike_rank.to_numpy())
+        # curr_epoch_spikes_aclu_rank_map = dict(zip(curr_epoch_spikes_aclus, curr_epoch_spikes_aclu_ranks)) # could build a map equiv to template versions
+        n_unique_aclus = np.shape(curr_epoch_spikes_df.aclu.unique())[0]
+        assert n_spikes == n_unique_aclus, f"there is more than one spike in curr_epoch_spikes_df for an aclu! n_spikes: {n_spikes}, n_unique_aclus: {n_unique_aclus}"
+
+        track_templates.rank_method = rank_method
+        decoder_aclu_peak_rank_dict_dict = track_templates.decoder_aclu_peak_rank_dict_dict
+
+        template_spearman_real_results = {}
+        for a_decoder_name, a_decoder_aclu_peak_rank_dict in decoder_aclu_peak_rank_dict_dict.items():
+            # template_corresponding_aclu_rank_list: the list of template ranks for each aclu present in the `curr_epoch_spikes_aclus`
+            template_corresponding_aclu_rank_list = np.array([a_decoder_aclu_peak_rank_dict.get(key, np.nan) for key in curr_epoch_spikes_aclus]) #  if key in decoder_aclu_peak_rank_dict_dict['long_LR']
+            # curr_epoch_spikes_aclu_rank_list = np.array([curr_epoch_spikes_aclu_rank_map.get(key, np.nan) for key in curr_epoch_spikes_aclus])
+            curr_epoch_spikes_aclu_rank_list = curr_epoch_spikes_aclu_ranks
+            n_missing_aclus = np.isnan(template_corresponding_aclu_rank_list).sum()
+            real_long_rank_stats = scipy.stats.spearmanr(curr_epoch_spikes_aclu_rank_list, template_corresponding_aclu_rank_list, nan_policy=stats_nan_policy)
+            # real_long_rank_stats = calculate_spearman_rank_correlation(curr_epoch_spikes_aclu_rank_list, template_corresponding_aclu_rank_list)
+            template_spearman_real_results[a_decoder_name] = (*real_long_rank_stats, n_missing_aclus)
+        
+        return template_spearman_real_results
+    
+
+
+    @classmethod
     @function_attributes(short_name=None, tags=['subfn', 'correlation', 'spearman', 'rank-order', 'pearson'], input_requires=[], output_provides=[], uses=[], used_by=['pandas_df_based_correlation_computations'], creation_date='2023-12-13 03:47', related_items=[])
     def _subfn_calculate_correlations(cls, group, method='spearman', enable_shuffle: bool=False) -> pd.Series:
         """ computes the pearson correlations between the spiketimes during a specific epoch (identified by each 'Probe_Epoch_id' group) and that spike's pf_peak_x location in the template.
@@ -1812,12 +1856,19 @@ class RankOrderAnalyses:
         else:
             shuffle_fn = lambda x: x # no-op
 
+        # correlations = {
+        #     f'LR_Long_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['LR_Long_pf_peak_x'], method=method),
+        #     f'RL_Long_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['RL_Long_pf_peak_x'], method=method),
+        #     f'LR_Short_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['LR_Short_pf_peak_x'], method=method),
+        #     f'RL_Short_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['RL_Short_pf_peak_x'], method=method)
+        # }
         correlations = {
-            f'LR_Long_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['LR_Long_pf_peak_x'], method=method),
-            f'RL_Long_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['RL_Long_pf_peak_x'], method=method),
-            f'LR_Short_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['LR_Short_pf_peak_x'], method=method),
-            f'RL_Short_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['RL_Short_pf_peak_x'], method=method)
+            f'LR_Long_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group['LR_Long_pf_peak_x'], method=method),
+            f'RL_Long_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group['RL_Long_pf_peak_x'], method=method),
+            f'LR_Short_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group['LR_Short_pf_peak_x'], method=method),
+            f'RL_Short_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group['RL_Short_pf_peak_x'], method=method)
         }
+
         return pd.Series(correlations)
 
     @classmethod
@@ -1858,14 +1909,18 @@ class RankOrderAnalyses:
 
         # LongShortStatsTuple: Tuple[Zscorer, Zscorer, float, float, bool]
 
+        _NaN_Type = np.nan
+        _NaN_Type = pd.NA
 
         rng = np.random.default_rng() # seed=13378 #TODO 2023-12-13 05:13: - [ ] DO NOT SET THE SEED! This makes the random permutation/shuffle the same every time!!!
         long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
 
+        track_templates.get_decoder_aclu_peak_map_dict()
+
         ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
         active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': 'int'}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
         _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
-        active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[np.nan, np.nan, np.nan, np.nan]], index=active_selected_spikes_df.index)
+        active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[_NaN_Type, _NaN_Type, _NaN_Type, _NaN_Type]], index=active_selected_spikes_df.index)
 
         ## Normal:
         active_selected_spikes_df['LR_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_LR_aclu_peak_map)
