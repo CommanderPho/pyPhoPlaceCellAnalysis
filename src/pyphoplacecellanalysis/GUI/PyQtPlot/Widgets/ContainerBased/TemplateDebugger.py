@@ -84,11 +84,9 @@ class TemplateDebugger:
 
     # on_idx_changed_callback_function_dict: Dict[str, Callable] = field(default=Factory(dict), repr=False)
 
-
     @property
     def track_templates(self) -> TrackTemplates:
         return self.plots_data.track_templates
-
 
     # @property
     # def active_epoch_tuple(self) -> tuple:
@@ -104,7 +102,7 @@ class TemplateDebugger:
 
 
     @classmethod
-    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=False, **kwargs):
+    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, **kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -331,15 +329,15 @@ class TemplateDebugger:
                 # Add vertical lines
                 if _out_params.enable_pf_peak_indicator_lines:
                     x_offset = curr_pf_peak_locations[cell_i]
-                    y_offset = float(cell_i+1)
+                    y_offset = float(cell_i) 
                     line_height = 1.0
-                    half_line_height = line_height / 2.0
+                    half_line_height = line_height / 2.0 # to compensate for middle
                     line = QtGui.QGraphicsLineItem(x_offset, (y_offset - half_line_height), x_offset, (y_offset + half_line_height)) # (xstart, ystart, xend, yend)
                     # line = pg.InfiniteLine(pos=(x_offset, float(cell_i+1)), angle=90, movable=False)
                     line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
                     curr_win.addItem(line)
                     # line.setPos(pg.Point(x_offset, (y_offset + (line_height / 2.0)))) # Adjust the height of the line if needed
-                    _out_ui.order_location_lines_dict[a_decoder_name][aclu] = line # add the TextItem to the map
+                    _out_ui.order_location_lines_dict[a_decoder_name][aclu] = line # add to the map
 
 
             # for x_offset, height in vertical_lines:
@@ -445,13 +443,13 @@ class TemplateDebugger:
                 # Add vertical lines
                 if _out_params.enable_pf_peak_indicator_lines:
                     x_offset = curr_pf_peak_locations[cell_i]
-                    y_offset = float(cell_i+1)
+                    y_offset = float(cell_i) 
                     line_height = 1.0
+                    half_line_height = line_height / 2.0 # to compensate for middle
                     line = _out_ui.order_location_lines_dict[a_decoder_name][aclu] # QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, line_height)
-                    # line = pg.InfiniteLine(pos=(x_offset, float(cell_i+1)), angle=90, movable=False)
                     # line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
                     # line.setPos(pg.Point(x_offset, (y_offset + (line_height / 2.0)))) # Adjust the height of the line if needed
-                
+                    line.setLine(x_offset, (y_offset - half_line_height), x_offset, (y_offset + half_line_height)) # (xstart, ystart, xend, yend)
 
             # end `for cell_i, (aclu, a_color_vector)`
 
