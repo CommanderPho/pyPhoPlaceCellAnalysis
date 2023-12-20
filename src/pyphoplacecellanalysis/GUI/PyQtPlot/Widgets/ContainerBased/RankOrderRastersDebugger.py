@@ -237,7 +237,7 @@ class RankOrderRastersDebugger:
 
 
     @classmethod
-    def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, rank_order_results: RankOrderComputationsContainer, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame]):
+    def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, rank_order_results: RankOrderComputationsContainer, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], **param_kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -1210,6 +1210,35 @@ class RankOrderRastersDebugger:
                 title_str = generate_html_string(f"{a_formatted_title_string_prefix}: {final_values_string}")
 
             a_root_plot.setTitle(title=title_str)
+
+
+    def plot_attached_directional_templates_pf_debugger(self, curr_active_pipeline):
+        """ builds a _display_directional_template_debugger, attaches it to the provided rank_order_event_raster_debugger so it's updated on its callback, and then returns what it created. 
+        
+        """
+        curr_active_pipeline.reload_default_display_functions()
+        # epoch_active_aclus = np.array([9,  26,  31,  39,  40,  43,  47,  52,  53,  54,  60,  61,  65,  68,  72,  75,  77,  78,  81,  82,  84,  85,  90,  92,  93,  98, 102]) # some test indicies
+        epoch_active_aclus = None
+        # epoch_active_aclus = deepcopy(self.get_epoch_active_aclus())
+        _out_directional_template_pfs_debugger = curr_active_pipeline.display('_display_directional_template_debugger', included_any_context_neuron_ids=epoch_active_aclus, figure_name=f'<Controlled by RankOrderRastersDebugger>', debug_draw=True, debug_print=True)
+
+        # Hold reference to the controlled plotter:
+        if self.ui.controlled_references is None:
+            self.ui.controlled_references = {}
+        if 'directional_template_pfs_debugger' not in self.ui.controlled_references:
+            self.ui.controlled_references['directional_template_pfs_debugger'] = _out_directional_template_pfs_debugger
+
+        def debug_update_paired_directional_template_pfs_debugger(a_plotter, an_idx: int):
+            """ captures nothing """
+            epoch_active_aclus = deepcopy(a_plotter.get_epoch_active_aclus())
+            # update the displayed cells:
+            controlled_directional_template_pfs_debugger = a_plotter.ui.controlled_references['directional_template_pfs_debugger']
+            directional_template_pfs_debugger_on_update_callback = controlled_directional_template_pfs_debugger.get('ui').on_update_callback
+            directional_template_pfs_debugger_on_update_callback(epoch_active_aclus)
+        
+        self.on_idx_changed_callback_function_dict['debug_update_paired_directional_template_pfs_debugger'] = debug_update_paired_directional_template_pfs_debugger
+        
+        return _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger
 
 
 
