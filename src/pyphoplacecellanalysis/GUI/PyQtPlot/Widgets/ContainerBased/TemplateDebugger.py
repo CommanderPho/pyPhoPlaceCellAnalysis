@@ -262,7 +262,7 @@ class TemplateDebugger:
 
         # sorted_pf_image_bounds_list = [pyqtplot_build_image_bounds_extent(a_decoder.pf.ratemap.xbins, a_decoder.pf.ratemap.ybins, margin=0.0, debug_print=False) for a_decoder in decoders_dict.values()]
         # pf_xbins_list = [a_decoder.pf.ratemap.xbin for a_decoder in decoders_dict.values()]
-
+        img_extents_dict = {a_decoder_name:[a_decoder.pf.ratemap.xbin[0], 0, (a_decoder.pf.ratemap.xbin[-1]-a_decoder.pf.ratemap.xbin[0]), (float(len(sorted_neuron_IDs_lists[i]))-0.0)] for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()) } # these extents are  (x, y, w, h)
         
         # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
         _out_data.ref_decoder_name = ref_decoder_name
@@ -272,6 +272,7 @@ class TemplateDebugger:
         _out_data.sorted_pf_tuning_curves = sorted_pf_tuning_curves
         _out_data.unsorted_included_any_context_neuron_ids = deepcopy(included_any_context_neuron_ids)
         _out_data.sorted_pf_peak_location_list = deepcopy(sorted_pf_peak_location_list)
+        _out_data.active_pfs_img_extents_dict = deepcopy(img_extents_dict)
         return _out_data
 
     # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
@@ -364,9 +365,12 @@ class TemplateDebugger:
                 # Ensure the data is in the correct range [0, 1]
             out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
             if enable_cell_colored_heatmap_rows:
-                curr_img.updateImage(out_colors_heatmap_image_matrix, xvals=curr_xbins) # use the color image only if `enable_cell_colored_heatmap_rows==True`
+                curr_img.updateImage(out_colors_heatmap_image_matrix) # , xvals=curr_xbins, use the color image only if `enable_cell_colored_heatmap_rows==True`
             _out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name] = out_colors_heatmap_image_matrix
 
+            # Set the extent to map pixels to x-locations
+            curr_img.setRect(_out_data.active_pfs_img_extents_dict[a_decoder_name])
+    
         # end `for i, (a_decoder_name, a_decoder)`
 
         ## Setup the Docks: 
@@ -475,8 +479,12 @@ class TemplateDebugger:
             # Ensure the data is in the correct range [0, 1]
             out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
             if enable_cell_colored_heatmap_rows:
-                curr_img.updateImage(out_colors_heatmap_image_matrix, xvals=curr_xbins) # use the color image only if `enable_cell_colored_heatmap_rows==True`
+                curr_img.updateImage(out_colors_heatmap_image_matrix) #, xvals=curr_xbins, use the color image only if `enable_cell_colored_heatmap_rows==True`
             _out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name] = out_colors_heatmap_image_matrix
+            
+            # Set the extent to map pixels to x-locations
+            curr_img.setRect(_out_data.active_pfs_img_extents_dict[a_decoder_name])
+            
         # end `for i, (a_decoder_name, a_decoder)`
 
         return _out_data, _out_plots, _out_ui
