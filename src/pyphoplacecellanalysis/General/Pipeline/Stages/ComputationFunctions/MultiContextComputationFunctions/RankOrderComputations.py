@@ -145,6 +145,46 @@ def determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2
 
 
 
+class SaveStringGenerator:
+    """ 
+    # 2023-11-27 - I'd like to be able to save/load single results a time, (meaning specific to their parameters):
+	day_date_str: str = '2023-12-11-minimum_inclusion_fr_Hz_2_included_qclu_values_1-2_'
+
+    """
+    _minimal_decimals_float_formatter = lambda x: f"{x:.1f}".rstrip('0').rstrip('.')
+    
+    @classmethod
+    def generate_save_suffix(cls, minimum_inclusion_fr_Hz: float, included_qclu_values: List[int], day_date: str='2023-12-11') -> str:
+        # day_date_str: str = '2023-12-11-minimum_inclusion_fr_Hz_2_included_qclu_values_1-2_'
+        print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        print(f'included_qclu_values: {included_qclu_values}')
+        out_filename_str: str = '-'.join([day_date, f'minimum_inclusion_fr', cls._minimal_decimals_float_formatter(minimum_inclusion_fr_Hz), f'included_qclu_values', f'{included_qclu_values}'])
+        return out_filename_str
+
+# list = ['2Hz', '12Hz']
+
+def save_rank_order_results(curr_active_pipeline, day_date: str='2023-12-19_729pm'):
+    """ saves out the rnak-order and directional laps results to disk.
+    
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+    ## Uses `SaveStringGenerator.generate_save_suffix` and the current rank_order_result's parameters to build a reasonable save name:
+    assert curr_active_pipeline.global_computation_results.computed_data['RankOrder'] is not None
+    minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computed_data['RankOrder'].minimum_inclusion_fr_Hz
+    included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computed_data['RankOrder'].included_qclu_values
+    out_filename_str = SaveStringGenerator.generate_save_suffix(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, day_date=day_date)
+    print(f'out_filename_str: "{out_filename_str}"')
+    directional_laps_output_path = curr_active_pipeline.get_output_path().joinpath(f'{out_filename_str}DirectionalLaps.pkl').resolve()
+    saveData(directional_laps_output_path, (curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']))
+    rank_order_output_path = curr_active_pipeline.get_output_path().joinpath(f'{out_filename_str}RankOrder.pkl').resolve()
+    saveData(rank_order_output_path, (curr_active_pipeline.global_computation_results.computed_data['RankOrder']))
+    # saveData(rank_order_output_path, (asdict(curr_active_pipeline.global_computation_results.computed_data['RankOrder'], recurse=True)))
+
+    # saveData(directional_laps_output_path, (curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'], asdict(curr_active_pipeline.global_computation_results.computed_data['RankOrder'], recurse=False))) 
+    # saveData(directional_laps_output_path, (curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']))
+    return rank_order_output_path, directional_laps_output_path, out_filename_str
+    
+
 
 @define(slots=False, repr=False, eq=False)
 class ShuffleHelper(HDFMixin):
@@ -2134,8 +2174,13 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
 
-            ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, rank_order_results.ripple_most_likely_result_tuple, 'Ripple')
-            lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, rank_order_results.laps_most_likely_result_tuple, 'Lap')
+            ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+            
+            ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, ripple_result_tuple, 'Ripple')
+            lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, laps_result_tuple, 'Lap')
+
+            ripple_result_tuple.plot_histograms()
+            laps_result_tuple.plot_histograms()
 
             return ripple_outputs, lap_outputs
 
