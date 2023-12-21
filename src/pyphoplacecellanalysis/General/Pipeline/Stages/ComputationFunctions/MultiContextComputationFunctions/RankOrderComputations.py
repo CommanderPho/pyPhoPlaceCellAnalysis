@@ -123,32 +123,32 @@ def compute_placefield_center_of_masses(tuning_curves):
 
 
 def determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2,4,9]):
-	"""
-	From all neuron_IDs in the session, get the ones that meet the new qclu criteria (their value is in) `included_qclu_values`
+    """
+    From all neuron_IDs in the session, get the ones that meet the new qclu criteria (their value is in) `included_qclu_values`
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import determine_good_aclus_by_qclu
 
-	allowed_aclus = determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2,4,9])
-	allowed_aclus
+    allowed_aclus = determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2,4,9])
+    allowed_aclus
 
-	"""
-	from neuropy.core.neuron_identities import NeuronType
+    """
+    from neuropy.core.neuron_identities import NeuronType
 
-	neuron_identities: pd.DataFrame = curr_active_pipeline.get_session_unique_aclu_information()
-	print(f"original {len(neuron_identities)}")
-	filtered_neuron_identities: pd.DataFrame = neuron_identities[neuron_identities.neuron_type == NeuronType.PYRAMIDAL]
-	print(f"post PYRAMIDAL filtering {len(filtered_neuron_identities)}")
-	filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
-	filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
-	print(f"post (qclu != [6, 7]) filtering {len(filtered_neuron_identities)}")
-	return filtered_neuron_identities.aclu.to_numpy()
+    neuron_identities: pd.DataFrame = curr_active_pipeline.get_session_unique_aclu_information()
+    print(f"original {len(neuron_identities)}")
+    filtered_neuron_identities: pd.DataFrame = neuron_identities[neuron_identities.neuron_type == NeuronType.PYRAMIDAL]
+    print(f"post PYRAMIDAL filtering {len(filtered_neuron_identities)}")
+    filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
+    filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
+    print(f"post (qclu != [6, 7]) filtering {len(filtered_neuron_identities)}")
+    return filtered_neuron_identities.aclu.to_numpy()
 
 
 
 class SaveStringGenerator:
     """ 
     # 2023-11-27 - I'd like to be able to save/load single results a time, (meaning specific to their parameters):
-	day_date_str: str = '2023-12-11-minimum_inclusion_fr_Hz_2_included_qclu_values_1-2_'
+    day_date_str: str = '2023-12-11-minimum_inclusion_fr_Hz_2_included_qclu_values_1-2_'
 
     """
     _minimal_decimals_float_formatter = lambda x: f"{x:.1f}".rstrip('0').rstrip('.')
@@ -1916,7 +1916,28 @@ class RankOrderAnalyses:
         real_stats_df = real_stats_df.rename(columns={'Probe_Epoch_id': 'label'})
         return real_stats_df
 
+    @classmethod
+    def _subfn_build_pandas_df_based_correlation_computations_column_rename_dict(cls, column_names: List[str], decoder_name_to_column_name_prefix_map:Optional[Dict[str,str]]=None) -> Dict[str,str]:
+        """ 2023-12-20 - ensures compatibility with lower-case names to older names
 
+        column_names = ['long_RL_spearman', 'long_LR_pearson', 'short_RL_spearman', 'short_RL_pearson', 'long_LR_spearman', 'short_LR_pearson', 'short_LR_spearman', 'long_RL_pearson', 'long_RL_spearman_Z', 'long_LR_pearson_Z', 'short_RL_spearman_Z', 'short_RL_pearson_Z', 'long_LR_spearman_Z', 'short_LR_pearson_Z', 'short_LR_spearman_Z', 'long_RL_pearson_Z']
+        decoder_name_to_column_name_prefix_map = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], ['LR_Long', 'RL_Long', 'LR_Short', 'RL_Short']))
+
+        old_to_new_names = build_column_rename_dict(column_names, decoder_name_to_column_name_prefix_map.copy())
+        print(old_to_new_names)
+
+        {'long_RL_spearman': 'RL_Long_spearman', 'long_LR_pearson': 'LR_Long_pearson', 'short_RL_spearman': 'RL_Short_spearman', 'short_RL_pearson': 'RL_Short_pearson', 'long_LR_spearman': 'LR_Long_spearman', 'short_LR_pearson': 'LR_Short_pearson', 'short_LR_spearman': 'LR_Short_spearman', 'long_RL_pearson': 'RL_Long_pearson', 'long_RL_spearman_Z': 'RL_Long_spearman_Z', 'long_LR_pearson_Z': 'LR_Long_pearson_Z', 'short_RL_spearman_Z': 'RL_Short_spearman_Z', 'short_RL_pearson_Z': 'RL_Short_pearson_Z', 'long_LR_spearman_Z': 'LR_Long_spearman_Z', 'short_LR_pearson_Z': 'LR_Short_pearson_Z', 'short_LR_spearman_Z': 'LR_Short_spearman_Z', 'long_RL_pearson_Z': 'RL_Long_pearson_Z'}
+        """
+        if decoder_name_to_column_name_prefix_map is None:
+            decoder_name_to_column_name_prefix_map = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], ['LR_Long', 'RL_Long', 'LR_Short', 'RL_Short']))
+
+        old_to_new_names = {}
+        for col in column_names:
+            for decoder_name, prefix in decoder_name_to_column_name_prefix_map.items():
+                if decoder_name in col:
+                    new_col = prefix + col.split(decoder_name)[-1]
+                    old_to_new_names[col] = new_col
+        return old_to_new_names
 
     @classmethod
     @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['_subfn_calculate_correlations', 'build_stacked_arrays'], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
@@ -2028,6 +2049,10 @@ class RankOrderAnalyses:
         except BaseException as e:
             print(f'Not giving up: e: {e}')
             pass
+
+        # rename columns for compatibility:
+        old_to_new_names = cls._subfn_build_pandas_df_based_correlation_computations_column_rename_dict(column_names=list(combined_epoch_stats_df.columns))
+        combined_epoch_stats_df = combined_epoch_stats_df.rename(columns=old_to_new_names)
 
         return combined_epoch_stats_df, (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
     
