@@ -1678,6 +1678,36 @@ class RankOrderAnalyses:
 
         return (LR_outputs, RL_outputs, laps_paired_tests)
 
+    @classmethod
+    def validate_has_rank_order_results_quantiles(cls, curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
+        """ Returns True if the pipeline has a valid RankOrder results set of the latest version
+
+        TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
+
+        """
+        # Unpacking:
+        rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        # ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+
+        # 2023-12-15 - Newest method:
+        ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
+        if ripple_combined_epoch_stats_df is None:
+            return False
+
+        if np.isnan(rank_order_results.ripple_combined_epoch_stats_df.index).any():
+            return False # can't have dataframe index that is missing values.
+
+        if ('LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df):
+            return False
+
+
+        laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
+        if laps_combined_epoch_stats_df is None:
+            return False
+
+        return True
+
+        
 
     @classmethod
     def validate_has_rank_order_results(cls, curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
@@ -1736,6 +1766,13 @@ class RankOrderAnalyses:
         if laps_combined_epoch_stats_df is None:
             return False
 
+
+        # if 'LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df:
+        #     return False
+
+        if not cls.validate_has_rank_order_results_quantiles(curr_active_pipeline, computation_filter_name=computation_filter_name, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz):
+            return False
+        
         # rank_order_results.included_qclu_values
 
         if minimum_inclusion_fr_Hz is not None:
