@@ -2204,88 +2204,88 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         return global_computation_results
     
 
-    @function_attributes(short_name='rank_order_shuffle_analysis_pandas', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-12-21 03:39', related_items=[],
-        validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
-    def perform_pandas_based_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2], skip_laps=False):
-        """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
+    # @function_attributes(short_name='rank_order_shuffle_analysis_pandas', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-12-21 03:39', related_items=[],
+    #     validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
+    # def perform_pandas_based_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2], skip_laps=False):
+    #     """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
-        Requires:
-            ['sess']
+    #     Requires:
+    #         ['sess']
 
-        Provides:
-            global_computation_results.computed_data['RankOrder']
-                ['RankOrder'].odd_ripple
-                ['RankOrder'].even_ripple
-                ['RankOrder'].odd_laps
-                ['RankOrder'].even_laps
+    #     Provides:
+    #         global_computation_results.computed_data['RankOrder']
+    #             ['RankOrder'].odd_ripple
+    #             ['RankOrder'].even_ripple
+    #             ['RankOrder'].odd_laps
+    #             ['RankOrder'].even_laps
 
 
-        """
-        print(f'perform_pandas_based_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
-        assert (not (('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')))), f"must have valid `global_computation_results.computed_data['RankOrder']`"
+    #     """
+    #     print(f'perform_pandas_based_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
+    #     assert (not (('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')))), f"must have valid `global_computation_results.computed_data['RankOrder']`"
 
-        ## Laps Rank-Order Analysis:
-        if not skip_laps:
-            print(f'\tcomputing Pandas-based Laps rank-order shuffles:')
-            print(f'\t\tnum_shuffles: {num_shuffles}, minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz} Hz')
-            try:
-                directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
-                selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_laps.selected_spikes_df) # WARNING: this is only using the `selected_spikes_df` from LR_laps!! This would miss spikes of any RL-specific cells?
-                active_epochs = deepcopy(global_computation_results.computed_data['RankOrder'].LR_laps.epochs_df)
+    #     ## Laps Rank-Order Analysis:
+    #     if not skip_laps:
+    #         print(f'\tcomputing Pandas-based Laps rank-order shuffles:')
+    #         print(f'\t\tnum_shuffles: {num_shuffles}, minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz} Hz')
+    #         try:
+    #             directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+    #             selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_laps.selected_spikes_df) # WARNING: this is only using the `selected_spikes_df` from LR_laps!! This would miss spikes of any RL-specific cells?
+    #             active_epochs = deepcopy(global_computation_results.computed_data['RankOrder'].LR_laps.epochs_df)
                 
-                track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-                laps_combined_epoch_stats_df, laps_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
-                # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = laps_new_output_tuple
-                global_computation_results.computed_data['RankOrder'].laps_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].laps_new_output_tuple = laps_combined_epoch_stats_df, laps_new_output_tuple
-                print(f'done!')
+    #             track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+    #             laps_combined_epoch_stats_df, laps_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
+    #             # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = laps_new_output_tuple
+    #             global_computation_results.computed_data['RankOrder'].laps_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].laps_new_output_tuple = laps_combined_epoch_stats_df, laps_new_output_tuple
+    #             print(f'done!')
 
-            except (AssertionError, BaseException) as e:
-                print(f'perform_pandas_based_rank_order_shuffle_analysis(...): Issue with Laps computation in new method 2023-12-15: e: {e}')
-                raise
+    #         except (AssertionError, BaseException) as e:
+    #             print(f'perform_pandas_based_rank_order_shuffle_analysis(...): Issue with Laps computation in new method 2023-12-15: e: {e}')
+    #             raise
 
-        ## END `if not skip_laps`
+    #     ## END `if not skip_laps`
 
-        ## Ripple Rank-Order Analysis:
-        print(f'\tcomputing Pandas-based Ripple rank-order shuffles:')
-        # New method 2023-12-15:
-        try:
-            directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
-            selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
-            active_epochs = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.epochs_df)
-            track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-            ripple_combined_epoch_stats_df, ripple_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
-            # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = ripple_new_output_tuple
-            global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].ripple_new_output_tuple = ripple_combined_epoch_stats_df, ripple_new_output_tuple
-            print(f'done!')
+    #     ## Ripple Rank-Order Analysis:
+    #     print(f'\tcomputing Pandas-based Ripple rank-order shuffles:')
+    #     # New method 2023-12-15:
+    #     try:
+    #         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+    #         selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
+    #         active_epochs = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.epochs_df)
+    #         track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+    #         ripple_combined_epoch_stats_df, ripple_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
+    #         # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = ripple_new_output_tuple
+    #         global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].ripple_new_output_tuple = ripple_combined_epoch_stats_df, ripple_new_output_tuple
+    #         print(f'done!')
 
-        except (AssertionError, BaseException) as e:
-            print(f'perform_pandas_based_rank_order_shuffle_analysis(...): New method 2023-12-15: e: {e}')
-            raise
+    #     except (AssertionError, BaseException) as e:
+    #         print(f'perform_pandas_based_rank_order_shuffle_analysis(...): New method 2023-12-15: e: {e}')
+    #         raise
 
 
-        ## Requires "New method 2023-12-15" result
-        # Set the global result:
-        try:
-            print(f'\tdone. building global result.')
-            global_computation_results.computed_data['RankOrder'].adding_active_aclus_info()
-            global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference, decoding_time_bin_size=0.006) # 6ms bins
+    #     ## Requires "New method 2023-12-15" result
+    #     # Set the global result:
+    #     try:
+    #         print(f'\tdone. building global result.')
+    #         global_computation_results.computed_data['RankOrder'].adding_active_aclus_info()
+    #         global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference, decoding_time_bin_size=0.006) # 6ms bins
         
-        except (AssertionError, BaseException) as e:
-            print(f'perform_pandas_based_rank_order_shuffle_analysis(...): Issue with `RankOrderAnalyses.most_likely_directional_rank_order_shuffling(...)` e: {e}')
-            raise
+    #     except (AssertionError, BaseException) as e:
+    #         print(f'perform_pandas_based_rank_order_shuffle_analysis(...): Issue with `RankOrderAnalyses.most_likely_directional_rank_order_shuffling(...)` e: {e}')
+    #         raise
 
-        """ Usage:
+    #     """ Usage:
         
-        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+    #     rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
 
-        odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values = rank_order_results.odd_laps
-        even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values = rank_order_results.even_laps
+    #     odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values = rank_order_results.odd_laps
+    #     even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values = rank_order_results.even_laps
 
-        odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.odd_ripple
-        even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values = rank_order_results.even_ripple
+    #     odd_ripple_evts_epoch_ranked_aclus_stats_dict, odd_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, odd_ripple_evts_long_z_score_values, odd_ripple_evts_short_z_score_values, odd_ripple_evts_long_short_z_score_diff_values = rank_order_results.odd_ripple
+    #     even_ripple_evts_epoch_ranked_aclus_stats_dict, even_ripple_evts_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, even_ripple_evts_long_z_score_values, even_ripple_evts_short_z_score_values, even_ripple_evts_long_short_z_score_diff_values = rank_order_results.even_ripple
 
-        """
-        return global_computation_results
+    #     """
+    #     return global_computation_results
 
 
 
