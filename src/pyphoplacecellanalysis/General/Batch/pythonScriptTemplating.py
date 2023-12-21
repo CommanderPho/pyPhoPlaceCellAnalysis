@@ -25,7 +25,8 @@ from neuropy.utils.result_context import IdentifyingContext
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
- 		create_slurm_scripts:bool=False, separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, batch_session_completion_handler_kwargs=None, **renderer_script_generation_kwargs):
+ 		create_slurm_scripts:bool=False, separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None,
+		batch_session_completion_handler_kwargs=None, **renderer_script_generation_kwargs):
 	""" Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
 	output_directory
@@ -61,7 +62,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 	separate_execute_and_figure_gen_scripts = renderer_script_generation_kwargs.pop('separate_execute_and_figure_gen_scripts', True)
 	assert separate_execute_and_figure_gen_scripts, f"Old non-separate mode not supported"
  
- 
+	assert ('force_recompute_override_computations_includelist' not in renderer_script_generation_kwargs), f"pass 'force_recompute_override_computations_includelist' explicitly to the call!!"
+	renderer_script_generation_kwargs['force_recompute_override_computations_includelist'] = (force_recompute_override_computations_includelist or [])
  
 	# if script_generation_kwargs is None:
 	# 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
