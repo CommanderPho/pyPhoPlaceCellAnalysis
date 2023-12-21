@@ -1363,6 +1363,66 @@ class RankOrderAnalyses:
 
 
     @classmethod
+    def _subfn_perform_compute_quantiles(cls, rank_order_results):
+        """ 2023-12-21 - Computes Quantiles/Percentiles - Computing Spearman Percentiles as an alternative to the Z-score from shuffling, which does not seem to work for small numbers of active cells in an event:
+        
+        Uses:
+        
+        rank_order_results.ripple_combined_epoch_stats_df
+        
+        
+        Usage:
+        
+        _perform_compute_quantiles(rank_order_results)
+        rank_order_results.ripple_combined_epoch_stats_df
+
+        """
+
+        def compute_percentile(real_value, original_shuffle_values):
+            return (1.0 - float(np.sum((np.abs(real_value) < original_shuffle_values)))/float(len(original_shuffle_values)))
+            # return (1.0 - float(np.sum((real_value < original_shuffle_values)))/float(len(original_shuffle_values)))
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
+        ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
+
+        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+
+        quantile_results_dict = dict(zip(['LR_Long_rank_percentile', 'LR_Short_rank_percentile', 'RL_Long_rank_percentile', 'RL_Short_rank_percentile'], np.hstack((new_LR_results_quantile_values, new_RL_results_quantile_values)).T))
+        # quantile_results_dict
+        # quantile_results_df = pd.DataFrame(np.hstack((new_LR_results_real_values, new_RL_results_real_values)), columns=['LR_Long_rank_percentile', 'LR_Short_rank_percentile', 'RL_Long_rank_percentile', 'RL_Short_rank_percentile'])
+        # quantile_results_df = pd.DataFrame(quantile_results_dict, index=ripple_combined_epoch_stats_df.index)
+        # quantile_results_df
+
+        ## Add the new columns into the `ripple_combined_epoch_stats_df`
+        for a_col_name, col_vals in quantile_results_dict.items():
+            ripple_combined_epoch_stats_df[a_col_name] = col_vals
+
+        ## Ripples:
+        # long_best_direction_indicies = deepcopy(rank_order_results.ripple_most_likely_result_tuple.directional_likelihoods_tuple.long_best_direction_indices)
+        # short_best_direction_indicies = deepcopy(rank_order_results.ripple_most_likely_result_tuple.directional_likelihoods_tuple.short_best_direction_indices)
+        # assert np.shape(long_best_direction_indicies) == np.shape(short_best_direction_indicies)
+
+        # `combined_best_direction_indicies` method:
+        active_replay_epochs_df = deepcopy(rank_order_results.LR_ripple.epochs_df)
+        assert 'combined_best_direction_indicies' in active_replay_epochs_df, f"active_replay_epochs_df needs combined_best_direction_indicies"
+        combined_best_direction_indicies = deepcopy(active_replay_epochs_df['combined_best_direction_indicies'])
+        assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.ripple_combined_epoch_stats_df)[0]
+        long_best_direction_indicies = combined_best_direction_indicies # use same (globally best) indicies for Long/Short
+        short_best_direction_indicies = combined_best_direction_indicies # use same (globally best) indicies for Long/Short
+
+        ripple_evts_long_best_dir_quantile_stats_values = np.where(long_best_direction_indicies, rank_order_results.ripple_combined_epoch_stats_df['LR_Long_rank_percentile'].to_numpy(), rank_order_results.ripple_combined_epoch_stats_df['RL_Long_rank_percentile'].to_numpy())
+        ripple_evts_short_best_dir_quantile_stats_values = np.where(short_best_direction_indicies, rank_order_results.ripple_combined_epoch_stats_df['LR_Short_rank_percentile'].to_numpy(), rank_order_results.ripple_combined_epoch_stats_df['RL_Short_rank_percentile'].to_numpy())
+        assert np.shape(ripple_evts_long_best_dir_quantile_stats_values) == np.shape(ripple_evts_short_best_dir_quantile_stats_values)
+        rank_order_results.ripple_combined_epoch_stats_df['Long_BestDir_quantile'] = ripple_evts_long_best_dir_quantile_stats_values
+        rank_order_results.ripple_combined_epoch_stats_df['Short_BestDir_quantile'] = ripple_evts_short_best_dir_quantile_stats_values
+
+        ripple_combined_epoch_stats_df['LongShort_BestDir_quantile_diff'] = ripple_combined_epoch_stats_df['Long_BestDir_quantile'] - ripple_combined_epoch_stats_df['Short_BestDir_quantile']
+        # return ripple_combined_epoch_stats_df
+
+
+    @classmethod
     @function_attributes(short_name=None, tags=['rank-order', 'shuffle', 'inst_fr', 'epoch', 'lap', 'replay', 'computation'], input_requires=[], output_provides=[], uses=['DirectionalRankOrderLikelihoods', 'DirectionalRankOrderResult', 'cls._compute_best'], used_by=[], creation_date='2023-11-16 18:43', related_items=['plot_rank_order_epoch_inst_fr_result_tuples'])
     def most_likely_directional_rank_order_shuffling(cls, curr_active_pipeline, decoding_time_bin_size=0.003) -> Tuple[DirectionalRankOrderResult, DirectionalRankOrderResult]:
         """ A version of the rank-order shufffling for a set of epochs that tries to use the most-likely direction (independently (e.g. long might be LR and short could be RL)) as the one to decode with.
@@ -1404,8 +1464,11 @@ class RankOrderAnalyses:
             ## Post-process Z-scores with their most likely directions:
             # rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
 
-            ripple_combined_epoch_stats_df = deepcopy(rank_order_results.ripple_combined_epoch_stats_df)
-            active_replay_epochs_df = deepcopy(rank_order_results.LR_ripple.epochs_df)
+            # ripple_combined_epoch_stats_df = deepcopy(rank_order_results.ripple_combined_epoch_stats_df)
+            # active_replay_epochs_df = deepcopy(rank_order_results.LR_ripple.epochs_df)
+
+            ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
+            active_replay_epochs_df = rank_order_results.LR_ripple.epochs_df
 
             # _traditional_arg_dict_key_names = ('active_LR_long_z_score', 'active_RL_long_z_score', 'active_LR_short_z_score', 'active_RL_short_z_score')
             # _traditional_arg_dict_values_tuple = (ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z)
@@ -1415,15 +1478,21 @@ class RankOrderAnalyses:
             # ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = _perform_compute_directional_likelihoods_tuple_methods(active_replay_epochs, **_arg_dict_from_ripple_combined_epoch_stats_df)
             
             LR_ripple_epoch_accumulated_evidence, LR_ripple_epoch_rate_dfs, active_replay_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_replay_epochs_df)
-            # RL_ripple_epoch_accumulated_evidence, RL_ripple_epoch_rate_dfs, RL_ripple_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, rank_order_results.RL_ripple.epochs_df)
 
             # long_best_direction_indicies = np.argmax(np.vstack([np.abs(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()), np.abs(LR_ripple_epochs_df['normed_RL_evidence'].to_numpy())]), axis=0).astype(int)
             # short_best_direction_indicies = np.argmax(np.vstack([np.abs(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()), np.abs(LR_ripple_epochs_df['normed_RL_evidence'].to_numpy())]), axis=0).astype(int)
             
-            long_best_direction_indicies = active_replay_epochs_df['Long_best_direction_indicies'].to_numpy()
-            short_best_direction_indicies = active_replay_epochs_df['Short_best_direction_indicies'].to_numpy()
+            # ## Long/Short Independent Version:
+            # long_best_direction_indicies = active_replay_epochs_df['Long_best_direction_indicies'].to_numpy()
+            # short_best_direction_indicies = active_replay_epochs_df['Short_best_direction_indicies'].to_numpy()
             
-
+            # `combined_best_direction_indicies` method:
+            assert 'combined_best_direction_indicies' in active_replay_epochs_df, f"active_replay_epochs_df needs combined_best_direction_indicies"
+            combined_best_direction_indicies = deepcopy(active_replay_epochs_df['combined_best_direction_indicies'])
+            assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.ripple_combined_epoch_stats_df)[0]
+            long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
+            short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
+            
             ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=active_replay_epochs_df['Long_normed_LR_evidence'].to_numpy(),
                                                                                                                    short_relative_direction_likelihoods=active_replay_epochs_df['Short_normed_RL_evidence'].to_numpy(),
                                             long_best_direction_indices=long_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int), 
@@ -1461,6 +1530,10 @@ class RankOrderAnalyses:
             assert np.shape(ripple_evts_long_best_dir_raw_stats_values) == np.shape(ripple_evts_short_best_dir_raw_stats_values)
             rank_order_results.ripple_combined_epoch_stats_df['Long_BestDir_spearman'] = ripple_evts_long_best_dir_raw_stats_values
             rank_order_results.ripple_combined_epoch_stats_df['Short_BestDir_spearman'] = ripple_evts_short_best_dir_raw_stats_values
+
+            # Compute the quantiles:
+            cls._subfn_perform_compute_quantiles(rank_order_results=rank_order_results)
+
 
 
         except (AttributeError, KeyError, IndexError, ValueError):
