@@ -1793,7 +1793,7 @@ class RankOrderAnalyses:
 
     @classmethod
     def _subfn_build_all_pf_peak_x_columns(cls, track_templates, selected_spikes_df: pd.DataFrame, override_decoder_aclu_peak_map_dict=None):
-        """ 2023-12-20 - Candidate for moving into RankOrderComputations 
+        """ 2023-12-20 - Returns `active_selected_spikes_df` but with its `f'{a_decoder_name}_pf_peak_x'` columns all shuffled according to `override_decoder_aclu_peak_map_dict` (which was previously shuffled)
         
         """
         # long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
