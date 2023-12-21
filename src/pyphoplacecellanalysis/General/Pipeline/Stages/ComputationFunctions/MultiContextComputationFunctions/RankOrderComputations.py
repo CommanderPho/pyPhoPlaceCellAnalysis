@@ -2422,7 +2422,8 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
 
         # significant_ripple_epochs: pd.DataFrame = deepcopy(global_events.epochs.get_valid_df())[is_epoch_significant]
     else:
-        is_epoch_significant = np.arange(global_events.n_epochs)
+        # is_epoch_significant = np.arange(global_events.n_epochs)
+        is_epoch_significant = np.full_like(result_tuple.long_short_best_dir_z_score_diff_values, fill_value=True)
 
 
     # epoch_identifiers = np.arange(global_events.n_epochs) # these should be labels!
