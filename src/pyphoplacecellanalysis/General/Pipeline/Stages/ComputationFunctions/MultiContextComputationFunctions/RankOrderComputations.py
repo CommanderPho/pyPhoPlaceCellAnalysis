@@ -1492,7 +1492,8 @@ class RankOrderAnalyses:
                                                                                         masked_z_score_values_list=ripple_masked_z_score_values_list, rank_order_z_score_df=None)
 
             # re-assign:
-            rank_order_results.ripple_combined_epoch_stats_df = active_replay_epochs_df
+            rank_order_results.LR_ripple.epochs_df = active_replay_epochs_df
+
 
         except (AttributeError, KeyError, IndexError, ValueError):
             raise # fail for ripples, but not for laps currently
