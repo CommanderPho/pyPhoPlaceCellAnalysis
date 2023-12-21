@@ -1347,6 +1347,13 @@ class RankOrderAnalyses:
             epochs_df[f'{a_prefix}best_direction_indicies'] = np.argmax(np.vstack([np.abs(epochs_df[f'{a_prefix}normed_LR_evidence'].to_numpy()), np.abs(epochs_df[f'{a_prefix}normed_RL_evidence'].to_numpy())]), axis=0).astype('int8')
         # ['Long_normed_LR_evidence', 'Long_normed_RL_evidence', 'Long_normed_product_LR_evidence', 'Long_normed_product_RL_evidence', 'Short_normed_LR_evidence', 'Short_normed_RL_evidence', 'Short_normed_product_LR_evidence', 'Short_normed_product_RL_evidence']
 
+        ## Compute the normed total LR/RL evidence by combining both Long/Short directional evidence:
+        total_normed_LR_evidence = ((epochs_df[f'Long_normed_LR_evidence'] + epochs_df[f'Short_normed_LR_evidence'])/2.0)
+        total_normed_RL_evidence = ((epochs_df[f'Long_normed_RL_evidence'] + epochs_df[f'Short_normed_RL_evidence'])/2.0)
+        
+        # np.argmax(np.vstack([np.abs(epochs_df[f'{a_prefix}normed_LR_evidence'].to_numpy()), np.abs(epochs_df[f'{a_prefix}normed_RL_evidence'].to_numpy())]), axis=0).astype('int8')
+        epochs_df['combined_best_direction_indicies'] = np.argmax(np.vstack([total_normed_LR_evidence.to_numpy(), total_normed_RL_evidence.to_numpy()]), axis=0).astype('int8')
+
 
         # ## Convenience: Best Direction properties:
         # long_best_direction_indicies = epochs_df['Long_best_direction_indicies'].to_numpy()
