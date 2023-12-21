@@ -1850,52 +1850,21 @@ class RankOrderAnalyses:
 
     @classmethod
     @function_attributes(short_name=None, tags=['subfn', 'correlation', 'spearman', 'rank-order', 'pearson'], input_requires=[], output_provides=[], uses=[], used_by=['pandas_df_based_correlation_computations'], creation_date='2023-12-13 03:47', related_items=[])
-    def _subfn_calculate_correlations(cls, group, method='spearman', enable_shuffle: bool=False, decoder_names: List[str]=None) -> pd.Series:
+    def _subfn_calculate_correlations(cls, group, method='spearman', decoder_names: List[str]=None) -> pd.Series:
         """ computes the pearson correlations between the spiketimes during a specific epoch (identified by each 'Probe_Epoch_id' group) and that spike's pf_peak_x location in the template.
 
         correlations = active_selected_spikes_df.groupby('Probe_Epoch_id').apply(lambda group: calculate_correlations(group, method='spearman'))
         correlations = active_selected_spikes_df.groupby('Probe_Epoch_id').apply(lambda group: calculate_correlations(group, method='pearson'))
 
         """
-        if enable_shuffle:
-            rng = np.random.default_rng()
-            shuffle_fn = lambda x: pd.Series(rng.permuted(x.values), index=x.index)  # x.values
-        else:
-            shuffle_fn = lambda x: x # no-op
-
-        # correlations = {
-        #     f'LR_Long_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['LR_Long_pf_peak_x'], method=method),
-        #     f'RL_Long_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['RL_Long_pf_peak_x'], method=method),
-        #     f'LR_Short_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['LR_Short_pf_peak_x'], method=method),
-        #     f'RL_Short_{method}': shuffle_fn(group['t_rel_seconds']).corr(group['RL_Short_pf_peak_x'], method=method)
-        # }
-        # correlations = {
-        #     f'LR_Long_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group['LR_Long_pf_peak_x'], method=method),
-        #     f'RL_Long_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group['RL_Long_pf_peak_x'], method=method),
-        #     f'LR_Short_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group['LR_Short_pf_peak_x'], method=method),
-        #     f'RL_Short_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group['RL_Short_pf_peak_x'], method=method)
-        # }
-        
         assert decoder_names is not None, f"2023-12-20 - decoder_names must be provided. Usually: `decoder_names = track_templates.get_decoder_names()`"    
         _pf_peak_x_column_names = [f'{a_decoder_name}_pf_peak_x' for a_decoder_name in decoder_names]
         _output_column_names = [f'{a_decoder_name}_{method}' for a_decoder_name in decoder_names]
         # correlations = {f'{a_decoder_name}_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group[f'{a_decoder_name}_pf_peak_x'], method=method) for a_decoder_name in _decoder_names}
-        correlations = {an_output_col_name:shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group[a_pf_peak_x_column_name], method=method) for a_decoder_name, a_pf_peak_x_column_name, an_output_col_name in zip(decoder_names, _pf_peak_x_column_names, _output_column_names)}
+        correlations = {an_output_col_name:group['t_rel_seconds'].rank(method="dense").corr(group[a_pf_peak_x_column_name], method=method) for a_decoder_name, a_pf_peak_x_column_name, an_output_col_name in zip(decoder_names, _pf_peak_x_column_names, _output_column_names)}
 
         return pd.Series(correlations)
 
-    @classmethod
-    def build_stacked_arrays(cls, output_active_epoch_computed_values):
-        # Convert each DataFrame to a NumPy array and stack them # shape of this array will be (n, m, p) where n is the number of DataFrames, m is the number of rows, and p is the number of columns in each DataFrame.
-        names0 = ['LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman']
-        dfs0 = [a_tuple[0] for a_tuple in output_active_epoch_computed_values] # [0] is just spearman_correlations
-        stacked_arrays0 = np.array([df[names0].values for df in dfs0])
-        names1 = ['LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson']
-        dfs1 = [a_tuple[1] for a_tuple in output_active_epoch_computed_values] # [1] is pearson_correlations
-        stacked_arrays1 = np.array([df[names1].values for df in dfs1])
-        stacked_arrays = np.concatenate((stacked_arrays0, stacked_arrays1), axis=-1) # .shape: (100, 412, 8) # (n_shuffles, n_epochs, n_columns)
-        return stacked_arrays
-    
 
     @classmethod
     def _subfn_build_all_pf_peak_x_columns(cls, track_templates, selected_spikes_df: pd.DataFrame, override_decoder_aclu_peak_map_dict=None):
@@ -1917,26 +1886,6 @@ class RankOrderAnalyses:
         _pf_peak_x_column_names = [f'{a_decoder_name}_pf_peak_x' for a_decoder_name in track_templates.get_decoder_names()]
         active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[cls._NaN_Type, cls._NaN_Type, cls._NaN_Type, cls._NaN_Type]], index=active_selected_spikes_df.index)
 
-        ## Normal:
-        # active_selected_spikes_df['LR_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_LR_aclu_peak_map)
-        # active_selected_spikes_df['RL_Long_pf_peak_x'] = active_selected_spikes_df.aclu.map(long_RL_aclu_peak_map)
-        # active_selected_spikes_df['LR_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_LR_aclu_peak_map)
-        # active_selected_spikes_df['RL_Short_pf_peak_x'] = active_selected_spikes_df.aclu.map(short_RL_aclu_peak_map)
-
-        # Shuffled:
-        # a_name = 'LR_Long_pf_peak_x'
-        # active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(long_LR_epoch_specific_shuffled_aclus[shuffle_IDX], long_LR_aclu_peak_map.values())))
-
-        # a_name = 'RL_Long_pf_peak_x'
-        # active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(long_RL_epoch_specific_shuffled_aclus[shuffle_IDX], long_RL_aclu_peak_map.values())))
-
-        # a_name = 'LR_Short_pf_peak_x'
-        # active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(short_LR_epoch_specific_shuffled_aclus[shuffle_IDX], short_LR_aclu_peak_map.values())))
-
-        # a_name = 'RL_Short_pf_peak_x'
-        # active_selected_spikes_df[a_name] = active_selected_spikes_df.aclu.map(dict(zip(short_RL_epoch_specific_shuffled_aclus[shuffle_IDX], short_RL_aclu_peak_map.values())))
-
-
         for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
             active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
 
@@ -1956,8 +1905,8 @@ class RankOrderAnalyses:
         decoder_names = track_templates.get_decoder_names()
         
         epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
-        spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', enable_shuffle=False, decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
-        pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='pearson', enable_shuffle=False, decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+        spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+        pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='pearson', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
 
         real_stats_df = pd.concat((spearman_correlations, pearson_correlations), axis='columns')
         real_stats_df = real_stats_df.loc[:, ~real_stats_df.columns.duplicated()] # drop duplicated 'Probe_Epoch_id' column
@@ -2007,12 +1956,6 @@ class RankOrderAnalyses:
         # PERFORM SHUFFLE HERE:                                                                                                #
         # ==================================================================================================================== #
         # On-the-fly shuffling mode using shuffle_helper:
-        # epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = build_shuffled_ids(list(long_LR_aclu_peak_map.keys()), num_shuffles=num_shuffles, seed=None) # .shape: ((num_shuffles, n_neurons), (num_shuffles, n_neurons))
-
-        # all_decoder_aclus_map_keys_list = [np.array(list(a_map.keys())) for a_map in (long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map)] # list of four elements
-        # all_shuffled_decoder_aclus_map_keys_list = [build_shuffled_ids(a_map_keys, num_shuffles=num_shuffles, seed=None)[0] for a_map_keys in all_decoder_aclus_map_keys_list] # [0] only gets the shuffled_aclus themselves, which are of shape .shape: ((num_shuffles, n_neurons[i]) where i is the decoder_index
-
-        # long_LR_epoch_specific_shuffled_aclus, long_RL_epoch_specific_shuffled_aclus, short_LR_epoch_specific_shuffled_aclus, short_RL_epoch_specific_shuffled_aclus = all_shuffled_decoder_aclus_map_keys_list
 
         all_decoder_aclus_map_keys_dict = {a_decoder_name:np.array(list(a_map.keys())) for a_decoder_name, a_map in decoder_aclu_peak_map_dict.items()} # list of four elements
         all_decoder_aclus_map_values_dict = {a_decoder_name:np.array(list(a_map.values())) for a_decoder_name, a_map in decoder_aclu_peak_map_dict.items()} # list of four elements
