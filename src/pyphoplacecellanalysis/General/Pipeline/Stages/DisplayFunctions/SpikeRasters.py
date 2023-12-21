@@ -1407,7 +1407,7 @@ def paired_separately_sort_neurons(decoders_dict: Dict, included_any_context_neu
 
     if sortable_values_list_dict is None:
         # build default sortable items list:
-        sortable_values_list_dict = {k:deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for k, a_decoder in decoders_dict.items()} 
+        sortable_values_list_dict = {k:deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for k, a_decoder in decoders_dict.items()} # tuning_curve peak location
     else:
         assert len(sortable_values_list_dict) == len(decoders_dict)
         
