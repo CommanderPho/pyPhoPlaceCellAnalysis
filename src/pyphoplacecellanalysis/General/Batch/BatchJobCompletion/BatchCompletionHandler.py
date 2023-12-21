@@ -174,6 +174,8 @@ class BatchSessionCompletionHandler:
                                     ]) # do only specified
 
     force_global_recompute: bool = field(default=False)
+    
+    force_recompute_override_computations_includelist: list = field(default=Factory(list)) # empty list by default. For example self.force_recompute_override_computations_includelist = ['rank_order_shuffle_analysis'] would force recomputation of that global computation function
 
 
     # @property
@@ -420,11 +422,29 @@ class BatchSessionCompletionHandler:
         if self.global_computations_options.should_save == SavingOptions.ALWAYS:
             assert self.global_computations_options.should_compute, f"currently  SavingOptions.ALWAYS requires that self.global_computations_options.should_compute == True also but this is not the case!"
 
+
+        
+        
+        # Computation ________________________________________________________________________________________________________ #
         if self.global_computations_options.should_compute:
+            # build computation functions to compute list:
+            active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
+            force_recompute_override_computations_includelist = self.force_recompute_override_computations_includelist or []
+            if (len(force_recompute_override_computations_includelist) > 0) and (not self.force_global_recompute):
+                # split out the forced computations:
+                active_extended_computations_include_includelist = [k for k in active_extended_computations_include_includelist if k not in force_recompute_override_computations_includelist] # exclude the forced recomputations from the main `active_extended_computations_include_includelist`
+
             try:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
                 curr_active_pipeline.reload_default_computation_functions()
-                newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=self.extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
+                # do forced recomputations first:
+                if (len(force_recompute_override_computations_includelist) > 0) and (not self.force_global_recompute):
+                    newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=force_recompute_override_computations_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=True, debug_print=False) # call with `force_recompute=True`
+                else:
+                    newly_computed_values = []
+
+                newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
+                
                 #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
                 return newly_computed_values # return the list of newly computed values
 
