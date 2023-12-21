@@ -1505,6 +1505,18 @@ class RankOrderAnalyses:
             # Re-assign the updated dataframe:
             rank_order_results.LR_laps.epochs_df = active_laps_epochs_df
             
+
+            assert np.shape(active_LR_laps_long_z_score) == np.shape(active_RL_laps_long_z_score)
+            assert np.shape(active_LR_laps_short_z_score) == np.shape(active_RL_laps_short_z_score)
+            assert np.shape(long_best_direction_indicies) == np.shape(short_best_direction_indicies)
+
+            laps_evts_long_best_dir_raw_stats_values = np.where(long_best_direction_indicies, rank_order_results.laps_combined_epoch_stats_df['LR_Long_spearman'].to_numpy(), rank_order_results.laps_combined_epoch_stats_df['RL_Long_spearman'].to_numpy())
+            laps_evts_short_best_dir_raw_stats_values = np.where(short_best_direction_indicies, rank_order_results.laps_combined_epoch_stats_df['LR_Short_spearman'].to_numpy(), rank_order_results.laps_combined_epoch_stats_df['RL_Short_spearman'].to_numpy())
+            assert np.shape(laps_evts_long_best_dir_raw_stats_values) == np.shape(laps_evts_short_best_dir_raw_stats_values)
+            rank_order_results.laps_combined_epoch_stats_df['Long_BestDir_spearman'] = laps_evts_long_best_dir_raw_stats_values
+            rank_order_results.laps_combined_epoch_stats_df['Short_BestDir_spearman'] = laps_evts_short_best_dir_raw_stats_values
+            
+
         except (AttributeError, KeyError, IndexError, ValueError):
             raise
             laps_result_tuple = None
