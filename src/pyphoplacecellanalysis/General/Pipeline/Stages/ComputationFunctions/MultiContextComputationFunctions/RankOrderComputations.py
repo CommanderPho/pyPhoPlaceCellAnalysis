@@ -405,6 +405,11 @@ from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import Mat
 
 class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
 
+    @property
+    def directional_likelihoods_df(self) -> pd.DataFrame:
+        return pd.DataFrame.from_dict(self.directional_likelihoods_tuple._asdict()).astype({'long_best_direction_indices': 'int8', 'short_best_direction_indices': 'int8'})
+
+
     def plot_histograms(self) -> MatplotlibRenderPlots:
         fig = plt.figure(layout="constrained", num='RipplesRankOrderZscore')
         ax_dict = fig.subplot_mosaic(
