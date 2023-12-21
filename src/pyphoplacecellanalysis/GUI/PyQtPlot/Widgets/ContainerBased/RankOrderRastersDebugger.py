@@ -183,9 +183,11 @@ class RankOrderRastersDebugger:
     @property
     def active_epoch_result_df(self) -> pd.DataFrame:
         """ returns a the combined_epoch_stats_df describing the single epoch corresponding to `self.active_epoch_IDX`. """
-        curr_epoch_label = self.lookup_label_from_index(self.active_epoch_IDX)
-        return self.combined_epoch_stats_df[self.combined_epoch_stats_df.label == curr_epoch_label]
-
+        # curr_epoch_label = self.lookup_label_from_index(self.active_epoch_IDX)
+        # return self.combined_epoch_stats_df[self.combined_epoch_stats_df.label == curr_epoch_label]
+        assert np.shape(self.combined_epoch_stats_df)[0] == np.shape(self.active_epochs_df)[0], f"np.shape(self.combined_epoch_stats_df)[0]: {np.shape(self.combined_epoch_stats_df)[0]} != np.shape(self.active_epochs_df)[0]: {np.shape(self.active_epochs_df)[0]}"
+        return self.combined_epoch_stats_df.iloc[[self.active_epoch_IDX]] # must pass a LIST of indicies to .iloc[...] so it returns a DataFrame instead of a pd.Series
+        
 
     def get_active_epoch_spikes_df(self) -> pd.DataFrame:
         active_epoch_tuple = self.active_epoch_tuple
