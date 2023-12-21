@@ -2327,7 +2327,7 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
     LR_results_long_short_z_diffs = np.array([long_short_z_diff for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
     RL_results_long_short_z_diff = np.array([long_short_z_diff for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
 
-    ax1, ax2, ax3 = None, None, None
+    ax1, ax2, ax3, ax4 = None, None, None, None
 
     _out_z_score = pd.DataFrame({'LR_long_z_scores': rank_order_results.LR_ripple.long_z_score, 'LR_short_z_scores': rank_order_results.LR_ripple.short_z_score,
               'RL_long_z_scores': rank_order_results.RL_ripple.long_z_score, 'RL_short_z_scores': rank_order_results.RL_ripple.short_z_score}).hist(bins=number_of_bins, ax=ax1, sharex=True, sharey=True)
@@ -2340,7 +2340,12 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
     _out_most_likely_z = pd.DataFrame({'most_likely_long_z_scores': rank_order_results.ripple_most_likely_result_tuple.long_best_dir_z_score_values, 'most_likely_short_z_scores': rank_order_results.ripple_most_likely_result_tuple.short_best_dir_z_score_values}).hist(bins=number_of_bins, ax=ax3, sharex=True, sharey=True)
     plt.suptitle(': '.join([f'Ripple Most-likely z-scores', post_title_info]))
 
-    return _out_z_score, _out_real, _out_most_likely_z
+
+    _out_most_likely_raw = pd.DataFrame({'most_likely_long_raw_rho': rank_order_results.ripple_combined_epoch_stats_df['Long_BestDir_spearman'].to_numpy(),
+                                          'most_likely_short_raw_rho': rank_order_results.ripple_combined_epoch_stats_df['Short_BestDir_spearman'].to_numpy()}).hist(bins=number_of_bins, ax=ax4, sharex=True, sharey=True)
+    plt.suptitle(': '.join([f'Ripple Most-likely Spearman Rho', post_title_info]))
+
+    return _out_z_score, _out_real, _out_most_likely_z, _out_most_likely_raw
 
 
 
