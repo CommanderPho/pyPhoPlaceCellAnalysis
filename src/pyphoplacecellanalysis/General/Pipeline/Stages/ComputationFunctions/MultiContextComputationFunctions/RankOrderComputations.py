@@ -560,6 +560,38 @@ class RankOrderComputationsContainer(ComputedResult):
         return active_epochs_df
 
 
+    @property
+    def ripple_merged_complete_epoch_stats_df(self) -> pd.DataFrame:
+        """ builds a single complete combined DataFrame for the ripples epochs, with all of the stats columns computed in various places. 
+        
+        Combines: [active_replay_epochs_df, directional_likelihoods_df, ripple_combined_epoch_stats_df]
+        """
+        ## All three DataFrames are the same number of rows, each with one row corresponding to an Epoch:
+        active_replay_epochs_df = deepcopy(self.LR_ripple.epochs_df)
+        # active_replay_epochs_df
+
+        # Change column type to int8 for columns: 'long_best_direction_indices', 'short_best_direction_indices'
+        # directional_likelihoods_df = pd.DataFrame.from_dict(ripple_result_tuple.directional_likelihoods_tuple._asdict()).astype({'long_best_direction_indices': 'int8', 'short_best_direction_indices': 'int8'})
+        directional_likelihoods_df = deepcopy(self.ripple_most_likely_result_tuple.directional_likelihoods_df)
+    
+        # 2023-12-15 - Newest method:
+        ripple_combined_epoch_stats_df = deepcopy(self.ripple_combined_epoch_stats_df)
+
+        # Concatenate the three DataFrames along the columns axis:
+        # Assert that all DataFrames have the same number of rows:
+        assert len(active_replay_epochs_df) == len(directional_likelihoods_df) == len(ripple_combined_epoch_stats_df), "DataFrames have different numbers of rows."
+        # Assert that all DataFrames have at least one row:
+        assert len(active_replay_epochs_df) > 0, "active_replay_epochs_df is empty."
+        assert len(directional_likelihoods_df) > 0, "directional_likelihoods_df is empty."
+        assert len(ripple_combined_epoch_stats_df) > 0, "ripple_combined_epoch_stats_df is empty."
+        merged_complete_epoch_stats_df: pd.DataFrame = pd.concat([active_replay_epochs_df.reset_index(drop=True, inplace=False), directional_likelihoods_df.reset_index(drop=True, inplace=False), ripple_combined_epoch_stats_df.reset_index(drop=True, inplace=False)], axis=1)
+        merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.set_index(active_replay_epochs_df.index, inplace=False)
+        return merged_complete_epoch_stats_df
+
+
+
+    # Utility Methods ____________________________________________________________________________________________________ #
+
     def to_dict(self) -> Dict:
         return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
 
@@ -1835,7 +1867,7 @@ class RankOrderAnalyses:
 
     @classmethod
     def pho_compute_rank_order(cls, track_templates, curr_epoch_spikes_df: pd.DataFrame, rank_method="average", stats_nan_policy='omit') -> Dict[str, Tuple]:
-        """ 2023-12-20 - Actually working spearman rank-ordering!! 
+        """ 2023-12-20 - Actually working spearman rank-ordering!! Independent computation, useful for debugging a period displayed in the DebugTemplateRasters GUI or w/e
 
         # rank_method: str = "dense"
         # rank_method: str = "average"
