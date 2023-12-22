@@ -702,6 +702,8 @@ class RankOrderRastersDebugger:
     def save_figure(self, export_path: Path):
         """ Exports all four rasters to a specified file path        
         
+        _out_rank_order_event_raster_debugger.save_figure(export_path=export_path)
+        
         """
         save_paths = []
         # root_plots_dict = {k:v['root_plot'] for k,v in _out_rank_order_event_raster_debugger.plots.all_separate_plots.items()} # PlotItem 
@@ -719,6 +721,39 @@ class RankOrderRastersDebugger:
         return save_paths
 
 
+
+
+    @function_attributes(short_name=None, tags=['figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-21 19:49', related_items=[])
+    def export_figure_all_slider_values(self, export_path: Union[str,Path]):
+        """ sweeps the rank_order_event_raster_debugger through its various slider values, exporting all four of its plots as images for each value. 
+
+        Usage:
+            export_path = Path(r'~/Desktop/2023-12-19 Exports').resolve()
+            all_save_paths = _out_rank_order_event_raster_debugger.export_figure_all_slider_values(export_path=export_path)
+
+
+        """
+        all_save_paths = {}
+
+        for i in np.arange(0, self.n_epochs, 5):
+            self.ui.ctrls_widget.setValue(i) ## Adjust the slider, using its callbacks as well to update the displayed epoch.
+            
+            # _out_rank_order_event_raster_debugger.on_update_epoch_IDX(an_epoch_idx=i)
+            active_epoch_label = self.active_epoch_label
+
+            save_paths = []
+
+            for a_decoder, a_plot in self.root_plots_dict.items():
+                curr_filename_prefix = f'Epoch{active_epoch_label}_{a_decoder}'
+                # a_plot.setYRange(-0.5, float(self.max_n_neurons))
+                out_path = export_path.joinpath(f'{curr_filename_prefix}_plot.png').resolve()
+                export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0))
+                save_paths.append(out_path)
+
+            all_save_paths[active_epoch_label] = save_paths
+        
+        return all_save_paths
+    
 
     # ==================================================================================================================== #
     # Cell y-axis Labels                                                                                                   #
