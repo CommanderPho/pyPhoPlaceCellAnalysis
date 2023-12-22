@@ -814,7 +814,10 @@ class RankOrderAnalyses:
 
         if included_qclu_values is not None:
             qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=included_qclu_values)
-            modified_directional_laps_results: DirectionalLapsResult = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
+            modified_directional_laps_results: DirectionalLapsResult = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus) 
+            # 2023-12-21 - Need to update the core directional_
+            print(f"ERROR! BUG?! 2023-12-21 - Need to update the previous 'DirectionalLaps' object with the qclu-restricted one right? on filter")
+            # curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] = modified_directional_laps_results ## Need to update the previous 'DirectionalLaps' object with the qclu-restricted one right?
             active_directional_laps_results = modified_directional_laps_results
         else:
             active_directional_laps_results = directional_laps_results
@@ -853,7 +856,7 @@ class RankOrderAnalyses:
 
         # ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
         # ShuffleHelper.init_from_long_short_shared_aclus_only_decoders(long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, num_shuffles=num_shuffles, bimodal_exclude_aclus=bimodal_exclude_aclus)
-        return global_spikes_df, (odd_shuffle_helper, even_shuffle_helper)
+        return global_spikes_df, (odd_shuffle_helper, even_shuffle_helper), active_directional_laps_results
 
 
 
@@ -1187,6 +1190,24 @@ class RankOrderAnalyses:
     # ==================================================================================================================== #
     # Directional Determination                                                                                            #
     # ==================================================================================================================== #
+    required_min_percentage_of_active_cells: float = 0.2 # 20% of active cells
+
+    @classmethod
+    def determine_active_min_num_unique_aclu_inclusions_requirement(cls, min_num_unique_aclu_inclusions: int, total_num_cells: int, debug_print=False) -> int:
+        """ 2023-12-21 - Compute the dynamic minimum number of active cells
+
+         active_min_num_unique_aclu_inclusions_requirement: int = cls.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions,
+                                                                                                                                    total_num_cells=len(any_list_neuron_IDs))
+
+        """
+        if debug_print:
+            print(f'required_min_percentage_of_active_cells: {cls.required_min_percentage_of_active_cells}') # 20% of active cells
+        dynamic_percentage_minimum_num_unique_aclu_inclusions: int = int(round((float(total_num_cells) * cls.required_min_percentage_of_active_cells))) # dynamic_percentage_minimum_num_unique_aclu_inclusions: the percentage-based requirement for the number of active cells
+        active_min_num_unique_aclu_inclusions_requirement: int = max(dynamic_percentage_minimum_num_unique_aclu_inclusions, min_num_unique_aclu_inclusions)
+        if debug_print:
+            print(f'active_min_num_unique_aclu_inclusions_requirement: {active_min_num_unique_aclu_inclusions_requirement}')
+        return active_min_num_unique_aclu_inclusions_requirement
+
 
     @classmethod
     @function_attributes(short_name=None, tags=['subfn', 'rank-order', 'active_set', 'directional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-14 13:40', related_items=[])
@@ -1222,6 +1243,8 @@ class RankOrderAnalyses:
         """
         def _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('LR_rate', 'RL_rate')):
             """ 
+            Updates `epoch_rate_df`:
+                epoch_rate_df['norm_term']
             
             """
             epoch_rate_df['norm_term'] = epoch_rate_df[list(epoch_column_pair_names)].sum(axis=1)
@@ -1262,9 +1285,6 @@ class RankOrderAnalyses:
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         decoders_aclu_peak_fr_dict = {a_decoder_name:dict(zip(np.array(a_decoder.pf.ratemap.neuron_ids), a_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates)) for a_decoder_name, a_decoder in decoders_dict.items()} # can't Long/Short have different `tuning_curve_unsmoothed_peak_firing_rates` even if they have the same neuron_ids and such?
 
-        # long_LR_aclu_peak_fr_map = decoders_aclu_peak_fr_dict['long_LR']
-        # long_RL_aclu_peak_fr_map = decoders_aclu_peak_fr_dict['long_RL']
-
         epoch_rate_dfs = {}
         epoch_accumulated_evidence = {}
 
@@ -1285,28 +1305,13 @@ class RankOrderAnalyses:
             epoch_rates_dict = {f"{a_decoder_name}_rate":np.array([an_aclu_peak_fr_map.get(an_aclu, 0.0) for an_aclu in active_unique_aclus]) for a_decoder_name, an_aclu_peak_fr_map in decoders_aclu_peak_fr_dict.items()}
             epoch_rate_df = pd.DataFrame(epoch_rates_dict) # ['long_LR', 'long_RL', 'short_LR', 'short_RL', 'norm_term']
             _epoch_rate_column_names = ['long_LR_rate', 'long_RL_rate', 'short_LR_rate', 'short_RL_rate']
-            # epoch_LR_rates = []
-            # epoch_RL_rates = []
-            
-            # for an_aclu in active_unique_aclus:
-            #     LR_rate = long_LR_aclu_peak_fr_map.get(an_aclu, 0.0)
-            #     RL_rate = long_RL_aclu_peak_fr_map.get(an_aclu, 0.0)
-            #     epoch_LR_rates.append(LR_rate)
-            #     epoch_RL_rates.append(RL_rate)
-                
-            #     # _norm_term = (LR_rate + RL_rate)
-                
-            # epoch_LR_rates = np.array(epoch_LR_rates)
-            # epoch_RL_rates = np.array(epoch_RL_rates)
-            
-            # epoch_rate_df = pd.DataFrame({'LR_rate': epoch_LR_rates, 'RL_rate': epoch_RL_rates})
-            # accumulated_evidence, epoch_rate_df = _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('LR_rate', 'RL_rate')) # 'long_LR', 'long_RL', 'short_LR', 'short_RL'
+
             Long_accumulated_evidence, Long_epoch_rate_df = _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('long_LR_rate', 'long_RL_rate'))
             # ['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']
 
             # Long_accumulated_evidence: ['Sum_Accumulated_LR_rate', 'Sum_Accumulated_RL_rate', 'Product_Accumulated_LR_rate', 'Product_Accumulated_RL_rate']
 
-            # Update the LR_evidence and RL_evidence columns in epochs_df_L
+            ### Update the LR_evidence and RL_evidence columns in epochs_df
             epochs_df.at[row.Index, 'Long_LR_evidence'] = Long_accumulated_evidence['Sum_Accumulated_LR_rate']
             epochs_df.at[row.Index, 'Long_RL_evidence'] = Long_accumulated_evidence['Sum_Accumulated_RL_rate']
             epochs_df.at[row.Index, 'Long_LR_product_evidence'] = Long_accumulated_evidence['Product_Accumulated_LR_rate']
@@ -1317,31 +1322,26 @@ class RankOrderAnalyses:
             # ['long_LR_rate', 'long_RL_rate', 'short_LR_rate', 'short_RL_rate', 'norm_term', 'Normed_LR_rate', 'Normed_RL_rate']
 
 
-            # Update the LR_evidence and RL_evidence columns in epochs_df_L
+            ### Update the LR_evidence and RL_evidence columns in epochs_df
             epochs_df.at[row.Index, 'Short_LR_evidence'] = Short_accumulated_evidence['Sum_Accumulated_LR_rate']
             epochs_df.at[row.Index, 'Short_RL_evidence'] = Short_accumulated_evidence['Sum_Accumulated_RL_rate']
             epochs_df.at[row.Index, 'Short_LR_product_evidence'] = Short_accumulated_evidence['Product_Accumulated_LR_rate']
             epochs_df.at[row.Index, 'Short_RL_product_evidence'] = Short_accumulated_evidence['Product_Accumulated_RL_rate']
             
+            ### Combine the Long/Short acumulated_evidence Dicts into `accumulated_evidence_dict` 
+            # accumulated_evidence_dict = {f"Long_{k}":v for k,v in Long_accumulated_evidence.items()} + {f"Short_{k}":v for k,v in Short_accumulated_evidence.items()}
+            accumulated_evidence_dict = {f"Long_{k}": v for k, v in Long_accumulated_evidence.items()}
+            accumulated_evidence_dict.update({f"Short_{k}": v for k, v in Short_accumulated_evidence.items()}) # ['Long_Sum_Accumulated_LR_rate', 'Long_Sum_Accumulated_RL_rate', 'Long_Product_Accumulated_LR_rate', 'Long_Product_Accumulated_RL_rate', 'Short_Sum_Accumulated_LR_rate', 'Short_Sum_Accumulated_RL_rate', 'Short_Product_Accumulated_LR_rate', 'Short_Product_Accumulated_RL_rate']
 
-            # accumulated_evidence = {f"Long_{k}":v for k,v in Long_accumulated_evidence.items()} + {f"Short_{k}":v for k,v in Short_accumulated_evidence.items()}
-            accumulated_evidence = {f"Long_{k}": v for k, v in Long_accumulated_evidence.items()}
-            accumulated_evidence.update({f"Short_{k}": v for k, v in Short_accumulated_evidence.items()}) # ['Long_Sum_Accumulated_LR_rate', 'Long_Sum_Accumulated_RL_rate', 'Long_Product_Accumulated_LR_rate', 'Long_Product_Accumulated_RL_rate', 'Short_Sum_Accumulated_LR_rate', 'Short_Sum_Accumulated_RL_rate', 'Short_Product_Accumulated_LR_rate', 'Short_Product_Accumulated_RL_rate']
-
+            ### Combine the two rate_dfs into a single `epoch_rate_df`:
             # the first part (`Long_epoch_rate_df[_epoch_rate_column_names]`) can be either Long/Short because they're the same for each 
             epoch_rate_df = pd.concat((epoch_rate_df[_epoch_rate_column_names], Long_epoch_rate_df[['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']].add_prefix('Long_'), Short_epoch_rate_df[['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']].add_prefix('Short_')), axis='columns')
-            # pd.merge(Long_epoch_rate_df, Short_epoch_rate_df, on=, suffixes=('Long', 'Short'))
-            # # Update the LR_evidence and RL_evidence columns in epochs_df_L
-            # epochs_df.at[row.Index, 'LR_evidence'] = accumulated_evidence['Sum_Accumulated_LR_rate']
-            # epochs_df.at[row.Index, 'RL_evidence'] = accumulated_evidence['Sum_Accumulated_RL_rate']
-            # epochs_df.at[row.Index, 'LR_product_evidence'] = accumulated_evidence['Product_Accumulated_LR_rate']
-            # epochs_df.at[row.Index, 'RL_product_evidence'] = accumulated_evidence['Product_Accumulated_RL_rate']
-
+            
             ## add to the output dicts:
             epoch_rate_dfs[int(row.label)] = epoch_rate_df
-            epoch_accumulated_evidence[int(row.label)] = accumulated_evidence
+            epoch_accumulated_evidence[int(row.label)] = accumulated_evidence_dict
 
-        
+        # Build the "normed" evidence columns for both Long and Short columns:
         for a_prefix in ('Long_', 'Short_'):
             epochs_df[f'{a_prefix}normed_LR_evidence'] = epochs_df[f'{a_prefix}LR_evidence']/epochs_df[[f'{a_prefix}LR_evidence', f'{a_prefix}RL_evidence']].sum(axis=1)
             epochs_df[f'{a_prefix}normed_RL_evidence'] = epochs_df[f'{a_prefix}RL_evidence']/epochs_df[[f'{a_prefix}LR_evidence', f'{a_prefix}RL_evidence']].sum(axis=1)
@@ -1355,14 +1355,8 @@ class RankOrderAnalyses:
         ## Compute the normed total LR/RL evidence by combining both Long/Short directional evidence:
         total_normed_LR_evidence = ((epochs_df[f'Long_normed_LR_evidence'] + epochs_df[f'Short_normed_LR_evidence'])/2.0)
         total_normed_RL_evidence = ((epochs_df[f'Long_normed_RL_evidence'] + epochs_df[f'Short_normed_RL_evidence'])/2.0)
-        
-        # np.argmax(np.vstack([np.abs(epochs_df[f'{a_prefix}normed_LR_evidence'].to_numpy()), np.abs(epochs_df[f'{a_prefix}normed_RL_evidence'].to_numpy())]), axis=0).astype('int8')
+
         epochs_df['combined_best_direction_indicies'] = np.argmax(np.vstack([total_normed_LR_evidence.to_numpy(), total_normed_RL_evidence.to_numpy()]), axis=0).astype('int8')
-
-
-        # ## Convenience: Best Direction properties:
-        # long_best_direction_indicies = epochs_df['Long_best_direction_indicies'].to_numpy()
-        # short_best_direction_indicies = epochs_df['Short_best_direction_indicies'].to_numpy()
         
         return epoch_accumulated_evidence, epoch_rate_dfs, epochs_df
 
@@ -1374,6 +1368,11 @@ class RankOrderAnalyses:
         Uses:
         
         rank_order_results.ripple_combined_epoch_stats_df
+
+
+        Modifies:
+            `ripple_combined_epoch_stats_df`:
+                ripple_combined_epoch_stats_df['LongShort_BestDir_quantile_diff']
         
         
         Usage:
@@ -1613,14 +1612,17 @@ class RankOrderAnalyses:
     @classmethod
     def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first', minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2,4,9]):
 
-        global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+        global_spikes_df, (odd_shuffle_helper, even_shuffle_helper), active_directional_laps_results = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
         ## Ripple Rank-Order Analysis: needs `global_spikes_df`
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
 
-        # curr_active_pipeline.sess.config.preprocessing_parameters
-        min_num_unique_aclu_inclusions: int = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions
+        # track templates:
+        track_templates: TrackTemplates = active_directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+        ## Compute the dynamic minimum number of active cells from current num total cells and the `curr_active_pipeline.sess.config.preprocessing_parameters` values:`
+        active_min_num_unique_aclu_inclusions_requirement: int = cls.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions, total_num_cells=len(any_list_neuron_IDs))
 
         global_replays = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
         if isinstance(global_replays, pd.DataFrame):
@@ -1628,8 +1630,8 @@ class RankOrderAnalyses:
             global_replays = Epoch(global_replays.epochs.get_valid_df())
 
         ## Replay Epochs:
-        LR_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions, debug_print=False)
-        RL_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions, debug_print=False)
+        LR_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, debug_print=False)
+        RL_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, debug_print=False)
 
         ripple_evts_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((LR_outputs.long_z_score, LR_outputs.short_z_score), (RL_outputs.long_z_score, RL_outputs.short_z_score))]
         print(f'ripple_evts_paired_tests: {ripple_evts_paired_tests}')
@@ -1655,15 +1657,18 @@ class RankOrderAnalyses:
 
         """
         ## Shared:
-        global_spikes_df, (odd_shuffle_helper, even_shuffle_helper) = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+        global_spikes_df, (odd_shuffle_helper, even_shuffle_helper), active_directional_laps_results = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
         ## Laps Epochs: Needs `global_spikes_df`
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
 
-        # curr_active_pipeline.sess.config.preprocessing_parameters
-        min_num_unique_aclu_inclusions: int = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions
-
+        
+        # track templates:
+        track_templates: TrackTemplates = active_directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+        ## Compute the dynamic minimum number of active cells from current num total cells and the `curr_active_pipeline.sess.config.preprocessing_parameters` values:`
+        active_min_num_unique_aclu_inclusions_requirement: int = cls.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions, total_num_cells=len(any_list_neuron_IDs))
 
         if not isinstance(global_laps, pd.DataFrame):
             global_laps_df = deepcopy(global_laps).to_dataframe()
@@ -1671,8 +1676,8 @@ class RankOrderAnalyses:
 
         # TODO: CenterOfMass for Laps instead of median spike
         # laps_rank_alignment = 'center_of_mass'
-        LR_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(global_spikes_df), deepcopy(global_laps), odd_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions, debug_print=False)
-        RL_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(global_spikes_df), deepcopy(global_laps), even_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions, debug_print=False)
+        LR_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(global_spikes_df), deepcopy(global_laps), odd_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, debug_print=False)
+        RL_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(global_spikes_df), deepcopy(global_laps), even_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, debug_print=False)
         laps_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((LR_outputs.long_z_score, LR_outputs.short_z_score), (RL_outputs.long_z_score, RL_outputs.short_z_score))]
         print(f'laps_paired_tests: {laps_paired_tests}')
 
