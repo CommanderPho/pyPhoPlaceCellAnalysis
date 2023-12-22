@@ -1621,8 +1621,10 @@ class RankOrderAnalyses:
         # track templates:
         track_templates: TrackTemplates = active_directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
         any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+        smallest_template_n_neurons: int = np.min([len(v) for v in track_templates.decoder_neuron_IDs_list]) # smallest_template_n_neurons: the fewest number of neurons any template has
+        
         ## Compute the dynamic minimum number of active cells from current num total cells and the `curr_active_pipeline.sess.config.preprocessing_parameters` values:`
-        active_min_num_unique_aclu_inclusions_requirement: int = cls.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions, total_num_cells=len(any_list_neuron_IDs))
+        active_min_num_unique_aclu_inclusions_requirement: int = cls.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions, total_num_cells=smallest_template_n_neurons)
 
         global_replays = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
         if isinstance(global_replays, pd.DataFrame):
@@ -1667,8 +1669,10 @@ class RankOrderAnalyses:
         # track templates:
         track_templates: TrackTemplates = active_directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
         any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+        smallest_template_n_neurons: int = np.min([len(v) for v in track_templates.decoder_neuron_IDs_list]) # smallest_template_n_neurons: the fewest number of neurons any template has
+
         ## Compute the dynamic minimum number of active cells from current num total cells and the `curr_active_pipeline.sess.config.preprocessing_parameters` values:`
-        active_min_num_unique_aclu_inclusions_requirement: int = cls.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions, total_num_cells=len(any_list_neuron_IDs))
+        active_min_num_unique_aclu_inclusions_requirement: int = cls.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions, total_num_cells=smallest_template_n_neurons)
 
         if not isinstance(global_laps, pd.DataFrame):
             global_laps_df = deepcopy(global_laps).to_dataframe()
