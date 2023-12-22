@@ -437,13 +437,9 @@ class BatchSessionCompletionHandler:
             try:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
                 curr_active_pipeline.reload_default_computation_functions()
-                # do forced recomputations first:
-                if (len(force_recompute_override_computations_includelist) > 0) and (not self.force_global_recompute):
-                    newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=force_recompute_override_computations_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=True, debug_print=False) # call with `force_recompute=True`
-                else:
-                    newly_computed_values = []
-
-                newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, force_recompute=self.force_global_recompute, debug_print=False)
+    
+                newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, 
+                                                                     force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
                 
                 #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
                 return newly_computed_values # return the list of newly computed values

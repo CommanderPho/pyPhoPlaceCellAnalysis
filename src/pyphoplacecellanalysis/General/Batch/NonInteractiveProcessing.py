@@ -275,9 +275,12 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def batch_extended_computations(curr_active_pipeline, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False, dry_run:bool=False):
+def batch_extended_computations(curr_active_pipeline, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False, force_recompute_override_computations_includelist=None, dry_run:bool=False):
     """ performs the remaining required global computations
 
+    
+    force_recompute_override_computations_includelist: Optional[List[str]] a list of computation function names to recompute regardless of their validator's status.
+    
     """
     #TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
     #TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
@@ -293,7 +296,8 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
             raise AttributeError # just raise an AttributeError to trigger recomputation    
 
     newly_computed_values = []
-
+    force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
+    
     non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
     global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis',
                          'split_to_directional_laps', 'rank_order_shuffle_analysis'] # , 'long_short_rate_remapping'
@@ -348,6 +352,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
                 else:
                     # Global-Only:
                     if not dry_run:
+                        force_recompute = force_recompute or ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist) in force_recompute_override_computations_includelist) # force_recompute for this specific result if either of its name is included in `force_recompute_override_computations_includelist`
                         newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
                     else:
                         print(f'dry-run: {_comp_specifier.short_name}')
