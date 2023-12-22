@@ -1875,10 +1875,15 @@ class RankOrderAnalyses:
         if np.isnan(rank_order_results.ripple_combined_epoch_stats_df.index).any():
             return False # can't have dataframe index that is missing values.
 
+        assert (len(rank_order_results.ripple_new_output_tuple) == 6), f"new_output_tuple must be greater than length 6"
+        
+
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
         if laps_combined_epoch_stats_df is None:
             return False
 
+        assert (len(rank_order_results.laps_new_output_tuple) == 6), f"new_output_tuple must be greater than length 6"
+        
 
         # if 'LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df:
         #     return False
