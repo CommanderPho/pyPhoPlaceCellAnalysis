@@ -71,7 +71,7 @@ class SpecificComputationValidator:
             comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
             if on_already_computed_fn is not None:
                 on_already_computed_fn(comp_short_name, computation_filter_name)
-        except (AttributeError, KeyError, TypeError, ValueError, AssertionError) as initial_validation_err:
+        except (AttributeError, KeyError, TypeError, ValueError, AttributeError, AssertionError) as initial_validation_err:
             ## validate_computation_test(...) failed, so we need to recompute.
             if progress_print or debug_print:
                 print(f'{comp_short_name} missing.')
@@ -88,7 +88,7 @@ class SpecificComputationValidator:
                 # try the validation again.
                 comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
                 newly_computed_values.append((comp_short_name, computation_filter_name))
-            except (AttributeError, KeyError, TypeError, ValueError, AssertionError) as inner_e:
+            except (AttributeError, KeyError, TypeError, ValueError, AttributeError, AssertionError) as inner_e:
                 # Handle the inner exception
                 print(f'Exception occured while computing (`perform_specific_computation(...)`) or validating (`validate_computation_test(...)`) after recomputation:\n Inner exception: {inner_e}')
                 if fail_on_exception:
