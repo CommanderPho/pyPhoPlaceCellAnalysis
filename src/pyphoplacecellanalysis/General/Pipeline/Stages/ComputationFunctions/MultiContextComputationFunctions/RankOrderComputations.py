@@ -2123,7 +2123,7 @@ class RankOrderAnalyses:
             if (active_epochs_df is not None) and ('label' in active_epochs_df.columns):
                 active_epochs_df['label'] = active_epochs_df['label'].astype(cls._label_column_type)
                 if (np.shape(active_epochs_df)[0] == np.shape(combined_epoch_stats_df)[0]):
-                    combined_epoch_stats_df['label'] = active_epochs_df['label'].copy()
+                    combined_epoch_stats_df['label'] = active_epochs_df['label'].astype(cls._label_column_type, copy=True).to_numpy() # .to_numpy() is CRITICAL here, otherwise it tries to apply them using each dataframe's .Index property and they get way off.
                 else:
                     print(f'failed to add label column, shapes differ! np.shape(active_epochs_df)[0] : {np.shape(active_epochs_df)[0] }, np.shape(combined_epoch_stats_df)[0]): {np.shape(combined_epoch_stats_df)[0]}')
 
