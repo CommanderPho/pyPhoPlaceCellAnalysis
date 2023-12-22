@@ -2047,7 +2047,7 @@ class RankOrderAnalyses:
         {'long_RL_spearman': 'RL_Long_spearman', 'long_LR_pearson': 'LR_Long_pearson', 'short_RL_spearman': 'RL_Short_spearman', 'short_RL_pearson': 'RL_Short_pearson', 'long_LR_spearman': 'LR_Long_spearman', 'short_LR_pearson': 'LR_Short_pearson', 'short_LR_spearman': 'LR_Short_spearman', 'long_RL_pearson': 'RL_Long_pearson', 'long_RL_spearman_Z': 'RL_Long_spearman_Z', 'long_LR_pearson_Z': 'LR_Long_pearson_Z', 'short_RL_spearman_Z': 'RL_Short_spearman_Z', 'short_RL_pearson_Z': 'RL_Short_pearson_Z', 'long_LR_spearman_Z': 'LR_Long_spearman_Z', 'short_LR_pearson_Z': 'LR_Short_pearson_Z', 'short_LR_spearman_Z': 'LR_Short_spearman_Z', 'long_RL_pearson_Z': 'RL_Long_pearson_Z'}
         """
         if decoder_name_to_column_name_prefix_map is None:
-            decoder_name_to_column_name_prefix_map = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], ['LR_Long', 'RL_Long', 'LR_Short', 'RL_Short']))
+            decoder_name_to_column_name_prefix_map = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], ['LR_Long', 'RL_Long', 'LR_Short', 'RL_Short'])) # renames lower-case long_, short_ to upper-case variants,  places 'Long' after 'LR'
 
         old_to_new_names = {}
         for col in column_names:
