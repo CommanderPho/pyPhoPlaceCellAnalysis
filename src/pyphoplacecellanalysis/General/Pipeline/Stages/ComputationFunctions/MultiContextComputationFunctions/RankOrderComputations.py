@@ -2078,6 +2078,8 @@ class RankOrderAnalyses:
 
 
         """
+        shuffled_results_output_dict = {}
+        
         ## Shuffle each map's aclus, takes `selected_spikes_df`
 
         # LongShortStatsTuple: Tuple[Zscorer, Zscorer, float, float, bool]
@@ -2145,6 +2147,7 @@ class RankOrderAnalyses:
 
         for variable_IDX, a_column_name in enumerate(combined_variable_z_score_column_names):
             z_scorer_list = [Zscorer.init_from_values(stats_corr_values=np.squeeze(valid_stacked_arrays[:, :, variable_IDX]), real_value=real_stacked_arrays[epoch_IDX, variable_IDX]) for epoch_IDX in np.arange(n_epochs)]
+            shuffled_results_output_dict[a_column_name] = (z_scorer_list, )
             z_score_values = np.array([a_zscorer.z_score_value for a_zscorer in z_scorer_list])
             combined_epoch_stats_df[a_column_name] = z_score_values
 
@@ -2172,7 +2175,7 @@ class RankOrderAnalyses:
         old_to_new_names = cls._subfn_build_pandas_df_based_correlation_computations_column_rename_dict(column_names=list(combined_epoch_stats_df.columns))
         combined_epoch_stats_df = combined_epoch_stats_df.rename(columns=old_to_new_names)
 
-        return combined_epoch_stats_df, (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
+        return combined_epoch_stats_df, (output_active_epoch_computed_values, shuffled_results_output_dict combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
     
 
 
