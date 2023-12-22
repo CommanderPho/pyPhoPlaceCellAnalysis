@@ -568,15 +568,11 @@ class RankOrderComputationsContainer(ComputedResult):
         """
         ## All three DataFrames are the same number of rows, each with one row corresponding to an Epoch:
         active_replay_epochs_df = deepcopy(self.LR_ripple.epochs_df)
-        # active_replay_epochs_df
-
         # Change column type to int8 for columns: 'long_best_direction_indices', 'short_best_direction_indices'
         # directional_likelihoods_df = pd.DataFrame.from_dict(ripple_result_tuple.directional_likelihoods_tuple._asdict()).astype({'long_best_direction_indices': 'int8', 'short_best_direction_indices': 'int8'})
         directional_likelihoods_df = deepcopy(self.ripple_most_likely_result_tuple.directional_likelihoods_df)
-    
         # 2023-12-15 - Newest method:
         ripple_combined_epoch_stats_df = deepcopy(self.ripple_combined_epoch_stats_df)
-
         # Concatenate the three DataFrames along the columns axis:
         # Assert that all DataFrames have the same number of rows:
         assert len(active_replay_epochs_df) == len(directional_likelihoods_df) == len(ripple_combined_epoch_stats_df), "DataFrames have different numbers of rows."
@@ -587,6 +583,33 @@ class RankOrderComputationsContainer(ComputedResult):
         merged_complete_epoch_stats_df: pd.DataFrame = pd.concat([active_replay_epochs_df.reset_index(drop=True, inplace=False), directional_likelihoods_df.reset_index(drop=True, inplace=False), ripple_combined_epoch_stats_df.reset_index(drop=True, inplace=False)], axis=1)
         merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.set_index(active_replay_epochs_df.index, inplace=False)
         return merged_complete_epoch_stats_df
+    
+
+    @property
+    def laps_merged_complete_epoch_stats_df(self) -> pd.DataFrame:
+        """ builds a single complete combined DataFrame for the laps epochs, with all of the stats columns computed in various places. 
+        
+        Combines: [active_laps_epochs_df, directional_likelihoods_df, laps_combined_epoch_stats_df]
+        """
+        ## All three DataFrames are the same number of rows, each with one row corresponding to an Epoch:
+        active_laps_epochs_df = deepcopy(self.LR_laps.epochs_df)
+        # Change column type to int8 for columns: 'long_best_direction_indices', 'short_best_direction_indices'
+        # directional_likelihoods_df = pd.DataFrame.from_dict(laps_result_tuple.directional_likelihoods_tuple._asdict()).astype({'long_best_direction_indices': 'int8', 'short_best_direction_indices': 'int8'})
+        directional_likelihoods_df = deepcopy(self.laps_most_likely_result_tuple.directional_likelihoods_df)
+        # 2023-12-15 - Newest method:
+        laps_combined_epoch_stats_df = deepcopy(self.laps_combined_epoch_stats_df)
+        # Concatenate the three DataFrames along the columns axis:
+        # Assert that all DataFrames have the same number of rows:
+        assert len(active_laps_epochs_df) == len(directional_likelihoods_df) == len(laps_combined_epoch_stats_df), "DataFrames have different numbers of rows."
+        # Assert that all DataFrames have at least one row:
+        assert len(active_laps_epochs_df) > 0, "active_laps_epochs_df is empty."
+        assert len(directional_likelihoods_df) > 0, "directional_likelihoods_df is empty."
+        assert len(laps_combined_epoch_stats_df) > 0, "laps_combined_epoch_stats_df is empty."
+        merged_complete_epoch_stats_df: pd.DataFrame = pd.concat([active_laps_epochs_df.reset_index(drop=True, inplace=False), directional_likelihoods_df.reset_index(drop=True, inplace=False), laps_combined_epoch_stats_df.reset_index(drop=True, inplace=False)], axis=1)
+        merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.set_index(active_laps_epochs_df.index, inplace=False)
+        return merged_complete_epoch_stats_df
+    
+
 
 
 
