@@ -564,6 +564,8 @@ class RankOrderComputationsContainer(ComputedResult):
     def ripple_merged_complete_epoch_stats_df(self) -> pd.DataFrame:
         """ builds a single complete combined DataFrame for the ripples epochs, with all of the stats columns computed in various places. 
         
+        # NOTE: `active_replay_epochs_df` has the correct label column
+        
         Combines: [active_replay_epochs_df, directional_likelihoods_df, ripple_combined_epoch_stats_df]
         """
         ## All three DataFrames are the same number of rows, each with one row corresponding to an Epoch:
@@ -609,6 +611,32 @@ class RankOrderComputationsContainer(ComputedResult):
         merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.set_index(active_laps_epochs_df.index, inplace=False)
         return merged_complete_epoch_stats_df
     
+
+    def get_significant_ripple_merged_complete_epoch_stats_df(self, quantile_significance_threshold: float = 0.95) -> pd.DataFrame:
+        """ 
+        Gets the events above a certain significance threshold
+        
+        """
+        ripple_combined_epoch_stats_df = deepcopy(self.merged_complete_epoch_stats_df)
+
+        # Filter rows based on columns: 'Long_BestDir_quantile', 'Short_BestDir_quantile'
+        quantile_significance_threshold: float = 0.95
+        significant_ripple_combined_epoch_stats_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['Long_BestDir_quantile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['Short_BestDir_quantile'] > quantile_significance_threshold)]
+        # significant_ripple_combined_epoch_stats_df
+        is_epoch_significant = np.isin(ripple_combined_epoch_stats_df.index, significant_ripple_combined_epoch_stats_df.index)
+        active_replay_epochs_df = self.LR_ripple.epochs_df
+        significant_ripple_epochs: Epoch = Epoch(deepcopy(active_replay_epochs_df).epochs.get_valid_df()).boolean_indicies_slice(is_epoch_significant)
+        epoch_identifiers = significant_ripple_epochs._df.label.astype({'label': RankOrderAnalyses._label_column_type}).values #.labels
+        x_values = significant_ripple_epochs.midtimes
+        x_axis_name_suffix = 'Mid-time (Sec)'
+
+        significant_ripple_epochs_df = significant_ripple_epochs.to_dataframe()
+        significant_ripple_epochs_df
+
+        significant_ripple_combined_epoch_stats_df['midtimes'] = significant_ripple_epochs.midtimes
+        return significant_ripple_combined_epoch_stats_df
+
+
 
 
 
@@ -1478,6 +1506,13 @@ class RankOrderAnalyses:
         rank_order_results.ripple_combined_epoch_stats_df['Short_BestDir_quantile'] = ripple_evts_short_best_dir_quantile_stats_values
 
         ripple_combined_epoch_stats_df['LongShort_BestDir_quantile_diff'] = ripple_combined_epoch_stats_df['Long_BestDir_quantile'] - ripple_combined_epoch_stats_df['Short_BestDir_quantile']
+
+        ## 2023-12-22 - Add the LR-LR, RL-RL differences
+        ripple_combined_epoch_stats_df['LongShort_LR_quantile_diff'] = ripple_combined_epoch_stats_df['LR_Long_rank_percentile'] - ripple_combined_epoch_stats_df['LR_Short_rank_percentile']
+        ripple_combined_epoch_stats_df['LongShort_RL_quantile_diff'] = ripple_combined_epoch_stats_df['RL_Long_rank_percentile'] - ripple_combined_epoch_stats_df['RL_Short_rank_percentile']
+
+
+
         # return ripple_combined_epoch_stats_df
 
 
@@ -1590,10 +1625,6 @@ class RankOrderAnalyses:
             rank_order_results.ripple_combined_epoch_stats_df['Long_BestDir_spearman'] = ripple_evts_long_best_dir_raw_stats_values
             rank_order_results.ripple_combined_epoch_stats_df['Short_BestDir_spearman'] = ripple_evts_short_best_dir_raw_stats_values
 
-            # Compute the quantiles:
-            cls._subfn_perform_compute_quantiles(rank_order_results=rank_order_results)
-
-
 
         except (AttributeError, KeyError, IndexError, ValueError):
             raise # fail for ripples, but not for laps currently
@@ -1655,11 +1686,14 @@ class RankOrderAnalyses:
             rank_order_results.laps_combined_epoch_stats_df['Long_BestDir_spearman'] = laps_evts_long_best_dir_raw_stats_values
             rank_order_results.laps_combined_epoch_stats_df['Short_BestDir_spearman'] = laps_evts_short_best_dir_raw_stats_values
             
-
         except (AttributeError, KeyError, IndexError, ValueError):
             raise
             laps_result_tuple = None
 
+
+        # Compute the quantiles:
+        cls._subfn_perform_compute_quantiles(rank_order_results=rank_order_results)
+        
         return ripple_result_tuple, laps_result_tuple
 
 
@@ -2616,3 +2650,30 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
 
 
 
+
+def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_ripple_combined_epoch_stats_df: pd.DataFrame):
+    """ 
+
+    Plots a scatterplot that shows the best dir quantile of each replay epoch over time
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import _plot_significant_event_quantile_fig
+        # Filter rows based on columns: 'Long_BestDir_quantile', 'Short_BestDir_quantile'
+        quantile_significance_threshold: float = 0.95
+        significant_ripple_combined_epoch_stats_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['Long_BestDir_quantile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['Short_BestDir_quantile'] > quantile_significance_threshold)]
+        _out = _plot_significant_event_quantile_fig(significant_ripple_combined_epoch_stats_df=significant_ripple_combined_epoch_stats_df)
+        _out
+
+
+    """
+    # ripple_combined_epoch_stats_df.plot.scatter(x=np.arange(np.shape(ripple_combined_epoch_stats_df)[0]), y='LongShort_BestDir_quantile_diff')
+    # ripple_combined_epoch_stats_df['LongShort_BestDir_quantile_diff'].plot.scatter(title='Best Quantile Diff')
+
+    # fig = plt.figure(num='best_quantile')
+    marker_style = dict(linestyle='None', color='#ff7f0eff', markersize=6,
+                        markerfacecolor='#ff7f0eb4', markeredgecolor='#ff7f0eff')
+
+    # dict(facecolor='#ff7f0eb4', size=8.0)
+    # fignum='best_quantiles'
+    return significant_ripple_combined_epoch_stats_df[['midtimes', 'LongShort_BestDir_quantile_diff']].plot(x='midtimes', y='LongShort_BestDir_quantile_diff', title='Sig. (>0.95) Best Quantile Diff', **marker_style, marker='o')
+    
