@@ -821,37 +821,12 @@ class RankOrderAnalyses:
             if LR_laps_long_short_z_score_diff_values is not None:
                 LR_laps_long_short_z_score_diff_values = LR_laps_long_short_z_score_diff_values[num_missing_points:]
 
-        # laps_fig, laps_ax = plt.subplots()
-        # laps_ax.scatter(np.arange(len(laps_long_short_z_score_diff_values)), laps_long_short_z_score_diff_values, label=f'laps{suffix_str}')
-        # plt.title(f'Rank-Order Long-Short ZScore Diff for Laps over time ({suffix_str})')
-        # plt.ylabel(f'Long-Short Z-Score Diff ({suffix_str})')
-        # plt.xlabel('Lap Index')
-
-        # epoch_idx_list = np.arange(len(even_laps_long_short_z_score_diff_values))
-        # epoch_idx_list = deepcopy(global_laps).lap_id # np.arange(len(even_laps_long_short_z_score_diff_values))
-        # out_plot_1D = pg.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values[1:], pen=None, symbol='o', title='Rank-Order Long-Short ZScore Diff for Laps over time', left='Long-Short Z-Score Diff', bottom='Lap Index') ## setting pen=None disables line drawing
-
+        
         #
 
         # 'orange'
         # symbolPen = 'w'
         symbolPen = None
-
-        # def _tip_fn(x, y, data):
-        #     """ the function required by pg.ScatterPlotItem's `tip` argument to print the tooltip for each spike. """
-        #     # data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in zip(active_datapoint_column_names, data)])
-        #     data_string:str = '\n'.join([f"{k}:\t{str(v)}" for k, v in asdict(data).items()])
-        #     print(f'_tip_fn(...): data_string: {data_string}')
-        #     return f"spike: (x={x}, y={y})\n{data_string}"
-
-        # # hover_kwargs = {}
-        # hover_kwargs = dict(hoverable=True, hoverPen=pg.mkPen('w', width=2), tip=_tip_fn)
-
-        # symbol='t2' is a left-facing arrow and 't3' is a right-facing one:
-        # even_out_plot_1D: pg.PlotDataItem = p1.plot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.even), symbolPen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
-        # odd_out_plot_1D: pg.PlotDataItem = p1.plot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
-
-        # when using pg.ScatterPlotItem(...) compared to p1.plot(...), you must use the non-'symbol' prefixed argument names: {'symbolBrush':'brush', 'symbolPen':'pen'}
 
         if LR_laps_long_short_z_score_diff_values is not None:
             first_plot_name = 'even'
@@ -867,12 +842,6 @@ class RankOrderAnalyses:
         p1.addItem(even_out_plot_1D)
         if LR_laps_long_short_z_score_diff_values is not None:
             p1.addItem(odd_out_plot_1D)
-
-        # even_out_plot_1D: pg.PlotDataItem = p1.scatterPlot(epoch_idx_list, even_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.even), symbolPen=symbolPen, symbol='t2', name='even', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
-        # odd_out_plot_1D: pg.PlotDataItem = p1.scatterPlot(epoch_idx_list, odd_laps_long_short_z_score_diff_values, pen=None, symbolBrush=pg.mkBrush(DisplayColorsEnum.Laps.odd), symbolPen=symbolPen, symbol='t3', name='odd', hoverable=True, hoverPen=pg.mkPen('w', width=2)) ## setting pen=None disables line drawing
-
-
-        # good_RL_laps_long_short_z_score_diff_values = RL_laps_long_short_z_score_diff_values[np.isfinite(RL_laps_long_short_z_score_diff_values)]
 
 
         ## Add marginal histogram to the right of the main plot here:
@@ -1497,15 +1466,22 @@ class RankOrderAnalyses:
         new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
         
     
-        # From new tuple:
-        output_active_epoch_computed_values, shuffled_results_output_dict, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.ripple_new_output_tuple
+        # # From new tuple:
+        # output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.ripple_new_output_tuple        
+        # recover from the valid stacked rarys valid_stacked_arrays
+        # recovered_shuffle_results_dict = {}
+        # for variable_IDX, a_column_name in enumerate(combined_variable_names):
+        #     recovered_shuffle_results_dict[a_column_name] = np.squeeze(valid_stacked_arrays[:, :, variable_IDX])
+
+
+        # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_spearman_Z'][0], shuffled_results_output_dict['short_LR_spearman_Z'][0])])
+        # new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_spearman_Z'][0], shuffled_results_output_dict['short_RL_spearman_Z'][0])])
         
-        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_spearman_Z'][0], shuffled_results_output_dict['short_LR_spearman_Z'][0])])
-        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_spearman_Z'][0], shuffled_results_output_dict['short_RL_spearman_Z'][0])])
         
-        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_pearson_Z'][0], shuffled_results_output_dict['short_LR_pearson_Z'][0])])
-        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_pearson_Z'][0], shuffled_results_output_dict['short_RL_pearson_Z'][0])])
+        # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(recovered_shuffle_results_dict['long_LR_pearson_Z'], shuffled_results_output_dict['short_LR_pearson_Z'])])
+        # new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(recovered_shuffle_results_dict['short_LR_pearson_Z'], shuffled_results_output_dict['short_RL_pearson_Z'])])
         
+
         quantile_results_dict = dict(zip(['LR_Long_rank_percentile', 'LR_Short_rank_percentile', 'RL_Long_rank_percentile', 'RL_Short_rank_percentile'], np.hstack((new_LR_results_quantile_values, new_RL_results_quantile_values)).T))
         
         ## Add the new columns into the `ripple_combined_epoch_stats_df`
@@ -1534,11 +1510,12 @@ class RankOrderAnalyses:
 
         ## Laps:
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
-        # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_laps.ranked_aclus_stats_dict.items()])
-        # new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_laps.ranked_aclus_stats_dict.items()])
-        output_active_epoch_computed_values, shuffled_results_output_dict, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.laps_new_output_tuple
-        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_pearson_Z'][0], shuffled_results_output_dict['short_LR_pearson_Z'][0])])
-        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_pearson_Z'][0], shuffled_results_output_dict['short_RL_pearson_Z'][0])])
+        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_laps.ranked_aclus_stats_dict.items()])
+        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_laps.ranked_aclus_stats_dict.items()])
+        
+        # output_active_epoch_computed_values, shuffled_results_output_dict, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.laps_new_output_tuple
+        # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_pearson_Z'][0], shuffled_results_output_dict['short_LR_pearson_Z'][0])])
+        # new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_pearson_Z'][0], shuffled_results_output_dict['short_RL_pearson_Z'][0])])
         quantile_results_dict = dict(zip(['LR_Long_rank_percentile', 'LR_Short_rank_percentile', 'RL_Long_rank_percentile', 'RL_Short_rank_percentile'], np.hstack((new_LR_results_quantile_values, new_RL_results_quantile_values)).T))
         # quantile_results_df = pd.DataFrame(np.hstack((new_LR_results_real_values, new_RL_results_real_values)), columns=['LR_Long_rank_percentile', 'LR_Short_rank_percentile', 'RL_Long_rank_percentile', 'RL_Short_rank_percentile'])
 
@@ -1910,14 +1887,14 @@ class RankOrderAnalyses:
         if np.isnan(rank_order_results.ripple_combined_epoch_stats_df.index).any():
             return False # can't have dataframe index that is missing values.
 
-        assert (len(rank_order_results.ripple_new_output_tuple) == 6), f"new_output_tuple must be greater than length 6"
+        assert (len(rank_order_results.ripple_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
         
 
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
         if laps_combined_epoch_stats_df is None:
             return False
 
-        assert (len(rank_order_results.laps_new_output_tuple) == 6), f"new_output_tuple must be greater than length 6"
+        assert (len(rank_order_results.laps_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
         
 
         # if 'LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df:
@@ -2204,7 +2181,7 @@ class RankOrderAnalyses:
 
         for variable_IDX, a_column_name in enumerate(combined_variable_z_score_column_names):
             z_scorer_list = [Zscorer.init_from_values(stats_corr_values=np.squeeze(valid_stacked_arrays[:, :, variable_IDX]), real_value=real_stacked_arrays[epoch_IDX, variable_IDX]) for epoch_IDX in np.arange(n_epochs)]
-            shuffled_results_output_dict[a_column_name] = (z_scorer_list, )
+            # shuffled_results_output_dict[a_column_name] = z_scorer_list
             z_score_values = np.array([a_zscorer.z_score_value for a_zscorer in z_scorer_list])
             combined_epoch_stats_df[a_column_name] = z_score_values
 
@@ -2232,7 +2209,7 @@ class RankOrderAnalyses:
         old_to_new_names = cls._subfn_build_pandas_df_based_correlation_computations_column_rename_dict(column_names=list(combined_epoch_stats_df.columns))
         combined_epoch_stats_df = combined_epoch_stats_df.rename(columns=old_to_new_names)
 
-        return combined_epoch_stats_df, (output_active_epoch_computed_values, shuffled_results_output_dict, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
+        return combined_epoch_stats_df, (output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
     
 
 
@@ -2247,7 +2224,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
     @function_attributes(short_name='rank_order_shuffle_analysis', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
-    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2], skip_laps=False):
+    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=300, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2], skip_laps=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Requires:
