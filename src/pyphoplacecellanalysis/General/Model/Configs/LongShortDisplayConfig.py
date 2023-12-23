@@ -8,11 +8,11 @@ import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure, FigureBase # FigureBase: both Figure and SubFigure
-
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.print_helpers import generate_html_string # used for `plot_long_short_surprise_difference_plot`
 
-from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
 import pyphoplacecellanalysis.External.pyqtgraph as pg
+
 
 """ Extreme overkill for this simple setup written by ChatGPT
 Written on 2023-09-20
@@ -168,6 +168,7 @@ class DisplayConfig:
         return {'epoch_label': self.epoch_label, 'pen': self.pen, 'brush': self.brush, 'hoverBrush': self.hoverBrush, 'hoverPen': self.hoverPen}
 
     def as_matplotlib_kwargs(self) -> dict:
+        from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
         return ColorFormatConverter.convert_pen_brush_to_matplot_kwargs(pen=self.pen, brush=self.brush)
 
 @define(slots=False, repr=False)
