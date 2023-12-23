@@ -299,30 +299,47 @@ class Zscorer(HDFMixin):
         self.z_score_value = (xcritical - self.mean)/self.std_dev
         return self.z_score_value
 
-    def plot_distribution(self):
-        """ plots a standalone figure showing the distribution of the original values and their fisher_z_transformed version in a histogram. """
-        win = pg.GraphicsLayoutWidget(show=True)
-        win.resize(800,350)
-        win.setWindowTitle('Z-Scorer: Histogram')
-        plt1 = win.addPlot()
-        vals = self.original_values
-        fisher_z_transformed_vals = np.arctanh(vals)
+    # def plot_distribution(self):
+    #     """ plots a standalone figure showing the distribution of the original values and their fisher_z_transformed version in a histogram. """
+    #     win = pg.GraphicsLayoutWidget(show=True)
+    #     win.resize(800,350)
+    #     win.setWindowTitle('Z-Scorer: Histogram')
+    #     plt1 = win.addPlot()
+    #     vals = self.original_values
+    #     fisher_z_transformed_vals = np.arctanh(vals)
 
-        ## compute standard histogram
-        y, x = np.histogram(vals) # , bins=np.linspace(-3, 8, 40)
-        fisher_z_transformed_y, x = np.histogram(fisher_z_transformed_vals, bins=x)
+    #     ## compute standard histogram
+    #     y, x = np.histogram(vals) # , bins=np.linspace(-3, 8, 40)
+    #     fisher_z_transformed_y, x = np.histogram(fisher_z_transformed_vals, bins=x)
 
-        ## Using stepMode="center" causes the plot to draw two lines for each sample.
-        ## notice that len(x) == len(y)+1
-        plt1.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,50), name='original_values')
-        plt1.plot(x, fisher_z_transformed_y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,255,100,50), name='fisher_z_values')
+    #     ## Using stepMode="center" causes the plot to draw two lines for each sample.
+    #     ## notice that len(x) == len(y)+1
+    #     plt1.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,50), name='original_values')
+    #     plt1.plot(x, fisher_z_transformed_y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,255,100,50), name='fisher_z_values')
 
-        # ## Now draw all points as a nicely-spaced scatter plot
-        # y = pg.pseudoScatter(vals, spacing=0.15)
-        # #plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5)
-        # plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5, symbolPen=(255,255,255,200), symbolBrush=(0,0,255,150))
+    #     # ## Now draw all points as a nicely-spaced scatter plot
+    #     # y = pg.pseudoScatter(vals, spacing=0.15)
+    #     # #plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5)
+    #     # plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5, symbolPen=(255,255,255,200), symbolBrush=(0,0,255,150))
 
-        return win, plt1
+    #     return win, plt1
+
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # if 'identity' not in state:
+        #     print(f'unpickling from old NeuropyPipelineStage')
+        #     state['identity'] = None
+        #     state['identity'] = type(self).get_stage_identity()
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        super(Zscorer, self).__init__() # from
+        
 
 
 @define(slots=False, repr=False, eq=False)
@@ -452,7 +469,6 @@ class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
 
     #     np.shape(long_best_direction_indicies)
     #     np.shape(short_best_direction_indicies)
-
 
     #     ripple_evts_long_best_dir_raw_stats_values = np.where(long_best_direction_indicies, active_LR_ripple_long_z_score, active_RL_ripple_long_z_score)
     #     ripple_evts_short_best_dir_raw_stats_values = np.where(short_best_direction_indicies, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
@@ -1476,15 +1492,22 @@ class RankOrderAnalyses:
 
         ## Ripples:
         ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
-        # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
-        # new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+        # prev method:
+        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+        
+    
+        # From new tuple:
         output_active_epoch_computed_values, shuffled_results_output_dict, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.ripple_new_output_tuple
+        
+        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_spearman_Z'][0], shuffled_results_output_dict['short_LR_spearman_Z'][0])])
+        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_spearman_Z'][0], shuffled_results_output_dict['short_RL_spearman_Z'][0])])
+        
         new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_pearson_Z'][0], shuffled_results_output_dict['short_LR_pearson_Z'][0])])
         new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_pearson_Z'][0], shuffled_results_output_dict['short_RL_pearson_Z'][0])])
         
         quantile_results_dict = dict(zip(['LR_Long_rank_percentile', 'LR_Short_rank_percentile', 'RL_Long_rank_percentile', 'RL_Short_rank_percentile'], np.hstack((new_LR_results_quantile_values, new_RL_results_quantile_values)).T))
-        # quantile_results_df = pd.DataFrame(np.hstack((new_LR_results_real_values, new_RL_results_real_values)), columns=['LR_Long_rank_percentile', 'LR_Short_rank_percentile', 'RL_Long_rank_percentile', 'RL_Short_rank_percentile'])
-
+        
         ## Add the new columns into the `ripple_combined_epoch_stats_df`
         for a_col_name, col_vals in quantile_results_dict.items():
             ripple_combined_epoch_stats_df[a_col_name] = col_vals
@@ -1508,7 +1531,6 @@ class RankOrderAnalyses:
         ## 2023-12-22 - Add the LR-LR, RL-RL differences
         ripple_combined_epoch_stats_df['LongShort_LR_quantile_diff'] = ripple_combined_epoch_stats_df['LR_Long_rank_percentile'] - ripple_combined_epoch_stats_df['LR_Short_rank_percentile']
         ripple_combined_epoch_stats_df['LongShort_RL_quantile_diff'] = ripple_combined_epoch_stats_df['RL_Long_rank_percentile'] - ripple_combined_epoch_stats_df['RL_Short_rank_percentile']
-
 
         ## Laps:
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
@@ -1665,8 +1687,19 @@ class RankOrderAnalyses:
 
             LR_laps_epoch_accumulated_evidence, LR_laps_epoch_rate_dfs, active_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_laps_epochs_df)
 
-            long_best_direction_indicies = active_laps_epochs_df['Long_best_direction_indicies'].to_numpy()
-            short_best_direction_indicies = active_laps_epochs_df['Short_best_direction_indicies'].to_numpy()
+            # long_best_direction_indicies = active_laps_epochs_df['Long_best_direction_indicies'].to_numpy()
+            # short_best_direction_indicies = active_laps_epochs_df['Short_best_direction_indicies'].to_numpy()
+            
+            # ## Long/Short Independent Version:
+            # long_best_direction_indicies = active_replay_epochs_df['Long_best_direction_indicies'].to_numpy()
+            # short_best_direction_indicies = active_replay_epochs_df['Short_best_direction_indicies'].to_numpy()
+            
+            # `combined_best_direction_indicies` method:
+            assert 'combined_best_direction_indicies' in active_laps_epochs_df, f"active_replay_epochs_df needs combined_best_direction_indicies"
+            combined_best_direction_indicies = deepcopy(active_laps_epochs_df['combined_best_direction_indicies'])
+            assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.laps_combined_epoch_stats_df)[0]
+            long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
+            short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
             
             laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=active_laps_epochs_df['Long_normed_LR_evidence'].to_numpy(),
                                                                                             short_relative_direction_likelihoods=active_laps_epochs_df['Short_normed_RL_evidence'].to_numpy(),
@@ -2419,8 +2452,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunc
 
 # from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions # used in `plot_z_score_diff_and_raw`
+
+
 
 
 class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -2434,6 +2467,8 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             """
 
             """
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+            
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
@@ -2621,7 +2656,8 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
         lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, laps_result_tuple, 'Lap')
 
     """
-
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions # used in `plot_z_score_diff_and_raw`
+    
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
     short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
@@ -2709,6 +2745,10 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
 
 @function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
 def plot_quantile_diffs(merged_complete_epoch_stats_df, quantile_significance_threshold: float = 0.95):
+    """ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_quantile_diffs
+    
+    
+    """
     import seaborn as sns
 
     ripple_combined_epoch_stats_df = deepcopy(merged_complete_epoch_stats_df)
