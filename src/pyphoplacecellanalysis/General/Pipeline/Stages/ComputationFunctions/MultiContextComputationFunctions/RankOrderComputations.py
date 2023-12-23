@@ -584,6 +584,7 @@ class RankOrderComputationsContainer(ComputedResult):
         assert len(ripple_combined_epoch_stats_df) > 0, "ripple_combined_epoch_stats_df is empty."
         merged_complete_epoch_stats_df: pd.DataFrame = pd.concat([active_replay_epochs_df.reset_index(drop=True, inplace=False), directional_likelihoods_df.reset_index(drop=True, inplace=False), ripple_combined_epoch_stats_df.reset_index(drop=True, inplace=False)], axis=1)
         merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.set_index(active_replay_epochs_df.index, inplace=False)
+        merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.loc[:, ~merged_complete_epoch_stats_df.columns.duplicated()] # drop duplicated 'label' column
         return merged_complete_epoch_stats_df
     
 
@@ -609,6 +610,7 @@ class RankOrderComputationsContainer(ComputedResult):
         assert len(laps_combined_epoch_stats_df) > 0, "laps_combined_epoch_stats_df is empty."
         merged_complete_epoch_stats_df: pd.DataFrame = pd.concat([active_laps_epochs_df.reset_index(drop=True, inplace=False), directional_likelihoods_df.reset_index(drop=True, inplace=False), laps_combined_epoch_stats_df.reset_index(drop=True, inplace=False)], axis=1)
         merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.set_index(active_laps_epochs_df.index, inplace=False)
+        merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.loc[:, ~merged_complete_epoch_stats_df.columns.duplicated()] # drop duplicated 'label' column
         return merged_complete_epoch_stats_df
     
 
