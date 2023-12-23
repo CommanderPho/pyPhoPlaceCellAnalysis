@@ -2704,3 +2704,102 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
     # fignum='best_quantiles'
     return significant_ripple_combined_epoch_stats_df[['midtimes', 'LongShort_BestDir_quantile_diff']].plot(x='midtimes', y='LongShort_BestDir_quantile_diff', title='Sig. (>0.95) Best Quantile Diff', **marker_style, marker='o')
     
+
+
+
+@function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
+def plot_quantile_diffs(merged_complete_epoch_stats_df, quantile_significance_threshold: float = 0.95):
+    import seaborn as sns
+
+    ripple_combined_epoch_stats_df = deepcopy(merged_complete_epoch_stats_df)
+
+    # Filter rows based on columns: 'Long_BestDir_quantile', 'Short_BestDir_quantile'
+    significant_BestDir_quantile_stats_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['Long_BestDir_quantile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['Short_BestDir_quantile'] > quantile_significance_threshold)]
+    LR_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==0) & ((ripple_combined_epoch_stats_df['LR_Long_rank_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['LR_Short_rank_percentile'] > quantile_significance_threshold))]
+    RL_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==1) & ((ripple_combined_epoch_stats_df['RL_Long_rank_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Short_rank_percentile'] > quantile_significance_threshold))]
+
+    # significant_ripple_combined_epoch_stats_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['LR_Long_rank_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['LR_Short_rank_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Long_rank_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Short_rank_percentile'] > quantile_significance_threshold)]
+    # significant_ripple_combined_epoch_stats_df
+    # is_epoch_significant = np.isin(ripple_combined_epoch_stats_df.index, significant_ripple_combined_epoch_stats_df.index)
+    # active_replay_epochs_df = rank_order_results.LR_ripple.epochs_df
+    # significant_ripple_epochs: Epoch = Epoch(deepcopy(active_replay_epochs_df).epochs.get_valid_df()).boolean_indicies_slice(is_epoch_significant)
+    # epoch_identifiers = significant_ripple_epochs._df.label.astype({'label': RankOrderAnalyses._label_column_type}).values #.labels
+    # x_values = significant_ripple_epochs.midtimes
+    # x_axis_name_suffix = 'Mid-time (Sec)'
+
+    # significant_ripple_epochs_df = significant_ripple_epochs.to_dataframe()
+    # significant_ripple_epochs_df
+
+    # significant_ripple_combined_epoch_stats_df['midtimes'] = significant_ripple_epochs.midtimes
+
+    # %matplotlib inline
+    
+
+    fig, ax = plt.subplots(num='LongShort_BestDir_quantile_diff')
+    _out_LR = sns.scatterplot(
+        ax=ax,
+        data=significant_BestDir_quantile_stats_df,
+        x='start',
+        y='LongShort_BestDir_quantile_diff',
+        size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+        # **marker_style,  # Apply additional marker styling from the dictionary
+    )
+    _out_LR.set_title('Sig. (>0.95) Best Quantile Diff')
+
+
+    # Assuming you have the DataFrame 'LR_likely_active_df' and 'marker_style' dictionary
+
+    # Create the scatter plot with Seaborn, using 'size' to set marker sizes
+    fig, ax = plt.subplots(num='LR-LR_LongShort_LR_quantile_diff')
+    _out_LR = sns.scatterplot(
+        ax=ax,
+        data=LR_likely_active_df,
+        x='start',
+        y='LongShort_LR_quantile_diff',
+        size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+        # **marker_style,  # Apply additional marker styling from the dictionary
+    )
+    _out_LR.set_title('Sig. (>0.95) LR-LR (LR-Likely) Quantile Diff')
+    # sns.relplot(
+    #     data=tips, x="total_bill", y="tip",
+    #     col="time", hue="day", style="day",
+    #     kind="scatter"
+    # )
+
+    # Show the plot
+    plt.show()
+
+    fig, ax = plt.subplots(num='RL-RL_LongShort_RL_quantile_diff')
+    # _out_RL = RL_likely_active_df[['start', 'LongShort_RL_quantile_diff']].plot(x='start', y='LongShort_RL_quantile_diff', title='Sig. (>0.95) RL-RL (RL-Likely) Quantile Diff', **marker_style, marker='o')
+    _out_RL = sns.scatterplot(
+        ax=ax,
+        data=RL_likely_active_df[RL_likely_active_df['RL_Long_rel_num_cells']>10],
+        x='start',
+        y='LongShort_RL_quantile_diff',
+        size='RL_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+        # **marker_style,  # Apply additional marker styling from the dictionary
+    )
+    _out_RL.set_title('Sig. (>0.95) RL-RL (RL-Likely) Quantile Diff')
+    _out_RL
+    plt.show()
+
+def _validate_estimated_lap_dirs(global_any_laps_epochs_obj):
+	""" 2023-12-19 - validstes the estimated lap directions against the ground-truth direction which is known for the laps. 
+ 	"""
+	 
+	
+	lap_dir_is_LR = deepcopy(rank_order_results.laps_most_likely_result_tuple.directional_likelihoods_tuple.long_best_direction_indices)
+	# lap_dir_is_LR = deepcopy(rank_order_results.laps_most_likely_result_tuple.directional_likelihoods_tuple.long_best_direction_indices)
+	lap_dir_index = deepcopy(lap_dir_is_LR).astype('int8')
+	# lap_dir_index = deepcopy(laps_merged_complete_epoch_stats_df['combined_best_direction_indicies'].to_numpy()).astype('int8')
+
+	# global_laps
+	actual_lap_dir = deepcopy(global_any_laps_epochs_obj.to_dataframe()['lap_dir'])
+	n_total_laps = np.shape(actual_lap_dir)[0]
+	is_correct = (actual_lap_dir.values == lap_dir_index)
+	n_correct_direction = is_correct.sum()
+	n_correct_direction
+
+	print(f'Lap directions: {n_correct_direction}/{n_total_laps} correct ({100.0*float(n_correct_direction)/float(n_total_laps)}%)') # Lap directions: 76/80 correct (95.0%)
+
+
