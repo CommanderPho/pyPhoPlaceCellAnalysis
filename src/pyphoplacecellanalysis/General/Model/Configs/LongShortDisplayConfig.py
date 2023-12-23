@@ -8,25 +8,10 @@ import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure, FigureBase # FigureBase: both Figure and SubFigure
-from flexitext import flexitext ## flexitext for formatted matplotlib text
 
-from neuropy.core.neuron_identities import PlotStringBrevityModeEnum, NeuronType  # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
-from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
-from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
-from neuropy.utils.matplotlib_helpers import build_or_reuse_figure # used for `_make_pho_jonathan_batch_plots(...)`
-from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_plot_long_short_firing_rate_indicies`
-from neuropy.utils.matplotlib_helpers import fit_both_axes
-from neuropy.utils.matplotlib_helpers import draw_epoch_regions # plot_expected_vs_observed
-
-from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.programming_helpers import metadata_attributes
-from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.print_helpers import generate_html_string # used for `plot_long_short_surprise_difference_plot`
 
-from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
-from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
-from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import CustomMatplotlibWidget # used by RateRemappingPaginatedFigureController
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 """ Extreme overkill for this simple setup written by ChatGPT
