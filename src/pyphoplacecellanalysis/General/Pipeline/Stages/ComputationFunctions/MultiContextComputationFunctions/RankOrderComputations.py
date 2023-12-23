@@ -2795,23 +2795,6 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, quantile_significance_th
     LR_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==0) & ((ripple_combined_epoch_stats_df['LR_Long_pearson_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['LR_Short_percentile'] > quantile_significance_threshold))]
     RL_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==1) & ((ripple_combined_epoch_stats_df['RL_Long_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Short_percentile'] > quantile_significance_threshold))]
 
-    # significant_ripple_combined_epoch_stats_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['LR_Long_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['LR_Short_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Long_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Short_percentile'] > quantile_significance_threshold)]
-    # significant_ripple_combined_epoch_stats_df
-    # is_epoch_significant = np.isin(ripple_combined_epoch_stats_df.index, significant_ripple_combined_epoch_stats_df.index)
-    # active_replay_epochs_df = rank_order_results.LR_ripple.epochs_df
-    # significant_ripple_epochs: Epoch = Epoch(deepcopy(active_replay_epochs_df).epochs.get_valid_df()).boolean_indicies_slice(is_epoch_significant)
-    # epoch_identifiers = significant_ripple_epochs._df.label.astype({'label': RankOrderAnalyses._label_column_type}).values #.labels
-    # x_values = significant_ripple_epochs.midtimes
-    # x_axis_name_suffix = 'Mid-time (Sec)'
-
-    # significant_ripple_epochs_df = significant_ripple_epochs.to_dataframe()
-    # significant_ripple_epochs_df
-
-    # significant_ripple_combined_epoch_stats_df['midtimes'] = significant_ripple_epochs.midtimes
-
-    # %matplotlib inline
-    
-
     fig, ax = plt.subplots(num='LongShort_BestDir_quantile_diff')
     _out_LR = sns.scatterplot(
         ax=ax,
