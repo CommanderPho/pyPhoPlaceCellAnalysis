@@ -2176,6 +2176,7 @@ class RankOrderAnalyses:
         n_epochs = np.shape(real_stacked_arrays)[0]
         n_variables = np.shape(real_stacked_arrays)[1]
 
+        # valid_stacked_arrays.shape: (n_shuffles, n_epochs, n_variables)
         assert n_epochs == np.shape(valid_stacked_arrays)[-2]
         assert n_variables == np.shape(valid_stacked_arrays)[-1]
 
