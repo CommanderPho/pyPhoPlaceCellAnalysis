@@ -1456,22 +1456,59 @@ class RankOrderAnalyses:
             return (1.0 - float(np.sum((np.abs(real_value) < original_shuffle_values)))/float(len(original_shuffle_values)))
             # return (1.0 - float(np.sum((real_value < original_shuffle_values)))/float(len(original_shuffle_values)))
 
+        def compute_percentiles_from_shuffle_results(combined_variable_names, valid_stacked_arrays, real_stacked_arrays):
+            """ computes all of the percentiles from the columns of the datafrrame
+            
+            Usage:	
+                # # From new tuple:
+                output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.laps_new_output_tuple      
+                results_quantile_value_laps = compute_percentiles_from_shuffle_results(combined_variable_names, valid_stacked_arrays, real_stacked_arrays)
+                results_quantile_value_laps
+
+            """
+            # decoder_name_to_column_name_prefix_map = RankOrderAnalyses._subfn_build_pandas_df_based_correlation_computations_column_rename_dict(combined_variable_names)
+            # print(f'decoder_name_to_column_name_prefix_map: {decoder_name_to_column_name_prefix_map}')
+
+            ## Extract the stats values for each shuffle from `valid_stacked_arrays`:
+            n_epochs = np.shape(real_stacked_arrays)[0]
+            n_variables = np.shape(real_stacked_arrays)[1]
+            assert n_variables == len(combined_variable_names)
+            
+            quantile_result_column_suffix: str = '_percentile'
+            quantile_result_column_names = [f'{a_column_name}_{quantile_result_column_suffix}' for a_column_name in combined_variable_names]
+        
+            # recover from the valid stacked rarys valid_stacked_arrays
+            results_quantile_value = {}
+            for variable_IDX, a_column_name in enumerate(combined_variable_names):
+                # Do one variable at a time, there's approximately 8, 
+                # real_values = rank_order_results.laps_combined_epoch_stats_df[decoder_name_to_column_name_prefix_map[a_column_name]].to_numpy() # real_values.shape: (n_epochs, )
+                # print(f'valid_stacked_arrays.shape: {valid_stacked_arrays.shape}') # valid_stacked_arrays.shape: (n_shuffles, n_epochs, n_variables)	
+                ## Extract the stats values for each shuffle from `valid_stacked_arrays`:
+                # n_epochs: int = np.shape(real_values)[0]
+                assert n_epochs == np.shape(valid_stacked_arrays)[-2] # penultimate element
+                assert n_variables == np.shape(valid_stacked_arrays)[-1]		
+                a_result_column_name: str = quantile_result_column_names[variable_IDX] # column name with the suffix '_percentile' added to it
+                results_quantile_value[a_result_column_name] = np.array([compute_percentile(real_stacked_arrays[epoch_IDX, variable_IDX], np.squeeze(valid_stacked_arrays[:, epoch_IDX, variable_IDX])) for epoch_IDX in np.arange(n_epochs)]) # real_stacked_arrays based version
+                # results_quantile_value[a_column_name] = np.array([compute_percentile(real_values[epoch_IDX], np.squeeze(valid_stacked_arrays[:, epoch_IDX, variable_IDX])) for epoch_IDX in np.arange(n_epochs)]) # working df-based version
+
+            return results_quantile_value # Dict[str, NDArray]
+
+
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
 
-        ## Ripples:
+        # Ripples: ___________________________________________________________________________________________________________ #
         ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
         # prev method:
         new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
         new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
         
     
-        # # From new tuple:
-        # output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.ripple_new_output_tuple        
-        # recover from the valid stacked rarys valid_stacked_arrays
-        # recovered_shuffle_results_dict = {}
-        # for variable_IDX, a_column_name in enumerate(combined_variable_names):
-        #     recovered_shuffle_results_dict[a_column_name] = np.squeeze(valid_stacked_arrays[:, :, variable_IDX])
+        ## 2023-12-23 Method:        
+        output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.ripple_new_output_tuple        
+        # recover from the valid stacked arrays: `valid_stacked_arrays`
+        results_quantile_value_ripple = compute_percentiles_from_shuffle_results(combined_variable_names, valid_stacked_arrays, real_stacked_arrays)
+        results_quantile_value_ripple
 
 
         # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_spearman_Z'][0], shuffled_results_output_dict['short_LR_spearman_Z'][0])])
@@ -1508,12 +1545,21 @@ class RankOrderAnalyses:
         ripple_combined_epoch_stats_df['LongShort_LR_quantile_diff'] = ripple_combined_epoch_stats_df['LR_Long_rank_percentile'] - ripple_combined_epoch_stats_df['LR_Short_rank_percentile']
         ripple_combined_epoch_stats_df['LongShort_RL_quantile_diff'] = ripple_combined_epoch_stats_df['RL_Long_rank_percentile'] - ripple_combined_epoch_stats_df['RL_Short_rank_percentile']
 
-        ## Laps:
+
+        # Laps: ______________________________________________________________________________________________________________ #
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
         new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_laps.ranked_aclus_stats_dict.items()])
         new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_laps.ranked_aclus_stats_dict.items()])
+
+        ## 2023-12-23 Method:        
+        # recover from the valid stacked arrays: `valid_stacked_arrays`
+        output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.laps_new_output_tuple      
+        results_quantile_value_laps = compute_percentiles_from_shuffle_results(combined_variable_names, valid_stacked_arrays, real_stacked_arrays)
         
-        # output_active_epoch_computed_values, shuffled_results_output_dict, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.laps_new_output_tuple
+
+
+        
+
         # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_pearson_Z'][0], shuffled_results_output_dict['short_LR_pearson_Z'][0])])
         # new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_pearson_Z'][0], shuffled_results_output_dict['short_RL_pearson_Z'][0])])
         quantile_results_dict = dict(zip(['LR_Long_rank_percentile', 'LR_Short_rank_percentile', 'RL_Long_rank_percentile', 'RL_Short_rank_percentile'], np.hstack((new_LR_results_quantile_values, new_RL_results_quantile_values)).T))
