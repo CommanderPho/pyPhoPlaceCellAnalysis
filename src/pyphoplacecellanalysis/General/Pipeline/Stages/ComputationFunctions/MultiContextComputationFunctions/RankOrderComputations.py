@@ -373,6 +373,18 @@ class RankOrderResult(ComputedResult):
         """
         return {k:v[1] for k, v in self.extra_info_dict.items()} # [1] corresponds to `template_epoch_actually_included_aclus`
 
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        super(RankOrderResult, self).__init__()
+        
 
 
 
