@@ -197,3 +197,60 @@ class LongShortDisplayConfigManager:
 # Access configurations
 long_short_display_config_manager = LongShortDisplayConfigManager()
 
+
+
+class PlottingHelpers:
+
+    @function_attributes(short_name=None, tags=['matplotlib', 'epoch', 'region'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-23 17:52', related_items=[])
+    def helper_matplotlib_add_long_short_epoch_indicator_regions(ax, t_split: float):
+        """ Draws the two indicator regions for the long and short track.
+        analagous to `_helper_add_long_short_session_indicator_regions` but for matplotlib figures 
+        
+        from neuropy.utils.matplotlib_helpers import build_matplotlib_epoch_indicator_regions
+        
+        """
+        output_dict = {}
+        ## Get the track configs for the colors:
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+
+        # Highlight the two epochs with their characteristic colors ['r','b'] - ideally this would be at the very back
+        x_start, x_stop = ax.get_xlim()
+        output_dict["long_region"] = ax.axvspan(x_start, t_split, color=long_epoch_config['facecolor'], alpha=0.2, zorder=0)
+        output_dict["short_region"] = ax.axvspan(t_split, x_stop, color=short_epoch_config['facecolor'], alpha=0.2, zorder=0)
+
+        # Draw the vertical epoch splitter line:
+        required_epoch_bar_height = ax.get_ylim()[-1]
+        output_dict["divider_line"] = ax.vlines(t_split, ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25), zorder=25) # divider should be in very front
+        return output_dict
+
+
+
+
+    @function_attributes(short_name=None, tags=['pyqtgraph', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=['pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.build_pyqtgraph_epoch_indicator_regions'], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 19:04')
+    def helper_pyqtgraph_add_long_short_session_indicator_regions(win, long_epoch, short_epoch):
+        """Add session indicators to pyqtgraph plot for the long and the short epoch
+
+                from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions
+
+                long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
+                short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
+                long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
+
+                long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
+                short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items
+        """
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions # Add session indicators to pyqtgraph plot
+
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+        long_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=long_epoch.t_start, t_stop=long_epoch.t_stop, **long_epoch_config)
+        short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
+        return long_epoch_indicator_region_items, short_epoch_indicator_region_items
+
+
+
+
