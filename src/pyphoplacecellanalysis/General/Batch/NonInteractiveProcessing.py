@@ -527,6 +527,11 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         print(f'batch_extended_programmatic_figures(...): BatchPhoJonathanFiguresHelper.run(...) failed for all cells. failed with error: {e}\n skipping.')
         
 
+    try:
+        _out = curr_active_pipeline.display('_display_rank_order_z_stats_results', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): "_display_rank_order_z_stats_results" failed with error: {e}\n skipping.')
+        
     
 
 

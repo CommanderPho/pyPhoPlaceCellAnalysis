@@ -439,8 +439,11 @@ class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
         return pd.DataFrame.from_dict(self.directional_likelihoods_tuple._asdict()).astype({'long_best_direction_indices': 'int8', 'short_best_direction_indices': 'int8'})
 
 
-    def plot_histograms(self) -> MatplotlibRenderPlots:
-        fig = plt.figure(layout="constrained", num='RipplesRankOrderZscore')
+    def plot_histograms(self, **kwargs) -> MatplotlibRenderPlots:
+        """ 
+        num='RipplesRankOrderZscore'
+        """
+        fig = plt.figure(layout="constrained", **kwargs)
         ax_dict = fig.subplot_mosaic(
             [
                 ["long_short_best_z_score_diff", "long_short_best_z_score_diff"],
@@ -2485,77 +2488,10 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
 
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
-# from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
-# from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
-
-
-
-
-class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
-    """ RankOrderGlobalDisplayFunctions
-    These display functions compare results across several contexts.
-    Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
-    """
-    @function_attributes(short_name='rank_order_debugger', tags=['rank-order','debugger','shuffle', 'interactive', 'slider'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 01:12', related_items=[],
-                         validate_computation_test=RankOrderAnalyses._validate_can_display_RankOrderRastersDebugger, is_global=True)
-    def _display_rank_order_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
-            """
-
-            """
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
-            
-            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
-
-            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-            assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
-            rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
-            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-
-            # track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # shared-only
-            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only
-            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-            global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df) # #TODO 2023-12-08 12:44: - [ ] does ripple_result_tuple contain a spikes_df?
-
-            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-            ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
-            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-            print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-
-            ## RankOrderRastersDebugger:
-            _out_rank_order_event_raster_debugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, rank_order_results.RL_ripple.selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.LR_ripple.selected_spikes_fragile_linear_neuron_IDX_dict)
-
-            return _out_rank_order_event_raster_debugger
-
-
-    @function_attributes(short_name='rank_order_z_stats', tags=['rank-order','debugger','shuffle'], input_requires=[], output_provides=[], uses=['plot_rank_order_epoch_inst_fr_result_tuples'], used_by=[], creation_date='2023-12-15 21:46', related_items=[],
-        validate_computation_test=RankOrderAnalyses._validate_can_display_RankOrderRastersDebugger, is_global=True)
-    def _display_rank_order_z_stats_results(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
-            """ Plots the z-scores differences and their raw-values
-
-            """
-            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
-
-
-
-            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-            assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
-            rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
-            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-
-            ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
-            
-            ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, ripple_result_tuple, 'Ripple')
-            lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, laps_result_tuple, 'Lap')
-
-            ripple_result_tuple.plot_histograms()
-            laps_result_tuple.plot_histograms()
-
-            return ripple_outputs, lap_outputs
-
-
+# ==================================================================================================================== #
+# Display Function Helpers                                                                                             #
+# ==================================================================================================================== #
 
 
 # def plot_z_score_diff_and_raw(x_values: np.ndarray, long_short_best_dir_z_score_diff_values: np.ndarray, masked_z_score_values_list: List[np.ma.core.MaskedArray], variable_name: str, x_axis_name_suffix: str, point_data_values: np.ndarray, long_epoch=None, short_epoch=None) -> Tuple:
@@ -2621,7 +2557,7 @@ def plot_new(ripple_result_tuple: DirectionalRankOrderResult):
 
 
 @function_attributes(short_name=None, tags=['histogram', '1D', 'rank-order'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-12 09:20', related_items=[])
-def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContainer, number_of_bins: int = 21, post_title_info: str = '') -> Tuple:
+def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContainer, number_of_bins: int = 21, post_title_info: str = '', active_context=None, perform_write_to_file_callback=None) -> Tuple:
     """ plots 1D histograms from the rank-order shuffled data during the ripples.
 
     https://pandas.pydata.org/pandas-docs/version/0.24.1/user_guide/visualization.html
@@ -2634,7 +2570,13 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
         _out_z_score, _out_real, _out_most_likely_z = plot_rank_order_histograms(rank_order_results, post_title_info=post_title_info)
 
     """
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from flexitext import flexitext ## flexitext for formatted matplotlib text
 
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
     # fig = build_or_reuse_figure(fignum=f'1D Histograms')
     # ax1 = fig.add_subplot(3, 1, 1)
     # ax2 = fig.add_subplot(3, 1, 2)
@@ -2646,25 +2588,69 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
     LR_results_long_short_z_diffs = np.array([long_short_z_diff for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
     RL_results_long_short_z_diff = np.array([long_short_z_diff for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
 
-    ax1, ax2, ax3, ax4 = None, None, None, None
+    if active_context is not None:
+            display_context = active_context.adding_context('display_fn', display_fn_name='plot_rank_order_histograms')
+            
+    with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+        # Create a FigureCollector instance
+        with FigureCollector(name='plot_rank_order_histograms', base_context=display_context) as collector:
 
-    _out_z_score = pd.DataFrame({'LR_long_z_scores': rank_order_results.LR_ripple.long_z_score, 'LR_short_z_scores': rank_order_results.LR_ripple.short_z_score,
-              'RL_long_z_scores': rank_order_results.RL_ripple.long_z_score, 'RL_short_z_scores': rank_order_results.RL_ripple.short_z_score}).hist(bins=number_of_bins, ax=ax1, sharex=True, sharey=True)
-    plt.suptitle(': '.join([f'Ripple Z-scores', post_title_info]))
+            ## Define common operations to do after making the figure:
+            def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>'):
+                """ Captures:
 
-    _out_real = pd.DataFrame({'LR_long_real_corr': np.squeeze(LR_results_real_values[:,0]), 'LR_short_real_corr': np.squeeze(LR_results_real_values[:,1]),
-              'RL_long_real_corr': np.squeeze(RL_results_real_values[:,0]), 'RL_short_real_corr': np.squeeze(RL_results_real_values[:,1])}).hist(bins=number_of_bins, ax=ax2, sharex=True, sharey=True)
-    plt.suptitle(': '.join([f'Ripple real correlations', post_title_info]))
+                t_split
+                """
+                a_collector.contexts.append(sub_context)                
+                for ax in (axes if isinstance(axes, Iterable) else [axes]):
+                    # `flexitext` version:
+                    text_formatter = FormattedFigureText()
+                    ax.set_title('')
+                    fig.suptitle('')
+                    text_formatter.setup_margins(fig)
+                    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
+                    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                                                text_formatter._build_footer_string(active_context=sub_context),
+                                                va="top", xycoords="figure fraction")
+            
+                if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+                    perform_write_to_file_callback(sub_context, fig)
+                    
+            # ax1, ax2, ax3, ax4 = None, None, None, None
+            label = ': '.join([f'Ripple Z-scores', post_title_info])
+            fig, ax1 = collector.subplots(num=label, clear=True)
+            _out_z_score = pd.DataFrame({'LR_long_z_scores': rank_order_results.LR_ripple.long_z_score, 'LR_short_z_scores': rank_order_results.LR_ripple.short_z_score,
+                    'RL_long_z_scores': rank_order_results.RL_ripple.long_z_score, 'RL_short_z_scores': rank_order_results.RL_ripple.short_z_score}).hist(bins=number_of_bins, ax=ax1, sharex=True, sharey=True)
+            # plt.suptitle(': '.join([f'Ripple Z-scores', post_title_info]))
+            setup_common_after_creation(collector, fig=fig, axes=ax1, sub_context=display_context.adding_context('subplot', subplot_name='Ripple Z-scores'), 
+                                                    title=f'<size:22> Ripple <weight:bold>Z-scores</> {post_title_info}</>')
 
-    _out_most_likely_z = pd.DataFrame({'most_likely_long_z_scores': rank_order_results.ripple_most_likely_result_tuple.long_best_dir_z_score_values, 'most_likely_short_z_scores': rank_order_results.ripple_most_likely_result_tuple.short_best_dir_z_score_values}).hist(bins=number_of_bins, ax=ax3, sharex=True, sharey=True)
-    plt.suptitle(': '.join([f'Ripple Most-likely z-scores', post_title_info]))
+            label = ': '.join([f'Ripple real correlations', post_title_info])
+            fig, ax2 = collector.subplots(num=label, clear=True)
+            _out_real = pd.DataFrame({'LR_long_real_corr': np.squeeze(LR_results_real_values[:,0]), 'LR_short_real_corr': np.squeeze(LR_results_real_values[:,1]),
+                    'RL_long_real_corr': np.squeeze(RL_results_real_values[:,0]), 'RL_short_real_corr': np.squeeze(RL_results_real_values[:,1])}).hist(bins=number_of_bins, ax=ax2, sharex=True, sharey=True)
+            # plt.suptitle(': '.join([f'Ripple real correlations', post_title_info]))
+            setup_common_after_creation(collector, fig=fig, axes=ax2, sub_context=display_context.adding_context('subplot', subplot_name='Ripple real correlations'), 
+                                                    title=f'<size:22> Ripple <weight:bold>real correlations</> {post_title_info}</>')
+            
+            
+            label = ': '.join([f'Ripple Most-likely Z-scores', post_title_info])
+            fig, ax3 = collector.subplots(num=label, clear=True)
+            _out_most_likely_z = pd.DataFrame({'most_likely_long_z_scores': rank_order_results.ripple_most_likely_result_tuple.long_best_dir_z_score_values, 'most_likely_short_z_scores': rank_order_results.ripple_most_likely_result_tuple.short_best_dir_z_score_values}).hist(bins=number_of_bins, ax=ax3, sharex=True, sharey=True)
+            # plt.suptitle(': '.join([f'Ripple Most-likely z-scores', post_title_info]))
+            setup_common_after_creation(collector, fig=fig, axes=ax3, sub_context=display_context.adding_context('subplot', subplot_name='Ripple Most-likely Z-scores'), 
+                                                    title=f'<size:22> Ripple Most-likely <weight:bold>Z-scores</> {post_title_info}</>')
 
+            label = ': '.join([f'Ripple Most-likely Spearman Rho', post_title_info])
+            fig, ax4 = collector.subplots(num=label, clear=True)
+            _out_most_likely_raw = pd.DataFrame({'most_likely_long_raw_rho': rank_order_results.ripple_combined_epoch_stats_df['Long_BestDir_spearman'].to_numpy(),
+                                                'most_likely_short_raw_rho': rank_order_results.ripple_combined_epoch_stats_df['Short_BestDir_spearman'].to_numpy()}).hist(bins=number_of_bins, ax=ax4, sharex=True, sharey=True)
+            # plt.suptitle(': '.join([f'Ripple Most-likely Spearman Rho', post_title_info]))
+            setup_common_after_creation(collector, fig=fig, axes=ax4, sub_context=display_context.adding_context('subplot', subplot_name='Ripple Most-likely Spearman Rho'), 
+                                                    title=f'<size:22> Ripple Most-likely <weight:bold>Spearman Rho</> {post_title_info}</>')
+            
 
-    _out_most_likely_raw = pd.DataFrame({'most_likely_long_raw_rho': rank_order_results.ripple_combined_epoch_stats_df['Long_BestDir_spearman'].to_numpy(),
-                                          'most_likely_short_raw_rho': rank_order_results.ripple_combined_epoch_stats_df['Short_BestDir_spearman'].to_numpy()}).hist(bins=number_of_bins, ax=ax4, sharex=True, sharey=True)
-    plt.suptitle(': '.join([f'Ripple Most-likely Spearman Rho', post_title_info]))
-
-    return _out_z_score, _out_real, _out_most_likely_z, _out_most_likely_raw
+    return collector
 
 
 
@@ -2693,7 +2679,7 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
         lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, laps_result_tuple, 'Lap')
 
     """
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers # used in `plot_z_score_diff_and_raw`
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
     
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
@@ -2778,11 +2764,7 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
     return significant_ripple_combined_epoch_stats_df[['midtimes', 'LongShort_BestDir_quantile_diff']].plot(x='midtimes', y='LongShort_BestDir_quantile_diff', title='Sig. (>0.95) Best Quantile Diff', **marker_style, marker='o')
     
 
-
-
-
-
-@function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
+@function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn', 'FigureCollector'], input_requires=[], output_provides=[], uses=['FigureCollector'], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
 def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95, active_context=None, perform_write_to_file_callback=None):
     """ Plots three Matplotlib figures displaying the quantile differences
     
@@ -2919,5 +2901,135 @@ def _validate_estimated_lap_dirs(rank_order_results, global_any_laps_epochs_obj)
 	n_correct_direction
 
 	print(f'Lap directions: {n_correct_direction}/{n_total_laps} correct ({100.0*float(n_correct_direction)/float(n_total_laps)}%)') # Lap directions: 76/80 correct (95.0%)
+
+def setup_histogram_common_after_creation(fig, axes, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>', perform_write_to_file_callback=None):
+    """ Captures:
+        perform_write_to_file_callback
+    """
+    from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    
+    # `flexitext` version:
+    text_formatter = FormattedFigureText()
+    fig.suptitle('')
+    text_formatter.setup_margins(fig)
+    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
+    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                                text_formatter._build_footer_string(active_context=sub_context),
+                                va="top", xycoords="figure fraction")
+
+    if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+        perform_write_to_file_callback(sub_context, fig)
+
+
+
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
+
+# from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
+# from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+
+
+# ==================================================================================================================== #
+# Display Functions                                                                                                    #
+# ==================================================================================================================== #
+
+class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
+    """ RankOrderGlobalDisplayFunctions
+    These display functions compare results across several contexts.
+    Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
+    """
+    @function_attributes(short_name='rank_order_debugger', tags=['rank-order','debugger','shuffle', 'interactive', 'slider'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 01:12', related_items=[],
+                         validate_computation_test=RankOrderAnalyses._validate_can_display_RankOrderRastersDebugger, is_global=True)
+    def _display_rank_order_debugger(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+            """
+
+            """
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+            
+            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+            assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
+            rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+
+            # track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # shared-only
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df) # #TODO 2023-12-08 12:44: - [ ] does ripple_result_tuple contain a spikes_df?
+
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+            print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+
+            ## RankOrderRastersDebugger:
+            _out_rank_order_event_raster_debugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, ripple_result_tuple.active_epochs, track_templates, rank_order_results.RL_ripple.selected_spikes_fragile_linear_neuron_IDX_dict, rank_order_results.LR_ripple.selected_spikes_fragile_linear_neuron_IDX_dict)
+
+            return _out_rank_order_event_raster_debugger
+
+
+    @function_attributes(short_name='rank_order_z_stats', tags=['rank-order','debugger','shuffle'], input_requires=[], output_provides=[], uses=['plot_rank_order_epoch_inst_fr_result_tuples'], used_by=[], creation_date='2023-12-15 21:46', related_items=[],
+        validate_computation_test=RankOrderAnalyses._validate_can_display_RankOrderRastersDebugger, is_global=True)
+    def _display_rank_order_z_stats_results(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+        """ Plots the z-scores differences and their raw-values
+
+        """
+        active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+        if include_includelist is None:
+            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+        long_epoch_name = include_includelist[0] # 'maze1_PYR'
+        short_epoch_name = include_includelist[1] # 'maze2_PYR'
+        assert len(include_includelist) > 2
+        global_epoch_name = include_includelist[-1] # 'maze_PYR'
+
+        directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+        assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
+        rank_order_results: RankOrderComputationsContainer = global_computation_results.computed_data['RankOrder']
+        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+        laps_merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.laps_merged_complete_epoch_stats_df ## New method
+        ripple_merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.ripple_merged_complete_epoch_stats_df ## New method
+
+
+        def _perform_write_to_file_callback(final_context, fig):
+            if save_figure:
+                return owning_pipeline_reference.output_figure(final_context, fig)
+            else:
+                pass # do nothing, don't save
+
+
+        # Quantile Diff Figures: _____________________________________________________________________________________________ #
+        global_epoch = owning_pipeline_reference.filtered_epochs[global_epoch_name]
+        short_epoch = owning_pipeline_reference.filtered_epochs[short_epoch_name]
+        split_time_t: float = short_epoch.t_start
+        
+        quantile_diffs_collector = plot_quantile_diffs(ripple_merged_complete_epoch_stats_df, t_split=split_time_t, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
+
+
+        post_title_info: str = f'{minimum_inclusion_fr_Hz} Hz'
+        collector_histograms = plot_rank_order_histograms(rank_order_results, post_title_info=post_title_info, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
+
+        # ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, ripple_result_tuple, 'Ripple')
+        # lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, laps_result_tuple, 'Lap')
+
+        histogram_display_context = active_context.adding_context('display_fn', display_fn_name='plot_histograms')
+        _out_ripple_result_tuple_histograms = ripple_result_tuple.plot_histograms() # MatplotlibRenderPlots num='ripple_result_tuple', clear=True
+        _out_ripple_result_tuple_histograms.context = histogram_display_context.adding_context('subplot', subplot_name='ripple_result_tuple')
+        setup_histogram_common_after_creation(fig=_out_ripple_result_tuple_histograms.figures[0], axes=_out_ripple_result_tuple_histograms.axes, sub_context=_out_ripple_result_tuple_histograms.context,
+                                    title=f'<size:22> Histogram: <weight:bold>ripple_result_tuple</></>', perform_write_to_file_callback=_perform_write_to_file_callback)
+
+        _out_laps_result_tuple_histograms = laps_result_tuple.plot_histograms() # num='laps_result_tuple', clear=True
+        _out_laps_result_tuple_histograms.context = histogram_display_context.adding_context('subplot', subplot_name='laps_result_tuple')
+        setup_histogram_common_after_creation(fig=_out_laps_result_tuple_histograms.figures[0], axes=_out_laps_result_tuple_histograms.axes, sub_context=_out_laps_result_tuple_histograms.context,
+                                    title=f'<size:22> Histogram: <weight:bold>laps_result_tuple</></>', perform_write_to_file_callback=_perform_write_to_file_callback)
+
+        return quantile_diffs_collector, collector_histograms
 
 
