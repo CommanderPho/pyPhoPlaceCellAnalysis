@@ -1,6 +1,6 @@
 
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 import concurrent.futures
 from functools import partial
 from itertools import repeat
@@ -2783,7 +2783,7 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
 
 
 @function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
-def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95):
+def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95, active_context=None):
     """ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_quantile_diffs
     
      # sns.relplot(
@@ -2795,11 +2795,12 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import seaborn as sns
+    from flexitext import flexitext ## flexitext for formatted matplotlib text
 
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
     
-
     ripple_combined_epoch_stats_df = deepcopy(merged_complete_epoch_stats_df)
 
     # Filter rows based on columns: 'Long_BestDir_quantile', 'Short_BestDir_quantile'
@@ -2807,11 +2808,38 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
     LR_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==0) & ((ripple_combined_epoch_stats_df['LR_Long_pearson_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['LR_Short_percentile'] > quantile_significance_threshold))]
     RL_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==1) & ((ripple_combined_epoch_stats_df['RL_Long_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Short_percentile'] > quantile_significance_threshold))]
    
+    if active_context is not None:
+        display_context = active_context.adding_context('display_fn', display_fn_name='plot_quantile_diffs')
+        
     with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
         # Create a FigureCollector instance
-        with FigureCollector(name='plot_quantile_diffs') as collector:
+        with FigureCollector(name='plot_quantile_diffs', context=display_context) as collector:
+
+            ## Define common operations to do after making the figure:
+            def setup_common_after_creation(a_collector, fig, axes, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>'):
+                """ Captures:
+
+                t_split
+                """
+                # Add epoch indicators
+                for ax in (axes if isinstance(axes, Iterable) else [axes]):
+                    PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+                    
+                    # `flexitext` version:
+                    text_formatter = FormattedFigureText()
+                    ax.set_title('')
+                    fig.suptitle('')
+                    text_formatter.setup_margins(fig)
+                    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
+                                            title,
+                                            va="bottom", xycoords="figure fraction")
+                    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                                                text_formatter._build_footer_string(active_context=a_collector.context),
+                                                va="top", xycoords="figure fraction")
+            
+
             # Plot for BestDir
-            fig, ax = collector.subplots(num='LongShort_BestDir_quantile_diff')
+            fig, ax = collector.subplots(num='LongShort_BestDir_quantile_diff', clear=True)
             _out_BestDir = sns.scatterplot(
                 ax=ax,
                 data=significant_BestDir_quantile_stats_df,
@@ -2820,14 +2848,33 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                 # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
                 # **marker_style,  # Apply additional marker styling from the dictionary
             )
-            _out_BestDir.set_title('Sig. (>0.95) Best Quantile Diff')
-            PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+            # _out_BestDir.set_title('Sig. (>0.95) Best Quantile Diff')
             # out_dict['BestDir'] = (fig, ax, _out_BestDir)
+            setup_common_after_creation(collector, fig=fig, axes=ax, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> Quantile Diff</>')
+            # Add epoch indicators:
+            # PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+            
+            # # `flexitext` version:
+            # text_formatter = FormattedFigureText()
+            # plt.title('')
+            # plt.suptitle('')
+            # text_formatter.setup_margins(fig)
+            # title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>', va="bottom", xycoords="figure fraction")
+            # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+
+            # def _perform_write_to_file_callback():
+            #     return owning_pipeline_reference.output_figure(final_context, fig)
+            
+            # if save_figure:
+            #     active_out_figure_paths = _perform_write_to_file_callback()
+            # else:
+            #     active_out_figure_paths = []
+            
 
             # Assuming you have the DataFrame 'LR_likely_active_df' and 'marker_style' dictionary
 
             # Create the scatter plot with Seaborn, using 'size' to set marker sizes
-            fig, ax = collector.subplots(num='LR-LR_LongShort_LR_quantile_diff')
+            fig, ax = collector.subplots(num='LR-LR_LongShort_LR_quantile_diff', clear=True)
             _out_LR = sns.scatterplot(
                 ax=ax,
                 data=LR_likely_active_df,
@@ -2836,13 +2883,14 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                 # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
                 # **marker_style,  # Apply additional marker styling from the dictionary
             )
-            _out_LR.set_title('Sig. (>0.95) LR-LR (LR-Likely) Quantile Diff')
-            PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+            setup_common_after_creation(collector, fig=fig, axes=ax, title=f'<size:22> Sig. (>0.95) <weight:bold>LR-LR (LR-Likely)</> Quantile Diff</>')
+            # _out_LR.set_title('Sig. (>0.95) LR-LR (LR-Likely) Quantile Diff')
+            # PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
             # out_dict['LR-Likely'] = (fig, ax, _out_LR)
             
            
 
-            fig, ax = collector.subplots(num='RL-RL_LongShort_RL_quantile_diff')
+            fig, ax = collector.subplots(num='RL-RL_LongShort_RL_quantile_diff', clear=True)
             _out_RL = sns.scatterplot(
                 ax=ax,
                 data=RL_likely_active_df[RL_likely_active_df['RL_Long_rel_num_cells']>10],
@@ -2851,8 +2899,9 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                 # size='RL_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
                 # **marker_style,  # Apply additional marker styling from the dictionary
             )
-            _out_RL.set_title('Sig. (>0.95) RL-RL (RL-Likely) Quantile Diff')
-            PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+            setup_common_after_creation(collector, fig=fig, axes=ax, title=f'<size:22> Sig. (>0.95) <weight:bold>RL-RL (RL-Likely)</> Quantile Diff</>')
+            # _out_RL.set_title('Sig. (>0.95) RL-RL (RL-Likely) Quantile Diff')
+            # PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
             # out_dict['RL-Likely'] = (fig, ax, _out_RL)
 
 
