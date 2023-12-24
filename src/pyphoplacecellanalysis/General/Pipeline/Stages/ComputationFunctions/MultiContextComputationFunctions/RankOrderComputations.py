@@ -2778,70 +2778,88 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
     return significant_ripple_combined_epoch_stats_df[['midtimes', 'LongShort_BestDir_quantile_diff']].plot(x='midtimes', y='LongShort_BestDir_quantile_diff', title='Sig. (>0.95) Best Quantile Diff', **marker_style, marker='o')
     
 
+import matplotlib.pyplot as plt
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
 
 
 @function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
-def plot_quantile_diffs(merged_complete_epoch_stats_df, quantile_significance_threshold: float = 0.95):
+def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95):
     """ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_quantile_diffs
     
-    
+     # sns.relplot(
+            #     data=tips, x="total_bill", y="tip",
+            #     col="time", hue="day", style="day",
+            #     kind="scatter"
+            # )
     """
+    import matplotlib as mpl
     import seaborn as sns
 
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    
     ripple_combined_epoch_stats_df = deepcopy(merged_complete_epoch_stats_df)
 
     # Filter rows based on columns: 'Long_BestDir_quantile', 'Short_BestDir_quantile'
     significant_BestDir_quantile_stats_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['Long_BestDir_quantile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['Short_BestDir_quantile'] > quantile_significance_threshold)]
     LR_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==0) & ((ripple_combined_epoch_stats_df['LR_Long_pearson_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['LR_Short_percentile'] > quantile_significance_threshold))]
     RL_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==1) & ((ripple_combined_epoch_stats_df['RL_Long_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Short_percentile'] > quantile_significance_threshold))]
+    out_dict = {}
+    
+    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+        # Create a FigureCollector instance
+        with FigureCollector(name='name') as collector:
+            # Plot for BestDir
+            fig, ax = collector.subplots(num='LongShort_BestDir_quantile_diff')
+            _out_BestDir = sns.scatterplot(
+                ax=ax,
+                data=significant_BestDir_quantile_stats_df,
+                x='start',
+                y='LongShort_BestDir_quantile_diff',
+                # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+                # **marker_style,  # Apply additional marker styling from the dictionary
+            )
+            _out_BestDir.set_title('Sig. (>0.95) Best Quantile Diff')
+            PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+            # out_dict['BestDir'] = (fig, ax, _out_BestDir)
 
-    fig, ax = plt.subplots(num='LongShort_BestDir_quantile_diff')
-    _out_LR = sns.scatterplot(
-        ax=ax,
-        data=significant_BestDir_quantile_stats_df,
-        x='start',
-        y='LongShort_BestDir_quantile_diff',
-        size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-        # **marker_style,  # Apply additional marker styling from the dictionary
-    )
-    _out_LR.set_title('Sig. (>0.95) Best Quantile Diff')
+            # Assuming you have the DataFrame 'LR_likely_active_df' and 'marker_style' dictionary
+
+            # Create the scatter plot with Seaborn, using 'size' to set marker sizes
+            fig, ax = collector.subplots(num='LR-LR_LongShort_LR_quantile_diff')
+            _out_LR = sns.scatterplot(
+                ax=ax,
+                data=LR_likely_active_df,
+                x='start',
+                y='LongShort_LR_quantile_diff',
+                # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+                # **marker_style,  # Apply additional marker styling from the dictionary
+            )
+            _out_LR.set_title('Sig. (>0.95) LR-LR (LR-Likely) Quantile Diff')
+            PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+            # out_dict['LR-Likely'] = (fig, ax, _out_LR)
+            
+           
+
+            fig, ax = collector.subplots(num='RL-RL_LongShort_RL_quantile_diff')
+            _out_RL = sns.scatterplot(
+                ax=ax,
+                data=RL_likely_active_df[RL_likely_active_df['RL_Long_rel_num_cells']>10],
+                x='start',
+                y='LongShort_RL_quantile_diff',
+                # size='RL_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+                # **marker_style,  # Apply additional marker styling from the dictionary
+            )
+            _out_RL.set_title('Sig. (>0.95) RL-RL (RL-Likely) Quantile Diff')
+            PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+            # out_dict['RL-Likely'] = (fig, ax, _out_RL)
 
 
-    # Assuming you have the DataFrame 'LR_likely_active_df' and 'marker_style' dictionary
+    # Access the collected figures outside the context manager
+    # result = tuple(collector.created_figures)
 
-    # Create the scatter plot with Seaborn, using 'size' to set marker sizes
-    fig, ax = plt.subplots(num='LR-LR_LongShort_LR_quantile_diff')
-    _out_LR = sns.scatterplot(
-        ax=ax,
-        data=LR_likely_active_df,
-        x='start',
-        y='LongShort_LR_quantile_diff',
-        size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-        # **marker_style,  # Apply additional marker styling from the dictionary
-    )
-    _out_LR.set_title('Sig. (>0.95) LR-LR (LR-Likely) Quantile Diff')
-    # sns.relplot(
-    #     data=tips, x="total_bill", y="tip",
-    #     col="time", hue="day", style="day",
-    #     kind="scatter"
-    # )
+    return collector
+    
 
-    # Show the plot
-    plt.show()
-
-    fig, ax = plt.subplots(num='RL-RL_LongShort_RL_quantile_diff')
-    # _out_RL = RL_likely_active_df[['start', 'LongShort_RL_quantile_diff']].plot(x='start', y='LongShort_RL_quantile_diff', title='Sig. (>0.95) RL-RL (RL-Likely) Quantile Diff', **marker_style, marker='o')
-    _out_RL = sns.scatterplot(
-        ax=ax,
-        data=RL_likely_active_df[RL_likely_active_df['RL_Long_rel_num_cells']>10],
-        x='start',
-        y='LongShort_RL_quantile_diff',
-        size='RL_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-        # **marker_style,  # Apply additional marker styling from the dictionary
-    )
-    _out_RL.set_title('Sig. (>0.95) RL-RL (RL-Likely) Quantile Diff')
-    _out_RL
-    plt.show()
 
 def _validate_estimated_lap_dirs(global_any_laps_epochs_obj):
 	""" 2023-12-19 - validstes the estimated lap directions against the ground-truth direction which is known for the laps. 
