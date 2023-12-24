@@ -2586,8 +2586,8 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
 
 # 	# Add long/short epoch indicator regions
 # 	if long_epoch is not None and short_epoch is not None:
-# 		long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(p1, long_epoch, short_epoch)
-# 		long_epoch_indicator_region_items_raw, short_epoch_indicator_region_items_raw = _helper_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
+# 		long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(p1, long_epoch, short_epoch)
+# 		long_epoch_indicator_region_items_raw, short_epoch_indicator_region_items_raw = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
 # 	else:
 # 		long_epoch_indicator_region_items, short_epoch_indicator_region_items = None, None
 # 		long_epoch_indicator_region_items_raw, short_epoch_indicator_region_items_raw = None, None
@@ -2693,7 +2693,7 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
         lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, laps_result_tuple, 'Lap')
 
     """
-    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions # used in `plot_z_score_diff_and_raw`
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers # used in `plot_z_score_diff_and_raw`
     
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
@@ -2741,9 +2741,9 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
     )
 
     app, win, diff_p1, out_plot_1D, *out_hist_stuff = _display_z_score_diff_outputs
-    long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(diff_p1, long_epoch, short_epoch)
+    long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(diff_p1, long_epoch, short_epoch)
     raw_app, raw_win, raw_p1, raw_out_plot_1D = _display_z_score_raw_outputs
-    long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
+    long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
 
     active_connections_dict = {}  # for holding connections
     return app, win, diff_p1, out_plot_1D, raw_app, raw_win, raw_p1, raw_out_plot_1D
@@ -2903,7 +2903,7 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
     
 
 
-def _validate_estimated_lap_dirs(global_any_laps_epochs_obj):
+def _validate_estimated_lap_dirs(rank_order_results, global_any_laps_epochs_obj):
 	""" 2023-12-19 - validstes the estimated lap directions against the ground-truth direction which is known for the laps. 
  	"""
 	 
