@@ -2783,7 +2783,7 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
 
 
 @function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
-def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95, active_context=None):
+def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95, active_context=None, perform_write_to_file_callback=None):
     """ Plots three Matplotlib figures displaying the quantile differences
     
     Usage:
@@ -2825,14 +2825,16 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
         
     with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
         # Create a FigureCollector instance
-        with FigureCollector(name='plot_quantile_diffs', context=display_context) as collector:
+        with FigureCollector(name='plot_quantile_diffs', base_context=display_context) as collector:
 
             ## Define common operations to do after making the figure:
-            def setup_common_after_creation(a_collector, fig, axes, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>'):
+            def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>'):
                 """ Captures:
 
                 t_split
                 """
+                a_collector.contexts.append(sub_context)
+                
                 # Add epoch indicators
                 for ax in (axes if isinstance(axes, Iterable) else [axes]):
                     PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
@@ -2846,9 +2848,12 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                                             title,
                                             va="bottom", xycoords="figure fraction")
                     footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
-                                                text_formatter._build_footer_string(active_context=a_collector.context),
+                                                text_formatter._build_footer_string(active_context=sub_context),
                                                 va="top", xycoords="figure fraction")
             
+                if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+                    perform_write_to_file_callback(sub_context, fig)
+                
 
             # Plot for BestDir
             fig, ax = collector.subplots(num='LongShort_BestDir_quantile_diff', clear=True)
@@ -2859,18 +2864,9 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                 y='LongShort_BestDir_quantile_diff',
                 # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
             )
-            setup_common_after_creation(collector, fig=fig, axes=ax, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> Quantile Diff</>')
+            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='BestDir'), 
+                                        title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> Quantile Diff</>')
             
-            # def _perform_write_to_file_callback():
-            #     return owning_pipeline_reference.output_figure(final_context, fig)
-            
-            # if save_figure:
-            #     active_out_figure_paths = _perform_write_to_file_callback()
-            # else:
-            #     active_out_figure_paths = []
-            
-
-            # Assuming you have the DataFrame 'LR_likely_active_df' and 'marker_style' dictionary
 
             # Create the scatter plot with Seaborn, using 'size' to set marker sizes
             fig, ax = collector.subplots(num='LR-LR_LongShort_LR_quantile_diff', clear=True)
@@ -2881,7 +2877,8 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                 y='LongShort_LR_quantile_diff',
                 # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
             )
-            setup_common_after_creation(collector, fig=fig, axes=ax, title=f'<size:22> Sig. (>0.95) <weight:bold>LR-LR (LR-Likely)</> Quantile Diff</>')
+            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='LR-Likely'), 
+                                         title=f'<size:22> Sig. (>0.95) <weight:bold>LR-LR (LR-Likely)</> Quantile Diff</>')
             
 
             fig, ax = collector.subplots(num='RL-RL_LongShort_RL_quantile_diff', clear=True)
@@ -2892,7 +2889,8 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                 y='LongShort_RL_quantile_diff',
                 # size='RL_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
             )
-            setup_common_after_creation(collector, fig=fig, axes=ax, title=f'<size:22> Sig. (>0.95) <weight:bold>RL-RL (RL-Likely)</> Quantile Diff</>')
+            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='RL-Likely'), 
+                                         title=f'<size:22> Sig. (>0.95) <weight:bold>RL-RL (RL-Likely)</> Quantile Diff</>')
             
 
 
