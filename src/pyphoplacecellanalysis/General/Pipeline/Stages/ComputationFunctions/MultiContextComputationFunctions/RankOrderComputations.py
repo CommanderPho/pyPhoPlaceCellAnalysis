@@ -2778,8 +2778,8 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
     return significant_ripple_combined_epoch_stats_df[['midtimes', 'LongShort_BestDir_quantile_diff']].plot(x='midtimes', y='LongShort_BestDir_quantile_diff', title='Sig. (>0.95) Best Quantile Diff', **marker_style, marker='o')
     
 
-import matplotlib.pyplot as plt
-from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+
+
 
 
 @function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
@@ -2793,21 +2793,23 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
             # )
     """
     import matplotlib as mpl
+    import matplotlib.pyplot as plt
     import seaborn as sns
 
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
     
+
     ripple_combined_epoch_stats_df = deepcopy(merged_complete_epoch_stats_df)
 
     # Filter rows based on columns: 'Long_BestDir_quantile', 'Short_BestDir_quantile'
     significant_BestDir_quantile_stats_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['Long_BestDir_quantile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['Short_BestDir_quantile'] > quantile_significance_threshold)]
     LR_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==0) & ((ripple_combined_epoch_stats_df['LR_Long_pearson_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['LR_Short_percentile'] > quantile_significance_threshold))]
     RL_likely_active_df = ripple_combined_epoch_stats_df[(ripple_combined_epoch_stats_df['combined_best_direction_indicies']==1) & ((ripple_combined_epoch_stats_df['RL_Long_percentile'] > quantile_significance_threshold) | (ripple_combined_epoch_stats_df['RL_Short_percentile'] > quantile_significance_threshold))]
-    out_dict = {}
-    
+   
     with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
         # Create a FigureCollector instance
-        with FigureCollector(name='name') as collector:
+        with FigureCollector(name='plot_quantile_diffs') as collector:
             # Plot for BestDir
             fig, ax = collector.subplots(num='LongShort_BestDir_quantile_diff')
             _out_BestDir = sns.scatterplot(
