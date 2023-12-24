@@ -2784,8 +2784,20 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
 
 @function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
 def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95, active_context=None):
-    """ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_quantile_diffs
+    """ Plots three Matplotlib figures displaying the quantile differences
     
+    Usage:
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_quantile_diffs
+
+    _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+    global_epoch = curr_active_pipeline.filtered_epochs[global_epoch_name]
+    short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
+    split_time_t: float = short_epoch.t_start
+    active_context = curr_active_pipeline.sess.get_context()
+
+    collector = plot_quantile_diffs(ripple_merged_complete_epoch_stats_df, t_split=split_time_t, active_context=active_context)
+
      # sns.relplot(
             #     data=tips, x="total_bill", y="tip",
             #     col="time", hue="day", style="day",
