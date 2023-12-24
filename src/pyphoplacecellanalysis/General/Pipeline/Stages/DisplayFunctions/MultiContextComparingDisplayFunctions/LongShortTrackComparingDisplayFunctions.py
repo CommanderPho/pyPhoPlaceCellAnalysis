@@ -84,32 +84,6 @@ def build_extra_cell_info_label_string(row) -> str:
 
 
 
-
-@function_attributes(short_name=None, tags=['pyqtgraph', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=['pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.build_pyqtgraph_epoch_indicator_regions'], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 19:04')
-def _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch):
-    """Add session indicators to pyqtgraph plot for the long and the short epoch
-
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.LongShortTrackComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _helper_add_long_short_session_indicator_regions
-
-            long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
-            short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
-            long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
-
-            long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
-            short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items
-    """
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
-    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions # Add session indicators to pyqtgraph plot
-
-    long_short_display_config_manager = LongShortDisplayConfigManager()
-    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
-    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
-
-    long_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=long_epoch.t_start, t_stop=long_epoch.t_stop, **long_epoch_config)
-    short_epoch_indicator_region_items = build_pyqtgraph_epoch_indicator_regions(win, t_start=short_epoch.t_start, t_stop=short_epoch.t_stop, **short_epoch_config)
-    return long_epoch_indicator_region_items, short_epoch_indicator_region_items
-
-
 # noinspection PyMethodParameters
 class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ LongShortTrackComparingDisplayFunctions
@@ -2086,6 +2060,8 @@ def plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_
         win, plots = plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_obj, short_results_obj, long_epoch_name, short_epoch_name)
     
     """
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    
     # Private Subfunctions _______________________________________________________________________________________________ #
     def _subfn_add_difference_plot_series(win, plots, result_df_grouped, series_suffix, **kwargs):
         """ captures nothing
@@ -2153,7 +2129,7 @@ def plot_long_short_surprise_difference_plot(curr_active_pipeline, long_results_
     # Add session indicators to pyqtgraph plot
     long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
     short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
-    long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
+    long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
 
     # epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(win, t_start=curr_active_pipeline.filtered_epochs[long_epoch_name].t_start, t_stop=curr_active_pipeline.filtered_epochs[long_epoch_name].t_stop, epoch_label='long', **dict(pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')))
     # epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(win, t_start=curr_active_pipeline.filtered_epochs[short_epoch_name].t_start, t_stop=curr_active_pipeline.filtered_epochs[short_epoch_name].t_stop, epoch_label='short', **dict(pen=pg.mkPen('#490000'), brush=pg.mkBrush('#f5161659'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')))
