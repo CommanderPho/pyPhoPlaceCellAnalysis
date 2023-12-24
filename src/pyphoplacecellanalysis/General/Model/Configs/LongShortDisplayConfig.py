@@ -201,13 +201,22 @@ long_short_display_config_manager = LongShortDisplayConfigManager()
 
 
 class PlottingHelpers:
+    """ 
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    
+    PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions
+    
+    import pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig.PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions as _helper_add_long_short_session_indicator_regions
+    
+    
+    """
 
     @function_attributes(short_name=None, tags=['matplotlib', 'epoch', 'region'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-23 17:52', related_items=[])
     def helper_matplotlib_add_long_short_epoch_indicator_regions(ax, t_split: float):
         """ Draws the two indicator regions for the long and short track.
         analagous to `_helper_add_long_short_session_indicator_regions` but for matplotlib figures 
         
-        from neuropy.utils.matplotlib_helpers import build_matplotlib_epoch_indicator_regions
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
         
         """
         output_dict = {}
