@@ -83,8 +83,120 @@ z
 """
 
 
+@define(slots=False, repr=False, eq=False)
+class Zscorer(HDFMixin):
+    """
+    Zscorer recieves the list of raw metric values, one for each shuffle, which is stores in .original_values
+
+    It also receives the "real" non-shuffled value, which is stores in .real_value
+
+
+
+    """
+    original_values: NDArray = serialized_field(repr=False, is_computable=False, eq=attrs.cmp_using(eq=np.array_equal))
+    mean: float = serialized_attribute_field(repr=True, is_computable=True)
+    std_dev: float = serialized_attribute_field(repr=True, is_computable=True)
+    n_values: int = serialized_attribute_field(repr=True, is_computable=True)
+
+    real_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False)
+    real_p_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False)
+    z_score_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False) # z-score values
+
+
+    @classmethod
+    def init_from_values(cls, stats_corr_values: NDArray, real_value=None, real_p_value=None):
+        _obj = cls(original_values=stats_corr_values, mean=np.mean(stats_corr_values), std_dev=np.std(stats_corr_values), n_values=len(stats_corr_values), real_value=real_value, real_p_value=real_p_value, z_score_value=None)
+        _obj.z_score_value = _obj.Zscore(real_value)
+        return _obj
+
+    def Zscore(self, xcritical):
+        self.z_score_value = (xcritical - self.mean)/self.std_dev
+        return self.z_score_value
+
+    # def plot_distribution(self):
+    #     """ plots a standalone figure showing the distribution of the original values and their fisher_z_transformed version in a histogram. """
+    #     win = pg.GraphicsLayoutWidget(show=True)
+    #     win.resize(800,350)
+    #     win.setWindowTitle('Z-Scorer: Histogram')
+    #     plt1 = win.addPlot()
+    #     vals = self.original_values
+    #     fisher_z_transformed_vals = np.arctanh(vals)
+
+    #     ## compute standard histogram
+    #     y, x = np.histogram(vals) # , bins=np.linspace(-3, 8, 40)
+    #     fisher_z_transformed_y, x = np.histogram(fisher_z_transformed_vals, bins=x)
+
+    #     ## Using stepMode="center" causes the plot to draw two lines for each sample.
+    #     ## notice that len(x) == len(y)+1
+    #     plt1.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,50), name='original_values')
+    #     plt1.plot(x, fisher_z_transformed_y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,255,100,50), name='fisher_z_values')
+
+    #     # ## Now draw all points as a nicely-spaced scatter plot
+    #     # y = pg.pseudoScatter(vals, spacing=0.15)
+    #     # #plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5)
+    #     # plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5, symbolPen=(255,255,255,200), symbolBrush=(0,0,255,150))
+
+    #     return win, plt1
+
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # if 'identity' not in state:
+        #     print(f'unpickling from old NeuropyPipelineStage')
+        #     state['identity'] = None
+        #     state['identity'] = type(self).get_stage_identity()
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        super(Zscorer, self).__init__() # from
+        
+
+
 LongShortStatsTuple = namedtuple('LongShortStatsTuple', ['long_stats_z_scorer', 'short_stats_z_scorer', 'long_short_z_diff', 'long_short_naive_z_diff', 'is_forward_replay']) # used in `compute_shuffled_rankorder_analyses`
 # LongShortStatsTuple: Tuple[Zscorer, Zscorer, float, float, bool]
+
+@define(slots=False)
+class LongShortStatsItem(object):
+    """ built using # CodeConversion.convert_dictionary_to_class_defn
+    from namedtuple LongShortStatsTuple
+    """
+    long_stats_z_scorer: Zscorer = field()
+    short_stats_z_scorer: Zscorer = field()
+    long_short_z_diff: np.float64 = field()
+    long_short_naive_z_diff: np.float64 = field()
+    is_forward_replay: np.bool_ = field()
+    
+    @classmethod
+    def init_from_LongShortStatsTuple(cls, a_tuple) -> "LongShortStatsItem":
+        return cls(**a_tuple._asdict())
+
+
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # del state['long_stats_z_scorer']
+        # del state['short_stats_z_scorer']
+
+        state['long_stats_z_scorer'] = state['long_stats_z_scorer'].__getstate__()
+        state['short_stats_z_scorer'] = state['short_stats_z_scorer'].__getstate__()
+
+        return state
+
+    # def __setstate__(self, state):
+    #     # Restore instance attributes (i.e., _mapping and _keys_at_init).
+    #     # if 'identity' not in state:
+    #     #     print(f'unpickling from old NeuropyPipelineStage')
+    #     #     state['identity'] = None
+    #     #     state['identity'] = type(self).get_stage_identity()
+    #     self.__dict__.update(state)
+    #     # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+    #     super(LongShortStatsItem, self).__init__() # from
+
 
 
 @function_attributes(short_name=None, tags=['rank_order', 'shuffle', 'renormalize'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-23 13:05', related_items=[])
@@ -270,86 +382,13 @@ class ShuffleHelper(HDFMixin):
 
 
 @define(slots=False, repr=False, eq=False)
-class Zscorer(HDFMixin):
-    """
-    Zscorer recieves the list of raw metric values, one for each shuffle, which is stores in .original_values
-
-    It also receives the "real" non-shuffled value, which is stores in .real_value
-
-
-
-    """
-    original_values: NDArray = serialized_field(repr=False, is_computable=False, eq=attrs.cmp_using(eq=np.array_equal))
-    mean: float = serialized_attribute_field(repr=True, is_computable=True)
-    std_dev: float = serialized_attribute_field(repr=True, is_computable=True)
-    n_values: int = serialized_attribute_field(repr=True, is_computable=True)
-
-    real_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False)
-    real_p_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False)
-    z_score_value: float = serialized_attribute_field(default=None, repr=True, is_computable=False) # z-score values
-
-
-    @classmethod
-    def init_from_values(cls, stats_corr_values: NDArray, real_value=None, real_p_value=None):
-        _obj = cls(original_values=stats_corr_values, mean=np.mean(stats_corr_values), std_dev=np.std(stats_corr_values), n_values=len(stats_corr_values), real_value=real_value, real_p_value=real_p_value, z_score_value=None)
-        _obj.z_score_value = _obj.Zscore(real_value)
-        return _obj
-
-    def Zscore(self, xcritical):
-        self.z_score_value = (xcritical - self.mean)/self.std_dev
-        return self.z_score_value
-
-    # def plot_distribution(self):
-    #     """ plots a standalone figure showing the distribution of the original values and their fisher_z_transformed version in a histogram. """
-    #     win = pg.GraphicsLayoutWidget(show=True)
-    #     win.resize(800,350)
-    #     win.setWindowTitle('Z-Scorer: Histogram')
-    #     plt1 = win.addPlot()
-    #     vals = self.original_values
-    #     fisher_z_transformed_vals = np.arctanh(vals)
-
-    #     ## compute standard histogram
-    #     y, x = np.histogram(vals) # , bins=np.linspace(-3, 8, 40)
-    #     fisher_z_transformed_y, x = np.histogram(fisher_z_transformed_vals, bins=x)
-
-    #     ## Using stepMode="center" causes the plot to draw two lines for each sample.
-    #     ## notice that len(x) == len(y)+1
-    #     plt1.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,50), name='original_values')
-    #     plt1.plot(x, fisher_z_transformed_y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,255,100,50), name='fisher_z_values')
-
-    #     # ## Now draw all points as a nicely-spaced scatter plot
-    #     # y = pg.pseudoScatter(vals, spacing=0.15)
-    #     # #plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5)
-    #     # plt2.plot(vals, y, pen=None, symbol='o', symbolSize=5, symbolPen=(255,255,255,200), symbolBrush=(0,0,255,150))
-
-    #     return win, plt1
-
-    ## For serialization/pickling:
-    def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
-        state = self.__dict__.copy()
-        return state
-
-    def __setstate__(self, state):
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        # if 'identity' not in state:
-        #     print(f'unpickling from old NeuropyPipelineStage')
-        #     state['identity'] = None
-        #     state['identity'] = type(self).get_stage_identity()
-        self.__dict__.update(state)
-        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        super(Zscorer, self).__init__() # from
-        
-
-
-@define(slots=False, repr=False, eq=False)
 class RankOrderResult(ComputedResult):
     """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
 
 
     """
     # is_global: bool = non_serialized_field(default=True, repr=False)
-    ranked_aclus_stats_dict: Dict[int, LongShortStatsTuple] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v))) # , serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v))
+    ranked_aclus_stats_dict: Dict[int, LongShortStatsItem] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v))) # , serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v))
     selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v)))
 
     long_z_score: NDArray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
@@ -377,11 +416,28 @@ class RankOrderResult(ComputedResult):
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
+        # del state['extra_info_dict'] # drop 'extra_info_dict'
+        if len(state['ranked_aclus_stats_dict']) > 0:
+            example_item = list(state['ranked_aclus_stats_dict'].values())[0] # first item
+            if not isinstance(example_item, LongShortStatsItem):
+                # convert all to stats items:
+                state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v._asdict()) for k,v in state['ranked_aclus_stats_dict'].items()}
+            state['ranked_aclus_stats_dict'] = {k:v.__getstate__() for k,v in state['ranked_aclus_stats_dict'].items()} # call the .__getstate__() for each dict entry
+
         return state
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        
+        # convert from old named-tuple based items to LongShortStatsItem (2024-01-02):
+        if len(state['ranked_aclus_stats_dict']) > 0:
+            example_item = list(state['ranked_aclus_stats_dict'].values())[0] # first item
+            if not isinstance(example_item, LongShortStatsItem):
+                # convert all to stats items:
+                state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v._asdict()) for k,v in state['ranked_aclus_stats_dict'].items()}
+            
         self.__dict__.update(state)
+
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         super(RankOrderResult, self).__init__()
         
@@ -683,7 +739,9 @@ class RankOrderComputationsContainer(ComputedResult):
     # Utility Methods ____________________________________________________________________________________________________ #
 
     def to_dict(self) -> Dict:
-        return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
+        # return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
+        return {k:v for k, v in self.__dict__.items() if k not in ['is_global']}
+    
 
 
     def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, **kwargs):
@@ -1250,8 +1308,8 @@ class RankOrderAnalyses:
                 long_short_z_diff: float = 0.0 # the value is exactly zero. Surprising.
 
             long_short_naive_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value # `long_short_naive_z_diff` was the old pre-2023-12-07 way of calculating the z-score diff.
-            epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsTuple(long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay)
-
+            # epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay)
+            epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer=long_stats_z_scorer, short_stats_z_scorer=short_stats_z_scorer, long_short_z_diff=long_short_z_diff, long_short_naive_z_diff=long_short_naive_z_diff, is_forward_replay=is_forward_replay)
 
         ## END for epoch_id
 
@@ -1262,7 +1320,7 @@ class RankOrderAnalyses:
         long_short_z_score_diff_values = []
 
         for epoch_id, epoch_stats in epoch_ranked_aclus_stats_dict.items():
-            long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay = epoch_stats
+            long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff = epoch_stats.long_stats_z_scorer, epoch_stats.short_stats_z_scorer, epoch_stats.long_short_z_diff 
             # paired_test = pho_stats_paired_t_test(long_stats_z_scorer.z_score_values, short_stats_z_scorer.z_score_values) # this doesn't seem to work well
             long_z_score_values.append(long_stats_z_scorer.z_score_value)
             short_z_score_values.append(short_stats_z_scorer.z_score_value)
