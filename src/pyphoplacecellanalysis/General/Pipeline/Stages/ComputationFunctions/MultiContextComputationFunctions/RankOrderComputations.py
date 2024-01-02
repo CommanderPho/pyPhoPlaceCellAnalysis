@@ -441,7 +441,7 @@ class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
         return pd.DataFrame.from_dict(self.directional_likelihoods_tuple._asdict()).astype({'long_best_direction_indices': 'int8', 'short_best_direction_indices': 'int8'})
 
 
-    def plot_histograms(self, **kwargs) -> MatplotlibRenderPlots:
+    def plot_histograms(self, **kwargs) -> "MatplotlibRenderPlots":
         """ 
         num='RipplesRankOrderZscore'
         """
