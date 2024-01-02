@@ -2920,7 +2920,7 @@ def setup_histogram_common_after_creation(fig, axes, sub_context, title=f'<size:
     # `flexitext` version:
     text_formatter = FormattedFigureText()
     fig.suptitle('')
-    text_formatter.setup_margins(fig)
+    text_formatter.setup_margins(fig, top_margin=0.740)
     title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
     footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
                                 text_formatter._build_footer_string(active_context=sub_context),
