@@ -433,6 +433,7 @@ DirectionalRankOrderResultBase = namedtuple('DirectionalRankOrderResultBase', ['
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
 
 
+# @define(slots=False, order=True)
 class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
 
     @property
