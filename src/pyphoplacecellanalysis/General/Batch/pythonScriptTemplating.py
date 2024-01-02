@@ -173,8 +173,8 @@ def display_generated_scripts_ipywidget(included_session_contexts, output_python
 
     _out_path_widgets = []
     for a_ctxt, a_python_script in zip(included_session_contexts, output_python_scripts):
-        a_computation_script_path = a_python_script[0]
-        a_generate_figures_script_path = a_python_script[1]
+        a_computation_script_path = Path(a_python_script[0]).resolve()
+        a_generate_figures_script_path = Path(a_python_script[1]).resolve()
     
         _out_path_widgets.append(fullwidth_path_widget(a_computation_script_path, a_computation_script_path.name))
 
