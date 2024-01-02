@@ -448,7 +448,8 @@ class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
         num='RipplesRankOrderZscore'
         """
         print(f'.plot_histograms(..., kwargs: {kwargs})')
-        fig = plt.figure(layout="constrained", **kwargs)
+        
+        fig = plt.figure(**kwargs) # layout="constrained", 
         ax_dict = fig.subplot_mosaic(
             [
                 ["long_short_best_z_score_diff", "long_short_best_z_score_diff"],
