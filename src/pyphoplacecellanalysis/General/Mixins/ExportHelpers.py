@@ -113,7 +113,8 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
     ## save to file
     exporter.export(str(savepath))
     if progress_print:
-        print(f'exported plot to {savepath}')
+        print(f'exported plot to "{savepath}"')
+    return savepath
 
 
 # ==================================================================================================================== #

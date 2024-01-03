@@ -804,6 +804,34 @@ class RankOrderAnalyses:
 
 
     # Plotting/Figure Helper Functions ___________________________________________________________________________________ #
+    def _subfn_perform_common_build_plot(title_str: str, plot_title: str='', left='Long-Short Z-Score Diff', variable_name='Lap', x_axis_name_suffix='Index'):
+        """ plots the z-score differences
+        Usage:
+            app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _subfn_perform_common_build_plot(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
+        """
+        title_str: str = f"Rank Order {variable_name}s Epoch Debugger"
+        
+        app = pg.mkQApp(title_str)
+        win = pg.GraphicsLayoutWidget(show=True, title=title_str)
+        win.setWindowTitle(title_str)
+        header_label = pg.LabelItem(justify='left')
+        header_label.setText('TEST LABEL TEXT')
+        win.addItem(header_label, row=1, col=0, colspan=2)
+        
+        p1: pg.PlotItem = win.addPlot(row=2, col=0, colspan=2, title=plot_title, left=left, bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True) # PlotItem
+        # p1.addLegend()
+        # p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
+
+        # Add footer label at the bottom of the window
+        # footer_label = pg.QtWidgets.QGraphicsTextItem("Your Footer Label Text")
+        footer_label = pg.LabelItem(justify='left')
+        footer_label.setText('Your Footer Label Text')
+        # win.addItem(footer_label)
+        win.addItem(footer_label, row=3, col=0, colspan=2)
+        
+        return app, win, p1, (header_label, footer_label)
+
+
     def _perform_plot_z_score_raw(epoch_idx_list, LR_long_z_score_values, RL_long_z_score_values, LR_short_z_score_values, RL_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
         """ plots the raw z-scores for each of the four templates
 
@@ -811,15 +839,17 @@ class RankOrderAnalyses:
             app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D) = _perform_plot_z_score_raw(deepcopy(global_laps).lap_id, odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values)
 
         """
-        app = pg.mkQApp(f"Rank Order {variable_name}s Epoch Debugger")
-        win = pg.GraphicsLayoutWidget(show=True, title=f"Rank-Order (Raw) {variable_name} Epoch Debugger")
-        win.setWindowTitle(f'Rank Order (Raw) {variable_name} Epoch Debugger')
-        label = pg.LabelItem(justify='right')
-        win.addItem(label)
-        p1: pg.PlotItem = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', bottom=f'{variable_name} {x_axis_name_suffix}')
+        # app = pg.mkQApp(f"Rank Order {variable_name}s Epoch Debugger")
+        # win = pg.GraphicsLayoutWidget(show=True, title=f"Rank-Order (Raw) {variable_name} Epoch Debugger")
+        # win.setWindowTitle(f'Rank Order (Raw) {variable_name} Epoch Debugger')
+        # label = pg.LabelItem(justify='right')
+        # win.addItem(label)
+        # p1: pg.PlotItem = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', bottom=f'{variable_name} {x_axis_name_suffix}')
+        app, win, p1, (header_label, footer_label) = RankOrderAnalyses._subfn_perform_common_build_plot(title_str=f"Rank Order {variable_name}s Long-Short ZScore (Raw)",
+                                                                                plot_title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix)
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
-
+        
         ## Add table:
         # layoutWidget = pg.LayoutWidget()
         # win.addItem(layoutWidget)
@@ -888,7 +918,7 @@ class RankOrderAnalyses:
             connect_vertical_points(x, y_values)
 
 
-        return app, win, p1, (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D)
+        return app, win, p1, (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D), (header_label, footer_label)
 
 
 
@@ -897,12 +927,15 @@ class RankOrderAnalyses:
         Usage:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
         """
-        app = pg.mkQApp(f"Rank Order {variable_name}s Epoch Debugger")
-        win = pg.GraphicsLayoutWidget(show=True, title=f"Rank Order {variable_name} Epoch Debugger")
-        win.setWindowTitle(f'Rank Order {variable_name}s Epoch Debugger')
-        label = pg.LabelItem(justify='right')
-        win.addItem(label)
-        p1: pg.PlotItem = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True) # PlotItem
+        app, win, p1, (header_label, footer_label) = RankOrderAnalyses._subfn_perform_common_build_plot(title_str=f"Rank Order {variable_name}s Long-Short ZScore (Raw)",
+                                                                                plot_title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix)
+
+        # app = pg.mkQApp(f"Rank Order {variable_name}s Epoch Debugger")
+        # win = pg.GraphicsLayoutWidget(show=True, title=f"Rank Order {variable_name} Epoch Debugger")
+        # win.setWindowTitle(f'Rank Order {variable_name}s Epoch Debugger')
+        # label = pg.LabelItem(justify='right')
+        # win.addItem(label)
+        # p1: pg.PlotItem = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True) # PlotItem
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
@@ -939,7 +972,7 @@ class RankOrderAnalyses:
 
 
         ## Add marginal histogram to the right of the main plot here:
-        py: pg.PlotItem = win.addPlot(row=1, col=1, right='Marginal Long-Short Z-Score Diff', hoverable=True) # , bottom=f'{variable_name} {x_axis_name_suffix}', title=f'Marginal Rank-Order Long-Short ZScore Diff for {variable_name}'
+        py: pg.PlotItem = win.addPlot(row=2, col=1, right='Marginal Long-Short Z-Score Diff', hoverable=True) # , bottom=f'{variable_name} {x_axis_name_suffix}', title=f'Marginal Rank-Order Long-Short ZScore Diff for {variable_name}'
         ## compute standard histogram
         number_of_bins: int = 21
         vals = deepcopy(RL_laps_long_short_z_score_diff_values)
@@ -962,7 +995,7 @@ class RankOrderAnalyses:
             py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal', name='LR')
 
 
-        return app, win, p1, (even_out_plot_1D, odd_out_plot_1D), (py, )
+        return app, win, p1, (even_out_plot_1D, odd_out_plot_1D), (py, ), (header_label, footer_label)
 
 
 
@@ -2806,13 +2839,13 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
         point_data_values=epoch_identifiers
     )
 
-    app, win, diff_p1, out_plot_1D, *out_hist_stuff = _display_z_score_diff_outputs
+    app, win, diff_p1, out_plot_1D, out_hist_stuff, out_label_tuple = _display_z_score_diff_outputs
     long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(diff_p1, long_epoch, short_epoch)
-    raw_app, raw_win, raw_p1, raw_out_plot_1D = _display_z_score_raw_outputs
+    raw_app, raw_win, raw_p1, raw_out_plot_1D, raw_label_tuple = _display_z_score_raw_outputs
     long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
 
     active_connections_dict = {}  # for holding connections
-    return app, win, diff_p1, out_plot_1D, raw_app, raw_win, raw_p1, raw_out_plot_1D
+    return app, win, diff_p1, out_plot_1D, out_label_tuple, raw_app, raw_win, raw_p1, raw_out_plot_1D, raw_label_tuple
 
 
 
