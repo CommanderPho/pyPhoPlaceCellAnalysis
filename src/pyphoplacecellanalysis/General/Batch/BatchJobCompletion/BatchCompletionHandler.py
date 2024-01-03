@@ -148,7 +148,7 @@ class BatchSessionCompletionHandler:
     num_processes: Optional[int] = field(default=None)
 
     # Computations
-    enable_full_pipeline_in_ram: bool = field(default=False) 
+    # enable_full_pipeline_in_ram: bool = field(default=False)
     ## Error with enable_full_pipeline_in_ram=True:
      # 	delta_since_last_compute=datetime.timedelta(seconds=43, microseconds=466370), outputs_local={'pkl': PosixPath('/nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-08_14-26-15/loadedSessPickle.pkl')}, outputs_global={'pkl': PosixPath('/nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-08_14-26-15/output/global_computation_results.pkl'), 'hdf5': None}, across_session_results={'inst_fr_comps': None, 'curr_active_pipeline': <pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline.NeuropyPipeline object at 0x148e83474700>}))'. Reason: 'AttributeError("Can't pickle local object 'DataSessionFormatBaseRegisteredClass.build_default_filter_functions.<locals>.<dictcomp>.<lambda>'")'
 
@@ -511,18 +511,18 @@ class BatchSessionCompletionHandler:
             return []
 
 
-    def completion_decorator(self, func):
-        """ NOT USED. Don't think it works yet. 
-        func (self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) to be called """
-        self.completion_functions.append(func)
+    # def completion_decorator(self, func):
+    #     """ NOT USED. Don't think it works yet. 
+    #     func (self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) to be called """
+    #     self.completion_functions.append(func)
         
-        def wrapper(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict):
-            print("Something is happening before the function is called.")
-            across_session_results_extended_dict = func(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
-            print("Something is happening after the function is called.")
-            return across_session_results_extended_dict
+    #     def wrapper(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict):
+    #         print("Something is happening before the function is called.")
+    #         across_session_results_extended_dict = func(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
+    #         print("Something is happening after the function is called.")
+    #         return across_session_results_extended_dict
         
-        return wrapper
+    #     return wrapper
 
 
     ## Main function that's called with the complete pipeline:
