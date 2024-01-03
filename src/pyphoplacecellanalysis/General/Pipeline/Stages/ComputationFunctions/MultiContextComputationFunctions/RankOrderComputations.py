@@ -804,7 +804,7 @@ class RankOrderAnalyses:
 
 
     # Plotting/Figure Helper Functions ___________________________________________________________________________________ #
-    def _subfn_perform_common_build_plot(title_str: str, plot_title: str='', left='Long-Short Z-Score Diff', variable_name='Lap', x_axis_name_suffix='Index', active_display_context=None):
+    def _subfn_perform_common_build_plot(title_str: str, plot_title: str='', left='Long-Short Z-Score Diff', variable_name='Lap', x_axis_name_suffix='Index', active_display_context=None, show=True):
         """ plots the z-score differences
                 
         
@@ -826,7 +826,7 @@ class RankOrderAnalyses:
             active_footer_string = None
             
         app = pg.mkQApp(title_str)
-        win = pg.GraphicsLayoutWidget(show=True, title=title_str)
+        win = pg.GraphicsLayoutWidget(show=show, title=title_str)
         win.setWindowTitle(title_str)
 
         header_label = pg.LabelItem(justify='left')
@@ -843,7 +843,7 @@ class RankOrderAnalyses:
         return app, win, p1, (header_label, footer_label)
 
 
-    def _perform_plot_z_score_raw(epoch_idx_list, LR_long_z_score_values, RL_long_z_score_values, LR_short_z_score_values, RL_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, active_display_context=None):
+    def _perform_plot_z_score_raw(epoch_idx_list, LR_long_z_score_values, RL_long_z_score_values, LR_short_z_score_values, RL_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, active_display_context=None, show=True):
         """ plots the raw z-scores for each of the four templates
 
         Usage:
@@ -864,7 +864,7 @@ class RankOrderAnalyses:
             
         app, win, p1, (header_label, footer_label) = RankOrderAnalyses._subfn_perform_common_build_plot(title_str=f"Rank Order {variable_name}s Long-Short ZScore (Raw)",
                                                                                 plot_title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix,
-                                                                                active_display_context=active_display_context)
+                                                                                active_display_context=active_display_context, show=show)
         
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
@@ -945,7 +945,7 @@ class RankOrderAnalyses:
 
 
 
-    def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, include_marginal_histogram:bool=False, active_display_context=None):
+    def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, include_marginal_histogram:bool=False, active_display_context=None, show=True):
         """ plots the z-score differences
         Usage:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
@@ -970,7 +970,7 @@ class RankOrderAnalyses:
         left = 'Long-Short Z-Score Diff'
         
         app = pg.mkQApp(title_str)
-        win = pg.GraphicsLayoutWidget(show=True, title=title_str)
+        win = pg.GraphicsLayoutWidget(show=show, title=title_str)
         win.setWindowTitle(title_str)
 
         header_label = pg.LabelItem(justify='left')
@@ -2824,7 +2824,7 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
 
 
 @function_attributes(short_name=None, tags=['rank-order', 'inst_fr', 'epoch', 'lap', 'replay'], input_requires=[], output_provides=[], uses=['pyqtgraph', 'pyqt'], used_by=[], creation_date='2023-11-16 18:42', related_items=['most_likely_directional_rank_order_shuffling'])
-def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tuple, analysis_type, included_epoch_idxs=None, active_context=None, perform_write_to_file_callback=None):
+def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tuple, analysis_type, included_epoch_idxs=None, active_context=None, perform_write_to_file_callback=None, show=False):
     """
     Generalized function to perform analysis and plot for either ripples or laps.
 
@@ -2892,13 +2892,13 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
         x_values, result_tuple.long_short_best_dir_z_score_diff_values[is_epoch_significant], None,
         variable_name=analysis_type, x_axis_name_suffix=x_axis_name_suffix,
         point_data_values=epoch_identifiers,
-        active_display_context=active_display_context, perform_write_to_file_callback=perform_write_to_file_callback
+        active_display_context=active_display_context, show=show
     )
     _display_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(
         x_values, *[x[is_epoch_significant] for x in result_tuple.masked_z_score_values_list],
         variable_name=analysis_type, x_axis_name_suffix=x_axis_name_suffix,
         point_data_values=epoch_identifiers,
-        active_display_context=active_display_context, perform_write_to_file_callback=perform_write_to_file_callback
+        active_display_context=active_display_context, show=show
     )
 
     app, diff_win, diff_p1, out_plot_1D, out_hist_stuff, out_label_tuple, diff_sub_context = _display_z_score_diff_outputs
@@ -3221,6 +3221,11 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
         """ Plots the z-scores differences and their raw-values
 
         """
+        defer_render: bool = kwargs.pop('defer_render', False)
+        should_show: bool = (not defer_render)
+        
+        # #TODO 2024-01-03 05:24: - [ ] Do something to switch the matplotlib backend to 'AGG' if defer_render == True. Currently only adjusts the pyqtgraph-based figures (`plot_rank_order_epoch_inst_fr_result_tuples`)
+
         active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
         if include_includelist is None:
             include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
@@ -3269,8 +3274,8 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
                                     title=f'<size:22> Histogram: <weight:bold>laps_result_tuple</></>', perform_write_to_file_callback=_perform_write_to_file_callback)
 
         ## PyQtGraph Outputs:
-        ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, ripple_result_tuple, 'Ripple', active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
-        lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, laps_result_tuple, 'Lap', active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
+        ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, ripple_result_tuple, 'Ripple', active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, show=should_show)
+        lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, laps_result_tuple, 'Lap', active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, show=should_show)
 
 
         return quantile_diffs_collector, collector_histograms
