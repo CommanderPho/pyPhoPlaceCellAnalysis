@@ -843,7 +843,7 @@ class RankOrderAnalyses:
         return app, win, p1, (header_label, footer_label)
 
 
-    def _perform_plot_z_score_raw(epoch_idx_list, LR_long_z_score_values, RL_long_z_score_values, LR_short_z_score_values, RL_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, active_display_context=None, perform_write_to_file_callback=None):
+    def _perform_plot_z_score_raw(epoch_idx_list, LR_long_z_score_values, RL_long_z_score_values, LR_short_z_score_values, RL_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, active_display_context=None):
         """ plots the raw z-scores for each of the four templates
 
         Usage:
@@ -941,15 +941,11 @@ class RankOrderAnalyses:
             header_label.setText('')
             footer_label.setText(active_footer_string)
 
-        # if ((perform_write_to_file_callback is not None) and (active_display_sub_context is not None)):
-        #     final_context = active_display_sub_context
-        #     perform_write_to_file_callback(final_context, win)
-
         return app, win, p1, (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D), (header_label, footer_label), active_display_sub_context
 
 
 
-    def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, include_marginal_histogram:bool=False, active_display_context=None, perform_write_to_file_callback=None):
+    def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, include_marginal_histogram:bool=False, active_display_context=None):
         """ plots the z-score differences
         Usage:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
@@ -1054,10 +1050,6 @@ class RankOrderAnalyses:
             header_label.setText('')
             footer_label.setText(active_footer_string)
 
-
-        # if ((perform_write_to_file_callback is not None) and (active_display_sub_context is not None)):
-        #     final_context = active_display_sub_context
-        #     perform_write_to_file_callback(final_context, win)
 
         return app, win, p1, (even_out_plot_1D, odd_out_plot_1D), (py, ), (header_label, footer_label), active_display_sub_context
 
