@@ -497,10 +497,12 @@ class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
         return pd.DataFrame.from_dict(self.directional_likelihoods_tuple._asdict()).astype({'long_best_direction_indices': 'int8', 'short_best_direction_indices': 'int8'})
 
 
-    def plot_histograms(self, **kwargs) -> "MatplotlibRenderPlots":
+    def plot_histograms(self, **kwargs): #  -> "MatplotlibRenderPlots"
         """ 
         num='RipplesRankOrderZscore'
         """
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
+
         print(f'.plot_histograms(..., kwargs: {kwargs})')
         layout = kwargs.pop('layout', 'none')
         fig = plt.figure(layout=layout, **kwargs) # layout="constrained", 
