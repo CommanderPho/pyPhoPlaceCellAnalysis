@@ -665,11 +665,17 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
 
        Requires: `plots_data.filter_epochs_decoder_result`
     """
-    
+    # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_x_list
+    # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list
+
+    active_marginal_list = plots_data.active_marginal_fn(plots_data.filter_epochs_decoder_result)
     for i, curr_ax in enumerate(plots.axs):
         curr_time_bin_container = plots_data.filter_epochs_decoder_result.time_bin_containers[i]
         curr_time_bins = curr_time_bin_container.centers
-        curr_posterior_container = plots_data.filter_epochs_decoder_result.marginal_x_list[i]
+        
+        # curr_posterior_container = plots_data.filter_epochs_decoder_result.marginal_x_list[i]
+        # curr_posterior_container = plots_data.filter_epochs_decoder_result.marginal_y_list[i] # why not marginal_y
+        curr_posterior_container = active_marginal_list[i] # why not marginal_y
         curr_posterior = curr_posterior_container.p_x_given_n
         curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
         
@@ -684,7 +690,7 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view', '_subfn_update_decoded_epoch_slices'], used_by=['_display_plot_decoded_epoch_slices', 'DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data'], creation_date='2023-05-08 16:31', related_items=[])
-def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, included_epoch_indicies=None, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', debug_print=False):
+def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, included_epoch_indicies=None, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False, debug_test_max_num_slices=20, name='stacked_epoch_slices_matplotlib_subplots', active_marginal_fn=None, debug_print=False):
     """ plots the decoded epoch results in a stacked slices view 
     
     Parameters:
@@ -765,6 +771,15 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
     plots_data.global_pos_df = global_pos_df.copy()
     plots_data.filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result)
+
+    # Select the desired marginal:
+    if active_marginal_fn is None:
+        active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_x_list
+    plots_data.active_marginal_fn = active_marginal_fn
+
+    # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list
+    # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_x_list # custom
+
 
     _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=debug_print)
 
