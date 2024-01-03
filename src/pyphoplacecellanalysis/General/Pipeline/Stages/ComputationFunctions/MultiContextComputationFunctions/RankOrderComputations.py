@@ -556,6 +556,21 @@ class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
     #     np.shape(ripple_evts_short_best_dir_raw_stats_values)
 
 
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
+        # method to avoid modifying the original state.
+        state = self._asdict().copy()
+        # Remove the unpicklable entries.
+        # del state['file']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self = DirectionalRankOrderResult(**state)
+        # self.__dict__.update(state)
+
+
 @define(slots=False, repr=False, eq=False)
 class RankOrderComputationsContainer(ComputedResult):
     """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
