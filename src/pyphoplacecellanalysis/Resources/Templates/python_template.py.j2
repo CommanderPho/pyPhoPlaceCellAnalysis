@@ -68,13 +68,19 @@ batch_session_completion_handler_kwargs = dict(
     {% endfor %}
 )
 
-# Override input/output files:
-local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
-global_computation_results_override_file = script_file_parent_path.joinpath('global_computation_results.pkl').resolve()
+# Disable all overrides for input/output files:
+local_computations_override_file = None
+global_computation_results_override_file = None
+local_computations_override_output_file = None
+global_computation_results_override_output_file = None
 
-# Overrides for the output files:
-local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
-global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results.pkl').resolve()
+## Override input/output files:
+#local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
+#global_computation_results_override_file = script_file_parent_path.joinpath('global_computation_results.pkl').resolve()
+
+## Overrides for the output files:
+#local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
+#global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results.pkl').resolve()
 
 
 force_recompute_override_computations_includelist = {{force_recompute_override_computations_includelist|default('[]')}}
