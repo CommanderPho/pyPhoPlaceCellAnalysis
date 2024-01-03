@@ -3108,66 +3108,6 @@ def setup_histogram_common_after_creation(fig, axes, sub_context, title=f'<size:
 
 
 
-def setup_rank_order_epoch_inst_fr_result_tuples_common_after_creation(ripple_outputs, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>', perform_write_to_file_callback=None):
-    """ Captures:
-        perform_write_to_file_callback
-    """
-    from flexitext import flexitext ## flexitext for formatted matplotlib text
-
-    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-    from neuropy.utils.matplotlib_helpers import FormattedFigureText
-    
-    # `flexitext` version:
-    text_formatter = FormattedFigureText()
-    fig.suptitle('')
-    text_formatter.setup_margins(fig, top_margin=0.740)
-    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
-    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
-                                text_formatter._build_footer_string(active_context=sub_context),
-                                va="top", xycoords="figure fraction")
-
-
-    
-    active_context = curr_active_pipeline.sess.get_context()
-    plot_rank_order_epoch_inst_fr_result_tuples_display_context = active_context.adding_context('display_fn', display_fn_name='plot_rank_order_epoch_inst_fr_result_tuples')
-    active_display_context = plot_rank_order_epoch_inst_fr_result_tuples_display_context.adding_context('variable_name', subplot_name='Ripple')
-
-    z_score_diff_sub_context = active_display_context.adding_context('subplot', subplot_name='z_score_diff')
-    raw_sub_context = active_display_context.adding_context('subplot', subplot_name='raw')
-
-    from neuropy.utils.matplotlib_helpers import FormattedFigureText
-        
-    # `flexitext` version:
-    text_formatter = FormattedFigureText()
-    raw_footer_string = text_formatter._build_footer_string(active_context=raw_sub_context)
-    raw_header_label.setText('')
-    raw_footer_label.setText(raw_footer_string)
-
-    diff_footer_string = text_formatter._build_footer_string(active_context=z_score_diff_sub_context)
-    diff_header_label.setText('')
-    diff_footer_label.setText(diff_footer_string)
-
-    # Export them:
-    # def _perform_write_to_file_callback(final_context, fig):
-    # 	if save_figure:
-    # 		return owning_pipeline_reference.output_figure(final_context, fig)
-    # 	else:
-    # 		pass # do nothing, don't save
-
-    curr_active_pipeline.output_figure(raw_sub_context, raw_win)
-    curr_active_pipeline.output_figure(z_score_diff_sub_context, diff_win)
-
-
-
-    if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
-        perform_write_to_file_callback(sub_context, fig)
-
-
-
-
-
-
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
 # from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
