@@ -804,49 +804,68 @@ class RankOrderAnalyses:
 
 
     # Plotting/Figure Helper Functions ___________________________________________________________________________________ #
-    def _subfn_perform_common_build_plot(title_str: str, plot_title: str='', left='Long-Short Z-Score Diff', variable_name='Lap', x_axis_name_suffix='Index'):
+    def _subfn_perform_common_build_plot(title_str: str, plot_title: str='', left='Long-Short Z-Score Diff', variable_name='Lap', x_axis_name_suffix='Index', active_display_context=None):
         """ plots the z-score differences
+                
+        
+        title_str: str = f"Rank Order {variable_name}s Epoch Debugger"
+                
         Usage:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _subfn_perform_common_build_plot(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
+
         """
-        title_str: str = f"Rank Order {variable_name}s Epoch Debugger"
+        from neuropy.utils.matplotlib_helpers import FormattedFigureText
         
+        if active_display_context is not None:
+            raw_sub_context = active_display_context.adding_context('subplot', subplot_name='raw')
+            active_display_sub_context = raw_sub_context
+            text_formatter = FormattedFigureText()
+            active_footer_string = text_formatter._build_footer_string(active_context=active_display_sub_context)
+        else:
+            active_display_sub_context = None
+            active_footer_string = None
+            
         app = pg.mkQApp(title_str)
         win = pg.GraphicsLayoutWidget(show=True, title=title_str)
         win.setWindowTitle(title_str)
+
         header_label = pg.LabelItem(justify='left')
-        header_label.setText('TEST LABEL TEXT')
+        header_label.setText('')
         win.addItem(header_label, row=1, col=0, colspan=2)
         
         p1: pg.PlotItem = win.addPlot(row=2, col=0, colspan=2, title=plot_title, left=left, bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True) # PlotItem
-        # p1.addLegend()
-        # p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
         # Add footer label at the bottom of the window
-        # footer_label = pg.QtWidgets.QGraphicsTextItem("Your Footer Label Text")
         footer_label = pg.LabelItem(justify='left')
-        footer_label.setText('Your Footer Label Text')
-        # win.addItem(footer_label)
+        footer_label.setText(active_footer_string)
         win.addItem(footer_label, row=3, col=0, colspan=2)
         
         return app, win, p1, (header_label, footer_label)
 
 
-    def _perform_plot_z_score_raw(epoch_idx_list, LR_long_z_score_values, RL_long_z_score_values, LR_short_z_score_values, RL_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
+    def _perform_plot_z_score_raw(epoch_idx_list, LR_long_z_score_values, RL_long_z_score_values, LR_short_z_score_values, RL_short_z_score_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, active_display_context=None, perform_write_to_file_callback=None):
         """ plots the raw z-scores for each of the four templates
 
         Usage:
             app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D) = _perform_plot_z_score_raw(deepcopy(global_laps).lap_id, odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values)
 
         """
-        # app = pg.mkQApp(f"Rank Order {variable_name}s Epoch Debugger")
-        # win = pg.GraphicsLayoutWidget(show=True, title=f"Rank-Order (Raw) {variable_name} Epoch Debugger")
-        # win.setWindowTitle(f'Rank Order (Raw) {variable_name} Epoch Debugger')
-        # label = pg.LabelItem(justify='right')
-        # win.addItem(label)
-        # p1: pg.PlotItem = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', bottom=f'{variable_name} {x_axis_name_suffix}')
+        from neuropy.utils.matplotlib_helpers import FormattedFigureText
+        
+        if active_display_context is not None:
+            raw_sub_context = active_display_context.adding_context('subplot', subplot_name='raw')
+            active_display_sub_context = raw_sub_context
+            text_formatter = FormattedFigureText()
+            active_footer_string = text_formatter._build_footer_string(active_context=active_display_sub_context)
+
+        else:
+            active_display_sub_context = None
+            active_footer_string = None
+            
         app, win, p1, (header_label, footer_label) = RankOrderAnalyses._subfn_perform_common_build_plot(title_str=f"Rank Order {variable_name}s Long-Short ZScore (Raw)",
-                                                                                plot_title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix)
+                                                                                plot_title=f'Rank-Order Long-Short ZScore (Raw) for {variable_name}s over time', left='Z-Score (Raw)', variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix,
+                                                                                active_display_context=active_display_context)
+        
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
         
@@ -918,24 +937,51 @@ class RankOrderAnalyses:
             connect_vertical_points(x, y_values)
 
 
-        return app, win, p1, (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D), (header_label, footer_label)
+        if active_footer_string is not None:
+            header_label.setText('')
+            footer_label.setText(active_footer_string)
+
+        # if ((perform_write_to_file_callback is not None) and (active_display_sub_context is not None)):
+        #     final_context = active_display_sub_context
+        #     perform_write_to_file_callback(final_context, win)
+
+        return app, win, p1, (long_LR_out_plot_1D, long_RL_out_plot_1D, short_LR_out_plot_1D, short_RL_out_plot_1D), (header_label, footer_label), active_display_sub_context
 
 
 
-    def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None):
+    def _perform_plot_z_score_diff(epoch_idx_list, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values, variable_name='Lap', x_axis_name_suffix='Index', point_data_values=None, include_marginal_histogram:bool=False, active_display_context=None, perform_write_to_file_callback=None):
         """ plots the z-score differences
         Usage:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
         """
-        app, win, p1, (header_label, footer_label) = RankOrderAnalyses._subfn_perform_common_build_plot(title_str=f"Rank Order {variable_name}s Long-Short ZScore (Raw)",
-                                                                                plot_title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix)
+        from neuropy.utils.matplotlib_helpers import FormattedFigureText
+        
+        if active_display_context is not None:
+            z_score_diff_sub_context = active_display_context.adding_context('subplot', subplot_name='z_score_diff')
+            active_display_sub_context = z_score_diff_sub_context
+            text_formatter = FormattedFigureText()
+            active_footer_string = text_formatter._build_footer_string(active_context=active_display_sub_context)
 
-        # app = pg.mkQApp(f"Rank Order {variable_name}s Epoch Debugger")
-        # win = pg.GraphicsLayoutWidget(show=True, title=f"Rank Order {variable_name} Epoch Debugger")
-        # win.setWindowTitle(f'Rank Order {variable_name}s Epoch Debugger')
-        # label = pg.LabelItem(justify='right')
-        # win.addItem(label)
-        # p1: pg.PlotItem = win.addPlot(row=1, col=0, title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True) # PlotItem
+        else:
+            active_display_sub_context = None
+            active_footer_string = None
+            
+        # app, win, p1, (header_label, footer_label) = RankOrderAnalyses._subfn_perform_common_build_plot(title_str=f"Rank Order {variable_name}s Long-Short ZScore (Raw)",
+        #                                                                         plot_title=f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time', left='Long-Short Z-Score Diff', variable_name=variable_name, x_axis_name_suffix=x_axis_name_suffix)
+
+        title_str = f"Rank Order {variable_name}s Long-Short ZScore (Raw)"
+        plot_title = f'Rank-Order Long-Short ZScore Diff for {variable_name}s over time'
+        left = 'Long-Short Z-Score Diff'
+        
+        app = pg.mkQApp(title_str)
+        win = pg.GraphicsLayoutWidget(show=True, title=title_str)
+        win.setWindowTitle(title_str)
+
+        header_label = pg.LabelItem(justify='left')
+        header_label.setText('')
+        win.addItem(header_label, row=1, col=0, colspan=2)
+        
+        p1: pg.PlotItem = win.addPlot(row=2, col=0, colspan=2, title=plot_title, left=left, bottom=f'{variable_name} {x_axis_name_suffix}', hoverable=True) # PlotItem
         p1.addLegend()
         p1.showGrid(x=False, y=True, alpha=1.0) # p1 is a new_ax
 
@@ -949,8 +995,6 @@ class RankOrderAnalyses:
                 LR_laps_long_short_z_score_diff_values = LR_laps_long_short_z_score_diff_values[num_missing_points:]
 
         
-        #
-
         # 'orange'
         # symbolPen = 'w'
         symbolPen = None
@@ -972,30 +1016,50 @@ class RankOrderAnalyses:
 
 
         ## Add marginal histogram to the right of the main plot here:
-        py: pg.PlotItem = win.addPlot(row=2, col=1, right='Marginal Long-Short Z-Score Diff', hoverable=True) # , bottom=f'{variable_name} {x_axis_name_suffix}', title=f'Marginal Rank-Order Long-Short ZScore Diff for {variable_name}'
-        ## compute standard histogram
-        number_of_bins: int = 21
-        vals = deepcopy(RL_laps_long_short_z_score_diff_values)
-        y,x = np.histogram(vals, bins=number_of_bins)
-        # Plot histogram along y-axis:
-        py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal')
-
-        # x = x[:-1] + np.diff(x) / 2 # Adjust x values for stepMode="center"
-        # py.plot(y, x, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal')
-
-        # ## Using stepMode="center" causes the plot to draw two lines for each sample. notice that len(x) == len(y)+1
-        # py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150)) # swapping x, y should make it horizontal? , stepMode="center"
-
-        if LR_laps_long_short_z_score_diff_values is not None:
-            print('TODO: add the LR scatter')
-            # good_LR_laps_long_short_z_score_diff_values = LR_laps_long_short_z_score_diff_values[np.isfinite(LR_laps_long_short_z_score_diff_values)]
-            vals = deepcopy(LR_laps_long_short_z_score_diff_values)
+        if include_marginal_histogram:
+            ## Add as another row:
+            py: pg.PlotItem = win.addPlot(row=3, col=0, colspan=2, right='Marginal Long-Short Z-Score Diff', hoverable=True) # , bottom=f'{variable_name} {x_axis_name_suffix}', title=f'Marginal Rank-Order Long-Short ZScore Diff for {variable_name}'
+            ## compute standard histogram
+            number_of_bins: int = 21
+            vals = deepcopy(RL_laps_long_short_z_score_diff_values)
             y,x = np.histogram(vals, bins=number_of_bins)
             # Plot histogram along y-axis:
-            py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal', name='LR')
+            py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal')
+
+            # x = x[:-1] + np.diff(x) / 2 # Adjust x values for stepMode="center"
+            # py.plot(y, x, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal')
+
+            # ## Using stepMode="center" causes the plot to draw two lines for each sample. notice that len(x) == len(y)+1
+            # py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150)) # swapping x, y should make it horizontal? , stepMode="center"
+
+            if LR_laps_long_short_z_score_diff_values is not None:
+                print('TODO: add the LR scatter')
+                # good_LR_laps_long_short_z_score_diff_values = LR_laps_long_short_z_score_diff_values[np.isfinite(LR_laps_long_short_z_score_diff_values)]
+                vals = deepcopy(LR_laps_long_short_z_score_diff_values)
+                y,x = np.histogram(vals, bins=number_of_bins)
+                # Plot histogram along y-axis:
+                py.plot(x, y, stepMode="center", fillLevel=0, fillOutline=True, brush=(0,0,255,150), orientation='horizontal', name='LR')
+
+            footer_label_row = 4
+        else:
+            py = None
+            footer_label_row = 3
+
+        # Add footer label at the bottom of the window
+        footer_label = pg.LabelItem(justify='left')
+        footer_label.setText(active_footer_string or 'Your Footer Label Text')
+        win.addItem(footer_label, row=footer_label_row, col=0, colspan=2)
+
+        if active_footer_string is not None:
+            header_label.setText('')
+            footer_label.setText(active_footer_string)
 
 
-        return app, win, p1, (even_out_plot_1D, odd_out_plot_1D), (py, ), (header_label, footer_label)
+        # if ((perform_write_to_file_callback is not None) and (active_display_sub_context is not None)):
+        #     final_context = active_display_sub_context
+        #     perform_write_to_file_callback(final_context, win)
+
+        return app, win, p1, (even_out_plot_1D, odd_out_plot_1D), (py, ), (header_label, footer_label), active_display_sub_context
 
 
 
@@ -2768,7 +2832,7 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
 
 
 @function_attributes(short_name=None, tags=['rank-order', 'inst_fr', 'epoch', 'lap', 'replay'], input_requires=[], output_provides=[], uses=['pyqtgraph', 'pyqt'], used_by=[], creation_date='2023-11-16 18:42', related_items=['most_likely_directional_rank_order_shuffling'])
-def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tuple, analysis_type, included_epoch_idxs=None):
+def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tuple, analysis_type, included_epoch_idxs=None, active_context=None, perform_write_to_file_callback=None):
     """
     Generalized function to perform analysis and plot for either ripples or laps.
 
@@ -2798,6 +2862,10 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
     long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
     short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
 
+    active_context = (active_context or curr_active_pipeline.sess.get_context())
+    plot_rank_order_epoch_inst_fr_result_tuples_display_context = active_context.adding_context('display_fn', display_fn_name='plot_rank_order_epoch_inst_fr_result_tuples')
+    active_display_context = plot_rank_order_epoch_inst_fr_result_tuples_display_context.adding_context('analysis_type', subplot_name=analysis_type)
+
     # global_spikes_df, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=1000)
     # spikes_df = deepcopy(global_spikes_df)
 
@@ -2807,7 +2875,7 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
     elif analysis_type == 'Lap':
         global_events = deepcopy(result_tuple.active_epochs)
     else:
-        raise ValueError("Invalid analysis type. Choose 'Ripple' or 'Lap'.")
+        raise ValueError(f"Invalid analysis type analysis_type: '{analysis_type}'. Choose 'Ripple' or 'Lap'.")
 
     if isinstance(global_events, pd.DataFrame):
         global_events = Epoch(global_events.epochs.get_valid_df())
@@ -2831,21 +2899,29 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
     _display_z_score_diff_outputs = RankOrderAnalyses._perform_plot_z_score_diff(
         x_values, result_tuple.long_short_best_dir_z_score_diff_values[is_epoch_significant], None,
         variable_name=analysis_type, x_axis_name_suffix=x_axis_name_suffix,
-        point_data_values=epoch_identifiers
+        point_data_values=epoch_identifiers,
+        active_display_context=active_display_context, perform_write_to_file_callback=perform_write_to_file_callback
     )
     _display_z_score_raw_outputs = RankOrderAnalyses._perform_plot_z_score_raw(
         x_values, *[x[is_epoch_significant] for x in result_tuple.masked_z_score_values_list],
         variable_name=analysis_type, x_axis_name_suffix=x_axis_name_suffix,
-        point_data_values=epoch_identifiers
+        point_data_values=epoch_identifiers,
+        active_display_context=active_display_context, perform_write_to_file_callback=perform_write_to_file_callback
     )
 
-    app, win, diff_p1, out_plot_1D, out_hist_stuff, out_label_tuple = _display_z_score_diff_outputs
+    app, diff_win, diff_p1, out_plot_1D, out_hist_stuff, out_label_tuple, diff_sub_context = _display_z_score_diff_outputs
     long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(diff_p1, long_epoch, short_epoch)
-    raw_app, raw_win, raw_p1, raw_out_plot_1D, raw_label_tuple = _display_z_score_raw_outputs
+    raw_app, raw_win, raw_p1, raw_out_plot_1D, raw_label_tuple, raw_sub_context = _display_z_score_raw_outputs
     long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(raw_p1, long_epoch, short_epoch)
 
-    active_connections_dict = {}  # for holding connections
-    return app, win, diff_p1, out_plot_1D, out_label_tuple, raw_app, raw_win, raw_p1, raw_out_plot_1D, raw_label_tuple
+    if (perform_write_to_file_callback is not None):
+        if (diff_sub_context is not None):
+            perform_write_to_file_callback(diff_sub_context, diff_win)
+        if (raw_sub_context is not None):
+            perform_write_to_file_callback(raw_sub_context, raw_win)            
+
+
+    return app, diff_win, diff_p1, out_plot_1D, out_label_tuple, raw_app, raw_win, raw_p1, raw_out_plot_1D, raw_label_tuple
 
 
 
@@ -2997,23 +3073,23 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
 
 
 def _validate_estimated_lap_dirs(rank_order_results, global_any_laps_epochs_obj):
-	""" 2023-12-19 - validstes the estimated lap directions against the ground-truth direction which is known for the laps. 
- 	"""
-	 
-	
-	lap_dir_is_LR = deepcopy(rank_order_results.laps_most_likely_result_tuple.directional_likelihoods_tuple.long_best_direction_indices)
-	# lap_dir_is_LR = deepcopy(rank_order_results.laps_most_likely_result_tuple.directional_likelihoods_tuple.long_best_direction_indices)
-	lap_dir_index = deepcopy(lap_dir_is_LR).astype('int8')
-	# lap_dir_index = deepcopy(laps_merged_complete_epoch_stats_df['combined_best_direction_indicies'].to_numpy()).astype('int8')
+    """ 2023-12-19 - validstes the estimated lap directions against the ground-truth direction which is known for the laps. 
+     """
+     
+    
+    lap_dir_is_LR = deepcopy(rank_order_results.laps_most_likely_result_tuple.directional_likelihoods_tuple.long_best_direction_indices)
+    # lap_dir_is_LR = deepcopy(rank_order_results.laps_most_likely_result_tuple.directional_likelihoods_tuple.long_best_direction_indices)
+    lap_dir_index = deepcopy(lap_dir_is_LR).astype('int8')
+    # lap_dir_index = deepcopy(laps_merged_complete_epoch_stats_df['combined_best_direction_indicies'].to_numpy()).astype('int8')
 
-	# global_laps
-	actual_lap_dir = deepcopy(global_any_laps_epochs_obj.to_dataframe()['lap_dir'])
-	n_total_laps = np.shape(actual_lap_dir)[0]
-	is_correct = (actual_lap_dir.values == lap_dir_index)
-	n_correct_direction = is_correct.sum()
-	n_correct_direction
+    # global_laps
+    actual_lap_dir = deepcopy(global_any_laps_epochs_obj.to_dataframe()['lap_dir'])
+    n_total_laps = np.shape(actual_lap_dir)[0]
+    is_correct = (actual_lap_dir.values == lap_dir_index)
+    n_correct_direction = is_correct.sum()
+    n_correct_direction
 
-	print(f'Lap directions: {n_correct_direction}/{n_total_laps} correct ({100.0*float(n_correct_direction)/float(n_total_laps)}%)') # Lap directions: 76/80 correct (95.0%)
+    print(f'Lap directions: {n_correct_direction}/{n_total_laps} correct ({100.0*float(n_correct_direction)/float(n_total_laps)}%)') # Lap directions: 76/80 correct (95.0%)
 
 def setup_histogram_common_after_creation(fig, axes, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>', perform_write_to_file_callback=None):
     """ Captures:
@@ -3036,6 +3112,66 @@ def setup_histogram_common_after_creation(fig, axes, sub_context, title=f'<size:
 
     if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
         perform_write_to_file_callback(sub_context, fig)
+
+
+
+
+def setup_rank_order_epoch_inst_fr_result_tuples_common_after_creation(ripple_outputs, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>', perform_write_to_file_callback=None):
+    """ Captures:
+        perform_write_to_file_callback
+    """
+    from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    
+    # `flexitext` version:
+    text_formatter = FormattedFigureText()
+    fig.suptitle('')
+    text_formatter.setup_margins(fig, top_margin=0.740)
+    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
+    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                                text_formatter._build_footer_string(active_context=sub_context),
+                                va="top", xycoords="figure fraction")
+
+
+    
+    active_context = curr_active_pipeline.sess.get_context()
+    plot_rank_order_epoch_inst_fr_result_tuples_display_context = active_context.adding_context('display_fn', display_fn_name='plot_rank_order_epoch_inst_fr_result_tuples')
+    active_display_context = plot_rank_order_epoch_inst_fr_result_tuples_display_context.adding_context('variable_name', subplot_name='Ripple')
+
+    z_score_diff_sub_context = active_display_context.adding_context('subplot', subplot_name='z_score_diff')
+    raw_sub_context = active_display_context.adding_context('subplot', subplot_name='raw')
+
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
+        
+    # `flexitext` version:
+    text_formatter = FormattedFigureText()
+    raw_footer_string = text_formatter._build_footer_string(active_context=raw_sub_context)
+    raw_header_label.setText('')
+    raw_footer_label.setText(raw_footer_string)
+
+    diff_footer_string = text_formatter._build_footer_string(active_context=z_score_diff_sub_context)
+    diff_header_label.setText('')
+    diff_footer_label.setText(diff_footer_string)
+
+    # Export them:
+    # def _perform_write_to_file_callback(final_context, fig):
+    # 	if save_figure:
+    # 		return owning_pipeline_reference.output_figure(final_context, fig)
+    # 	else:
+    # 		pass # do nothing, don't save
+
+    curr_active_pipeline.output_figure(raw_sub_context, raw_win)
+    curr_active_pipeline.output_figure(z_score_diff_sub_context, diff_win)
+
+
+
+    if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+        perform_write_to_file_callback(sub_context, fig)
+
+
 
 
 
@@ -3129,9 +3265,6 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
         post_title_info: str = f'{minimum_inclusion_fr_Hz} Hz'
         collector_histograms = plot_rank_order_histograms(rank_order_results, post_title_info=post_title_info, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
 
-        # ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, ripple_result_tuple, 'Ripple')
-        # lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, laps_result_tuple, 'Lap')
-
         histogram_display_context = active_context.adding_context('display_fn', display_fn_name='plot_histograms')
         _out_ripple_result_tuple_histograms = ripple_result_tuple.plot_histograms() # MatplotlibRenderPlots num='ripple_result_tuple', clear=True
         _out_ripple_result_tuple_histograms.context = histogram_display_context.adding_context('subplot', subplot_name='ripple_result_tuple')
@@ -3142,6 +3275,11 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
         _out_laps_result_tuple_histograms.context = histogram_display_context.adding_context('subplot', subplot_name='laps_result_tuple')
         setup_histogram_common_after_creation(fig=_out_laps_result_tuple_histograms.figures[0], axes=_out_laps_result_tuple_histograms.axes, sub_context=_out_laps_result_tuple_histograms.context,
                                     title=f'<size:22> Histogram: <weight:bold>laps_result_tuple</></>', perform_write_to_file_callback=_perform_write_to_file_callback)
+
+        ## PyQtGraph Outputs:
+        ripple_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, ripple_result_tuple, 'Ripple', active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
+        lap_outputs = plot_rank_order_epoch_inst_fr_result_tuples(owning_pipeline_reference, laps_result_tuple, 'Lap', active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
+
 
         return quantile_diffs_collector, collector_histograms
 
