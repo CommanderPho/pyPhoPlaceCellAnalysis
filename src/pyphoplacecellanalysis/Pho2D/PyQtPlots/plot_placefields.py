@@ -1,10 +1,3 @@
-# required to enable non-blocking interaction:
-# from PyQt5.Qt import QApplication
-# # start qt event loop
-# _instance = QApplication.instance()
-# if not _instance:
-#     _instance = QApplication([])
-# app = _instance
 import numpy as np
 
 from neuropy.utils.misc import safe_item
@@ -196,6 +189,16 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     Analagous to:
         NeuroPy.neuropy.plotting.ratemaps.plot_ratemap_2D: the matplotlib-based version
 
+    Uses:
+        active_pf_2D.xbin, ybin=active_pf_2D.ybin
+        active_pf_2D.occupancy
+    
+        active_pf_2D.ratemap.neuron_ids, active_pf_2D.ratemap.neuron_extended_ids
+        
+        active_pf_2D.ratemap.tuning_curves || active_pf_2D.ratemap.spikes_maps
+
+        
+        
     Usage:
         out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config)
         
@@ -330,6 +333,4 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     # out.plots_data.active_maps = active_maps
 
     return out
-    
-    
     
