@@ -82,11 +82,6 @@ should_force_reload_all = {{should_force_reload_all|default('False')}}
 should_freeze_pipeline_updates = {{should_freeze_pipeline_updates|default('False')}}
 should_symlink_output_pickles = {{should_symlink_output_pickles|default('False')}}
 
-
-# custom_user_completion_function_template_code = {{custom_user_completion_function_template_code|default('""')}}
-# custom_user_completion_functions = {{custom_user_completion_functions|default('[]')}}
-
-
 {% if should_freeze_pipeline_updates %}
 ## No recomputing at all:
 result_handler = BatchSessionCompletionHandler(force_reload_all=False,
@@ -117,10 +112,12 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=False,
 
 
 # Add custom_user_completion_functions:
+# custom_user_completion_functions = {{custom_user_completion_functions|default('[]')}}
 {{custom_user_completion_function_template_code|default('custom_user_completion_functions = []')}}
 
 for a_custom_custom_user_completion_function in custom_user_completion_functions:
     result_handler.completion_functions.append(a_custom_custom_user_completion_function)
+
     
 
 with open(log_file_path, 'a') as f:
