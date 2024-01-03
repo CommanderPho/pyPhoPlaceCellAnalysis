@@ -181,6 +181,7 @@ class LongShortStatsItem(object):
         state = self.__dict__.copy()
         # del state['long_stats_z_scorer']
         # del state['short_stats_z_scorer']
+
         state['long_stats_z_scorer'] = state['long_stats_z_scorer'].__getstate__()
         state['short_stats_z_scorer'] = state['short_stats_z_scorer'].__getstate__()
 
@@ -485,47 +486,11 @@ DirectionalRankOrderResultBase = namedtuple('DirectionalRankOrderResultBase', ['
 
 
 
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
 
-@define(slots=False)
-class DirectionalRankOrderLikelihoodsResult(object):
-    """ converted from a namedtuple with definition:
-    
-    DirectionalRankOrderLikelihoods = namedtuple('DirectionalRankOrderLikelihoods', ['long_relative_direction_likelihoods',
-                                                           'short_relative_direction_likelihoods',
-                                                           'long_best_direction_indices',
-                                                           'short_best_direction_indices'])
-    """
 
-    long_relative_direction_likelihoods: np.ndarray = field()
-    short_relative_direction_likelihoods: np.ndarray = field()
-    long_best_direction_indices: pd.Series = field()
-    short_best_direction_indices: pd.Series = field()
-
-    
-
-@define(slots=False) # , order=True
-class DirectionalRankOrderResult(object):
-    """ converted from a namedtuple with definition:
-    
-    Used to be a subclass of the namedtuple-derived `DirectionalRankOrderResultBase`.
-    
-    
-    DirectionalRankOrderResultBase = namedtuple('DirectionalRankOrderResultBase', ['active_epochs',
-                                                                       'long_best_dir_z_score_values',
-                                                           'short_best_dir_z_score_values',
-                                                           'long_short_best_dir_z_score_diff_values',
-                                                           'directional_likelihoods_tuple', "masked_z_score_values_list", "rank_order_z_score_df"])
-
-                                                           
-    """
-    active_epochs: pd.DataFrame = field()
-    long_best_dir_z_score_values: np.ndarray = field()
-    short_best_dir_z_score_values: np.ndarray = field()
-    long_short_best_dir_z_score_diff_values: np.ndarray = field()
-    # directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = field()
-    directional_likelihoods_tuple: DirectionalRankOrderLikelihoodsResult = field()
-    masked_z_score_values_list: list = field()
-    rank_order_z_score_df: type = field()
+# @define(slots=False, order=True)
+class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
 
     @property
     def directional_likelihoods_df(self) -> pd.DataFrame:
