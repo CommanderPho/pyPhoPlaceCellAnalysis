@@ -145,13 +145,13 @@ def display_generated_scripts_ipywidget(included_session_contexts, output_python
     """
     import ipywidgets as widgets
     from IPython.display import display
-    # from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
+    from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
     # from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
     # from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default
     from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget       
     
-    # btn_layout = widgets.Layout(width='auto', height='40px') #set width and height
-    # default_kwargs = dict(display='flex', flex_flow='column', align_items='stretch', layout=btn_layout)
+    btn_layout = widgets.Layout(width='auto', height='40px') #set width and height
+    default_kwargs = dict(display='flex', flex_flow='column', align_items='stretch', layout=btn_layout)
 
     # #TODO 2023-12-12 16:43: - [ ] Can potentially replace these complicated definitions with the simplier `fullwidth_path_widget` implementation which contains the two buttons by default
     # # from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget       
@@ -176,9 +176,9 @@ def display_generated_scripts_ipywidget(included_session_contexts, output_python
         a_computation_script_path = Path(a_python_script[0]).resolve()
         a_generate_figures_script_path = Path(a_python_script[1]).resolve()
     
-        _out_path_widgets.append(fullwidth_path_widget(a_computation_script_path, a_computation_script_path.name))
+        _out_path_widgets.append(fullwidth_path_widget(a_computation_script_path, a_computation_script_path.name, box_layout_kwargs=dict(display='flex', flex_flow='row', align_items='stretch', width='auto')))
 
-    return widgets.VBox(_out_path_widgets)
+    return widgets.VBox(_out_path_widgets, display='flex', flex_flow='column', align_items='stretch')
 
 
 def symlink_output_files():
