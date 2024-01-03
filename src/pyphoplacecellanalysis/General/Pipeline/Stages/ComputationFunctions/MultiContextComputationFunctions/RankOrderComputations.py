@@ -1691,9 +1691,9 @@ class RankOrderAnalyses:
         # Ripples: ___________________________________________________________________________________________________________ #
         ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
         # prev method:
-        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
-        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
-        
+        # # `LongShortStatsItem` form (2024-01-02):        
+        # new_LR_results_quantile_values = np.array([(compute_percentile(a_result_item.long_stats_z_scorer.real_value, a_result_item.long_stats_z_scorer.original_values), compute_percentile(a_result_item.short_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.original_values)) for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+        # new_RL_results_quantile_values = np.array([(compute_percentile(a_result_item.long_stats_z_scorer.real_value, a_result_item.long_stats_z_scorer.original_values), compute_percentile(a_result_item.short_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.original_values)) for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
     
         ## 2023-12-23 Method:        
         output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.ripple_new_output_tuple        
@@ -1736,8 +1736,10 @@ class RankOrderAnalyses:
 
         # Laps: ______________________________________________________________________________________________________________ #
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
-        new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_laps.ranked_aclus_stats_dict.items()])
-        new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_laps.ranked_aclus_stats_dict.items()])
+        
+        # # `LongShortStatsItem` form (2024-01-02):        
+        # new_LR_results_quantile_values = np.array([(compute_percentile(a_result_item.long_stats_z_scorer.real_value, a_result_item.long_stats_z_scorer.original_values), compute_percentile(a_result_item.short_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.original_values)) for epoch_id, a_result_item in rank_order_results.LR_laps.ranked_aclus_stats_dict.items()])
+        # new_RL_results_quantile_values = np.array([(compute_percentile(a_result_item.long_stats_z_scorer.real_value, a_result_item.long_stats_z_scorer.original_values), compute_percentile(a_result_item.short_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.original_values)) for epoch_id, a_result_item in rank_order_results.RL_laps.ranked_aclus_stats_dict.items()])
 
         ## 2023-12-23 Method:        
         # recover from the valid stacked arrays: `valid_stacked_arrays`
