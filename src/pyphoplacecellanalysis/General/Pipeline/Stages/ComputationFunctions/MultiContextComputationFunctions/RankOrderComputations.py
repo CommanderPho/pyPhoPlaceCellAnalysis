@@ -2661,11 +2661,12 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
     # ax2 = fig.add_subplot(3, 1, 2)
     # ax3 = fig.add_subplot(3, 1, 3)
 
-    LR_results_real_values = np.array([(long_stats_z_scorer.real_value, short_stats_z_scorer.real_value) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
-    RL_results_real_values = np.array([(long_stats_z_scorer.real_value, short_stats_z_scorer.real_value) for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+    # `LongShortStatsItem` form (2024-01-02):
+    LR_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+    RL_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+    LR_results_long_short_z_diffs = np.array([a_result_item.long_short_z_diff for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+    RL_results_long_short_z_diff = np.array([a_result_item.long_short_z_diff for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
 
-    LR_results_long_short_z_diffs = np.array([long_short_z_diff for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
-    RL_results_long_short_z_diff = np.array([long_short_z_diff for epoch_id, (long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay) in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
 
     if active_context is not None:
             display_context = active_context.adding_context('display_fn', display_fn_name='plot_rank_order_histograms')
