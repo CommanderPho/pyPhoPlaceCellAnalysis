@@ -2083,21 +2083,22 @@ class RankOrderAnalyses:
         rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
         ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
 
+        ## Used to be `x[0] for x.long_stats_z_scorer` and `x[1] for x.short_stats_z_scorer`
         # Extract the real spearman-values/p-values:
-        LR_long_relative_real_p_values = np.array([x[0].real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-        LR_long_relative_real_values = np.array([x[0].real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        LR_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        LR_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
 
-        LR_short_relative_real_p_values = np.array([x[1].real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-        LR_short_relative_real_values = np.array([x[1].real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        LR_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        LR_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
 
         LR_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.LR_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
         LR_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.LR_ripple.extra_info_dict.values()])
 
-        RL_long_relative_real_p_values = np.array([x[0].real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-        RL_long_relative_real_values = np.array([x[0].real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        RL_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        RL_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
 
-        RL_short_relative_real_p_values = np.array([x[1].real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-        RL_short_relative_real_values = np.array([x[1].real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        RL_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        RL_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
 
         RL_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.RL_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
         RL_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.RL_ripple.extra_info_dict.values()])
