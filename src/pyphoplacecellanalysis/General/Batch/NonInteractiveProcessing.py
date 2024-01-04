@@ -354,8 +354,8 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
                 else:
                     # Global-Only:
                     if not dry_run:
-                        force_recompute = force_recompute or ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist) in force_recompute_override_computations_includelist) # force_recompute for this specific result if either of its name is included in `force_recompute_override_computations_includelist`
-                        newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                        _curr_force_recompute = force_recompute or ((_comp_specifier.short_name in force_recompute_override_computations_includelist) or (_comp_specifier.computation_fn_name in include_includelist) in force_recompute_override_computations_includelist) # force_recompute for this specific result if either of its name is included in `force_recompute_override_computations_includelist`
+                        newly_computed_values += _comp_specifier.try_computation_if_needed(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=_curr_force_recompute)
                     else:
                         print(f'dry-run: {_comp_specifier.short_name}')
 
