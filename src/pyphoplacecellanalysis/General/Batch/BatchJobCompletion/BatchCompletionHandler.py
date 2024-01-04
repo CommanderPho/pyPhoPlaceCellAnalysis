@@ -170,6 +170,7 @@ class BatchSessionCompletionHandler:
                                         'long_short_endcap_analysis',
                                         # 'spike_burst_detection',
                                         'split_to_directional_laps',
+                                        'merged_directional_placefields',
                                         'rank_order_shuffle_analysis',
                                     ]) # do only specified
 
