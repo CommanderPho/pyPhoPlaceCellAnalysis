@@ -281,6 +281,8 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     
     force_recompute_override_computations_includelist: Optional[List[str]] a list of computation function names to recompute regardless of their validator's status.
     
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+    batch_extended_computations(include_includelist=['merged_directional_placefields'], include_global_functions=True)
     """
     #TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
     #TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
