@@ -850,16 +850,18 @@ class DirectionalMergedDecodersResult(ComputedResult):
             assert np.all(active_global_laps_df[(active_global_laps_df['is_LR_dir'].astype(int) == np.logical_not(active_global_laps_df['lap_dir'].astype(int)))])
             return active_global_laps_df
 
-    # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
-    active_global_laps_df = compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe())
-    # Validate Laps:
-    # ground_truth_lap_dirs = active_global_laps_df['lap_dir'].to_numpy()
-    ground_truth_lap_is_LR_dir = active_global_laps_df['is_LR_dir'].to_numpy()
-    n_laps = np.shape(active_global_laps_df)[0]
-    assert len(laps_is_most_likely_direction_LR_dir) == n_laps
-    percent_laps_estimated_correctly = (np.sum(ground_truth_lap_is_LR_dir == laps_is_most_likely_direction_LR_dir) / n_laps)
-    print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
-    return percent_laps_estimated_correctly
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
+        # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
+        active_global_laps_df = compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe())
+        # Validate Laps:
+        # ground_truth_lap_dirs = active_global_laps_df['lap_dir'].to_numpy()
+        ground_truth_lap_is_LR_dir = active_global_laps_df['is_LR_dir'].to_numpy()
+        n_laps = np.shape(active_global_laps_df)[0]
+        assert len(laps_is_most_likely_direction_LR_dir) == n_laps
+        percent_laps_estimated_correctly = (np.sum(ground_truth_lap_is_LR_dir == laps_is_most_likely_direction_LR_dir) / n_laps)
+        print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
+        return percent_laps_estimated_correctly
 
 
 class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
