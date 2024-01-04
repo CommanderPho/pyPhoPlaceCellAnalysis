@@ -801,7 +801,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         determine_directional_likelihoods
 
-        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decode, is_most_likely_direction_LR_dirr = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
 
         """
         directional_marginals = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result)
@@ -1108,8 +1108,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
             rank_order_results = global_computation_results.computed_data['RankOrder'] # RankOrderComputationsContainer
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-
-
 
             # track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # shared-only
             track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only
@@ -1492,4 +1490,75 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             graphics_output_dict = {'win': template_debugger.ui.root_dockAreaWindow, 'app': template_debugger.ui.app,  'ui': template_debugger.ui, 'plots': template_debugger.plots, 'data': template_debugger.plots_data, 'obj': template_debugger}
 
 
+    @function_attributes(short_name='directional_merged_decoder_decoded_epochs', tags=['directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-01-04 02:59', related_items=[], is_global=True)
+    def _display_directional_merged_pf_decoded_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+            """ Renders a window with the position/laps displayed in the middle and the four templates displayed to the left and right of them.
 
+            """
+
+            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
+            # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
+            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import EpochsEditor # perform_plot_laps_diagnoser
+            # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
+            # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+            # from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
+            # from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
+            # from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
+
+            from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+
+            # raise NotImplementedError
+            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+            defer_render = kwargs.pop('defer_render', False)
+            debug_print: bool = kwargs.pop('debug_print', False)
+
+            # figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
+            # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
+
+            # Recover from the saved global result:
+            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+            directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+            # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+            
+            # Marginal
+            global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+            active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                                                        )
+
+
+            global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+            active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+            ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='stacked_epoch_slices_matplotlib_subplots_Ripples',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                                                        )
+
+
+
+            # active_decoder = long_directional_pf1D_Decoder
+            # laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.long_only_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+            #                                             name='long_only_lstacked_epoch_slices_matplotlib_subplots_LAPS',
+            #                                             # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+            #                                             active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+            #                                             )
+
+
+
+            graphics_output_dict = {'laps_plot_tuple': laps_plot_tuple, 'ripples_plot_tuple': ripples_plot_tuple}
+
+
+            return graphics_output_dict
