@@ -1820,6 +1820,11 @@ class RankOrderAnalyses:
         decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_
         # LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
 
+        # Get the `directional_merged_decoders_result` to determining most-likely direction from the merged pseudo-2D decoder:
+        directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+
+        directional_merged_decoders_result
+
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
         ## Replays:
@@ -1838,19 +1843,43 @@ class RankOrderAnalyses:
             # long_best_direction_indicies = active_replay_epochs_df['Long_best_direction_indicies'].to_numpy()
             # short_best_direction_indicies = active_replay_epochs_df['Short_best_direction_indicies'].to_numpy()
             
-            # `combined_best_direction_indicies` method:
-            assert 'combined_best_direction_indicies' in active_replay_epochs_df, f"active_replay_epochs_df needs combined_best_direction_indicies"
-            combined_best_direction_indicies = deepcopy(active_replay_epochs_df['combined_best_direction_indicies'])
+            # # `combined_best_direction_indicies` method:
+            # assert 'combined_best_direction_indicies' in active_replay_epochs_df, f"active_replay_epochs_df needs combined_best_direction_indicies"
+            # combined_best_direction_indicies = deepcopy(active_replay_epochs_df['combined_best_direction_indicies'])
+            # assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.ripple_combined_epoch_stats_df)[0]
+            # long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
+            # short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
+            
+            # ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=active_replay_epochs_df['Long_normed_LR_evidence'].to_numpy(),
+            #                                                                                                        short_relative_direction_likelihoods=active_replay_epochs_df['Short_normed_RL_evidence'].to_numpy(),
+            #                                 long_best_direction_indices=long_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int), 
+            #                                 short_best_direction_indices=short_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int)
+            #                                 )
+
+
+            ## 2024-01-04 - DirectionalMergedDecoders version:
+            # NOTE: ripple_most_likely_direction_from_decoder comes with with more epochs than the already filtered `rank_order_results.ripple_combined_epoch_stats_df` version. We'll get only the active indicies from `rank_order_results.ripple_combined_epoch_stats_df.index`
+            # needs: rank_order_results, ripple_most_likely_direction_from_decoder, ripple_directional_all_epoch_bins_marginal, 
+            ripple_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
+            ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = ripple_marginals
+
+            combined_best_direction_indicies = deepcopy(ripple_most_likely_direction_from_decoder) # .shape (611,)
+            # np.shape(combined_best_direction_indicies)
+            combined_best_direction_indicies = combined_best_direction_indicies[rank_order_results.ripple_combined_epoch_stats_df['label'].to_numpy()] # get only the indicies for the active epochs
+            # np.shape(combined_best_direction_indicies)
             assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.ripple_combined_epoch_stats_df)[0]
             long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
             short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
-            
-            ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=active_replay_epochs_df['Long_normed_LR_evidence'].to_numpy(),
-                                                                                                                   short_relative_direction_likelihoods=active_replay_epochs_df['Short_normed_RL_evidence'].to_numpy(),
-                                            long_best_direction_indices=long_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int), 
-                                            short_best_direction_indices=short_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int)
-                                            )
 
+            # gets the LR likelihood for each of these (long/short)
+            long_relative_direction_likelihoods = ripple_directional_all_epoch_bins_marginal[rank_order_results.ripple_combined_epoch_stats_df['label'].to_numpy(), 0] # (n_epochs, 2)
+            short_relative_direction_likelihoods = ripple_directional_all_epoch_bins_marginal[rank_order_results.ripple_combined_epoch_stats_df['label'].to_numpy(), 0] # (n_epochs, 2)
+
+            ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=long_relative_direction_likelihoods,
+                                                                                            short_relative_direction_likelihoods=short_relative_direction_likelihoods,
+                                                                                            long_best_direction_indices=long_best_direction_indicies, 
+                                                                                            short_best_direction_indices=short_best_direction_indicies,
+                                                                                            )
             long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
 
             ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, active_LR_ripple_long_z_score, active_RL_ripple_long_z_score)
@@ -1908,18 +1937,41 @@ class RankOrderAnalyses:
             # long_best_direction_indicies = active_replay_epochs_df['Long_best_direction_indicies'].to_numpy()
             # short_best_direction_indicies = active_replay_epochs_df['Short_best_direction_indicies'].to_numpy()
             
-            # `combined_best_direction_indicies` method:
-            assert 'combined_best_direction_indicies' in active_laps_epochs_df, f"active_replay_epochs_df needs combined_best_direction_indicies"
-            combined_best_direction_indicies = deepcopy(active_laps_epochs_df['combined_best_direction_indicies'])
+            # # `combined_best_direction_indicies` method:
+            # assert 'combined_best_direction_indicies' in active_laps_epochs_df, f"active_laps_epochs_df needs combined_best_direction_indicies"
+            # combined_best_direction_indicies = deepcopy(active_laps_epochs_df['combined_best_direction_indicies'])
+            # assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.laps_combined_epoch_stats_df)[0]
+            # long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
+            # short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
+            
+            # laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=active_laps_epochs_df['Long_normed_LR_evidence'].to_numpy(),
+            #                                                                                 short_relative_direction_likelihoods=active_laps_epochs_df['Short_normed_RL_evidence'].to_numpy(),
+            #                                                                                 long_best_direction_indices=long_best_direction_indicies, 
+            #                                                                                 short_best_direction_indices=short_best_direction_indicies)
+
+            ## 2024-01-04 - DirectionalMergedDecoders version:
+            # NOTE: laps_most_likely_direction_from_decoder comes with with more epochs than the already filtered `rank_order_results.laps_combined_epoch_stats_df` version. We'll get only the active indicies from `rank_order_results.ripple_combined_epoch_stats_df.index`
+            # needs: rank_order_results, laps_most_likely_direction_from_decoder, laps_directional_all_epoch_bins_marginal, 
+            laps_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+            laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = laps_marginals
+
+            combined_best_direction_indicies = deepcopy(laps_most_likely_direction_from_decoder) # .shape (611,)
+            # np.shape(combined_best_direction_indicies)
+            combined_best_direction_indicies = combined_best_direction_indicies[rank_order_results.laps_combined_epoch_stats_df['label'].to_numpy()] # get only the indicies for the active epochs
+            # np.shape(combined_best_direction_indicies)
             assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.laps_combined_epoch_stats_df)[0]
             long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
             short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
-            
-            laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=active_laps_epochs_df['Long_normed_LR_evidence'].to_numpy(),
-                                                                                            short_relative_direction_likelihoods=active_laps_epochs_df['Short_normed_RL_evidence'].to_numpy(),
-                                                                                            long_best_direction_indices=long_best_direction_indicies, 
-                                                                                            short_best_direction_indices=short_best_direction_indicies)
 
+            # gets the LR likelihood for each of these (long/short)
+            long_relative_direction_likelihoods = laps_directional_all_epoch_bins_marginal[rank_order_results.laps_combined_epoch_stats_df['label'].to_numpy(), 0] # (n_epochs, 2)
+            short_relative_direction_likelihoods = laps_directional_all_epoch_bins_marginal[rank_order_results.laps_combined_epoch_stats_df['label'].to_numpy(), 0] # (n_epochs, 2)
+
+            laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=long_relative_direction_likelihoods,
+                                                                                            short_relative_direction_likelihoods=short_relative_direction_likelihoods,
+                                                                                            long_best_direction_indices=long_best_direction_indicies, 
+                                                                                            short_best_direction_indices=short_best_direction_indicies,
+                                                                                            )
             long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = laps_directional_likelihoods_tuple.long_relative_direction_likelihoods, laps_directional_likelihoods_tuple.short_relative_direction_likelihoods, laps_directional_likelihoods_tuple.long_best_direction_indices, laps_directional_likelihoods_tuple.short_best_direction_indices
 
             # Using NumPy advanced indexing to select from array_a or array_b:
