@@ -1490,21 +1490,52 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             graphics_output_dict = {'win': template_debugger.ui.root_dockAreaWindow, 'app': template_debugger.ui.app,  'ui': template_debugger.ui, 'plots': template_debugger.plots, 'data': template_debugger.plots_data, 'obj': template_debugger}
 
 
+    @function_attributes(short_name='directional_merged_pfs', tags=['display'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-04 03:27', related_items=[], is_global=True)
+    def _display_directional_merged_pfs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+        """ Plots the merged pseduo-2D pfs/ratemaps. Plots: All-Directions, Long-Directional, Short-Directional in seperate windows. 
+        """
+        # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
+
+        ## Post 2022-10-22 display_all_pf_2D_pyqtgraph_binned_image_rendering-based method:
+
+        # Visualization:
+        # from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap, visualize_heatmap_pyqtgraph
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array, display_all_pf_2D_pyqtgraph_binned_image_rendering
+        # from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+
+        defer_render = kwargs.pop('defer_render', False)
+
+        # active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+        
+        directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+        active_merged_pf_plots_data_dict = {
+                                       owning_pipeline_reference.build_display_context_for_session(track_config='All-Directions', display_fn_name='display_all_pf_2D_pyqtgraph_binned_image_rendering'):directional_merged_decoders_result.all_directional_pf1D_Decoder.pf, # all-directions
+                                       owning_pipeline_reference.build_display_context_for_session(track_config='Long-Directional', display_fn_name='display_all_pf_2D_pyqtgraph_binned_image_rendering'):directional_merged_decoders_result.long_directional_pf1D_Decoder.pf, # Long-only:
+                                       owning_pipeline_reference.build_display_context_for_session(track_config='Short-Directional', display_fn_name='display_all_pf_2D_pyqtgraph_binned_image_rendering'):directional_merged_decoders_result.short_directional_pf1D_Decoder.pf, # Short-only:
+                                    }
+
+        out_plots_dict = {}
+        
+        for active_context, active_pf_2D in active_merged_pf_plots_data_dict.items():
+            # figure_format_config = {} # empty dict for config
+            figure_format_config = {} # kwargs # kwargs as default figure_format_config
+            out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config) # output is BasicBinnedImageRenderingWindow
+            # Set the window title from the context
+            out_all_pf_2D_pyqtgraph_binned_image_fig.setWindowTitle(f'{active_context.get_description()}')
+            out_plots_dict[active_context] = out_all_pf_2D_pyqtgraph_binned_image_fig
+
+            if not defer_render:
+                out_all_pf_2D_pyqtgraph_binned_image_fig.show()
+
+        return out_plots_dict
+
+
     @function_attributes(short_name='directional_merged_decoder_decoded_epochs', tags=['directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-01-04 02:59', related_items=[], is_global=True)
     def _display_directional_merged_pf_decoded_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
-            """ Renders a window with the position/laps displayed in the middle and the four templates displayed to the left and right of them.
+            """ Renders to windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
 
             """
-
-            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
-            # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
-            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import EpochsEditor # perform_plot_laps_diagnoser
-            # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
-            # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
-            # from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
-            # from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
-            # from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
-
             from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
 
