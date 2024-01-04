@@ -1022,13 +1022,15 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         laps_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(_out_result.all_directional_laps_filter_epochs_decoder_result)
         laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_marginals
 
-        # Validate Laps:
+        
         # ground_truth_lap_dirs = global_any_laps_epochs_obj.to_dataframe()['lap_dir'].to_numpy()
         # n_laps = global_any_laps_epochs_obj.n_epochs
         # assert len(laps_most_likely_direction_from_decoder) == n_laps
         # percent_laps_estimated_correctly = (np.sum(ground_truth_lap_dirs == laps_most_likely_direction_from_decoder) / n_laps)
         # print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
 
+        
+        # Validate Laps:
         global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name])
         percent_laps_estimated_correctly = DirectionalMergedDecodersResult.validate_lap_dir_estimations(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
@@ -1040,7 +1042,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size)
         _out_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_ripple_filter_epochs_decoder_result
         
-        # directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder = determine_directional_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
         ripple_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(_out_result.all_directional_ripple_filter_epochs_decoder_result)
         ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = ripple_marginals
 
