@@ -1339,13 +1339,17 @@ class PipelineWithComputedPipelineStageMixin:
             global_computation_results_pickle_path = override_global_computation_results_pickle_path
 
 
-        loaded_global_computation_result_dict = loadData(global_computation_results_pickle_path)
+        loaded_global_computation_results = loadData(global_computation_results_pickle_path)
         if ((self.global_computation_results is None) or (self.global_computation_results.computed_data is None)):
             """ only if no previous global result at all """
-            loaded_global_computation_result_dict = ComputationResult(**loaded_global_computation_result_dict)
-            self.stage.global_computation_results = loaded_global_computation_result_dict # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
+            loaded_global_computation_results = ComputationResult(**loaded_global_computation_results) # convert to proper object type
+            self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
         else:
             # Have extant global result of some kind:
+            
+            loaded_global_computation_result_dict = loaded_global_computation_results['computed_data']
+
+            # successfully_loaded_keys = list(loaded_global_computation_result_dict.keys())
             successfully_loaded_keys = list(loaded_global_computation_result_dict.keys())
             sucessfully_updated_keys = []
             
@@ -1354,12 +1358,18 @@ class PipelineWithComputedPipelineStageMixin:
                 should_apply: bool = False
                 if curr_result_key in self.global_computation_results.computed_data:
                     # key already exists, overwrite it?
-                    
                     if not allow_overwrite_existing:
                         if (curr_result_key in allow_overwrite_existing_allow_keys):
                             should_apply = True
                         else:
-                            print(f'WARN: key {curr_result_key} already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?')
+                            print(f'WARN: key "{curr_result_key}" already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?')
+                            # Error:
+                            # WARN: key sess already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                            # WARN: key computation_config already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                            # WARN: key computed_data already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                            # WARN: key accumulated_errors already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                            # WARN: key computation_times already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+
                     else:
                         # allow_overwrite_existing: means always overwrite existing results with loaded ones
                         should_apply = True
