@@ -1317,22 +1317,65 @@ class PipelineWithComputedPipelineStageMixin:
         return split_save_folder, split_save_paths, failed_keys
         
 
-    def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None):
+    def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+        TODO: shouldn't replace newer values without prompting, especially if the loaded value doesn't have that computed property but the current results do
+        
+         - [X] TODO 2023-05-19 - Implemented merging into existing `self.global_computation_results` results instead of replacing with loaded values.
+                If `allow_overwrite_existing=True` all existing values in `self.global_computation_results` will be replaced with their versions in the loaded file, unless they only exist in the variable.
+                Otherwise, specific keys can be specified using `allow_overwrite_existing_allow_keys=[]` to replace the variable versions of those keys with the ones loaded from file. 
+                ?? Requires checking parameters.
+         
+        
         Usage:
             curr_active_pipeline.load_pickled_global_computation_results()
         """
+        allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
+
         if override_global_computation_results_pickle_path is None:
             # Use the default if no override is provided.
             global_computation_results_pickle_path = self.global_computation_results_pickle_path
         else:
             global_computation_results_pickle_path = override_global_computation_results_pickle_path
 
-        loaded_global_computation_dict = loadData(global_computation_results_pickle_path)
 
-        loaded_global_computation_results = ComputationResult(**loaded_global_computation_dict)
+        loaded_global_computation_result_dict = loadData(global_computation_results_pickle_path)
+        if ((self.global_computation_results is None) or (self.global_computation_results.computed_data is None)):
+            """ only if no previous global result at all """
+            loaded_global_computation_result_dict = ComputationResult(**loaded_global_computation_result_dict)
+            self.stage.global_computation_results = loaded_global_computation_result_dict # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
+        else:
+            # Have extant global result of some kind:
+            successfully_loaded_keys = list(loaded_global_computation_result_dict.keys())
+            sucessfully_updated_keys = []
+            
+            ## append them to the extant global_computations (`curr_active_pipeline.global_computation_results.computed_data`)
+            for curr_result_key, loaded_value in loaded_global_computation_result_dict.items():
+                should_apply: bool = False
+                if curr_result_key in self.global_computation_results.computed_data:
+                    # key already exists, overwrite it?
+                    
+                    if not allow_overwrite_existing:
+                        if (curr_result_key in allow_overwrite_existing_allow_keys):
+                            should_apply = True
+                        else:
+                            print(f'WARN: key {curr_result_key} already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?')
+                    else:
+                        # allow_overwrite_existing: means always overwrite existing results with loaded ones
+                        should_apply = True
+                else:
+                    ## doesn't exist, add it
+                    should_apply = True
+                
+                if should_apply:
+                    # apply the loaded result to the computed_data.
+                    sucessfully_updated_keys.append(curr_result_key)
+                    self.global_computation_results.computed_data[curr_result_key] = loaded_value
 
-        self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
+            return sucessfully_updated_keys, successfully_loaded_keys
+        
+
+
 
 
     def load_split_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
