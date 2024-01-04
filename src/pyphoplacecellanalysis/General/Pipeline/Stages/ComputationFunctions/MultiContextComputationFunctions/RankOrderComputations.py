@@ -432,8 +432,10 @@ class RankOrderResult(ComputedResult):
             example_item = list(state['ranked_aclus_stats_dict'].values())[0] # first item
             if not isinstance(example_item, LongShortStatsItem):
                 # convert all to stats items:
-                state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v._asdict()) for k,v in state['ranked_aclus_stats_dict'].items()}
-            
+                if isinstance(example_item, dict):
+                    state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v) for k,v in state['ranked_aclus_stats_dict'].items()}
+                else:
+                    state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v._asdict()) for k,v in state['ranked_aclus_stats_dict'].items()}
         self.__dict__.update(state)
 
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
