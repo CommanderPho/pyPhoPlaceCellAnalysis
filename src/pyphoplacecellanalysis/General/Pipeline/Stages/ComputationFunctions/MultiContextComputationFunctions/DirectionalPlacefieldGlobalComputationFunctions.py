@@ -1029,7 +1029,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # percent_laps_estimated_correctly = (np.sum(ground_truth_lap_dirs == laps_most_likely_direction_from_decoder) / n_laps)
         # print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
 
-        global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
+        global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name])
         percent_laps_estimated_correctly = DecodedFilterEpochsResult.validate_lap_dir_estimations(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe())
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
 
