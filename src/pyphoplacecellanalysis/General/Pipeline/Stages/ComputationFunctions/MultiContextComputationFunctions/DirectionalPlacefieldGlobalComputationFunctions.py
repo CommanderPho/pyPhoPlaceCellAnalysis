@@ -803,6 +803,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decode, is_most_likely_direction_LR_dirr = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
 
+        0: LR
+        1: RL
+        
         """
         directional_marginals = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result)
 
@@ -936,12 +939,12 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             ['sess']
 
         Provides:
-            global_computation_results.computed_data['DirectionalLaps']
-                ['DirectionalLaps']['directional_lap_specific_configs']
-                ['DirectionalLaps']['split_directional_laps_dict']
-                ['DirectionalLaps']['split_directional_laps_contexts_dict']
-                ['DirectionalLaps']['split_directional_laps_names']
-                ['DirectionalLaps']['computed_base_epoch_names']
+            global_computation_results.computed_data['DirectionalMergedDecoders']
+                ['DirectionalMergedDecoders']['directional_lap_specific_configs']
+                ['DirectionalMergedDecoders']['split_directional_laps_dict']
+                ['DirectionalMergedDecoders']['split_directional_laps_contexts_dict']
+                ['DirectionalMergedDecoders']['split_directional_laps_names']
+                ['DirectionalMergedDecoders']['computed_base_epoch_names']
 
 
                 directional_merged_decoders_result: "DirectionalMergedDecodersResult" = global_computation_results.computed_data['DirectionalMergedDecoders']
