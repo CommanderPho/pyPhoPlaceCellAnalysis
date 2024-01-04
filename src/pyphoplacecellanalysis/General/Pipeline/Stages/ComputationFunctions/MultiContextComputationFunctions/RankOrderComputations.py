@@ -1467,156 +1467,174 @@ class RankOrderAnalyses:
         return active_min_num_unique_aclu_inclusions_requirement
 
 
+    # @classmethod
+    # @function_attributes(short_name=None, tags=['subfn', 'rank-order', 'active_set', 'directional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-14 13:40', related_items=[])
+    # def epoch_directionality_active_set_evidence(cls, decoders_dict, epochs_df: pd.DataFrame):
+    #     """ 2023-12-14 - Replay Direction Active Set FR Classification - A method I came up with Kamran as a super quick way of using the active set (of cells) to determine the likelihood that a given epoch belongs to a certain direction.
+    #     Used to classify replays as LR/RL
+        
+    #     Returns:
+    #         epoch_rate_dfs
+    #         epoch_accumulated_evidence
+
+    #     Usage:    
+        
+    #     from PendingNotebookCode import epoch_directionality_active_set_evidence
+
+    #     # recieves lists of identities (such as cell aclus) and a function that returns a sortable value for each identity:
+    #     directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    #     track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=None) # non-shared-only
+    #     decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_
+    #     # LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+
+    #     global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
+    #     active_replay_epochs, active_epochs_df, active_selected_spikes_df = combine_rank_order_results(rank_order_results, global_replays, track_templates=track_templates)
+
+    #     # 
+    #     # ['start', 'stop', 'label', 'duration', 'LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman', 'LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson', 'LR_Long_Old_Spearman', 'RL_Long_Old_Spearman', 'LR_Short_Old_Spearman', 'RL_Short_Old_Spearman', 'LR_Long_ActuallyIncludedAclus', 'LR_Long_rel_num_cells', 'RL_Long_ActuallyIncludedAclus', 'RL_Long_rel_num_cells', 'LR_Short_ActuallyIncludedAclus', 'LR_Short_rel_num_cells', 'RL_Short_ActuallyIncludedAclus', 'RL_Short_rel_num_cells', 'LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']
+    #     active_epochs_df.columns
+    #     # accumulated_evidence_df = pd.DataFrame({'LR_evidence': accumulated_evidence['Normed_LR_rate'], 'RL_evidence': accumulated_evidence['Normed_LR_rate']}) epoch_accumulated_evidence.items()
+    #     epoch_accumulated_evidence, epoch_rate_dfs, epochs_df_L = epoch_directionality_active_set_evidence(decoders_dict, active_epochs_df)
+    #     epochs_df_L
+
+
+    #     """
+    #     def _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('LR_rate', 'RL_rate')):
+    #         """ 
+    #         Updates `epoch_rate_df`:
+    #             epoch_rate_df['norm_term']
+            
+    #         """
+    #         epoch_rate_df['norm_term'] = epoch_rate_df[list(epoch_column_pair_names)].sum(axis=1)
+
+
+    #         # epoch_rate_df.update({'Normed_LR_rate': epoch_rate_df['LR_rate']/epoch_rate_df['norm_term'], 'Normed_RL_rate': epoch_rate_df['RL_rate']/epoch_rate_df['norm_term']})
+
+    #         # Update DataFrame with new columns
+    #         epoch_rate_df = epoch_rate_df.assign(
+    #             Normed_LR_rate=epoch_rate_df[epoch_column_pair_names[0]] / epoch_rate_df['norm_term'],
+    #             Normed_RL_rate=epoch_rate_df[epoch_column_pair_names[1]] / epoch_rate_df['norm_term']
+    #         )
+
+
+    #         # Drop missing rows, not sure why these emerge (where there are cells with 0.0 fr for both directions.
+    #         epoch_rate_df = epoch_rate_df[~((epoch_rate_df['Normed_LR_rate'].isna()) | (epoch_rate_df['Normed_RL_rate'].isna()))]
+
+    #         ## Accumulate over all cells in the event:
+    #         accumulated_evidence_by_sum: pd.Series = epoch_rate_df.sum(axis=0)
+                    
+    #         # Transpose the DataFrame to have columns as rows
+    #         # accumulated_evidence_df = accumulated_evidence_df.transpose()
+
+    #         # Rename the columns if necessary
+    #         # accumulated_evidence_df.columns = ['Accumulated_LR_rate', 'Accumulated_RL_rate'] # , 'Product_Accumulated_LR_rate', 'Product_Accumulated_RL_rate'
+
+    #         accumulated_evidence_by_product: pd.Series = epoch_rate_df.product(axis=0)
+    #         accumulated_evidence = {
+    #             'Sum_Accumulated_LR_rate': accumulated_evidence_by_sum['Normed_LR_rate'],
+    #             'Sum_Accumulated_RL_rate': accumulated_evidence_by_sum['Normed_RL_rate'],
+    #             'Product_Accumulated_LR_rate': accumulated_evidence_by_product['Normed_LR_rate'],
+    #             'Product_Accumulated_RL_rate': accumulated_evidence_by_product['Normed_RL_rate']
+    #         }
+
+    #         return accumulated_evidence, epoch_rate_df
+
+
+    #     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+    #     decoders_aclu_peak_fr_dict = {a_decoder_name:dict(zip(np.array(a_decoder.pf.ratemap.neuron_ids), a_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates)) for a_decoder_name, a_decoder in decoders_dict.items()} # can't Long/Short have different `tuning_curve_unsmoothed_peak_firing_rates` even if they have the same neuron_ids and such?
+
+    #     epoch_rate_dfs = {}
+    #     epoch_accumulated_evidence = {}
+
+    #     for row in epochs_df.itertuples(name="EpochRow"):
+    #         try:
+    #             ## This never seems to do anything anymore.
+    #             active_unique_aclus = row.active_unique_aclus
+
+    #         except (KeyError, AttributeError):    
+    #             ## Make map exhaustive
+    #             either_direction_aclus = np.sort(np.union1d(row.LR_Long_ActuallyIncludedAclus, row.RL_Long_ActuallyIncludedAclus)) #TODO 2023-12-18 16:56: - [ ] Note only uses 'LONG' to make decisions. I think SHORT are constrained to be equal, but this test should be explicitly performed.
+    #             active_unique_aclus = either_direction_aclus
+    #             # LR_Long_ActuallyIncludedAclus
+    #             # RL_Long_ActuallyIncludedAclus
+    #             pass
+
+            
+    #         epoch_rates_dict = {f"{a_decoder_name}_rate":np.array([an_aclu_peak_fr_map.get(an_aclu, 0.0) for an_aclu in active_unique_aclus]) for a_decoder_name, an_aclu_peak_fr_map in decoders_aclu_peak_fr_dict.items()}
+    #         epoch_rate_df = pd.DataFrame(epoch_rates_dict) # ['long_LR', 'long_RL', 'short_LR', 'short_RL', 'norm_term']
+    #         _epoch_rate_column_names = ['long_LR_rate', 'long_RL_rate', 'short_LR_rate', 'short_RL_rate']
+
+    #         Long_accumulated_evidence, Long_epoch_rate_df = _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('long_LR_rate', 'long_RL_rate'))
+    #         # ['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']
+
+    #         # Long_accumulated_evidence: ['Sum_Accumulated_LR_rate', 'Sum_Accumulated_RL_rate', 'Product_Accumulated_LR_rate', 'Product_Accumulated_RL_rate']
+
+    #         ### Update the LR_evidence and RL_evidence columns in epochs_df
+    #         epochs_df.at[row.Index, 'Long_LR_evidence'] = Long_accumulated_evidence['Sum_Accumulated_LR_rate']
+    #         epochs_df.at[row.Index, 'Long_RL_evidence'] = Long_accumulated_evidence['Sum_Accumulated_RL_rate']
+    #         epochs_df.at[row.Index, 'Long_LR_product_evidence'] = Long_accumulated_evidence['Product_Accumulated_LR_rate']
+    #         epochs_df.at[row.Index, 'Long_RL_product_evidence'] = Long_accumulated_evidence['Product_Accumulated_RL_rate']
+            
+
+    #         Short_accumulated_evidence, Short_epoch_rate_df = _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('short_LR_rate', 'short_RL_rate'))
+    #         # ['long_LR_rate', 'long_RL_rate', 'short_LR_rate', 'short_RL_rate', 'norm_term', 'Normed_LR_rate', 'Normed_RL_rate']
+
+
+    #         ### Update the LR_evidence and RL_evidence columns in epochs_df
+    #         epochs_df.at[row.Index, 'Short_LR_evidence'] = Short_accumulated_evidence['Sum_Accumulated_LR_rate']
+    #         epochs_df.at[row.Index, 'Short_RL_evidence'] = Short_accumulated_evidence['Sum_Accumulated_RL_rate']
+    #         epochs_df.at[row.Index, 'Short_LR_product_evidence'] = Short_accumulated_evidence['Product_Accumulated_LR_rate']
+    #         epochs_df.at[row.Index, 'Short_RL_product_evidence'] = Short_accumulated_evidence['Product_Accumulated_RL_rate']
+            
+    #         ### Combine the Long/Short acumulated_evidence Dicts into `accumulated_evidence_dict` 
+    #         # accumulated_evidence_dict = {f"Long_{k}":v for k,v in Long_accumulated_evidence.items()} + {f"Short_{k}":v for k,v in Short_accumulated_evidence.items()}
+    #         accumulated_evidence_dict = {f"Long_{k}": v for k, v in Long_accumulated_evidence.items()}
+    #         accumulated_evidence_dict.update({f"Short_{k}": v for k, v in Short_accumulated_evidence.items()}) # ['Long_Sum_Accumulated_LR_rate', 'Long_Sum_Accumulated_RL_rate', 'Long_Product_Accumulated_LR_rate', 'Long_Product_Accumulated_RL_rate', 'Short_Sum_Accumulated_LR_rate', 'Short_Sum_Accumulated_RL_rate', 'Short_Product_Accumulated_LR_rate', 'Short_Product_Accumulated_RL_rate']
+
+    #         ### Combine the two rate_dfs into a single `epoch_rate_df`:
+    #         # the first part (`Long_epoch_rate_df[_epoch_rate_column_names]`) can be either Long/Short because they're the same for each 
+    #         epoch_rate_df = pd.concat((epoch_rate_df[_epoch_rate_column_names], Long_epoch_rate_df[['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']].add_prefix('Long_'), Short_epoch_rate_df[['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']].add_prefix('Short_')), axis='columns')
+            
+    #         ## add to the output dicts:
+    #         epoch_rate_dfs[int(row.label)] = epoch_rate_df
+    #         epoch_accumulated_evidence[int(row.label)] = accumulated_evidence_dict
+
+    #     # Build the "normed" evidence columns for both Long and Short columns:
+    #     for a_prefix in ('Long_', 'Short_'):
+    #         epochs_df[f'{a_prefix}normed_LR_evidence'] = epochs_df[f'{a_prefix}LR_evidence']/epochs_df[[f'{a_prefix}LR_evidence', f'{a_prefix}RL_evidence']].sum(axis=1)
+    #         epochs_df[f'{a_prefix}normed_RL_evidence'] = epochs_df[f'{a_prefix}RL_evidence']/epochs_df[[f'{a_prefix}LR_evidence', f'{a_prefix}RL_evidence']].sum(axis=1)
+            
+    #         epochs_df[f'{a_prefix}normed_product_LR_evidence'] = epochs_df[f'{a_prefix}LR_product_evidence']/epochs_df[[f'{a_prefix}LR_product_evidence', f'{a_prefix}RL_product_evidence']].sum(axis=1)
+    #         epochs_df[f'{a_prefix}normed_product_RL_evidence'] = epochs_df[f'{a_prefix}RL_product_evidence']/epochs_df[[f'{a_prefix}LR_product_evidence', f'{a_prefix}RL_product_evidence']].sum(axis=1)
+
+    #         epochs_df[f'{a_prefix}best_direction_indicies'] = np.argmax(np.vstack([np.abs(epochs_df[f'{a_prefix}normed_LR_evidence'].to_numpy()), np.abs(epochs_df[f'{a_prefix}normed_RL_evidence'].to_numpy())]), axis=0).astype('int8')
+    #     # ['Long_normed_LR_evidence', 'Long_normed_RL_evidence', 'Long_normed_product_LR_evidence', 'Long_normed_product_RL_evidence', 'Short_normed_LR_evidence', 'Short_normed_RL_evidence', 'Short_normed_product_LR_evidence', 'Short_normed_product_RL_evidence']
+
+    #     ## Compute the normed total LR/RL evidence by combining both Long/Short directional evidence:
+    #     total_normed_LR_evidence = ((epochs_df[f'Long_normed_LR_evidence'] + epochs_df[f'Short_normed_LR_evidence'])/2.0)
+    #     total_normed_RL_evidence = ((epochs_df[f'Long_normed_RL_evidence'] + epochs_df[f'Short_normed_RL_evidence'])/2.0)
+
+    #     epochs_df['combined_best_direction_indicies'] = np.argmax(np.vstack([total_normed_LR_evidence.to_numpy(), total_normed_RL_evidence.to_numpy()]), axis=0).astype('int8')
+        
+    #     return epoch_accumulated_evidence, epoch_rate_dfs, epochs_df
+
+
     @classmethod
-    @function_attributes(short_name=None, tags=['subfn', 'rank-order', 'active_set', 'directional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-14 13:40', related_items=[])
-    def epoch_directionality_active_set_evidence(cls, decoders_dict, epochs_df: pd.DataFrame):
-        """ 2023-12-14 - Replay Direction Active Set FR Classification - A method I came up with Kamran as a super quick way of using the active set (of cells) to determine the likelihood that a given epoch belongs to a certain direction.
+    @function_attributes(short_name=None, tags=['subfn', 'rank-order', 'merged_decoder', 'directional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-04 12:47', related_items=[])
+    def epoch_directionality_merged_pseduo2D_decoder_evidence(cls, decoders_dict, ripple_marginals, ripple_directional_likelihoods_tuple, combined_best_direction_indicies, epochs_df: pd.DataFrame):
+        """ 2024-01-04 - Replay Direction Decoder-based Classification
         Used to classify replays as LR/RL
         
-        Returns:
-            epoch_rate_dfs
-            epoch_accumulated_evidence
-
-        Usage:    
-        
-        from PendingNotebookCode import epoch_directionality_active_set_evidence
-
-        # recieves lists of identities (such as cell aclus) and a function that returns a sortable value for each identity:
-        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=None) # non-shared-only
-        decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_
-        # LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
-
-        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-        active_replay_epochs, active_epochs_df, active_selected_spikes_df = combine_rank_order_results(rank_order_results, global_replays, track_templates=track_templates)
-
-        # 
-        # ['start', 'stop', 'label', 'duration', 'LR_Long_spearman', 'RL_Long_spearman', 'LR_Short_spearman', 'RL_Short_spearman', 'LR_Long_pearson', 'RL_Long_pearson', 'LR_Short_pearson', 'RL_Short_pearson', 'LR_Long_Old_Spearman', 'RL_Long_Old_Spearman', 'LR_Short_Old_Spearman', 'RL_Short_Old_Spearman', 'LR_Long_ActuallyIncludedAclus', 'LR_Long_rel_num_cells', 'RL_Long_ActuallyIncludedAclus', 'RL_Long_rel_num_cells', 'LR_Short_ActuallyIncludedAclus', 'LR_Short_rel_num_cells', 'RL_Short_ActuallyIncludedAclus', 'RL_Short_rel_num_cells', 'LR_Long_Z', 'RL_Long_Z', 'LR_Short_Z', 'RL_Short_Z']
-        active_epochs_df.columns
-        # accumulated_evidence_df = pd.DataFrame({'LR_evidence': accumulated_evidence['Normed_LR_rate'], 'RL_evidence': accumulated_evidence['Normed_LR_rate']}) epoch_accumulated_evidence.items()
-        epoch_accumulated_evidence, epoch_rate_dfs, epochs_df_L = epoch_directionality_active_set_evidence(decoders_dict, active_epochs_df)
-        epochs_df_L
-
-
         """
-        def _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('LR_rate', 'RL_rate')):
-            """ 
-            Updates `epoch_rate_df`:
-                epoch_rate_df['norm_term']
-            
-            """
-            epoch_rate_df['norm_term'] = epoch_rate_df[list(epoch_column_pair_names)].sum(axis=1)
-
-
-            # epoch_rate_df.update({'Normed_LR_rate': epoch_rate_df['LR_rate']/epoch_rate_df['norm_term'], 'Normed_RL_rate': epoch_rate_df['RL_rate']/epoch_rate_df['norm_term']})
-
-            # Update DataFrame with new columns
-            epoch_rate_df = epoch_rate_df.assign(
-                Normed_LR_rate=epoch_rate_df[epoch_column_pair_names[0]] / epoch_rate_df['norm_term'],
-                Normed_RL_rate=epoch_rate_df[epoch_column_pair_names[1]] / epoch_rate_df['norm_term']
-            )
-
-
-            # Drop missing rows, not sure why these emerge (where there are cells with 0.0 fr for both directions.
-            epoch_rate_df = epoch_rate_df[~((epoch_rate_df['Normed_LR_rate'].isna()) | (epoch_rate_df['Normed_RL_rate'].isna()))]
-
-            ## Accumulate over all cells in the event:
-            accumulated_evidence_by_sum: pd.Series = epoch_rate_df.sum(axis=0)
-                    
-            # Transpose the DataFrame to have columns as rows
-            # accumulated_evidence_df = accumulated_evidence_df.transpose()
-
-            # Rename the columns if necessary
-            # accumulated_evidence_df.columns = ['Accumulated_LR_rate', 'Accumulated_RL_rate'] # , 'Product_Accumulated_LR_rate', 'Product_Accumulated_RL_rate'
-
-            accumulated_evidence_by_product: pd.Series = epoch_rate_df.product(axis=0)
-            accumulated_evidence = {
-                'Sum_Accumulated_LR_rate': accumulated_evidence_by_sum['Normed_LR_rate'],
-                'Sum_Accumulated_RL_rate': accumulated_evidence_by_sum['Normed_RL_rate'],
-                'Product_Accumulated_LR_rate': accumulated_evidence_by_product['Normed_LR_rate'],
-                'Product_Accumulated_RL_rate': accumulated_evidence_by_product['Normed_RL_rate']
-            }
-
-            return accumulated_evidence, epoch_rate_df
-
-
-        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        decoders_aclu_peak_fr_dict = {a_decoder_name:dict(zip(np.array(a_decoder.pf.ratemap.neuron_ids), a_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates)) for a_decoder_name, a_decoder in decoders_dict.items()} # can't Long/Short have different `tuning_curve_unsmoothed_peak_firing_rates` even if they have the same neuron_ids and such?
-
-        epoch_rate_dfs = {}
-        epoch_accumulated_evidence = {}
-
-        for row in epochs_df.itertuples(name="EpochRow"):
-            try:
-                ## This never seems to do anything anymore.
-                active_unique_aclus = row.active_unique_aclus
-
-            except (KeyError, AttributeError):    
-                ## Make map exhaustive
-                either_direction_aclus = np.sort(np.union1d(row.LR_Long_ActuallyIncludedAclus, row.RL_Long_ActuallyIncludedAclus)) #TODO 2023-12-18 16:56: - [ ] Note only uses 'LONG' to make decisions. I think SHORT are constrained to be equal, but this test should be explicitly performed.
-                active_unique_aclus = either_direction_aclus
-                # LR_Long_ActuallyIncludedAclus
-                # RL_Long_ActuallyIncludedAclus
-                pass
-
-            
-            epoch_rates_dict = {f"{a_decoder_name}_rate":np.array([an_aclu_peak_fr_map.get(an_aclu, 0.0) for an_aclu in active_unique_aclus]) for a_decoder_name, an_aclu_peak_fr_map in decoders_aclu_peak_fr_dict.items()}
-            epoch_rate_df = pd.DataFrame(epoch_rates_dict) # ['long_LR', 'long_RL', 'short_LR', 'short_RL', 'norm_term']
-            _epoch_rate_column_names = ['long_LR_rate', 'long_RL_rate', 'short_LR_rate', 'short_RL_rate']
-
-            Long_accumulated_evidence, Long_epoch_rate_df = _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('long_LR_rate', 'long_RL_rate'))
-            # ['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']
-
-            # Long_accumulated_evidence: ['Sum_Accumulated_LR_rate', 'Sum_Accumulated_RL_rate', 'Product_Accumulated_LR_rate', 'Product_Accumulated_RL_rate']
-
-            ### Update the LR_evidence and RL_evidence columns in epochs_df
-            epochs_df.at[row.Index, 'Long_LR_evidence'] = Long_accumulated_evidence['Sum_Accumulated_LR_rate']
-            epochs_df.at[row.Index, 'Long_RL_evidence'] = Long_accumulated_evidence['Sum_Accumulated_RL_rate']
-            epochs_df.at[row.Index, 'Long_LR_product_evidence'] = Long_accumulated_evidence['Product_Accumulated_LR_rate']
-            epochs_df.at[row.Index, 'Long_RL_product_evidence'] = Long_accumulated_evidence['Product_Accumulated_RL_rate']
-            
-
-            Short_accumulated_evidence, Short_epoch_rate_df = _subfn_compute_evidence_for_epoch(epoch_rate_df, epoch_column_pair_names=('short_LR_rate', 'short_RL_rate'))
-            # ['long_LR_rate', 'long_RL_rate', 'short_LR_rate', 'short_RL_rate', 'norm_term', 'Normed_LR_rate', 'Normed_RL_rate']
-
-
-            ### Update the LR_evidence and RL_evidence columns in epochs_df
-            epochs_df.at[row.Index, 'Short_LR_evidence'] = Short_accumulated_evidence['Sum_Accumulated_LR_rate']
-            epochs_df.at[row.Index, 'Short_RL_evidence'] = Short_accumulated_evidence['Sum_Accumulated_RL_rate']
-            epochs_df.at[row.Index, 'Short_LR_product_evidence'] = Short_accumulated_evidence['Product_Accumulated_LR_rate']
-            epochs_df.at[row.Index, 'Short_RL_product_evidence'] = Short_accumulated_evidence['Product_Accumulated_RL_rate']
-            
-            ### Combine the Long/Short acumulated_evidence Dicts into `accumulated_evidence_dict` 
-            # accumulated_evidence_dict = {f"Long_{k}":v for k,v in Long_accumulated_evidence.items()} + {f"Short_{k}":v for k,v in Short_accumulated_evidence.items()}
-            accumulated_evidence_dict = {f"Long_{k}": v for k, v in Long_accumulated_evidence.items()}
-            accumulated_evidence_dict.update({f"Short_{k}": v for k, v in Short_accumulated_evidence.items()}) # ['Long_Sum_Accumulated_LR_rate', 'Long_Sum_Accumulated_RL_rate', 'Long_Product_Accumulated_LR_rate', 'Long_Product_Accumulated_RL_rate', 'Short_Sum_Accumulated_LR_rate', 'Short_Sum_Accumulated_RL_rate', 'Short_Product_Accumulated_LR_rate', 'Short_Product_Accumulated_RL_rate']
-
-            ### Combine the two rate_dfs into a single `epoch_rate_df`:
-            # the first part (`Long_epoch_rate_df[_epoch_rate_column_names]`) can be either Long/Short because they're the same for each 
-            epoch_rate_df = pd.concat((epoch_rate_df[_epoch_rate_column_names], Long_epoch_rate_df[['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']].add_prefix('Long_'), Short_epoch_rate_df[['norm_term', 'Normed_LR_rate', 'Normed_RL_rate']].add_prefix('Short_')), axis='columns')
-            
-            ## add to the output dicts:
-            epoch_rate_dfs[int(row.label)] = epoch_rate_df
-            epoch_accumulated_evidence[int(row.label)] = accumulated_evidence_dict
-
-        # Build the "normed" evidence columns for both Long and Short columns:
-        for a_prefix in ('Long_', 'Short_'):
-            epochs_df[f'{a_prefix}normed_LR_evidence'] = epochs_df[f'{a_prefix}LR_evidence']/epochs_df[[f'{a_prefix}LR_evidence', f'{a_prefix}RL_evidence']].sum(axis=1)
-            epochs_df[f'{a_prefix}normed_RL_evidence'] = epochs_df[f'{a_prefix}RL_evidence']/epochs_df[[f'{a_prefix}LR_evidence', f'{a_prefix}RL_evidence']].sum(axis=1)
-            
-            epochs_df[f'{a_prefix}normed_product_LR_evidence'] = epochs_df[f'{a_prefix}LR_product_evidence']/epochs_df[[f'{a_prefix}LR_product_evidence', f'{a_prefix}RL_product_evidence']].sum(axis=1)
-            epochs_df[f'{a_prefix}normed_product_RL_evidence'] = epochs_df[f'{a_prefix}RL_product_evidence']/epochs_df[[f'{a_prefix}LR_product_evidence', f'{a_prefix}RL_product_evidence']].sum(axis=1)
-
-            epochs_df[f'{a_prefix}best_direction_indicies'] = np.argmax(np.vstack([np.abs(epochs_df[f'{a_prefix}normed_LR_evidence'].to_numpy()), np.abs(epochs_df[f'{a_prefix}normed_RL_evidence'].to_numpy())]), axis=0).astype('int8')
-        # ['Long_normed_LR_evidence', 'Long_normed_RL_evidence', 'Long_normed_product_LR_evidence', 'Long_normed_product_RL_evidence', 'Short_normed_LR_evidence', 'Short_normed_RL_evidence', 'Short_normed_product_LR_evidence', 'Short_normed_product_RL_evidence']
-
-        ## Compute the normed total LR/RL evidence by combining both Long/Short directional evidence:
-        total_normed_LR_evidence = ((epochs_df[f'Long_normed_LR_evidence'] + epochs_df[f'Short_normed_LR_evidence'])/2.0)
-        total_normed_RL_evidence = ((epochs_df[f'Long_normed_RL_evidence'] + epochs_df[f'Short_normed_RL_evidence'])/2.0)
-
-        epochs_df['combined_best_direction_indicies'] = np.argmax(np.vstack([total_normed_LR_evidence.to_numpy(), total_normed_RL_evidence.to_numpy()]), axis=0).astype('int8')
+        ## Not needed, but could add more columns in future:
+        # ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = ripple_marginals
+        # long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
         
-        return epoch_accumulated_evidence, epoch_rate_dfs, epochs_df
+        assert np.shape(epochs_df)[0] == np.shape(combined_best_direction_indicies)[0]
+        epochs_df['combined_best_direction_indicies'] = combined_best_direction_indicies.astype('int8')
+
+        return epochs_df
+
 
 
     @classmethod
@@ -1822,10 +1840,9 @@ class RankOrderAnalyses:
         decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_
         # LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
 
-        # Get the `directional_merged_decoders_result` to determining most-likely direction from the merged pseudo-2D decoder:
+        # 2024-01-04 - Get the `directional_merged_decoders_result` to determining most-likely direction from the merged pseudo-2D decoder:
         directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
 
-        directional_merged_decoders_result
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
@@ -1839,7 +1856,8 @@ class RankOrderAnalyses:
             active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score = ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.RL_Short_spearman_Z
 
             
-            LR_ripple_epoch_accumulated_evidence, LR_ripple_epoch_rate_dfs, active_replay_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_replay_epochs_df)
+            # LR_ripple_epoch_accumulated_evidence, LR_ripple_epoch_rate_dfs, active_replay_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_replay_epochs_df)
+
 
             # ## Long/Short Independent Version:
             # long_best_direction_indicies = active_replay_epochs_df['Long_best_direction_indicies'].to_numpy()
@@ -1866,9 +1884,7 @@ class RankOrderAnalyses:
             ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = ripple_marginals
 
             combined_best_direction_indicies = deepcopy(ripple_most_likely_direction_from_decoder) # .shape (611,)
-            # np.shape(combined_best_direction_indicies)
             combined_best_direction_indicies = combined_best_direction_indicies[rank_order_results.ripple_combined_epoch_stats_df['label'].to_numpy()] # get only the indicies for the active epochs
-            # np.shape(combined_best_direction_indicies)
             assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.ripple_combined_epoch_stats_df)[0]
             long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
             short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
@@ -1883,6 +1899,8 @@ class RankOrderAnalyses:
                                                                                             short_best_direction_indices=short_best_direction_indicies,
                                                                                             )
             long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = ripple_directional_likelihoods_tuple
+            active_replay_epochs_df = cls.epoch_directionality_merged_pseduo2D_decoder_evidence(decoders_dict, ripple_marginals, ripple_directional_likelihoods_tuple, combined_best_direction_indicies, active_replay_epochs_df)
+
 
             ripple_evts_long_best_dir_z_score_values = np.where(long_best_direction_indicies, active_LR_ripple_long_z_score, active_RL_ripple_long_z_score)
             ripple_evts_short_best_dir_z_score_values = np.where(short_best_direction_indicies, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score)
@@ -1930,7 +1948,7 @@ class RankOrderAnalyses:
             
             active_LR_laps_long_z_score, active_RL_laps_long_z_score, active_LR_laps_short_z_score, active_RL_laps_short_z_score = laps_combined_epoch_stats_df.LR_Long_spearman_Z, laps_combined_epoch_stats_df.RL_Long_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z, laps_combined_epoch_stats_df.RL_Short_spearman_Z
 
-            LR_laps_epoch_accumulated_evidence, LR_laps_epoch_rate_dfs, active_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_laps_epochs_df)
+            # LR_laps_epoch_accumulated_evidence, LR_laps_epoch_rate_dfs, active_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_laps_epochs_df)
 
             # long_best_direction_indicies = active_laps_epochs_df['Long_best_direction_indicies'].to_numpy()
             # short_best_direction_indicies = active_laps_epochs_df['Short_best_direction_indicies'].to_numpy()
@@ -1975,6 +1993,8 @@ class RankOrderAnalyses:
                                                                                             short_best_direction_indices=short_best_direction_indicies,
                                                                                             )
             long_relative_direction_likelihoods, short_relative_direction_likelihoods, long_best_direction_indicies, short_best_direction_indicies = laps_directional_likelihoods_tuple.long_relative_direction_likelihoods, laps_directional_likelihoods_tuple.short_relative_direction_likelihoods, laps_directional_likelihoods_tuple.long_best_direction_indices, laps_directional_likelihoods_tuple.short_best_direction_indices
+            # epoch_directionality_merged_pseduo2D_decoder_evidence update active_laps_epochs_df
+            active_laps_epochs_df = cls.epoch_directionality_merged_pseduo2D_decoder_evidence(decoders_dict, laps_marginals, laps_directional_likelihoods_tuple, combined_best_direction_indicies, active_laps_epochs_df)
 
             # Using NumPy advanced indexing to select from array_a or array_b:
             laps_long_best_dir_z_score_values = np.where(long_best_direction_indicies, active_LR_laps_long_z_score, active_RL_laps_long_z_score)
@@ -3008,7 +3028,7 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
     
 
 @function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn', 'FigureCollector'], input_requires=[], output_provides=[], uses=['FigureCollector'], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
-def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95, active_context=None, perform_write_to_file_callback=None):
+def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95, active_context=None, perform_write_to_file_callback=None, include_LR_LR_plot:bool=False, include_RL_RL_plot:bool=False):
     """ Plots three Matplotlib figures displaying the quantile differences
     
     Usage:
@@ -3093,29 +3113,31 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                                         title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> Quantile Diff</>')
             
 
-            # Create the scatter plot with Seaborn, using 'size' to set marker sizes
-            fig, ax = collector.subplots(num='LR-LR_LongShort_LR_quantile_diff', clear=True)
-            _out_LR = sns.scatterplot(
-                ax=ax,
-                data=LR_likely_active_df,
-                x='start',
-                y='LongShort_LR_quantile_diff',
-                # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-            )
-            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='LR-Likely'), 
-                                         title=f'<size:22> Sig. (>0.95) <weight:bold>LR-LR (LR-Likely)</> Quantile Diff</>')
+            if include_LR_LR_plot:
+                # Create the scatter plot with Seaborn, using 'size' to set marker sizes
+                fig, ax = collector.subplots(num='LR-LR_LongShort_LR_quantile_diff', clear=True)
+                _out_LR = sns.scatterplot(
+                    ax=ax,
+                    data=LR_likely_active_df,
+                    x='start',
+                    y='LongShort_LR_quantile_diff',
+                    # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+                )
+                setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='LR-Likely'), 
+                                            title=f'<size:22> Sig. (>0.95) <weight:bold>LR-LR (LR-Likely)</> Quantile Diff</>')
             
 
-            fig, ax = collector.subplots(num='RL-RL_LongShort_RL_quantile_diff', clear=True)
-            _out_RL = sns.scatterplot(
-                ax=ax,
-                data=RL_likely_active_df[RL_likely_active_df['RL_Long_rel_num_cells']>10],
-                x='start',
-                y='LongShort_RL_quantile_diff',
-                # size='RL_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-            )
-            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='RL-Likely'), 
-                                         title=f'<size:22> Sig. (>0.95) <weight:bold>RL-RL (RL-Likely)</> Quantile Diff</>')
+            if include_RL_RL_plot:
+                fig, ax = collector.subplots(num='RL-RL_LongShort_RL_quantile_diff', clear=True)
+                _out_RL = sns.scatterplot(
+                    ax=ax,
+                    data=RL_likely_active_df[RL_likely_active_df['RL_Long_rel_num_cells']>10],
+                    x='start',
+                    y='LongShort_RL_quantile_diff',
+                    # size='RL_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+                )
+                setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='RL-Likely'), 
+                                            title=f'<size:22> Sig. (>0.95) <weight:bold>RL-RL (RL-Likely)</> Quantile Diff</>')
             
 
 
