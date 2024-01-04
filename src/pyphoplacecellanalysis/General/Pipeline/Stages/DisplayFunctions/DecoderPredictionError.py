@@ -780,7 +780,6 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list
     # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_x_list # custom
 
-
     _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=debug_print)
 
     return params, plots_data, plots, ui

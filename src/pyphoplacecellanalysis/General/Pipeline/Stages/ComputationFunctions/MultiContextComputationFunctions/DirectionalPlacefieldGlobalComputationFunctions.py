@@ -795,20 +795,123 @@ class DirectionalMergedDecodersResult(ComputedResult):
             custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
         return custom_curr_unit_marginal_list
 
+
+
+    @classmethod
+    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result, debug_print=False):
+        """ only works for the all-directional coder with the four items
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+
+            active_decoder = all_directional_pf1D_Decoder
+            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                                                        )
+                                    
+                                                        
+        0: LR
+        1: RL
+        
+        """
+        custom_curr_unit_marginal_list = []
+        
+        for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
+            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
+            curr_array_shape = np.shape(a_p_x_given_n)
+            if debug_print:
+                print(f'a_p_x_given_n.shape: {curr_array_shape}')
+            # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            # (['long', 'long', 'short', 'short'])
+            # (n_neurons, is_long, is_LR, pos_bins)
+            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
+
+            # out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
+            # out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 2, :]) # LR_marginal = long_LR + short_LR
+            # out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 1, :] + a_p_x_given_n[:, 3, :]) # RL_marginal = long_RL + short_RL
+
+            # Extract the Long/Short items
+            out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
+            out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 1, :]) # Long_marginal = long_LR + long_RL 
+            out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 2, :] + a_p_x_given_n[:, 3, :]) # Short_marginal = short_LR + short_RL
+            
+
+            # normalized_out_p_x_given_n = out_p_x_given_n / np.sum(out_p_x_given_n, axis=1) # , keepdims=True
+
+            normalized_out_p_x_given_n = out_p_x_given_n
+            # reshaped_p_x_given_n = np.reshape(a_p_x_given_n, (curr_array_shape[0], 2, 2, curr_array_shape[-1]))
+            # assert np.array_equiv(reshaped_p_x_given_n[:,0,0,:], a_p_x_given_n[:, 0, :]) # long_LR
+            # assert np.array_equiv(reshaped_p_x_given_n[:,1,0,:], a_p_x_given_n[:, 2, :]) # short_LR
+
+            # print(f'np.shape(reshaped_p_x_given_n): {np.shape(reshaped_p_x_given_n)}')
+
+            # normalized_reshaped_p_x_given_n = np.squeeze(np.sum(reshaped_p_x_given_n, axis=(1), keepdims=False)) / np.sum(reshaped_p_x_given_n, axis=(0,1), keepdims=False)
+            # print(f'np.shape(normalized_reshaped_p_x_given_n): {np.shape(normalized_reshaped_p_x_given_n)}')
+
+            # restored_shape_p_x_given_n = np.reshape(normalized_reshaped_p_x_given_n, curr_array_shape)
+            # print(f'np.shape(restored_shape_p_x_given_n): {np.shape(restored_shape_p_x_given_n)}')
+
+            # np.sum(reshaped_array, axis=2) # axis=2 means sum over both long and short for LR/RL
+
+            # to sum over both long/short for LR
+            # np.sum(reshaped_p_x_given_n, axis=1).shape # axis=2 means sum over both long and short for LR/RL
+            
+
+            # input_array = a_p_x_given_n
+            # input_array = normalized_reshaped_p_x_given_n
+            input_array = normalized_out_p_x_given_n
+
+            if debug_print:
+                print(f'np.shape(input_array): {np.shape(input_array)}')
+            # custom marginal over long/short, leaving only LR/RL:
+            curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_y.p_x_given_n = input_array
+            
+            # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+            # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, 1)) # sum over all y. Result should be [x_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+        
+            # y-axis marginal:
+            curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=1, keepdims=True) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+
+            curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+
+            # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=1)) # sum over all x. Result should be [y_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            if debug_print:
+                print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_y.p_x_given_n)}')
+            
+            ## Ensures that the marginal posterior is at least 2D:
+            # print(f"curr_unit_marginal_y.p_x_given_n.ndim: {curr_unit_marginal_y.p_x_given_n.ndim}")
+            # assert curr_unit_marginal_y.p_x_given_n.ndim >= 2
+            if curr_unit_marginal_y.p_x_given_n.ndim == 0:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_y.p_x_given_n.ndim == 1:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
+            custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
+        return custom_curr_unit_marginal_list
+    
+
+    
     @classmethod
     def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result):
         """ 
 
         determine_directional_likelihoods
 
-        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decode, is_most_likely_direction_LR_dirr = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decode, is_most_likely_direction_LR_dir = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
 
         0: LR
         1: RL
         
         """
         directional_marginals = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result)
-
+        
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
         directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
         # directional_all_epoch_bins_marginal
@@ -819,6 +922,33 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         # most_likely_direction_from_decoder
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
+    
+    @classmethod
+    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result):
+        """ 
+        
+        laps_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
+        
+        0: Long
+        1: Short
+        
+        """
+        track_identity_marginals = cls.build_custom_marginal_over_long_short(all_directional_laps_filter_epochs_decoder_result)
+        
+        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
+        track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
+        # directional_all_epoch_bins_marginal
+
+        # Find the indicies via this method:
+        most_likely_track_identity_from_decoder = np.argmax(track_identity_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
+        is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
+
+        # most_likely_direction_from_decoder
+        return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
+
+
+
 
     @classmethod
     def validate_lap_dir_estimations(cls, global_session, active_global_laps_df, laps_is_most_likely_direction_LR_dir):
@@ -1015,6 +1145,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir = determine_directional_likelihoods(all_directional_laps_filter_epochs_decoder_result)
         laps_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(_out_result.all_directional_laps_filter_epochs_decoder_result)
         laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_marginals
+
+        # laps_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        # track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
 
         # ground_truth_lap_dirs = global_any_laps_epochs_obj.to_dataframe()['lap_dir'].to_numpy()
         # n_laps = global_any_laps_epochs_obj.n_epochs
@@ -1542,6 +1675,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
 
+
+            max_num_lap_epochs: int = 80
+            
             # raise NotImplementedError
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
@@ -1563,14 +1699,25 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
             
-            # Marginal
+            # Direction (LR/RL) Marginal:
             global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
             active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
             laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
                                                         name='stacked_epoch_slices_matplotlib_subplots_LAPS',
                                                         # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
                                                         active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                                                        debug_test_max_num_slices=max_num_lap_epochs
                                                         )
+
+            # Track-identity (Long/Short) Marginal:
+            global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+            active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+            track_identity_marginal_laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='TrackIdentity_Marginal_LAPS',
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                                                        debug_test_max_num_slices=max_num_lap_epochs
+                                                        )
+
 
 
             global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
@@ -1583,6 +1730,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
 
+
+
+
+
             # active_decoder = long_directional_pf1D_Decoder
             # laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.long_only_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
             #                                             name='long_only_lstacked_epoch_slices_matplotlib_subplots_LAPS',
@@ -1592,7 +1743,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
 
-            graphics_output_dict = {'laps_plot_tuple': laps_plot_tuple, 'ripples_plot_tuple': ripples_plot_tuple}
+            graphics_output_dict = {'laps_plot_tuple': laps_plot_tuple, 'ripples_plot_tuple': ripples_plot_tuple, "track_identity_marginal_laps_plot_tuple": track_identity_marginal_laps_plot_tuple}
 
 
             return graphics_output_dict
