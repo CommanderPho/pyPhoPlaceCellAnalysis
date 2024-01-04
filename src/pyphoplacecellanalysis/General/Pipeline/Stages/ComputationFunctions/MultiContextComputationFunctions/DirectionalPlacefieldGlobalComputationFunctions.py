@@ -1737,7 +1737,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # Track-identity (Long/Short) Marginal:
             global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
             active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-            ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+            track_identity_marginal_ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
                                                         name='TrackIdentity_Marginal_Ripples',
                                                         # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
                                                         active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
@@ -1756,8 +1756,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             #                                             )
 
 
-
-            graphics_output_dict = {'laps_plot_tuple': laps_plot_tuple, 'ripples_plot_tuple': ripples_plot_tuple, "track_identity_marginal_laps_plot_tuple": track_identity_marginal_laps_plot_tuple}
+            graphics_output_dict = {'laps_plot_tuple': laps_plot_tuple, 'ripples_plot_tuple': ripples_plot_tuple, "track_identity_marginal_laps_plot_tuple": track_identity_marginal_laps_plot_tuple, 'track_identity_marginal_ripples_plot_tuple': track_identity_marginal_ripples_plot_tuple}
 
 
             return graphics_output_dict
