@@ -182,9 +182,13 @@ class LongShortStatsItem(object):
         # del state['long_stats_z_scorer']
         # del state['short_stats_z_scorer']
 
-        state['long_stats_z_scorer'] = state['long_stats_z_scorer'].__getstate__()
-        state['short_stats_z_scorer'] = state['short_stats_z_scorer'].__getstate__()
-
+        try:
+            state['long_stats_z_scorer'] = state['long_stats_z_scorer'].__getstate__()
+            state['short_stats_z_scorer'] = state['short_stats_z_scorer'].__getstate__()
+        except AttributeError:
+            # state['long_stats_z_scorer'] is already a dict
+            pass
+        
         return state
 
     # def __setstate__(self, state):
