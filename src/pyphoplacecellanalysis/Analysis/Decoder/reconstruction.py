@@ -402,6 +402,7 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
        
     """
     decoding_time_bin_size: float # the time bin_size in seconds
+    filter_epochs: pd.DataFrame # the filter epochs themselves
     num_filter_epochs: int # depends on the number of epochs (`n_epochs`)
     most_likely_positions_list: list = field(metadata={'shape': ('n_epochs',)})
     p_x_given_n_list: list = field(metadata={'shape': ('n_epochs',)})
@@ -479,6 +480,7 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
         subset = deepcopy(self)
         original_num_filter_epochs = subset.num_filter_epochs
+        subset.filter_epochs = subset.filter_epochs.iloc[included_epoch_indicies]
         subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in included_epoch_indicies]
         subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in included_epoch_indicies]
         subset.marginal_x_list = [subset.marginal_x_list[i] for i in included_epoch_indicies]
@@ -914,7 +916,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         filter_epochs_decoder_result.nbins = nbins
         filter_epochs_decoder_result.time_bin_containers = time_bin_containers_list
         filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
+        filter_epochs_decoder_result.filter_epochs = filter_epochs
         filter_epochs_decoder_result.num_filter_epochs = num_filter_epochs
+
+        
         if debug_print:
             print(f'num_filter_epochs: {num_filter_epochs}, nbins: {nbins}') # the number of time bins that compose each decoding epoch e.g. nbins: [7 2 7 1 5 2 7 6 8 5 8 4 1 3 5 6 6 6 3 3 4 3 6 7 2 6 4 1 7 7 5 6 4 8 8 5 2 5 5 8]
 
