@@ -1159,16 +1159,17 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         percent_laps_estimated_correctly = DirectionalMergedDecodersResult.validate_lap_dir_estimations(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
 
+
         ## Decode Ripples:
         # Decode using long_directional_decoder
-        ripple_decoding_time_bin_size: float = 0.002        
+        ripple_decoding_time_bin_size: float = 0.010 # 10ms # 0.002
+        
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay))
         all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size)
         _out_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_ripple_filter_epochs_decoder_result
         
         ripple_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(_out_result.all_directional_ripple_filter_epochs_decoder_result)
-        ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = ripple_marginals
-
+        ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = ripple_marginals
 
         # Set the global result:
         # global_computation_results.computed_data['DirectionalMergedDecoders']
@@ -1677,6 +1678,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
             max_num_lap_epochs: int = 80
+            max_num_ripple_epochs: int = 80
             
             # raise NotImplementedError
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
@@ -1692,7 +1694,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
 
             # Recover from the saved global result:
-            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+            # directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
             directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
 
             # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
@@ -1703,7 +1705,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
             active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
             laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
+                                                        name='Directional_Marginal_LAPS',
                                                         # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
                                                         active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
                                                         debug_test_max_num_slices=max_num_lap_epochs
@@ -1720,15 +1722,27 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
 
+            # Replays: ___________________________________________________________________________________________________________ #
+
+            # Direction (LR/RL) Marginal:
             global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
             active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
             ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-                                                        name='stacked_epoch_slices_matplotlib_subplots_Ripples',
+                                                        name='Directional_Marginal_Ripples',
                                                         # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
                                                         active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                                                        debug_test_max_num_slices=max_num_ripple_epochs,
                                                         )
 
-
+            # Track-identity (Long/Short) Marginal:
+            global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+            active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+            ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='TrackIdentity_Marginal_Ripples',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                                                        debug_test_max_num_slices=max_num_ripple_epochs,
+                                                        )
 
 
 
