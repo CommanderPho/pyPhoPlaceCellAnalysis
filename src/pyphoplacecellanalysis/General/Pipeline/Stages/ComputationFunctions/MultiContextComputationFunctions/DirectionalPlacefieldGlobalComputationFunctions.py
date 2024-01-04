@@ -818,8 +818,8 @@ class DirectionalMergedDecodersResult(ComputedResult):
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
 
     @classmethod
-    def validate_lap_dir_estimations(cls, global_session, active_global_laps_df):
-        def compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df):
+    def validate_lap_dir_estimations(cls, global_session, active_global_laps_df, laps_is_most_likely_direction_LR_dir):
+        def _subfn_compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df):
             """ uses the smoothed velocity to determine the proper lap direction
 
             for LR_dir, values become more positive with time
@@ -830,9 +830,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
             """
             # global_session.laps.to_dataframe()
-            if active_global_laps_df is None:
-                active_global_laps = deepcopy(global_session.laps)
-                active_global_laps_df = global_laps._df
+            # if active_global_laps_df is None:
+            #     active_global_laps = deepcopy(global_session.laps)
+            #     active_global_laps_df = global_laps._df
 
             n_laps = np.shape(active_global_laps_df)[0]
 
@@ -853,7 +853,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
         # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
-        active_global_laps_df = compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe())
+        active_global_laps_df = _subfn_compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df=active_global_laps_df)
         # Validate Laps:
         # ground_truth_lap_dirs = active_global_laps_df['lap_dir'].to_numpy()
         ground_truth_lap_is_LR_dir = active_global_laps_df['is_LR_dir'].to_numpy()
@@ -1030,9 +1030,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
 
         global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name])
-        percent_laps_estimated_correctly = DecodedFilterEpochsResult.validate_lap_dir_estimations(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe())
+        percent_laps_estimated_correctly = DirectionalMergedDecodersResult.validate_lap_dir_estimations(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
-
 
         ## Decode Ripples:
         # Decode using long_directional_decoder
