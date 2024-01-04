@@ -24,7 +24,9 @@ from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, c
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalMergedDecodersResult
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+
 
 import scipy.stats
 from scipy import ndimage
@@ -643,6 +645,223 @@ class DirectionalLapsHelpers:
 
 
 
+@define(slots=False, repr=False)
+class DirectionalMergedDecodersResult(ComputedResult):
+    """ a container for holding information regarding the computation of merged directional placefields.
+
+    result_instance = DirectionalMergedDecodersResult()
+
+    all_directional_decoder_dict_value = result_instance.all_directional_decoder_dict
+    all_directional_pf1D_Decoder_value = result_instance.all_directional_pf1D_Decoder
+    long_directional_pf1D_Decoder_value = result_instance.long_directional_pf1D_Decoder
+    long_directional_decoder_dict_value = result_instance.long_directional_decoder_dict
+    short_directional_pf1D_Decoder_value = result_instance.short_directional_pf1D_Decoder
+    short_directional_decoder_dict_value = result_instance.short_directional_decoder_dict
+
+    all_directional_laps_filter_epochs_decoder_result_value = result_instance.all_directional_laps_filter_epochs_decoder_result
+    all_directional_ripple_filter_epochs_decoder_result_value = result_instance.all_directional_ripple_filter_epochs_decoder_result
+
+
+    """
+    all_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+    all_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
+    long_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
+    long_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+    short_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
+    short_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+
+    all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = serialized_field(default=None)
+    all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = serialized_field(default=None)
+
+
+    # long_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='long_odd_shared_aclus_only_one_step_decoder_1D')
+    # long_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='long_even_shared_aclus_only_one_step_decoder_1D')
+    # short_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='short_odd_shared_aclus_only_one_step_decoder_1D')
+    # short_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='short_even_shared_aclus_only_one_step_decoder_1D')
+
+    @classmethod
+    def validate_has_directional_merged_placefields(cls, curr_active_pipeline, computation_filter_name='maze'):
+        """ 
+            DirectionalMergedDecodersResult.validate_has_directional_merged_placefields
+        """
+        # Unpacking:
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+        
+        # extract properties:
+        all_directional_decoder_dict_value = directional_merged_decoders_result.all_directional_decoder_dict
+        all_directional_pf1D_Decoder_value = directional_merged_decoders_result.all_directional_pf1D_Decoder
+        long_directional_pf1D_Decoder_value = directional_merged_decoders_result.long_directional_pf1D_Decoder
+        long_directional_decoder_dict_value = directional_merged_decoders_result.long_directional_decoder_dict
+        short_directional_pf1D_Decoder_value = directional_merged_decoders_result.short_directional_pf1D_Decoder
+        short_directional_decoder_dict_value = directional_merged_decoders_result.short_directional_decoder_dict
+
+        all_directional_laps_filter_epochs_decoder_result_value = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
+        all_directional_ripple_filter_epochs_decoder_result_value = directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result
+
+        return True
+
+
+    @classmethod
+    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result, debug_print=False):
+        """ only works for the all-directional coder with the four items
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+
+            active_decoder = all_directional_pf1D_Decoder
+            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                                                        )
+                                    
+                                                        
+        0: LR
+        1: RL
+        
+        """
+        custom_curr_unit_marginal_list = []
+        
+        for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
+            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
+            curr_array_shape = np.shape(a_p_x_given_n)
+            if debug_print:
+                print(f'a_p_x_given_n.shape: {curr_array_shape}')
+            # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            # (['long', 'long', 'short', 'short'])
+            # (n_neurons, is_long, is_LR, pos_bins)
+            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
+
+            out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
+            out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 2, :]) # LR_marginal = long_LR + short_LR
+            out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 1, :] + a_p_x_given_n[:, 3, :]) # RL_marginal = long_RL + short_RL
+
+            # normalized_out_p_x_given_n = out_p_x_given_n / np.sum(out_p_x_given_n, axis=1) # , keepdims=True
+
+            normalized_out_p_x_given_n = out_p_x_given_n
+            # reshaped_p_x_given_n = np.reshape(a_p_x_given_n, (curr_array_shape[0], 2, 2, curr_array_shape[-1]))
+            # assert np.array_equiv(reshaped_p_x_given_n[:,0,0,:], a_p_x_given_n[:, 0, :]) # long_LR
+            # assert np.array_equiv(reshaped_p_x_given_n[:,1,0,:], a_p_x_given_n[:, 2, :]) # short_LR
+
+            # print(f'np.shape(reshaped_p_x_given_n): {np.shape(reshaped_p_x_given_n)}')
+
+            # normalized_reshaped_p_x_given_n = np.squeeze(np.sum(reshaped_p_x_given_n, axis=(1), keepdims=False)) / np.sum(reshaped_p_x_given_n, axis=(0,1), keepdims=False)
+            # print(f'np.shape(normalized_reshaped_p_x_given_n): {np.shape(normalized_reshaped_p_x_given_n)}')
+
+            # restored_shape_p_x_given_n = np.reshape(normalized_reshaped_p_x_given_n, curr_array_shape)
+            # print(f'np.shape(restored_shape_p_x_given_n): {np.shape(restored_shape_p_x_given_n)}')
+
+            # np.sum(reshaped_array, axis=2) # axis=2 means sum over both long and short for LR/RL
+
+            # to sum over both long/short for LR
+            # np.sum(reshaped_p_x_given_n, axis=1).shape # axis=2 means sum over both long and short for LR/RL
+            
+
+            # input_array = a_p_x_given_n
+            # input_array = normalized_reshaped_p_x_given_n
+            input_array = normalized_out_p_x_given_n
+
+            if debug_print:
+                print(f'np.shape(input_array): {np.shape(input_array)}')
+            # custom marginal over long/short, leaving only LR/RL:
+            curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_y.p_x_given_n = input_array
+            
+            # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+            # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, 1)) # sum over all y. Result should be [x_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+        
+            # y-axis marginal:
+            curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=1, keepdims=True) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+
+            curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+
+            # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=1)) # sum over all x. Result should be [y_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            if debug_print:
+                print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_y.p_x_given_n)}')
+            
+            ## Ensures that the marginal posterior is at least 2D:
+            # print(f"curr_unit_marginal_y.p_x_given_n.ndim: {curr_unit_marginal_y.p_x_given_n.ndim}")
+            # assert curr_unit_marginal_y.p_x_given_n.ndim >= 2
+            if curr_unit_marginal_y.p_x_given_n.ndim == 0:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_y.p_x_given_n.ndim == 1:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
+            custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
+        return custom_curr_unit_marginal_list
+
+    @classmethod
+    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result):
+        """ 
+
+        determine_directional_likelihoods
+
+        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+
+        """
+        directional_marginals = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result)
+
+        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
+        directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
+        # directional_all_epoch_bins_marginal
+
+        # Find the indicies via this method:
+        most_likely_direction_from_decoder = np.argmax(directional_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
+        is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
+
+        # most_likely_direction_from_decoder
+        return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
+
+    @classmethod
+    def validate_lap_dir_estimations(cls, global_session, active_global_laps_df):
+        def compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df):
+            """ uses the smoothed velocity to determine the proper lap direction
+
+            for LR_dir, values become more positive with time
+
+            global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
+            global_laps = compute_lap_dir_from_smoothed_velocity(global_session)
+            global_laps
+
+            """
+            # global_session.laps.to_dataframe()
+            if active_global_laps_df is None:
+                active_global_laps = deepcopy(global_session.laps)
+                active_global_laps_df = global_laps._df
+
+            n_laps = np.shape(active_global_laps_df)[0]
+
+            global_pos = global_session.position
+            global_pos.compute_higher_order_derivatives()
+            global_pos.compute_smoothed_position_info()
+            pos_df: pd.DataFrame = global_pos.to_dataframe()
+
+            # Filter rows based on column: 'lap'
+            pos_df = pos_df[pos_df['lap'].notna()]
+            # Performed 1 aggregation grouped on column: 'lap'
+            is_LR_dir = ((pos_df.groupby(['lap']).agg(speed_mean=('velocity_x_smooth', 'mean'))).reset_index()['speed_mean'] > 0.0).to_numpy() # increasing values => LR_dir
+            active_global_laps_df['is_LR_dir'] = is_LR_dir
+            # global_laps._df['direction_consistency'] = 0.0
+            assert np.all(active_global_laps_df[(active_global_laps_df['is_LR_dir'].astype(int) == np.logical_not(active_global_laps_df['lap_dir'].astype(int)))])
+            return active_global_laps_df
+
+    # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
+    active_global_laps_df = compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe())
+    # Validate Laps:
+    # ground_truth_lap_dirs = active_global_laps_df['lap_dir'].to_numpy()
+    ground_truth_lap_is_LR_dir = active_global_laps_df['is_LR_dir'].to_numpy()
+    n_laps = np.shape(active_global_laps_df)[0]
+    assert len(laps_is_most_likely_direction_LR_dir) == n_laps
+    percent_laps_estimated_correctly = (np.sum(ground_truth_lap_is_LR_dir == laps_is_most_likely_direction_LR_dir) / n_laps)
+    print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
+    return percent_laps_estimated_correctly
+
+
 class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """ functions related to directional placefield computations. """
     _computationGroupName = 'directional_pfs'
@@ -704,6 +923,142 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         """
         return global_computation_results
 
+
+
+    @function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields('], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
+        validate_computation_test=DirectionalMergedDecodersResult.validate_has_directional_merged_placefields, is_global=True)
+    def _build_merged_directional_placefields(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+        """
+
+        Requires:
+            ['sess']
+
+        Provides:
+            global_computation_results.computed_data['DirectionalLaps']
+                ['DirectionalLaps']['directional_lap_specific_configs']
+                ['DirectionalLaps']['split_directional_laps_dict']
+                ['DirectionalLaps']['split_directional_laps_contexts_dict']
+                ['DirectionalLaps']['split_directional_laps_names']
+                ['DirectionalLaps']['computed_base_epoch_names']
+
+
+                directional_merged_decoders_result: "DirectionalMergedDecodersResult" = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+        """
+        from neuropy.analyses.placefields import PfND
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in owning_pipeline_reference.sess.epochs is 'maze1' without the '_any' part.
+
+        # Unwrap the naturally produced directional placefields:
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [owning_pipeline_reference.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
+        (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
+        (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [owning_pipeline_reference.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
+        # (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
+        # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+
+        # Unpack all directional variables:
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name
+
+
+        # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
+        # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D  = DirectionalLapsHelpers.build_directional_constrained_decoders(curr_active_pipeline)
+
+        ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
+        # long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D  = [BasePositionDecoder.init_from_stateful_decoder(deepcopy(results_data.get('pf1D_Decoder', None))) for results_data in (long_LR_results, long_RL_results, short_LR_results, short_RL_results)]
+
+        # directional_laps_result = global_computation_results.computed_data['DirectionalLaps']
+
+        # Use the four epochs to make to a pseudo-y:
+        all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        all_directional_decoder_dict = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D)]))
+        all_directional_pf1D = PfND.build_merged_directional_placefields(all_directional_decoder_dict, debug_print=False)
+        all_directional_pf1D_Decoder = BasePositionDecoder(all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+
+        ## Combine the non-directional PDFs and renormalize to get the directional PDF:
+        # Inputs: long_LR_pf1D, long_RL_pf1D
+        long_directional_decoder_names = ['long_LR', 'long_RL']
+        long_directional_decoder_dict = dict(zip(long_directional_decoder_names, [deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D)]))
+        long_directional_pf1D = PfND.build_merged_directional_placefields(long_directional_decoder_dict, debug_print=False)
+        long_directional_pf1D_Decoder = BasePositionDecoder(long_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+
+        # Inputs: short_LR_pf1D, short_RL_pf1D
+        short_directional_decoder_names = ['short_LR', 'short_RL']
+        short_directional_decoder_dict = dict(zip(short_directional_decoder_names, [deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D)]))
+        short_directional_pf1D = PfND.build_merged_directional_placefields(short_directional_decoder_dict, debug_print=False)
+        short_directional_pf1D_Decoder = BasePositionDecoder(short_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+        # takes 6.3 seconds
+
+
+        
+        
+        _out_result = global_computation_results.computed_data.get('DirectionalMergedDecoders', DirectionalMergedDecodersResult(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
+                                                      long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
+                                                      short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder))
+
+
+        _out_result.__dict__.update(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
+                                                      long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
+                                                      short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder)
+        
+        
+
+        # Do decodings:
+        ## Decode Laps:
+        laps_decoding_time_bin_size: float = 0.05
+        all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
+        _out_result.all_directional_laps_filter_epochs_decoder_result = all_directional_laps_filter_epochs_decoder_result
+        # directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir = determine_directional_likelihoods(all_directional_laps_filter_epochs_decoder_result)
+        laps_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(_out_result.all_directional_laps_filter_epochs_decoder_result)
+        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_marginals
+
+        # Validate Laps:
+        # ground_truth_lap_dirs = global_any_laps_epochs_obj.to_dataframe()['lap_dir'].to_numpy()
+        # n_laps = global_any_laps_epochs_obj.n_epochs
+        # assert len(laps_most_likely_direction_from_decoder) == n_laps
+        # percent_laps_estimated_correctly = (np.sum(ground_truth_lap_dirs == laps_most_likely_direction_from_decoder) / n_laps)
+        # print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
+
+        global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
+        percent_laps_estimated_correctly = DecodedFilterEpochsResult.validate_lap_dir_estimations(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe())
+        print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
+
+
+        ## Decode Ripples:
+        # Decode using long_directional_decoder
+        ripple_decoding_time_bin_size: float = 0.002        
+        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay))
+        all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size)
+        _out_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_ripple_filter_epochs_decoder_result
+        
+        # directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder = determine_directional_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
+        ripple_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(_out_result.all_directional_ripple_filter_epochs_decoder_result)
+        ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = ripple_marginals
+
+
+        # Set the global result:
+        # global_computation_results.computed_data['DirectionalMergedDecoders']
+        
+        
+        # Only update what has changed:
+        global_computation_results.computed_data['DirectionalMergedDecoders'] = _out_result
+        
+
+        """ Usage:
+        
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_contexts_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
+
+        """
+        return global_computation_results
 
 
 # ==================================================================================================================== #
