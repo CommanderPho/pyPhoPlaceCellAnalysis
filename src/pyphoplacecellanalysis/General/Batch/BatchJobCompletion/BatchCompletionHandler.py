@@ -171,7 +171,7 @@ class BatchSessionCompletionHandler:
                                         # 'spike_burst_detection',
                                         'split_to_directional_laps',
                                         'merged_directional_placefields',
-                                        'rank_order_shuffle_analysis',
+                                        # 'rank_order_shuffle_analysis',
                                     ]) # do only specified
 
     force_global_recompute: bool = field(default=False)
