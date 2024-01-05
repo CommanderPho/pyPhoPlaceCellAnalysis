@@ -947,9 +947,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
         # most_likely_direction_from_decoder
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
 
-
-
-
     @classmethod
     def validate_lap_dir_estimations(cls, global_session, active_global_laps_df, laps_is_most_likely_direction_LR_dir):
         def _subfn_compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df):
@@ -995,6 +992,62 @@ class DirectionalMergedDecodersResult(ComputedResult):
         percent_laps_estimated_correctly = (np.sum(ground_truth_lap_is_LR_dir == laps_is_most_likely_direction_LR_dir) / n_laps)
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
         return percent_laps_estimated_correctly
+
+
+    def compute_and_export_marginals_df_csvs(self, active_context):
+        """ 
+        
+        active_context = curr_active_pipeline.get_session_context()
+        """
+        # Export CSVs:
+        def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)'):
+            """ captures `active_context`
+
+            """
+            parent_output_path: Path = Path('output').resolve()
+            # active_context = curr_active_pipeline.get_session_context()
+            session_identifier_str: str = active_context.get_description()
+            output_date_str: str = f'2024-01-04'
+            out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04|kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+            out_filename = f"{out_basename}.csv"
+            out_path = parent_output_path.joinpath(out_filename).resolve()
+            marginals_df.to_csv(out_path)
+            return out_path 
+
+
+        ## Laps:
+        laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs).to_dataframe()
+        laps_directional_marginals_tuple = DirectionalMergedDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
+        laps_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
+        
+        laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
+        laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
+        laps_marginals_df
+
+        laps_out_path = export_marginals_df_csv(laps_marginals_df, data_identifier_str=f'(laps_marginals_df)')
+
+
+        ## Ripples:
+        ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
+        all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = self.all_directional_ripple_filter_epochs_decoder_result
+        ripple_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
+        ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = ripple_marginals
+        ripple_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
+        ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals
+
+        ## Ripple marginals_df:
+        ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+        ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
+        ripple_marginals_df
+
+        ripple_out_path = export_marginals_df_csv(ripple_marginals_df, data_identifier_str=f'(ripple_marginals_df)')
+
+        return (laps_marginals_df, laps_out_path), (ripple_marginals_df, ripple_out_path)
+
 
 
 class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
