@@ -1083,7 +1083,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         from neuropy.analyses.placefields import PfND
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
-
+        from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
+        
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in owning_pipeline_reference.sess.epochs is 'maze1' without the '_any' part.
@@ -1136,8 +1137,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         # Do decodings:
         ## Decode Laps:
-        laps_decoding_time_bin_size: float = 0.05
-
+        laps_decoding_time_bin_size: float = 0.075
         global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_any_name].computation_config.pf_params.computation_epochs) # global_any_name='maze_any' (? same as global_epoch_name?)
 
         all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
@@ -1162,9 +1162,12 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         ## Decode Ripples:
         # Decode using long_directional_decoder
-        ripple_decoding_time_bin_size: float = 0.010 # 10ms # 0.002
-        
+                
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay))
+
+        min_possible_time_bin_size: float = find_minimum_time_bin_duration(global_replays['duration'].to_numpy())
+        ripple_decoding_time_bin_size: float = min(0.010, min_possible_time_bin_size) # 10ms # 0.002
+
         all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size)
         _out_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_ripple_filter_epochs_decoder_result
         
@@ -1173,7 +1176,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         # Set the global result:
         # global_computation_results.computed_data['DirectionalMergedDecoders']
-        
         
         # Only update what has changed:
         global_computation_results.computed_data['DirectionalMergedDecoders'] = _out_result
