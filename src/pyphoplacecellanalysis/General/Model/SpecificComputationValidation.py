@@ -1,5 +1,41 @@
 from attrs import define, Factory, fields
-from typing import Callable
+from typing import Callable, List
+
+@define(slots=False, repr=False)
+class SpecificComputationResultsSpecification:
+    """ This encapsulates the specification for required/provided global results 
+
+    Usage:
+    	from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationResultsSpecification
+    
+    Can specify like:
+    
+    	@function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields('], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
+		    results_specification = SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders']),
+		    provides_global_keys = ['DirectionalMergedDecoders'],
+		validate_computation_test=DirectionalMergedDecodersResult.validate_has_directional_merged_placefields, is_global=True)
+        def a_fn(...
+            ...
+            
+        results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders']),
+		provides_global_keys=['DirectionalMergedDecoders'],
+
+
+    """
+    provides_global_keys: List[str] = Factory(list)
+    # provides_local_keys: List[str] = Factory(list)
+    requires_global_keys: List[str] = Factory(list)
+    # requires_local_keys: List[str] = Factory(list)
+    
+    def remove_provided_keys(self, global_computation_results):
+        removed_keys_dict = {}
+        for a_key in self.provides_global_keys:
+            prev_result = global_computation_results.computed_data.pop(a_key, None)
+            if prev_result is not None:
+                removed_keys_dict[a_key] = prev_result
+        return removed_keys_dict     
+            
+
 
 @define(slots=False, repr=False)
 class SpecificComputationValidator:
@@ -30,6 +66,7 @@ class SpecificComputationValidator:
     short_name:str # 'long_short_post_decoding'
     computation_fn_name:str # '_perform_long_short_post_decoding_analysis'
     validate_computation_test:Callable # lambda curr_active_pipeline, computation_filter_name='maze'
+    results_specification: SpecificComputationResultsSpecification = Factory(SpecificComputationResultsSpecification) # (provides_global_keys=['DirectionalMergedDecoders']) # results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders'])
     computation_fn_kwargs:dict = Factory(dict) # {'perform_cache_load': False}]`
     is_global:bool = False
     
@@ -41,6 +78,7 @@ class SpecificComputationValidator:
         Example:
         
         @function_attributes(short_name='pfdt_computation', tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-30 19:58', related_items=[],
+                         provides_global_keys=[], requires_global_keys=[],
                          validate_computation_test=lambda curr_active_pipeline, global_epoch_name='maze': (curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'], curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt']))
         def _perform_time_dependent_placefield_computation(computation_result: ComputationResult, debug_print=False):
             # ... function definiition
@@ -48,7 +86,21 @@ class SpecificComputationValidator:
                         
         """
         assert hasattr(a_fn, 'validate_computation_test') and (a_fn.validate_computation_test is not None)
-        return cls(short_name=a_fn.short_name, computation_fn_name=a_fn.__name__, validate_computation_test=a_fn.validate_computation_test, is_global=a_fn.is_global)
+        results_specification = None
+        if hasattr(a_fn, 'results_specification') and (a_fn.results_specification is not None):
+            # ensure the alternative non-import syntax isn't used simultaneously
+            assert not (hasattr(a_fn, 'provides_global_keys') and (a_fn.provides_global_keys is not None))
+            assert not (hasattr(a_fn, 'requires_global_keys') and (a_fn.requires_global_keys is not None))
+            results_specification = a_fn.results_specification
+            
+        else:
+            # allows specifying provides_global_keys=['DirectionalMergedDecoders] as a List without importing:
+            if hasattr(a_fn, 'provides_global_keys') and (a_fn.provides_global_keys is not None):
+                results_specification = SpecificComputationResultsSpecification(provides_global_keys=list(a_fn.provides_global_keys))
+            if hasattr(a_fn, 'requires_global_keys') and (a_fn.requires_global_keys is not None):
+                results_specification.requires_global_keys = a_fn.requires_global_keys
+    
+        return cls(short_name=a_fn.short_name, computation_fn_name=a_fn.__name__, validate_computation_test=a_fn.validate_computation_test, results_specification=results_specification, is_global=a_fn.is_global)
         
 
     def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
@@ -67,6 +119,14 @@ class SpecificComputationValidator:
         """
         comp_short_name: str = comp_specifier.short_name
         newly_computed_values = []
+        
+        if force_recompute:
+            print(f'2024-01-02 - TEST _perform_try_computation_if_needed, remove_provided_keys')
+            removed_results_dict = comp_specifier.results_specification.remove_provided_keys(curr_active_pipeline.global_computation_results)
+            if (removed_results_dict is not None) and len(removed_results_dict) > 0:
+                print(f'removed results: {list(removed_results_dict.keys())} because force_recompute was True.')
+                
+
         try:
             comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
             if on_already_computed_fn is not None:
