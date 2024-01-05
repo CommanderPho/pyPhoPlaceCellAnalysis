@@ -994,17 +994,17 @@ class DirectionalMergedDecodersResult(ComputedResult):
         return percent_laps_estimated_correctly
 
 
-    def compute_and_export_marginals_df_csvs(self, active_context):
+    def compute_and_export_marginals_df_csvs(self, parent_output_path: Path, active_context):
         """ 
         
         active_context = curr_active_pipeline.get_session_context()
         """
         # Export CSVs:
         def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)'):
-            """ captures `active_context`
+            """ captures `active_context`, `parent_output_path`
 
             """
-            parent_output_path: Path = Path('output').resolve()
+            # parent_output_path: Path = Path('output').resolve()
             # active_context = curr_active_pipeline.get_session_context()
             session_identifier_str: str = active_context.get_description()
             output_date_str: str = f'2024-01-04'
