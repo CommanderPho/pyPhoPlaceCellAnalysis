@@ -327,10 +327,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
             print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
 
 
-    # ## Get existing `pf1D_dt`:
-    # active_pf_1D = global_results.pf1D
-    # active_pf_1D_dt = global_results.pf1D_dt
-    
+
     ## Specify the computations and the requirements to validate them.
 
     ## Hardcoded comp_specifiers
