@@ -29,7 +29,7 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         mw.draw()
     """
     
-    def __init__(self, name='CustomMatplotlibWidget', disable_toolbar=True, scrollable_figure=True, size=(5.0, 4.0), dpi=72, **kwargs):
+    def __init__(self, name='CustomMatplotlibWidget', plot_function_name=None, disable_toolbar=True, scrollable_figure=True, size=(5.0, 4.0), dpi=72, **kwargs):
         """_summary_
 
         Args:
@@ -42,14 +42,14 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         QtWidgets.QWidget.__init__(self)
         
         ## Init containers:
-        self.params = VisualizationParameters(name=name)
+        self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name)
         self.plots_data = RenderPlotsData(name=name)
         self.plots = RenderPlots(name=name)
         self.ui = PhoUIContainer(name=name)
         self.ui.connections = PhoUIContainer(name=name)
 
         self.params.name = name
-        self.params.window_title = kwargs.pop('plot_function_name', name)
+        self.params.window_title = f"{plot_function_name} - {name}" # kwargs.pop('plot_function_name', name)
         self.params.disable_toolbar = disable_toolbar
         self.params.scrollable_figure = scrollable_figure
         self.params.scrollAreaContents_MinimumHeight = kwargs.pop('scrollAreaContents_MinimumHeight', None)
@@ -61,7 +61,6 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         
         self.setup()
         self.buildUI()
-        
         
     def setup(self):
         pass
