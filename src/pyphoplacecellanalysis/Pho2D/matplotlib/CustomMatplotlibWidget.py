@@ -7,6 +7,8 @@ from matplotlib.figure import Figure
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from qtpy import QtCore, QtWidgets, QtGui
 
+from neuropy.utils.dynamic_container import get_dict_subset # used to filter kwargs down to proper Figure inputs
+
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.function_helpers import function_attributes
@@ -57,7 +59,7 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.params.scrollAreaContents_MinimumHeight = kwargs.pop('scrollAreaContents_MinimumHeight', None)
         
         # Extract figure_kwargs:
-        self.params.figure_kwargs = kwargs
+        self.params.figure_kwargs = get_dict_subset(kwargs, ['figsize', 'dpi', 'facecolor', 'edgecolor', 'linewidth', 'frameon', 'subplotpars', 'tight_layout', 'constrained_layout', 'layout']) 
         self.params.figure_kwargs['figsize'] = size
         self.params.figure_kwargs['dpi'] = dpi
         

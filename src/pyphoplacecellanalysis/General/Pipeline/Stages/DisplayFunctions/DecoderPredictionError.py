@@ -9,7 +9,7 @@ from matplotlib.patches import FancyArrowPatch, FancyArrow
 from matplotlib import patheffects
 
 from neuropy.core import Epoch
-from neuropy.utils.dynamic_container import overriding_dict_with # required for safely_accepts_kwargs
+from neuropy.utils.dynamic_container import overriding_dict_with, get_dict_subset # required for safely_accepts_kwargs
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
 from neuropy.utils.result_context import IdentifyingContext
 
@@ -803,14 +803,15 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
         raise NotImplementedError(f"valid options are ['basic_view', 'insets_view'], but '{build_fn}' was specified")
 
     # figure_kwargs = overriding_dict_with(dict(figsize=None, dpi=None, facecolor=None, edgecolor=None, linewidth=0.0, frameon=None, subplotpars=None, tight_layout=None, constrained_layout=None, layout=None), **kwargs)
-    figure_kwargs = overriding_dict_with(dict(figsize=None, dpi=dpi, facecolor=None, edgecolor=None, linewidth=0.0, frameon=None, subplotpars=None, tight_layout=None, constrained_layout=constrained_layout, layout=None), **kwargs)
+    # figure_kwargs = kwargs # overriding_dict_with(dict(figsize=None, dpi=dpi, facecolor=None, edgecolor=None, linewidth=0.0, frameon=None, subplotpars=None, tight_layout=None, constrained_layout=constrained_layout, layout=None), **kwargs)
+    # get_dict_subset(kwargs, ['figsize', 'dpi', 'facecolor', 'edgecolor', 'linewidth', 'frameon', 'subplotpars', 'tight_layout', 'constrained_layout', 'layout'])
 
     plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
     params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_fn(epoch_slices, epoch_labels=epoch_labels,
                                                                                 name=name, plot_function_name=plot_function_name,
                                                                                 single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=debug_test_max_num_slices, size=size,
                                                                                 should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, scrollable_figure=scrollable_figure,
-                                                                                debug_print=debug_print, **figure_kwargs)
+                                                                                debug_print=debug_print, **kwargs)
 
 
 
