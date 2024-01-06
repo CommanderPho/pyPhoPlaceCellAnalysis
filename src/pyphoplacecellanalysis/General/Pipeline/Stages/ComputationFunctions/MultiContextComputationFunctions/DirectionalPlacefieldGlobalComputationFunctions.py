@@ -671,6 +671,8 @@ class DirectionalMergedDecodersResult(ComputedResult):
 	laps_decoding_time_bin_size: float = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result.decoding_time_bin_size
 	laps_decoding_time_bin_size
 
+	laps_all_epoch_bins_marginals_df = directional_merged_decoders_result.laps_all_epoch_bins_marginals_df
+	ripple_all_epoch_bins_marginals_df = directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df
 
 	"""
 	all_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
@@ -691,6 +693,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
 	ripple_directional_marginals_tuple: Tuple = serialized_field(default=None)
 	ripple_track_identity_marginals_tuple: Tuple = serialized_field(default=None) 
 	
+
+
+
 	# Computed Properties ________________________________________________________________________________________________ #
 	@property
 	def laps_epochs_df(self) -> pd.DataFrame:
@@ -708,7 +713,33 @@ class DirectionalMergedDecodersResult(ComputedResult):
 	def ripple_decoding_time_bin_size(self) -> float:
 		return self.all_directional_ripple_filter_epochs_decoder_result.decoding_time_bin_size
 
+	@property
+	def laps_all_epoch_bins_marginals_df(self) -> pd.DataFrame:
+		""" same quantities computed by `compute_and_export_marginals_df_csvs(...)` 
 
+		all_epoch_bins_marginal
+
+		"""
+		laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
+		laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
+
+		laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+		laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
+		laps_marginals_df['lap_start_t'] = self.laps_epochs_df['start'].to_numpy()
+		return laps_marginals_df
+
+	@property
+	def ripple_all_epoch_bins_marginals_df(self) -> pd.DataFrame:
+		""" same quantities computed by `compute_and_export_marginals_df_csvs(...)` 
+		"""
+		ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
+		ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
+
+		## Ripple marginals_df:
+		ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+		ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+		ripple_marginals_df['ripple_start_t'] = self.ripple_epochs_df['start'].to_numpy()
+		return ripple_marginals_df
 
 
 	def __attrs_post_init__(self):
@@ -737,18 +768,31 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
 		"""
 		# Computes and initializes the marginal properties:
-		# laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs).to_dataframe()
+		laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs).to_dataframe()
 		self.laps_directional_marginals_tuple = DirectionalMergedDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
-		# laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
+		laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
 		self.laps_track_identity_marginals_tuple = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
-		# laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
+		laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
+
+		laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+		laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
+		laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
+		laps_marginals_df
 
 		## Decode Ripples:
-		# ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
+		ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
 		self.ripple_directional_marginals_tuple = DirectionalMergedDecodersResult.determine_directional_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
-		# ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
+		ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
 		self.ripple_track_identity_marginals_tuple = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
-		# ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
+		ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
+
+		## Ripple marginals_df:
+		ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+		ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+		ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
+		ripple_marginals_df
+
+
 
 
 	@classmethod
