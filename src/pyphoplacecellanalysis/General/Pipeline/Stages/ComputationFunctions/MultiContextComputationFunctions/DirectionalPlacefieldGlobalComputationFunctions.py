@@ -1876,29 +1876,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 						if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
 							perform_write_to_file_callback(sub_context, fig)
 
-					# def _subfn_save_figure(curr_active_pipeline, fig, _main_context, save_figure):
-					# 	active_display_context = curr_active_pipeline.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
-					# 	# active_display_context.get_description(separator='.') # 'kdiba.gor01.one.2006-6-09_1-22-43.directional_merged_pf_decoded_epochs.Laps.Direction'
-					# 	final_context = active_display_context
-					# 	# print(f'final_context: {final_context}')
-					# 	# active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=active_session_figures_out_path, register_output_file_fn=curr_active_pipeline.register_output_file)
-					# 	if save_figure:
-					# 		# fig = fig # get the figure
-					# 		# active_out_figure_paths, final_context = curr_active_pipeline.write_figure_to_daily_programmatic_session_output_path(fig, final_context, debug_print=True)
-					# 		active_out_figure_paths = curr_active_pipeline.output_figure(final_context, fig, context_tuple_join_character='.', debug_print=True) 
-					# 	else:
-					# 		active_out_figure_paths = None
 
-					# 	return active_out_figure_paths
-
-					# def _perform_write_to_file_callback(final_context, fig):
-					# 	return owning_pipeline_reference.output_figure(final_context, fig)
+					def _mod_plot_decoded_epoch_slices(*args, **kwargs):
+						""" implicitly captures: owning_pipeline_reference
+						"""
+						_main_context = kwargs.pop('_main_context', None)
+						out_plot_tuple = plot_decoded_epoch_slices(*args, **kwargs)
+						setup_common_after_creation(collector, out_plot_tuple, sub_context=owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context), 
+							# title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> Quantile Diff</>',
+							)
+						return out_plot_tuple
 					
 
 					if render_directional_laps:
 						# Laps Direction (LR/RL) Marginal:
 						_main_context = {'decoded_epochs': 'Laps', 'Marginal': 'Direction'}
-						# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
 						global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
 						graphics_output_dict['directional_laps_plot_tuple'] = plot_decoded_epoch_slices(
 							global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
@@ -1911,7 +1903,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 						setup_common_after_creation(collector, graphics_output_dict['directional_laps_plot_tuple'], sub_context=owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context), 
 							# title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> Quantile Diff</>',
 							)
-						# _subfn_save_figure(owning_pipeline_reference, active_fig, _main_context, save_figure)
 						
 
 					if render_directional_ripples:
@@ -1933,14 +1924,16 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 						_main_context = {'decoded_epochs': 'Laps', 'Marginal': 'TrackID'}
 						global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
 						# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
-						graphics_output_dict['track_identity_marginal_laps_plot_tuple'] = plot_decoded_epoch_slices(
+						graphics_output_dict['track_identity_marginal_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
 							global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
 							global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
 							name='TrackIdentity_Marginal_LAPS',
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+							_main_context=_main_context
 						)
+
 
 					if render_track_identity_marginal_ripples:
 						# Ripple Track-identity (Long/Short) Marginal:
