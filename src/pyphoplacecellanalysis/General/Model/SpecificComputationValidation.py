@@ -1,5 +1,5 @@
-from attrs import define, Factory, fields
-from typing import Callable, List
+from attrs import define, Factory, field, fields
+from typing import Callable, List, Dict, Optional
 
 @define(slots=False, repr=False)
 class SpecificComputationResultsSpecification:
@@ -22,12 +22,38 @@ class SpecificComputationResultsSpecification:
 
 
     """
-    provides_global_keys: List[str] = Factory(list)
-    # provides_local_keys: List[str] = Factory(list)
-    requires_global_keys: List[str] = Factory(list)
-    # requires_local_keys: List[str] = Factory(list)
+    provides_global_keys: List[str] = field(default=Factory(list), repr=True) 
+    # provides_local_keys: List[str] = field(default=Factory(list), repr=True)
+    requires_global_keys: List[str] = field(default=Factory(list), repr=True)
+    # requires_local_keys: List[str] = field(default=Factory(list), repr=True)
     
-    def remove_provided_keys(self, global_computation_results):
+    def has_provided_keys(self, global_computation_results):
+        """ check if the provided_global_keys are in the global_computation_results already.
+
+        # Check for existing result:
+        are_all_included, (matching_keys_dict, missing_keys_dict) = comp_specifier.results_specification.has_provided_keys(curr_active_pipeline.global_computation_results)
+        if are_all_included:
+            print(f'all provided {len(matching_keys_dict)} keys are already present and valid: {list(matching_keys_dict.keys())}')
+        else:
+            print(f'{len(matching_keys_dict)}/{len(matching_keys_dict) + len(missing_keys_dict)} provided keys are already present and valid:\n\tmatching: {list(matching_keys_dict.keys())}\n\tmissing: {list(missing_keys_dict.keys())}')
+            # missing_keys_dict
+
+
+        """
+        matching_keys_dict = {}
+        missing_keys_dict = {}
+        for a_key in self.provides_global_keys:
+            prev_result = global_computation_results.computed_data.get(a_key, None)
+            if prev_result is not None:
+                matching_keys_dict[a_key] = True
+            else:
+                missing_keys_dict[a_key] = False
+
+        are_all_included: bool = (len(matching_keys_dict) == len(self.provides_global_keys))
+        return are_all_included, (matching_keys_dict, missing_keys_dict)
+
+    def remove_provided_keys(self, global_computation_results) -> Dict:
+        """ try to find and remove any existing results that match provides_global_keys """
         removed_keys_dict = {}
         for a_key in self.provides_global_keys:
             prev_result = global_computation_results.computed_data.pop(a_key, None)
@@ -70,6 +96,10 @@ class SpecificComputationValidator:
     computation_fn_kwargs:dict = Factory(dict) # {'perform_cache_load': False}]`
     is_global:bool = False
     
+    @property
+    def has_results_spec(self) -> bool:
+       return (self.results_specification is not None) 
+
     @classmethod
     def init_from_decorated_fn(cls, a_fn):
         """
@@ -86,6 +116,8 @@ class SpecificComputationValidator:
                         
         """
         assert hasattr(a_fn, 'validate_computation_test') and (a_fn.validate_computation_test is not None)
+
+        ## Try to retrieve the `results_specification` from the function validator
         results_specification = None
         if hasattr(a_fn, 'results_specification') and (a_fn.results_specification is not None):
             # ensure the alternative non-import syntax isn't used simultaneously
@@ -106,6 +138,54 @@ class SpecificComputationValidator:
     def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
         return self._perform_try_computation_if_needed(self, curr_active_pipeline, **kwargs)
 
+
+    def try_remove_provided_keys(self, curr_active_pipeline, **kwargs):
+        """Remove any existing results:
+            if (removed_results_dict is not None) and len(removed_results_dict) > 0:
+                print(f'removed results: {list(removed_results_dict.keys())} because force_recompute was True.')
+        """
+        if self.has_results_spec:
+            removed_results_dict = self.results_specification.remove_provided_keys(curr_active_pipeline.global_computation_results)
+            return removed_results_dict
+        else:
+            return None
+
+    def try_check_missing_provided_keys(self, curr_active_pipeline, debug_print=False) -> bool:
+        """ Check for known provided results that are missing, indicating that it needs to be recomputed either way. If no self.results_specification is provided we can't conlude either way and must fall back to the normal validation function. """
+        is_known_missing_provided_keys: bool = False # we don't know if we are or not
+        if self.has_results_spec:
+            are_all_included, (matching_keys_dict, missing_keys_dict) = self.results_specification.has_provided_keys(curr_active_pipeline.global_computation_results)
+            if are_all_included:
+                if debug_print:
+                    print(f'all provided {len(matching_keys_dict)} keys are already present and valid: {list(matching_keys_dict.keys())}')
+            else:
+                if debug_print:
+                    print(f'{len(matching_keys_dict)}/{len(matching_keys_dict) + len(missing_keys_dict)} provided keys are already present and valid:\n\tmatching: {list(matching_keys_dict.keys())}\n\tmissing: {list(missing_keys_dict.keys())}')
+                # missing_keys_dict
+            is_known_missing_provided_keys = (not are_all_included)
+            return is_known_missing_provided_keys
+        else:
+            # inconclusive:
+            return is_known_missing_provided_keys
+
+
+    def debug_comp_validator_status(self, curr_active_pipeline):
+        # Check for existing result:
+        are_all_included = None
+        matching_keys_dict, missing_keys_dict = None, None
+        if self.has_results_spec:
+            are_all_included, (matching_keys_dict, missing_keys_dict) = self.results_specification.has_provided_keys(curr_active_pipeline.global_computation_results)
+            if are_all_included:
+                print(f'all provided {len(matching_keys_dict)} keys are already present and valid: {list(matching_keys_dict.keys())}')
+            else:
+                print(f'{len(matching_keys_dict)}/{len(matching_keys_dict) + len(missing_keys_dict)} provided keys are already present and valid:\n\tmatching: {list(matching_keys_dict.keys())}\n\tmissing: {list(missing_keys_dict.keys())}')
+            return are_all_included
+
+        else:
+            print(f'does not have any comp_specifier.results_specification properties so the value is None.') 
+            return None
+
+
     @classmethod
     def _perform_try_computation_if_needed(cls, comp_specifier: "SpecificComputationValidator", curr_active_pipeline, computation_filter_name:str, on_already_computed_fn=None, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False):
         """ 2023-06-08 - tries to perform the computation if the results are missing and it's needed. 
@@ -121,16 +201,23 @@ class SpecificComputationValidator:
         newly_computed_values = []
         
         if force_recompute:
+            ## Remove any existing results:
             print(f'2024-01-02 - TEST _perform_try_computation_if_needed, remove_provided_keys')
-            removed_results_dict = comp_specifier.results_specification.remove_provided_keys(curr_active_pipeline.global_computation_results)
+            removed_results_dict = comp_specifier.try_remove_provided_keys(curr_active_pipeline)
             if (removed_results_dict is not None) and len(removed_results_dict) > 0:
                 print(f'removed results: {list(removed_results_dict.keys())} because force_recompute was True.')
-                
+
+
+        # Check for existing result:
+        is_known_missing_provided_keys: bool = comp_specifier.try_check_missing_provided_keys(curr_active_pipeline)
 
         try:
-            comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
-            if on_already_computed_fn is not None:
-                on_already_computed_fn(comp_short_name, computation_filter_name)
+            if (is_known_missing_provided_keys):
+                raise ValueError(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
+            else:
+                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
+                if on_already_computed_fn is not None:
+                    on_already_computed_fn(comp_short_name, computation_filter_name)
         except (AttributeError, KeyError, TypeError, ValueError, AttributeError, AssertionError) as initial_validation_err:
             ## validate_computation_test(...) failed, so we need to recompute.
             if progress_print or debug_print:
