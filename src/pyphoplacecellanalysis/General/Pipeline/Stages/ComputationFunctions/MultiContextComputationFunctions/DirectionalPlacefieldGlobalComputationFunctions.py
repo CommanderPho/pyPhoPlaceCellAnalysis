@@ -13,10 +13,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.print_helpers import strip_type_str_to_classname
 
-
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
-from neuropy.utils.dynamic_container import DynamicContainer # used to build config
+from neuropy.utils.dynamic_container import DynamicContainer, override_dict # used to build config
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
@@ -1781,7 +1780,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 	@function_attributes(short_name='directional_merged_decoder_decoded_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-01-04 02:59', related_items=[], is_global=True)
 	def _display_directional_merged_pf_decoded_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
-													single_plot_fixed_height=50.0, max_num_lap_epochs: int = 25, max_num_ripple_epochs: int = 45, size=(15,7), dpi=72, constrained_layout=True, scrollable_figure=True, **kwargs):
+													single_plot_fixed_height=50.0, max_num_lap_epochs: int = 25, max_num_ripple_epochs: int = 45, size=(15,7), dpi=72, constrained_layout=True, scrollable_figure=True,
+													skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **kwargs):
 			""" Renders to windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
 
 			"""
@@ -1790,7 +1790,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 			import matplotlib as mpl
 			import matplotlib.pyplot as plt
-			import seaborn as sns
 			from flexitext import flexitext ## flexitext for formatted matplotlib text
 
 			from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
@@ -1813,7 +1812,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 			defer_render = kwargs.pop('defer_render', False)
 			debug_print: bool = kwargs.pop('debug_print', False)
-
+			active_config_name: bool = kwargs.pop('active_config_name', None)
 
 			perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
 			# Extract kwargs for figure rendering
@@ -1839,33 +1838,52 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 			active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
 			global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
 
-			with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }): # 'figure.figsize': (12.4, 4.8), 
+			with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False)}): # 'figure.figsize': (12.4, 4.8), 
 				# Create a FigureCollector instance
 				with FigureCollector(name='plot_quantile_diffs', base_context=display_context) as collector:
 
 					## Define the overriden plot function that internally calls the normal plot function but also permits doing operations before and after, such as building titles or extracting figures to save them:
-					def _mod_plot_decoded_epoch_slices(*args, **kwargs):
-						""" implicitly captures: owning_pipeline_reference, collector, perform_write_to_file_callback
+					def _mod_plot_decoded_epoch_slices(*args, **subfn_kwargs):
+						""" implicitly captures: owning_pipeline_reference, collector, perform_write_to_file_callback, save_figure, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True
 
 						NOTE: each call requires adding the additional kwarg: `_main_context=_main_context`
 						"""
-						assert '_mod_plot_kwargs' in kwargs
-						_mod_plot_kwargs = kwargs.pop('_mod_plot_kwargs')
+						assert '_mod_plot_kwargs' in subfn_kwargs
+						_mod_plot_kwargs = subfn_kwargs.pop('_mod_plot_kwargs')
 						assert 'final_context' in _mod_plot_kwargs
 						_main_context = _mod_plot_kwargs['final_context']
 						assert _main_context is not None
 						# Build the rest of the properties:
 						sub_context = owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
 						# Call the main plot function:
-						out_plot_tuple = plot_decoded_epoch_slices(*args, **kwargs)
+						out_plot_tuple = plot_decoded_epoch_slices(*args, skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions, **subfn_kwargs)
 						# Post-plot call:
 						assert len(out_plot_tuple) == 4
 						params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
-						mw = ui.mw # MatplotlibTimeSynchronizedWidget
-						fig = mw.fig
 						# post_hoc_append to collector
-						collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
-					
+						mw = ui.mw # MatplotlibTimeSynchronizedWidget
+						if mw is not None:
+							fig = mw.getFigure()
+							collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
+							title = mw.params.name
+						else:
+							fig = plots.fig
+							collector.post_hoc_append(figs=fig, axes=plots.axs, contexts=sub_context)
+							title = params.name
+
+						# Recover the proper title:
+						assert title is not None, f"title: {title}"
+						print(f'title: {title}')
+
+						# # `flexitext` version:
+						# text_formatter = FormattedFigureText()
+						# fig.suptitle('')
+						# text_formatter.setup_margins(fig) # , top_margin=0.740
+						# title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
+						# footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+						# 							text_formatter._build_footer_string(active_context=sub_context),
+						# 							va="top", xycoords="figure fraction")
+
 						# # Add epoch indicators
 						# for ax in (axes if isinstance(axes, Iterable) else [axes]):
 						# 	PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
@@ -1883,14 +1901,13 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 							# 							va="top", xycoords="figure fraction")
 					
 						if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
-							perform_write_to_file_callback(sub_context, fig)
+							if save_figure:
+								perform_write_to_file_callback(sub_context, fig)
 							
 						# Close if defer_render
 						if defer_render:
-							mw.close()
-							# ui.mw = None
-							# del ui['mw']
-							# out_plot_tuple = None # needed?
+							if mw is not None:
+								mw.close()
 
 						return out_plot_tuple
 					
@@ -1906,7 +1923,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-							_mod_plot_kwargs=dict(final_context=_main_context)
+							_mod_plot_kwargs=dict(final_context=_main_context),
+							**deepcopy(kwargs)
 						)
 
 					if render_directional_marginal_ripples:
@@ -1921,7 +1939,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-							_mod_plot_kwargs=dict(final_context=_main_context)
+							_mod_plot_kwargs=dict(final_context=_main_context),
+							**deepcopy(kwargs)
 						)
 
 					if render_track_identity_marginal_laps:
@@ -1936,7 +1955,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-							_mod_plot_kwargs=dict(final_context=_main_context)
+							_mod_plot_kwargs=dict(final_context=_main_context),
+							**deepcopy(kwargs)
 						)
 
 
@@ -1952,8 +1972,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-							_mod_plot_kwargs=dict(final_context=_main_context)
+							_mod_plot_kwargs=dict(final_context=_main_context),
+							**deepcopy(kwargs)
 						)
 
+			graphics_output_dict['collector'] = collector
 
 			return graphics_output_dict

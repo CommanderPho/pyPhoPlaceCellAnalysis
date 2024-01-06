@@ -24,7 +24,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunc
 
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import DecoderResultDisplayingPlot2D
 
-from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slices_matplotlib_build_view
+from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slices_matplotlib_build_view, stacked_epoch_slices_matplotlib_build_insets_view
 
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand # for AddNewDecodedPosition_MatplotlibPlotCommand
 
@@ -228,7 +228,7 @@ def _cached_epoch_computation_if_needed(computation_result, active_config, activ
 # ==================================================================================================================== #
 # Private Implementations                                                                                              #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions'], creation_date='2023-05-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=[])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
@@ -268,8 +268,10 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             fig = None # Calling plt.gcf() creates an empty figure and returns the wrong value 
             # fig = plt.gcf()
         
-        # Actual Position Plots (red line):
-        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        if measured_position_df is not None:
+            # Actual Position Plots (red line):
+            ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+
         ax.set_title(variable_name)
        
         # Posterior distribution heatmap:
@@ -419,39 +421,39 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
     
 
 def _batch_update_posterior_image(long_results_obj, xbin, ax): # time_window_centers, posterior
-	# Get the colormap to use and set the bad color
-	cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
-	cmap.set_bad(color='black')
-	main_plot_kwargs = {'origin': 'lower', 'vmin': 0, 'vmax': 1, 'cmap': cmap, 'interpolation':'nearest', 'aspect':'auto'}
-	assert ax is not None
-	ymin, ymax = xbin[0], xbin[-1]
+    # Get the colormap to use and set the bad color
+    cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
+    cmap.set_bad(color='black')
+    main_plot_kwargs = {'origin': 'lower', 'vmin': 0, 'vmax': 1, 'cmap': cmap, 'interpolation':'nearest', 'aspect':'auto'}
+    assert ax is not None
+    ymin, ymax = xbin[0], xbin[-1]
 
-	out_img_list = []
-	with plt.ion():
-		# Posterior distribution heatmap:
-		if long_results_obj is not None:
-			for epoch_idx in np.arange(long_results_obj.num_filter_epochs):
-				# a_curr_num_bins: int = long_results_obj.nbins[epoch_idx]
-				a_centers = long_results_obj.time_bin_containers[epoch_idx].centers
-				a_posterior = long_results_obj.p_x_given_n_list[epoch_idx]
-				# n_pos_bins = np.shape(a_posterior)[0]
-				# Compute extents for imshow:
-				# xmin, xmax, ymin, ymax = (a_centers[0], a_centers[-1], xbin[0], xbin[-1])
-				xmin, xmax = (a_centers[0], a_centers[-1])           
-				x_first_extent = (xmin, xmax, ymin, ymax)
-				active_extent = x_first_extent
-				# Posterior distribution heatmaps at each point.
-				im_posterior_x = ax.imshow(a_posterior, extent=active_extent, animated=True, **main_plot_kwargs)
-				out_img_list.append(im_posterior_x)
-			
-			# ax.set_xlim((xmin, xmax))
-			# ax.set_ylim((ymin, ymax))
+    out_img_list = []
+    with plt.ion():
+        # Posterior distribution heatmap:
+        if long_results_obj is not None:
+            for epoch_idx in np.arange(long_results_obj.num_filter_epochs):
+                # a_curr_num_bins: int = long_results_obj.nbins[epoch_idx]
+                a_centers = long_results_obj.time_bin_containers[epoch_idx].centers
+                a_posterior = long_results_obj.p_x_given_n_list[epoch_idx]
+                # n_pos_bins = np.shape(a_posterior)[0]
+                # Compute extents for imshow:
+                # xmin, xmax, ymin, ymax = (a_centers[0], a_centers[-1], xbin[0], xbin[-1])
+                xmin, xmax = (a_centers[0], a_centers[-1])           
+                x_first_extent = (xmin, xmax, ymin, ymax)
+                active_extent = x_first_extent
+                # Posterior distribution heatmaps at each point.
+                im_posterior_x = ax.imshow(a_posterior, extent=active_extent, animated=True, **main_plot_kwargs)
+                out_img_list.append(im_posterior_x)
+            
+            # ax.set_xlim((xmin, xmax))
+            # ax.set_ylim((ymin, ymax))
 
 
-		# ax.set_xlim((xmin, xmax))
-		ax.set_ylim((ymin, ymax))
-		
-	return out_img_list
+        # ax.set_xlim((xmin, xmax))
+        ax.set_ylim((ymin, ymax))
+        
+    return out_img_list
 
 
 
@@ -643,10 +645,24 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
 
     Needs only: curr_time_bins, curr_posterior, curr_most_likely_positions
     Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+    
+    Optional:
+        params.skip_plotting_measured_positions: controls whether the red measured positions line is plotted
+    
+    
     """    
+    
     if debug_print:
         print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
-    _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=params.variable_name, xbin=params.xbin,
+        
+    # The measured positions are extracted from the track data, so we'll need to check if we want to plot them and if we don't pass None instead.
+    skip_plotting_measured_positions: bool = params.get('skip_plotting_measured_positions', False)
+    if skip_plotting_measured_positions:
+        measured_position_df = None
+    else:
+        measured_position_df = plots_data.global_pos_df        
+
+    _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(measured_position_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=params.variable_name, xbin=params.xbin,
                                                         posterior=curr_posterior,
                                                         active_most_likely_positions_1D=curr_most_likely_positions,
                                                         enable_flat_line_drawing=params.enable_flat_line_drawing, debug_print=debug_print)
@@ -656,6 +672,7 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
     curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
     return params, plots_data, plots, ui
+
 
 @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['_helper_update_decoded_single_epoch_slice_plot'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-09 00:00', related_items=[])
 def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_print=False):
@@ -675,7 +692,13 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
         curr_posterior_container = active_marginal_list[i] # why not marginal_y
         curr_posterior = curr_posterior_container.p_x_given_n
         curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
-        
+
+        # the easiest way to skip plotting these lines/points/etc is by passing None for their values
+        skip_plotting_most_likely_positions = params.get('skip_plotting_most_likely_positions', False)
+        if skip_plotting_most_likely_positions:
+            curr_most_likely_positions = None
+
+            
         params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
         on_render_page_callbacks = params.get('on_render_page_callbacks', {})
         for a_callback_name, a_callback in on_render_page_callbacks.items():
@@ -689,9 +712,15 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','matplotlib'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view', '_subfn_update_decoded_epoch_slices'], used_by=['_display_plot_decoded_epoch_slices', 'DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data'], creation_date='2023-05-08 16:31', related_items=[])
 def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, included_epoch_indicies=None, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False,
                                 single_plot_fixed_height=100.0, debug_test_max_num_slices=20, size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True,
-                                name='stacked_epoch_slices_matplotlib_subplots', active_marginal_fn=None, debug_print=False):
+                                name='stacked_epoch_slices_matplotlib_subplots', active_marginal_fn=None, debug_print=False, **kwargs):
     """ plots the decoded epoch results in a stacked slices view 
     
+
+    # PROCESS:
+        `_subfn_update_decoded_epoch_slices` actually plots the data!
+
+
+
     Parameters:
         variable_name: str - the name of the column in the global_pos_df that contains the variable to plot. 
         included_epoch_indicies: Optional[np.ndarray] - an optional list of epoch indicies to plot instead of all of them in filter_epochs. Uses `.filtered_by_epochs(...)` to filter the filter_epochs_decoder_result.
@@ -759,18 +788,39 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     if debug_print:
         print(f'epoch_labels: {epoch_labels}')
     
+
+    should_use_MatplotlibTimeSynchronizedWidget: bool = kwargs.pop('should_use_MatplotlibTimeSynchronizedWidget', True) 
+    if (scrollable_figure and (not should_use_MatplotlibTimeSynchronizedWidget)):
+        print(f'WARN: `scollable_figure` requires `MatplotlibTimeSynchronizedWidget`, but should_use_MatplotlibTimeSynchronizedWidget == False! Scrollability will be disabled.')
+
+    # 2023-01-06 - Allow switching between regular and insets view ['view', 'insets_view']
+    build_fn: str = kwargs.pop('build_fn', 'basic_view')
+    if (build_fn == 'basic_view'):
+        stacked_epoch_slices_matplotlib_build_fn = stacked_epoch_slices_matplotlib_build_view
+    elif (build_fn == 'insets_view'):
+        stacked_epoch_slices_matplotlib_build_fn = stacked_epoch_slices_matplotlib_build_insets_view
+    else:
+        raise NotImplementedError(f"valid options are ['basic_view', 'insets_view'], but '{build_fn}' was specified")
+
+    # figure_kwargs = overriding_dict_with(dict(figsize=None, dpi=None, facecolor=None, edgecolor=None, linewidth=0.0, frameon=None, subplotpars=None, tight_layout=None, constrained_layout=None, layout=None), **kwargs)
+    figure_kwargs = overriding_dict_with(dict(figsize=None, dpi=dpi, facecolor=None, edgecolor=None, linewidth=0.0, frameon=None, subplotpars=None, tight_layout=None, constrained_layout=constrained_layout, layout=None), **kwargs)
+
     plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
-    params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_view(epoch_slices, epoch_labels=epoch_labels,
+    params, plots_data, plots, ui = stacked_epoch_slices_matplotlib_build_fn(epoch_slices, epoch_labels=epoch_labels,
                                                                                 name=name, plot_function_name=plot_function_name,
-                                                                                single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=debug_test_max_num_slices, size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-                                                                                debug_print=debug_print)
+                                                                                single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=debug_test_max_num_slices, size=size,
+                                                                                should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, scrollable_figure=scrollable_figure,
+                                                                                debug_print=debug_print, **figure_kwargs)
+
+
 
     ## Add required variables to `params` and `plots_data`:
     params.variable_name = variable_name
     params.xbin = xbin.copy()
     params.enable_flat_line_drawing = enable_flat_line_drawing
-      
-
+    params.skip_plotting_measured_positions = kwargs.pop('skip_plotting_measured_positions', False)
+    params.skip_plotting_most_likely_positions = kwargs.pop('skip_plotting_most_likely_positions', False)
+    
     plots_data.global_pos_df = global_pos_df.copy()
     plots_data.filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result)
 
@@ -796,7 +846,7 @@ class RadonTransformPlotData:
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController', 'add_inner_title', 'RadonTransformPlotData'], used_by=[], creation_date='2023-06-02 13:36')
-def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, included_epoch_indicies=None, save_figure=True, enable_radon_transform_info:bool=True, **kwargs):
+def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, included_epoch_indicies=None, save_figure=True, enable_radon_transform_info:bool=True):
     """ Plots a `DecodedEpochSlicesPaginatedFigureController`
 
         display_context is kinda mixed up, DecodedEpochSlicesPaginatedFigureController builds its own kind of display context but this isn't the one that we want for the file outputs usually.
