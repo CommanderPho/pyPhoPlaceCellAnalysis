@@ -477,9 +477,10 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     # plots.figure_id = 'stacked_epoch_slices_INSET_matplotlib'
     plots.figure_id = plots.name # copy the name as the figure_id
 
+    ## Build Core Figure and its single axis:
     if not params.should_use_MatplotlibTimeSynchronizedWidget:
         ## Basic Matplotlib Version:
-        plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True, frameon=False)
+        plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=size, dpi=dpi, clear=True, sharex=False, sharey=False, constrained_layout=constrained_layout, frameon=False, **kwargs)
         ui.mw = None
     else:
         ## MatplotlibTimeSynchronizedWidget-embedded Version:
