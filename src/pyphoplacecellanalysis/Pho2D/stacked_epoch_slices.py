@@ -28,7 +28,7 @@ These functions help render a vertically stacked column of subplots that represe
 # Stacked Epoch Slices View                                                                                            #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['helper', 'common', 'setup', 'axes', 'figure', 'stacked'], input_requires=[], output_provides=[], uses=[], used_by=['stacked_epoch_slices_view'], creation_date='2023-03-28 00:00', related_items=[])
-def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, single_plot_fixed_width=200.0, debug_test_max_num_variants=64, debug_print=False):
+def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, single_plot_fixed_width=200.0, debug_test_max_num_variants=64, should_use_MatplotlibTimeSynchronizedWidget=True, debug_print=False):
     """ Builds the common setup/containers for all stacked-epoch type plots:
     
     epoch_description_list: list of length 
@@ -60,7 +60,8 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
     # params.global_epoch_start_t, params.global_epoch_end_t # (1238.0739798661089, 2067.4688883359777)
     params.single_plot_fixed_height = single_plot_fixed_height
     params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
-
+    params.should_use_MatplotlibTimeSynchronizedWidget = should_use_MatplotlibTimeSynchronizedWidget
+    
     if (epoch_labels is None) or (epoch_labels == []):
         # Build defaults for the plots
         epoch_labels = [f'epoch[{a_slice_idx}]' for a_slice_idx in np.arange(num_slices)]
@@ -359,11 +360,11 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
 
 
 # Helper Figure/Plots Builders _______________________________________________________________________________________ #
-@function_attributes(short_name=None, tags=['epoch', 'stacked', 'matplotlib', 'TODO:PERFORMANCE'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-30 10:05', related_items=[])
+@function_attributes(short_name=None, tags=['epoch', 'stacked', 'matplotlib', 'TODO:PERFORMANCE'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget', '_pagination_helper_plot_single_epoch_slice'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-30 10:05', related_items=[])
 def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None,
                                                 single_plot_fixed_height=100.0, debug_test_max_num_slices=127,
-                                                size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True,
-                                                debug_print=False):
+                                                size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, should_use_MatplotlibTimeSynchronizedWidget=True,
+                                                debug_print=False, **kwargs):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -390,19 +391,21 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     ## Inset Subplots Version:
     if plot_function_name is None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
-    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
     # plots.figure_id = 'stacked_epoch_slices_matplotlib'    
     plots.figure_id = plots.name # copy the name as the figure_id
     
     ## Create the main figure and plot axes:
-    
-    ## Basic Matplotlib Version:
-    # plots.fig, plots.axs = plt.subplots(num=plots.figure_id, ncols=1, nrows=params.active_num_slices, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
-    
-    ## MatplotlibTimeSynchronizedWidget-embedded Version:
+    if not params.should_use_MatplotlibTimeSynchronizedWidget:
+        ## Basic Matplotlib Version:
+        plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+        ui.mw = None
+    else:
+        ## MatplotlibTimeSynchronizedWidget-embedded Version:
+        ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name, **kwargs)
+        plots.fig = ui.mw.getFigure()
 
-    ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name)
-    plots.fig = ui.mw.getFigure()
+
     plots.fig.suptitle(plots.name)
     plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False)
     if not isinstance(plots.axs, (list, tuple, np.ndarray)):
@@ -413,22 +416,21 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     for a_slice_idx, curr_ax in enumerate(plots.axs):
         _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx=a_slice_idx, is_first_setup=True, debug_print=debug_print)
 
-    ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
-    ui.mw.draw() #TODO 2023-07-06 15:08: - [ ] TODO: PERFORMANCE - uneeded-draw
-    # ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
-    ui.mw.show()
-    
+    if params.should_use_MatplotlibTimeSynchronizedWidget:
+        ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
+        ui.mw.draw() #TODO 2023-07-06 15:08: - [ ] TODO: PERFORMANCE - uneeded-draw
+        # ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
+        ui.mw.show()
+        
     # It seems that the title must not be updated until after ui.mw.show() is called.
-    
-
     return params, plots_data, plots, ui
 
 
 @function_attributes(short_name=None, tags=['matplotlib', 'plot', 'figure', 'variant', 'helper'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=[], creation_date='2023-05-30 10:06', related_items=[])
 def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, epoch_labels=None,
                                                         single_plot_fixed_height=100.0, debug_test_max_num_slices=12,
-                                                        size=(15,15), dpi=72, constrained_layout=True, 
-                                                        debug_print=False):
+                                                        size=(15,15), dpi=72, constrained_layout=True, should_use_MatplotlibTimeSynchronizedWidget=True, 
+                                                        debug_print=False, **kwargs):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -458,8 +460,9 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     # debug_print = False
     if plot_function_name is not None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB INSET SUBPLOTS Version'
-    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_heights, debug_print=debug_print)
-
+        
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
+    
     global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
     global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
     epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
@@ -471,16 +474,22 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     # inset_plot_heights
     inset_plot_widths = epoch_slice_relative_durations * 100.0 # convert to percent width of parent
     # inset_plot_widths.shape
+    # plots.figure_id = 'stacked_epoch_slices_INSET_matplotlib'
+    plots.figure_id = plots.name # copy the name as the figure_id
 
-    plots.figure_id = 'stacked_epoch_slices_INSET_matplotlib'
-    
-    ## Basic Matplotlib Version:
-    # plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
+    if not params.should_use_MatplotlibTimeSynchronizedWidget:
+        ## Basic Matplotlib Version:
+        plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True, frameon=False)
+        ui.mw = None
+    else:
+        ## MatplotlibTimeSynchronizedWidget-embedded Version:
+        ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, name=name, plot_function_name=plot_function_name, **kwargs) # , clear=True
+        plots.fig = ui.mw.getFigure()
+        plots.parent_ax = plots.fig.subplots(ncols=1, nrows=1, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
 
-    ## MatplotlibTimeSynchronizedWidget-embedded Version:
-    ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, name=name, plot_function_name=plot_function_name) # , clear=True
-    plots.fig = ui.mw.getFigure()
-    plots.parent_ax = plots.fig.subplots(ncols=1, nrows=1, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
+    # Remove frames/spines:
+    plots.parent_ax.axis('off')
+    plots.fig.patch.set_visible(False)
 
     plots.axs = [] # an empty list of core axes
     plots.fig.suptitle(plots.name)
@@ -507,13 +516,16 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
         curr_ax.tick_params(labelleft=False, labelbottom=False)
         curr_ax.set_title('') # remove the title
+        curr_ax.axis('off') # remove the box and spines
+
         # Appends:
         plots.axs.append(curr_ax)
     
-    ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
-    ui.mw.draw()
-    ui.mw.show()
-    
+    if params.should_use_MatplotlibTimeSynchronizedWidget:
+        ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
+        ui.mw.draw()
+        ui.mw.show()
+        
     return params, plots_data, plots, ui
 
 
