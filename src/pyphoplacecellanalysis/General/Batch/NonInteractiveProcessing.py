@@ -697,7 +697,7 @@ class BatchPhoJonathanFiguresHelper:
         # if figures_parent_out_path is None:
         #     figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
 
-        #TODO 2023-06-14 21:53: - [ ] REPLACE `create_daily_programmatic_display_function_testing_folder_if_needed` with `curr_active_pipeline.get_figure_manager()` approach
+        # 2023-06-14 21:53: - [X] REPLACE `create_daily_programmatic_display_function_testing_folder_if_needed` with `curr_active_pipeline.get_figure_manager()` approach
         fig_man = curr_active_pipeline.get_output_manager()
 
         active_out_figures_dict = {} # empty dict to hold figures

@@ -186,13 +186,13 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
     def showEvent(self, event):
         """ called only when the widget is shown for the first time. """
         if self.params.debug_print:
-        print(f'showEvent(self, event: {event})')
-        print(f'\tevent.spontaneous(): {event.spontaneous()}')
+            print(f'showEvent(self, event: {event})')
+            print(f'\tevent.spontaneous(): {event.spontaneous()}')
         if event.spontaneous():
             if self.params.debug_print:
-            print(f'\tfirst show!')
-            # Check if the event is spontaneous to identify the first time the widget is shown
-            # self.on_first_show()
+                print(f'\tfirst show!')
+                # Check if the event is spontaneous to identify the first time the widget is shown
+                # self.on_first_show()
 
         if self.isVisible():
             # IMPORTANT: It seems that the title must not be updated until after ui.mw.show() is called or else it crashes the Jupyter kernel! This is why we check for the first show and make sure that the window is visible

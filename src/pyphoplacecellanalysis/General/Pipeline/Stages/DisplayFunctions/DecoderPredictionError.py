@@ -637,9 +637,9 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
 # Functions for rendering a stack of decoded epochs in a stacked_epoch_slices-style manner                             #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=['_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-08 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=['_subfn_update_decoded_epoch_slices', 'plot_decoded_epoch_slices_paginated'], creation_date='2023-05-08 00:00', related_items=[])
 def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=False):
-    """ 2023-05-08 - Factored out of plot_decoded_epoch_slices to enable paged 
+    """ 2023-05-08 - Factored out of plot_decoded_epoch_slices to enable paged via `plot_decoded_epoch_slices_paginated`
 
     Needs only: curr_time_bins, curr_posterior, curr_most_likely_positions
     Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
@@ -672,9 +672,6 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
     for i, curr_ax in enumerate(plots.axs):
         curr_time_bin_container = plots_data.filter_epochs_decoder_result.time_bin_containers[i]
         curr_time_bins = curr_time_bin_container.centers
-        
-        # curr_posterior_container = plots_data.filter_epochs_decoder_result.marginal_x_list[i]
-        # curr_posterior_container = plots_data.filter_epochs_decoder_result.marginal_y_list[i] # why not marginal_y
         curr_posterior_container = active_marginal_list[i] # why not marginal_y
         curr_posterior = curr_posterior_container.p_x_given_n
         curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
