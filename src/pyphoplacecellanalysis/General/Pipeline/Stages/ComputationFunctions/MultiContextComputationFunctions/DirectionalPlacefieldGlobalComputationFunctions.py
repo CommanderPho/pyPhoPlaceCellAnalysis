@@ -1765,18 +1765,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
 	@function_attributes(short_name='directional_merged_decoder_decoded_epochs', tags=['yellow-blue-plots', 'directional_merged_decoder_decoded_epochs', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-01-04 02:59', related_items=[], is_global=True)
-	def _display_directional_merged_pf_decoded_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+	def _display_directional_merged_pf_decoded_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
+													single_plot_fixed_height=50.0, max_num_lap_epochs: int = 25, max_num_ripple_epochs: int = 45, size=(15,7), dpi=72, constrained_layout=True, scrollable_figure=True, **kwargs):
 			""" Renders to windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
 
 			"""
 			from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 			from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
 
-
-			max_num_lap_epochs: int = 80
-			max_num_ripple_epochs: int = 80
-			
-			# raise NotImplementedError
 			active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
 			fignum = kwargs.pop('fignum', None)

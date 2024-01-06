@@ -360,7 +360,10 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
 
 # Helper Figure/Plots Builders _______________________________________________________________________________________ #
 @function_attributes(short_name=None, tags=['epoch', 'stacked', 'matplotlib', 'TODO:PERFORMANCE'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=['plot_decoded_epoch_slices'], creation_date='2023-05-30 10:05', related_items=[])
-def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None, single_plot_fixed_height=100.0, debug_test_max_num_slices=127, debug_print=False):
+def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None,
+                                                single_plot_fixed_height=100.0, debug_test_max_num_slices=127,
+                                                size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True,
+                                                debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -398,7 +401,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     
     ## MatplotlibTimeSynchronizedWidget-embedded Version:
 
-    ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name)
+    ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name)
     plots.fig = ui.mw.getFigure()
     plots.fig.suptitle(plots.name)
     plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False)
@@ -415,6 +418,9 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     # ui.mw.ui.scrollAreaContentsWidget.setMinimumHeight(params.all_plots_height)
     ui.mw.show()
     
+    # It seems that the title must not be updated until after ui.mw.show() is called.
+    
+
     return params, plots_data, plots, ui
 
 @function_attributes(short_name=None, tags=['matplotlib', 'plot', 'figure', 'variant', 'helper'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=[], creation_date='2023-05-30 10:06', related_items=[])
