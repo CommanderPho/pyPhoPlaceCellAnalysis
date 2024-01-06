@@ -529,13 +529,28 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         print(f'batch_extended_programmatic_figures(...): BatchPhoJonathanFiguresHelper.run(...) failed for all cells. failed with error: {e}\n skipping.')
         
 
+    # _display_directional_merged_pf_decoded_epochs ______________________________________________________________________ #
+    try:
+        _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_epochs', curr_active_pipeline.get_session_context(),
+                    max_num_lap_epochs = 240, max_num_ripple_epochs = 500,
+                    render_directional_marginal_laps=True, render_directional_marginal_ripples=True, render_track_identity_marginal_laps=True, render_track_identity_marginal_ripples=True,
+                    # render_directional_marginal_laps=True, render_directional_marginal_ripples=False, render_track_identity_marginal_laps=False, render_track_identity_marginal_ripples=False,
+                    # constrained_layout=True, # layout='none',
+                    # build_fn='basic_view', constrained_layout=True, 
+                    build_fn='insets_view', constrained_layout=None, layout='none', # , constrained_layout=False constrained_layout=None, layout='none', # , constrained_layout=None, layout='none' extrodinarily fast
+                    should_use_MatplotlibTimeSynchronizedWidget=False, skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, scrollable_figure=False,
+                    defer_render=True, save_figure=save_figure)
+        
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs" failed with error: {e}\n skipping.')
+        
+
+    # _display_rank_order_z_stats_results ________________________________________________________________________________ #
     try:
         _out = curr_active_pipeline.display('_display_rank_order_z_stats_results', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): "_display_rank_order_z_stats_results" failed with error: {e}\n skipping.')
         
-    
-
 
 
 class BatchPhoJonathanFiguresHelper:
