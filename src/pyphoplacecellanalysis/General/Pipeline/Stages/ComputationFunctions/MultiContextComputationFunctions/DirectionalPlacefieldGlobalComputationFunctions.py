@@ -652,7 +652,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
 	## Get the result after computation:
 	directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
 	
-
 	all_directional_decoder_dict_value = directional_merged_decoders_result.all_directional_decoder_dict
 	all_directional_pf1D_Decoder_value = directional_merged_decoders_result.all_directional_pf1D_Decoder
 	# long_directional_pf1D_Decoder_value = directional_merged_decoders_result.long_directional_pf1D_Decoder
@@ -1782,6 +1781,13 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 			defer_render = kwargs.pop('defer_render', False)
 			debug_print: bool = kwargs.pop('debug_print', False)
 
+			# Extract kwargs for figure rendering
+			render_directional_laps = kwargs.pop('render_directional_laps', True)
+			render_directional_ripples = kwargs.pop('render_directional_ripples', False)
+			render_track_identity_marginal_laps = kwargs.pop('render_track_identity_marginal_laps', True)
+			render_track_identity_marginal_ripples = kwargs.pop('render_track_identity_marginal_ripples', False)
+
+
 			# figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
 			# _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
 
@@ -1791,64 +1797,108 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 			# requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
 			long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-			global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
 			
-			# Direction (LR/RL) Marginal:
-			global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+			# # active_context.
+			# # Track-identity (Long/Short) Marginal:
+			# global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+			# active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+			# track_identity_marginal_laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+			# 											name='TrackIdentity_Marginal_LAPS',
+			# 											active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+			# 											single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs, size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+			# 											)
+
+			# # Direction (LR/RL) Marginal:
+			# global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+			# active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+			# directional_laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+			# 											name='Directional_Marginal_LAPS',
+			# 											active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+			# 											single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs, size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+			# 											)
+			
+			
+			# # Replays: ___________________________________________________________________________________________________________ #
+
+
+			# # Track-identity (Long/Short) Marginal:
+			# global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+			# active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+			# track_identity_marginal_ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+			# 											name='TrackIdentity_Marginal_Ripples',
+			# 											active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+			# 											single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs, size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+			# 											)
+
+			# # Direction (LR/RL) Marginal:
+			# global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+			# active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+			# directional_ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+			# 											name='Directional_Marginal_Ripples',
+			# 											active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+			# 											single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs, size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+			# 											)
+
+			# graphics_output_dict = {'directional_laps_plot_tuple': directional_laps_plot_tuple, 'directional_ripples_plot_tuple': directional_ripples_plot_tuple, "track_identity_marginal_laps_plot_tuple": track_identity_marginal_laps_plot_tuple, 'track_identity_marginal_ripples_plot_tuple': track_identity_marginal_ripples_plot_tuple}
+
+
+			graphics_output_dict = {}
+
+			# Shared active_decoder, global_session:
 			active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-			laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-														name='Directional_Marginal_LAPS',
-														# active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
-														active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
-														debug_test_max_num_slices=max_num_lap_epochs
-														)
+			global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
 
-			# Track-identity (Long/Short) Marginal:
-			global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
-			active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-			track_identity_marginal_laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-														name='TrackIdentity_Marginal_LAPS',
-														active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
-														debug_test_max_num_slices=max_num_lap_epochs
-														)
+			if render_directional_laps:
+				# Laps Direction (LR/RL) Marginal:
+				# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+				global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+				graphics_output_dict['directional_laps_plot_tuple'] = plot_decoded_epoch_slices(
+					global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
+					global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+					name='Directional_Marginal_LAPS',
+					active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+					single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
+					size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+				)
 
+			if render_directional_ripples:
+				# Ripple Direction (LR/RL) Marginal:
+				# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+				global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+				graphics_output_dict['directional_ripples_plot_tuple'] = plot_decoded_epoch_slices(
+					global_replays, directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result,
+					global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+					name='Directional_Marginal_Ripples',
+					active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+					single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
+					size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+				)
 
+			if render_track_identity_marginal_laps:
+				# Laps Track-identity (Long/Short) Marginal:
+				global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+				# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+				graphics_output_dict['track_identity_marginal_laps_plot_tuple'] = plot_decoded_epoch_slices(
+					global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
+					global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+					name='TrackIdentity_Marginal_LAPS',
+					active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+					single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
+					size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+				)
 
-			# Replays: ___________________________________________________________________________________________________________ #
-
-			# Direction (LR/RL) Marginal:
-			global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
-			active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-			ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-														name='Directional_Marginal_Ripples',
-														# active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
-														active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
-														debug_test_max_num_slices=max_num_ripple_epochs,
-														)
-
-			# Track-identity (Long/Short) Marginal:
-			global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
-			active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-			track_identity_marginal_ripples_plot_tuple = plot_decoded_epoch_slices(global_replays,  directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-														name='TrackIdentity_Marginal_Ripples',
-														# active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
-														active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
-														debug_test_max_num_slices=max_num_ripple_epochs,
-														)
-
-
-
-
-
-			# active_decoder = long_directional_pf1D_Decoder
-			# laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, directional_merged_decoders_result.long_only_laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-			#                                             name='long_only_lstacked_epoch_slices_matplotlib_subplots_LAPS',
-			#                                             # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
-			#                                             active_marginal_fn = lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
-			#                                             )
-
-
-			graphics_output_dict = {'laps_plot_tuple': laps_plot_tuple, 'ripples_plot_tuple': ripples_plot_tuple, "track_identity_marginal_laps_plot_tuple": track_identity_marginal_laps_plot_tuple, 'track_identity_marginal_ripples_plot_tuple': track_identity_marginal_ripples_plot_tuple}
+			if render_track_identity_marginal_ripples:
+				# Ripple Track-identity (Long/Short) Marginal:
+				global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+				# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+				graphics_output_dict['track_identity_marginal_ripples_plot_tuple'] = plot_decoded_epoch_slices(
+					global_replays, directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result,
+					global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+					name='TrackIdentity_Marginal_Ripples',
+					active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+					single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
+					size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+				)
 
 
 			return graphics_output_dict
