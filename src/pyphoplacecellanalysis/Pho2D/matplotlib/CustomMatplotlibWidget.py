@@ -42,7 +42,7 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         QtWidgets.QWidget.__init__(self)
         
         ## Init containers:
-        self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name)
+        self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name, debug_print=False)
         self.plots_data = RenderPlotsData(name=name)
         self.plots = RenderPlots(name=name)
         self.ui = PhoUIContainer(name=name)
@@ -80,9 +80,8 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         else:
             self._buildUI_buildNonScrollableWidget()
 
-        # WHY IS THIS HAPPENING?
-        if self.ui.canvas.manager is not None:
-            self.ui.canvas.manager.set_window_title(self.params.window_title) # sets the window's title
+        # self.setWindowTitle(self.params.window_title) # sets the window's title
+
 
     def _buildUI_buildNonScrollableWidget(self):
         """ sets up the widget to contain a basic layout with no scrollability """
@@ -186,14 +185,17 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
     
     def showEvent(self, event):
         """ called only when the widget is shown for the first time. """
+        if self.params.debug_print:
         print(f'showEvent(self, event: {event})')
         print(f'\tevent.spontaneous(): {event.spontaneous()}')
         if event.spontaneous():
+            if self.params.debug_print:
             print(f'\tfirst show!')
             # Check if the event is spontaneous to identify the first time the widget is shown
             # self.on_first_show()
 
         if self.isVisible():
+            # IMPORTANT: It seems that the title must not be updated until after ui.mw.show() is called or else it crashes the Jupyter kernel! This is why we check for the first show and make sure that the window is visible
             self.window().setWindowTitle(self.params.window_title)
     
         # Call the base class implementation
