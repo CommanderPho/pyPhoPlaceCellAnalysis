@@ -423,8 +423,12 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
 
     return params, plots_data, plots, ui
 
+
 @function_attributes(short_name=None, tags=['matplotlib', 'plot', 'figure', 'variant', 'helper'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=[], creation_date='2023-05-30 10:06', related_items=[])
-def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, epoch_labels=None, debug_test_max_num_slices=12, debug_print=False):
+def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, epoch_labels=None,
+                                                        single_plot_fixed_height=100.0, debug_test_max_num_slices=12,
+                                                        size=(15,15), dpi=72, constrained_layout=True, 
+                                                        debug_print=False):
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -454,7 +458,7 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     # debug_print = False
     if plot_function_name is not None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB INSET SUBPLOTS Version'
-    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, debug_print=debug_print)
+    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_heights, debug_print=debug_print)
 
     global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
     global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
@@ -474,7 +478,7 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     # plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False, constrained_layout=True)
 
     ## MatplotlibTimeSynchronizedWidget-embedded Version:
-    ui.mw = MatplotlibTimeSynchronizedWidget(size=(15,15), dpi=72, constrained_layout=True) # , clear=True
+    ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, name=name, plot_function_name=plot_function_name) # , clear=True
     plots.fig = ui.mw.getFigure()
     plots.parent_ax = plots.fig.subplots(ncols=1, nrows=1, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
 
