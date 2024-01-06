@@ -1801,7 +1801,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 			active_context = kwargs.pop('active_context', None)
 			if active_context is not None:
 				# Update the existing context:
-				display_context = active_context.adding_context('display_fn', display_fn_name='plot_quantile_diffs')
+				display_context = active_context.adding_context('display_fn', display_fn_name='plot_directional_merged_pf_decoded_epochs')
 			else:
 				active_context = owning_pipeline_reference.sess.get_context()
 				# Build the active context directly:
@@ -1841,7 +1841,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 			with mpl.rc_context({'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, 'figure.constrained_layout.use': (constrained_layout or False)}): # 'figure.figsize': (12.4, 4.8), 
 				# Create a FigureCollector instance
-				with FigureCollector(name='plot_quantile_diffs', base_context=display_context) as collector:
+				with FigureCollector(name='plot_directional_merged_pf_decoded_epochs', base_context=display_context) as collector:
 
 					## Define the overriden plot function that internally calls the normal plot function but also permits doing operations before and after, such as building titles or extracting figures to save them:
 					def _mod_plot_decoded_epoch_slices(*args, **subfn_kwargs):
