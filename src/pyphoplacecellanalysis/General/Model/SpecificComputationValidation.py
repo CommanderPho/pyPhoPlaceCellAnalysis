@@ -202,7 +202,7 @@ class SpecificComputationValidator:
         
         if force_recompute:
             ## Remove any existing results:
-            print(f'2024-01-02 - TEST _perform_try_computation_if_needed, remove_provided_keys')
+            print(f'2024-01-02 - {comp_short_name} _perform_try_computation_if_needed, remove_provided_keys')
             removed_results_dict = comp_specifier.try_remove_provided_keys(curr_active_pipeline)
             if (removed_results_dict is not None) and len(removed_results_dict) > 0:
                 print(f'removed results: {list(removed_results_dict.keys())} because force_recompute was True.')
