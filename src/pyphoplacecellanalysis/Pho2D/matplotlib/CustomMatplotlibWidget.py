@@ -49,7 +49,7 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.ui.connections = PhoUIContainer(name=name)
 
         self.params.name = name
-        self.params.window_title = f"{plot_function_name} - {name}" # kwargs.pop('plot_function_name', name)
+        self.params.window_title = f" - ".join([name, plot_function_name]) # name should be first so window title is rendered reasonably. kwargs.pop('plot_function_name', name)
         self.params.disable_toolbar = disable_toolbar
         self.params.scrollable_figure = scrollable_figure
         self.params.scrollAreaContents_MinimumHeight = kwargs.pop('scrollAreaContents_MinimumHeight', None)
