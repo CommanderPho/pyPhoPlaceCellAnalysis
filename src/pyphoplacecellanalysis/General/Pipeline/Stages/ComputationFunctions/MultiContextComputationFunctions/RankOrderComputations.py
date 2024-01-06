@@ -27,6 +27,7 @@ from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_pa
 from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
 import scipy.stats
 from scipy import ndimage
+from pyphocorehelpers.indexing_helpers import NumpyHelpers
 from neuropy.utils.misc import build_shuffled_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 from neuropy.utils.mixins.print_helpers import print_array
 import matplotlib.pyplot as plt
@@ -468,7 +469,24 @@ class RankOrderResult(ComputedResult):
                 if isinstance(example_item, dict):
                     state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v) for k,v in state['ranked_aclus_stats_dict'].items()}
                 else:
-                    state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v._asdict()) for k,v in state['ranked_aclus_stats_dict'].items()}
+                    try:
+                        state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v._asdict()) for k,v in state['ranked_aclus_stats_dict'].items()}
+                    except AttributeError:
+                        # AttributeError: 'tuple' object has no attribute '_asdict' 
+                        fixed_ranked_aclus_stats_dict = {}
+                        assert NumpyHelpers.all_array_equal([len(v) for k,v in state['ranked_aclus_stats_dict'].items()])
+                        for k,v in state['ranked_aclus_stats_dict'].items():
+                            num_missing_items = (5 - len(v))
+                            completed_position_args_list = [*v, *(num_missing_items * [None])]
+                            # if (len(v) == 3)
+                            assert (isinstance(completed_position_args_list[0], Zscorer) and isinstance(completed_position_args_list[1], Zscorer))
+                            assert (isinstance(completed_position_args_list[2], float))
+                            # fixed_ranked_aclus_stats_dict[k] = LongShortStatsItem(long_stats_z_scorer=v[0], short_stats_z_scorer=v[1], long_short_z_diff=v[2], long_short_naive_z_diff=None, is_forward_replay=None)
+                            fixed_ranked_aclus_stats_dict[k] = LongShortStatsItem(*completed_position_args_list)
+                        state['ranked_aclus_stats_dict'] = fixed_ranked_aclus_stats_dict # replace it with the new dict
+                        
+                        
+
         self.__dict__.update(state)
 
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
