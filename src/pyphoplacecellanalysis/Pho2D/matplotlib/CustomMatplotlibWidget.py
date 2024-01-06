@@ -156,6 +156,19 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         else:
             return None
          
+
+    @property
+    def windowTitle(self):
+        """The windowTitle property."""
+        return self.params.window_title
+    @windowTitle.setter
+    def windowTitle(self, value):
+        self.params.window_title = value
+        if self.window().isVisible():
+            print(f'updating the window title!!')
+            self.window().setWindowTitle(self.params.window_title)
+
+
     def getFigure(self):
         return self.plots.fig
         
@@ -180,5 +193,8 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
             # Check if the event is spontaneous to identify the first time the widget is shown
             # self.on_first_show()
 
+        if self.isVisible():
+            self.window().setWindowTitle(self.params.window_title)
+    
         # Call the base class implementation
         super().showEvent(event)
