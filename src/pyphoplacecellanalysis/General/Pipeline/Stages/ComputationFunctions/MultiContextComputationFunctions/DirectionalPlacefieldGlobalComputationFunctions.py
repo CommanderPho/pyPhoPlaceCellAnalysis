@@ -667,6 +667,12 @@ class DirectionalMergedDecodersResult(ComputedResult):
 	ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = directional_merged_decoders_result.ripple_directional_marginals_tuple
 	ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = directional_merged_decoders_result.ripple_track_identity_marginals_tuple
 	
+	ripple_decoding_time_bin_size: float = directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result.decoding_time_bin_size
+	ripple_decoding_time_bin_size
+	laps_decoding_time_bin_size: float = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result.decoding_time_bin_size
+	laps_decoding_time_bin_size
+
+
 	"""
 	all_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
 	all_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
@@ -694,6 +700,16 @@ class DirectionalMergedDecodersResult(ComputedResult):
 	@property
 	def ripple_epochs_df(self) -> pd.DataFrame:
 		return deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
+
+	@property
+	def laps_decoding_time_bin_size(self) -> float:
+		return self.all_directional_laps_filter_epochs_decoder_result.decoding_time_bin_size
+
+	@property
+	def ripple_decoding_time_bin_size(self) -> float:
+		return self.all_directional_ripple_filter_epochs_decoder_result.decoding_time_bin_size
+
+
 
 
 	def __attrs_post_init__(self):
