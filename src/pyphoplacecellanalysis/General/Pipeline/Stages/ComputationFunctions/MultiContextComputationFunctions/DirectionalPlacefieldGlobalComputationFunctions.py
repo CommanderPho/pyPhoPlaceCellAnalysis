@@ -1844,19 +1844,29 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 				# Create a FigureCollector instance
 				with FigureCollector(name='plot_quantile_diffs', base_context=display_context) as collector:
 
-					## Define common operations to do after making the figure:
-					def setup_common_after_creation(a_collector, graphics_output_dict_tuple, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>'):
-						""" Captures: perform_write_to_file_callback
+					## Define the overriden plot function that internally calls the normal plot function but also permits doing operations before and after, such as building titles or extracting figures to save them:
+					def _mod_plot_decoded_epoch_slices(*args, **kwargs):
+						""" implicitly captures: owning_pipeline_reference, collector, perform_write_to_file_callback
 
-						graphics_output_dict_tuple=graphics_output_dict['directional_laps_plot_tuple']
+						NOTE: each call requires adding the additional kwarg: `_main_context=_main_context`
 						"""
-						# post_hoc_append
-						assert len(graphics_output_dict_tuple) == 4
-						params, plots_data, plots, ui = graphics_output_dict_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
+						assert '_mod_plot_kwargs' in kwargs
+						_mod_plot_kwargs = kwargs.pop('_mod_plot_kwargs')
+						assert 'final_context' in _mod_plot_kwargs
+						_main_context = _mod_plot_kwargs['final_context']
+						assert _main_context is not None
+						# Build the rest of the properties:
+						sub_context = owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
+						# Call the main plot function:
+						out_plot_tuple = plot_decoded_epoch_slices(*args, **kwargs)
+						# Post-plot call:
+						assert len(out_plot_tuple) == 4
+						params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
 						mw = ui.mw
 						fig = mw.fig
-						a_collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
-												
+						# post_hoc_append to collector
+						collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
+					
 						# # Add epoch indicators
 						# for ax in (axes if isinstance(axes, Iterable) else [axes]):
 						# 	PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
@@ -1875,16 +1885,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 					
 						if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
 							perform_write_to_file_callback(sub_context, fig)
-
-
-					def _mod_plot_decoded_epoch_slices(*args, **kwargs):
-						""" implicitly captures: owning_pipeline_reference
-						"""
-						_main_context = kwargs.pop('_main_context', None)
-						out_plot_tuple = plot_decoded_epoch_slices(*args, **kwargs)
-						setup_common_after_creation(collector, out_plot_tuple, sub_context=owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context), 
-							# title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> Quantile Diff</>',
-							)
+							
 						return out_plot_tuple
 					
 
@@ -1892,31 +1893,29 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 						# Laps Direction (LR/RL) Marginal:
 						_main_context = {'decoded_epochs': 'Laps', 'Marginal': 'Direction'}
 						global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
-						graphics_output_dict['directional_laps_plot_tuple'] = plot_decoded_epoch_slices(
+						graphics_output_dict['directional_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
 							global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
 							global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
 							name='Directional_Marginal_LAPS',
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+							_mod_plot_kwargs=dict(final_context=_main_context)
 						)
-						setup_common_after_creation(collector, graphics_output_dict['directional_laps_plot_tuple'], sub_context=owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context), 
-							# title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> Quantile Diff</>',
-							)
-						
 
 					if render_directional_ripples:
 						# Ripple Direction (LR/RL) Marginal:
 						_main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'Direction'}
 						# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
 						global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
-						graphics_output_dict['directional_ripples_plot_tuple'] = plot_decoded_epoch_slices(
+						graphics_output_dict['directional_ripples_plot_tuple'] = _mod_plot_decoded_epoch_slices(
 							global_replays, directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result,
 							global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
 							name='Directional_Marginal_Ripples',
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+							_mod_plot_kwargs=dict(final_context=_main_context)
 						)
 
 					if render_track_identity_marginal_laps:
@@ -1931,7 +1930,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-							_main_context=_main_context
+							_mod_plot_kwargs=dict(final_context=_main_context)
 						)
 
 
@@ -1940,13 +1939,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 						_main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID'}
 						global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
 						# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
-						graphics_output_dict['track_identity_marginal_ripples_plot_tuple'] = plot_decoded_epoch_slices(
+						graphics_output_dict['track_identity_marginal_ripples_plot_tuple'] = _mod_plot_decoded_epoch_slices(
 							global_replays, directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result,
 							global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
 							name='TrackIdentity_Marginal_Ripples',
 							active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
 							single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
 							size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+							_mod_plot_kwargs=dict(final_context=_main_context)
 						)
 
 
