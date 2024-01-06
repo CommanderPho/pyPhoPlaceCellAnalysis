@@ -172,4 +172,14 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
     # QT Slots                                                                                                             #
     # ==================================================================================================================== #
     
-    
+    def showEvent(self, event):
+        """ called only when the widget is shown for the first time. """
+        print(f'showEvent(self, event: {event})')
+        print(f'\tevent.spontaneous(): {event.spontaneous()}')
+        if event.spontaneous():
+            print(f'\tfirst show!')
+            # Check if the event is spontaneous to identify the first time the widget is shown
+            # self.on_first_show()
+
+        # Call the base class implementation
+        super().showEvent(event)
