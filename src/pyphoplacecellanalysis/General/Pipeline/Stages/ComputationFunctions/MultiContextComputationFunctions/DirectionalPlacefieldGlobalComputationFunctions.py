@@ -1817,11 +1817,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 			perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
 			# Extract kwargs for figure rendering
-			render_directional_laps = kwargs.pop('render_directional_laps', True)
-			render_directional_ripples = kwargs.pop('render_directional_ripples', False)
+			render_directional_marginal_laps = kwargs.pop('render_directional_marginal_laps', True)
+			render_directional_marginal_ripples = kwargs.pop('render_directional_marginal_ripples', False)
 			render_track_identity_marginal_laps = kwargs.pop('render_track_identity_marginal_laps', False)
 			render_track_identity_marginal_ripples = kwargs.pop('render_track_identity_marginal_ripples', False)
-
 
 			# figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
 			# _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
@@ -1862,7 +1861,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 						# Post-plot call:
 						assert len(out_plot_tuple) == 4
 						params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
-						mw = ui.mw
+						mw = ui.mw # MatplotlibTimeSynchronizedWidget
 						fig = mw.fig
 						# post_hoc_append to collector
 						collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
@@ -1886,10 +1885,17 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 						if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
 							perform_write_to_file_callback(sub_context, fig)
 							
+						# Close if defer_render
+						if defer_render:
+							mw.close()
+							# ui.mw = None
+							# del ui['mw']
+							# out_plot_tuple = None # needed?
+
 						return out_plot_tuple
 					
 
-					if render_directional_laps:
+					if render_directional_marginal_laps:
 						# Laps Direction (LR/RL) Marginal:
 						_main_context = {'decoded_epochs': 'Laps', 'Marginal': 'Direction'}
 						global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
@@ -1903,7 +1909,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 							_mod_plot_kwargs=dict(final_context=_main_context)
 						)
 
-					if render_directional_ripples:
+					if render_directional_marginal_ripples:
 						# Ripple Direction (LR/RL) Marginal:
 						_main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'Direction'}
 						# global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
