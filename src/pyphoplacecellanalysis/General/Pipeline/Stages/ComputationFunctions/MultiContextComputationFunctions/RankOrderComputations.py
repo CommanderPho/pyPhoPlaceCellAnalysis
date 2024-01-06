@@ -190,6 +190,21 @@ class LongShortStatsItem(object):
         
         return state
 
+    def fixup_types_if_needed(self):
+        """ 2024-01-06 - Fix ZScorer types being dicts after loading:
+        # this was resulting in `AttributeError: 'dict' object has no attribute 'real_value'`
+        """
+        try:
+            self.long_stats_z_scorer.real_value
+            self.short_stats_z_scorer.real_value
+        except AttributeError:
+            # fix the values, they weren't loaded correctly
+            if isinstance(self.long_stats_z_scorer, dict):
+                self.long_stats_z_scorer = Zscorer(**self.long_stats_z_scorer)
+            if isinstance(self.short_stats_z_scorer, dict):
+                self.short_stats_z_scorer = Zscorer(**self.short_stats_z_scorer)
+        
+
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
@@ -207,8 +222,13 @@ class LongShortStatsItem(object):
         self.__dict__.update(state)
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         super(LongShortStatsItem, self).__init__() # from
-        
 
+
+        self.fixup_types_if_needed()
+
+
+
+    
 
 
 
@@ -2815,6 +2835,7 @@ def plot_new(ripple_result_tuple: DirectionalRankOrderResult):
 
     # plt.suptitle('Ripple Rank-Order')
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import Zscorer
 
 @function_attributes(short_name=None, tags=['histogram', '1D', 'rank-order'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-12 09:20', related_items=[])
 def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContainer, number_of_bins: int = 21, post_title_info: str = '', active_context=None, perform_write_to_file_callback=None) -> Tuple:
@@ -2841,6 +2862,22 @@ def plot_rank_order_histograms(rank_order_results: RankOrderComputationsContaine
     # ax1 = fig.add_subplot(3, 1, 1)
     # ax2 = fig.add_subplot(3, 1, 2)
     # ax3 = fig.add_subplot(3, 1, 3)
+
+    try:
+        # `LongShortStatsItem` form (2024-01-02):
+        LR_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+        RL_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+    except AttributeError as e:
+
+        for a_sub_result in (rank_order_results.LR_ripple,  rank_order_results.RL_ripple):
+            ## Fix ZScorer types being dicts after loading:
+            # this was resulting in `AttributeError: 'dict' object has no attribute 'real_value'`
+            for epoch_id, a_result_item in a_sub_result.ranked_aclus_stats_dict.items():
+                a_result_item.fixup_types_if_needed()
+
+        print(f'result fixedup.')
+
+    # {epoch_id:a_result_item for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()}
 
     # `LongShortStatsItem` form (2024-01-02):
     LR_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
