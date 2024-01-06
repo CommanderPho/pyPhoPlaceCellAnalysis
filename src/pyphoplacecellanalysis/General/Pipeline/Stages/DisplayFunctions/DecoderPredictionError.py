@@ -842,7 +842,6 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         _out_pagination_controller.plots_data.radon_transform_data = {}
         _out_pagination_controller.plots['radon_transform'] = {}
 
-
         for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs), epochs_linear_fit_df['velocity'].values, epochs_linear_fit_df['intercept'].values, epochs_linear_fit_df['score'].values, epochs_linear_fit_df['speed'].values):
             # build the discrete line over the centered time bins:
             epoch_time_bins = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx].centers
