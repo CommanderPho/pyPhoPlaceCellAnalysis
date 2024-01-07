@@ -3094,7 +3094,7 @@ def _plot_significant_event_quantile_fig(curr_active_pipeline, significant_rippl
     
 
 @function_attributes(short_name=None, tags=['quantile', 'figure', 'seaborn', 'FigureCollector'], input_requires=[], output_provides=[], uses=['FigureCollector'], used_by=[], creation_date='2023-12-22 19:50', related_items=[])
-def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile_significance_threshold: float = 0.95, active_context=None, perform_write_to_file_callback=None, include_LR_LR_plot:bool=False, include_RL_RL_plot:bool=False):
+def plot_quantile_diffs(merged_complete_epoch_stats_df, t_start=None, t_split=1000.0, t_end=None, quantile_significance_threshold: float = 0.95, active_context=None, perform_write_to_file_callback=None, include_LR_LR_plot:bool=False, include_RL_RL_plot:bool=False):
     """ Plots three Matplotlib figures displaying the quantile differences
     
     Usage:
@@ -3103,11 +3103,12 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
 
     _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
     global_epoch = curr_active_pipeline.filtered_epochs[global_epoch_name]
+    t_start, t_end = global_epoch.start_end_times
     short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
     split_time_t: float = short_epoch.t_start
     active_context = curr_active_pipeline.sess.get_context()
 
-    collector = plot_quantile_diffs(ripple_merged_complete_epoch_stats_df, t_split=split_time_t, active_context=active_context)
+    collector = plot_quantile_diffs(ripple_merged_complete_epoch_stats_df, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context)
 
      # sns.relplot(
             #     data=tips, x="total_bill", y="tip",
@@ -3148,7 +3149,9 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_split=1000.0, quantile
                 
                 # Add epoch indicators
                 for ax in (axes if isinstance(axes, Iterable) else [axes]):
-                    PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+                    PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split, t_start=t_start, t_end=t_end)
+                    # Update the xlimits with the new bounds
+                    ax.set_xlim(t_start, t_end)
                     
                     # `flexitext` version:
                     text_formatter = FormattedFigureText()
@@ -3343,10 +3346,11 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
 
         # Quantile Diff Figures: _____________________________________________________________________________________________ #
         global_epoch = owning_pipeline_reference.filtered_epochs[global_epoch_name]
+        t_start, t_end = global_epoch.start_end_times
         short_epoch = owning_pipeline_reference.filtered_epochs[short_epoch_name]
         split_time_t: float = short_epoch.t_start
         
-        quantile_diffs_collector = plot_quantile_diffs(ripple_merged_complete_epoch_stats_df, t_split=split_time_t, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
+        quantile_diffs_collector = plot_quantile_diffs(ripple_merged_complete_epoch_stats_df, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
 
 
         post_title_info: str = f'{minimum_inclusion_fr_Hz} Hz'
