@@ -554,14 +554,22 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs" failed with error: {e}\n skipping.')
-        
+
+    # _display_directional_merged_pf_decoded_epochs_marginals ________________________________________________________________________________ #
+    try:
+        _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_epochs_marginals', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
+    except Exception as e:
+        print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs_marginals" failed with error: {e}\n skipping.')
+
+
 
     # _display_rank_order_z_stats_results ________________________________________________________________________________ #
     try:
         _out = curr_active_pipeline.display('_display_rank_order_z_stats_results', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
     except Exception as e:
         print(f'batch_extended_programmatic_figures(...): "_display_rank_order_z_stats_results" failed with error: {e}\n skipping.')
-        
+
+
 
 
 class BatchPhoJonathanFiguresHelper:
