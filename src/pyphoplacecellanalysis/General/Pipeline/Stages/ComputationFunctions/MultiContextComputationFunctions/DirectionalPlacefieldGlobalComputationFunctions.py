@@ -1232,7 +1232,7 @@ def plot_all_sessions(directory, save_figures=False, figure_save_extension='.png
 
 
 
-def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_split=1000.0, active_context=None, perform_write_to_file_callback=None):
+def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=None, t_split=1000.0, t_end=None, active_context=None, perform_write_to_file_callback=None):
     """ Plots three Matplotlib figures displaying the quantile differences
     
     
@@ -1245,6 +1245,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
 
     _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
     global_epoch = curr_active_pipeline.filtered_epochs[global_epoch_name]
+    t_start, t_end = global_epoch.start_end_times
     short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
     split_time_t: float = short_epoch.t_start
     active_context = curr_active_pipeline.sess.get_context()
@@ -1283,8 +1284,22 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
                 a_collector.contexts.append(sub_context)
                 # Add epoch indicators
                 for ax in (axes if isinstance(axes, Iterable) else [axes]):
-                    PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
+                    # Update the xlimits with the new bounds
+                    ax.set_ylim(0.0, 1.0)
                     
+                    _tmp_output_dict = PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split, t_start=t_start, t_end=t_end)
+             
+                    # Update the xlimits with the new bounds
+                    ax.set_xlim(t_start, t_end)
+
+                    # Draw a horizontal line at y=0.5
+                    ax.axhline(y=0.5, color=(0,0,0,1)) # , linestyle='--'
+                    
+                    # # Resize the divider lines to take up the full y-axis
+                    # for line in _tmp_output_dict["divider_line"]:
+                    #     line.set_ydata([0.0, 1.0]) # [0, ax.get_ylim()[1]]
+                        
+                    ## This is figure level stuff and only needs to be done once:
                     # `flexitext` version:
                     text_formatter = FormattedFigureText()
                     ax.set_title('')
@@ -1302,7 +1317,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
                 
             # Plot for BestDir
             fig, ax = collector.subplots(num='Laps_Marginal', clear=True)
-            _out_BestDir = sns.scatterplot(
+            _out_Laps = sns.scatterplot(
                 ax=ax,
                 data=laps_all_epoch_bins_marginals_df,
                 x='lap_start_t',
@@ -1313,7 +1328,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
                                         title=f'<size:22> Laps <weight:bold>all_epoch_binned</> Marginals</>')
             
             fig, ax = collector.subplots(num='Ripple_Marginal', clear=True)
-            _out_BestDir = sns.scatterplot(
+            _out_Ripple = sns.scatterplot(
                 ax=ax,
                 data=ripple_all_epoch_bins_marginals_df,
                 x='ripple_start_t',
@@ -1324,6 +1339,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
                             title=f'<size:22> Ripple <weight:bold>all_epoch_binned</> Marginals</>')
 
 
+    
     # Access the collected figures outside the context manager
     # result = tuple(collector.created_figures)
 
