@@ -1253,7 +1253,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
     ## Get the result after computation:
     directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
     
-    collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_split=split_time_t, active_context=active_context, perform_write_to_file_callback=None)
+    collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context, perform_write_to_file_callback=None)
 
     """
     import matplotlib as mpl
@@ -1271,7 +1271,9 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
     if active_context is not None:
         display_context = active_context.adding_context('display_fn', display_fn_name='plot_all_epoch_bins_marginal_predictions')
         
-    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42,
+                          "axes.spines.left": False, "axes.spines.right": False, "axes.spines.bottom": False, "axes.spines.top": False,
+                          "axes.edgecolor": "none", "xtick.bottom": False, "xtick.top": False, "ytick.left": False, "ytick.right": False}):
         # Create a FigureCollector instance
         with FigureCollector(name='plot_all_epoch_bins_marginal_predictions', base_context=display_context) as collector:
 
@@ -1279,7 +1281,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
             def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>'):
                 """ Captures:
 
-                t_split
+                t_split, t_start, t_end)
                 """
                 a_collector.contexts.append(sub_context)
                 # Add epoch indicators
@@ -1294,23 +1296,25 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
 
                     # Draw a horizontal line at y=0.5
                     ax.axhline(y=0.5, color=(0,0,0,1)) # , linestyle='--'
-                    
-                    # # Resize the divider lines to take up the full y-axis
-                    # for line in _tmp_output_dict["divider_line"]:
-                    #     line.set_ydata([0.0, 1.0]) # [0, ax.get_ylim()[1]]
                         
                     ## This is figure level stuff and only needs to be done once:
                     # `flexitext` version:
                     text_formatter = FormattedFigureText()
                     ax.set_title('')
                     fig.suptitle('')
-                    text_formatter.setup_margins(fig)
-                    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
-                                            title,
-                                            va="bottom", xycoords="figure fraction")
-                    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                    # top=0.84, bottom=0.125, left=0.07, right=0.97,
+                    # text_formatter.setup_margins(fig, top_margin=1.0, left_margin=0.0, right_margin=1.0, bottom_margin=0.05)
+                    text_formatter.setup_margins(fig, top_margin=0.84, left_margin=0.07, right_margin=0.97, bottom_margin=0.125)
+                    # fig.subplots_adjust(top=top_margin, left=left_margin, right=right_margin, bottom=bottom_margin)
+                    # title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
+                    title_text_obj = flexitext(text_formatter.left_margin, 0.98, title, va="top", xycoords="figure fraction") # 0.98, va="top" means the top edge of the title will be aligned to the fig_y=0.98 mark of the figure.
+                    # footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                    #                             text_formatter._build_footer_string(active_context=sub_context),
+                    #                             va="top", xycoords="figure fraction")
+
+                    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (0.0025), ## (va="bottom", (0.0025)) - this means that the bottom edge of the footer text is aligned with the fig_y=0.0025 in figure space
                                                 text_formatter._build_footer_string(active_context=sub_context),
-                                                va="top", xycoords="figure fraction")
+                                                va="bottom", xycoords="figure fraction")
             
                 if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
                     perform_write_to_file_callback(sub_context, fig)
@@ -1337,6 +1341,30 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
             )
             setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='Ripple all_epoch_binned Marginals'), 
                             title=f'<size:22> Ripple <weight:bold>all_epoch_binned</> Marginals</>')
+
+
+            # # Plot for Both Laps/Ripple on the same figure using subplots:
+            # fig, axs = collector.subplots(num='all_epoch_binned_Marginals', nrows = 2, ncols = 1, sharex=True, sharey=True, clear=True)
+            # _out_Laps = sns.scatterplot(
+            #     ax=axs[0],
+            #     data=laps_all_epoch_bins_marginals_df,
+            #     x='lap_start_t',
+            #     y='P_Long',
+            #     # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+            # )
+            
+            # # Ripple_Marginal
+            # _out_Ripple = sns.scatterplot(
+            #     ax=axs[1],
+            #     data=ripple_all_epoch_bins_marginals_df,
+            #     x='ripple_start_t',
+            #     y='P_Long',
+            #     # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+            # )
+            # setup_common_after_creation(collector, fig=fig, axes=axs, sub_context=display_context.adding_context('subplot', subplot_name='Laps and Ripple all_epoch_binned Marginals'), 
+            #                             title=f'<size:22> Laps+Ripple <weight:bold>all_epoch_binned</> Marginals</>')
+
+
 
 
     
@@ -2210,3 +2238,46 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             graphics_output_dict['collector'] = collector
 
             return graphics_output_dict
+
+
+
+    @function_attributes(short_name='directional_decoded_epochs_marginals', tags=['directional_merged_decoder_decoded_epochs','directional','marginal'], input_requires=[], output_provides=[], uses=['plot_rank_order_epoch_inst_fr_result_tuples'], used_by=[], creation_date='2023-12-15 21:46', related_items=[], is_global=True)
+    def _display_directional_merged_pf_decoded_epochs_marginals(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+        """ Plots the decoded marginals from the merged decoder
+
+        """
+        defer_render: bool = kwargs.pop('defer_render', False)
+        should_show: bool = (not defer_render)
+        
+        # #TODO 2024-01-03 05:24: - [ ] Do something to switch the matplotlib backend to 'AGG' if defer_render == True. Currently only adjusts the pyqtgraph-based figures (`plot_rank_order_epoch_inst_fr_result_tuples`)
+
+        active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+        if include_includelist is None:
+            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+        long_epoch_name = include_includelist[0] # 'maze1_PYR'
+        short_epoch_name = include_includelist[1] # 'maze2_PYR'
+        assert len(include_includelist) > 2
+        global_epoch_name = include_includelist[-1] # 'maze_PYR'
+
+        directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+        ## Get the result after computation:
+        directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+        def _perform_write_to_file_callback(final_context, fig):
+            if save_figure:
+                return owning_pipeline_reference.output_figure(final_context, fig)
+            else:
+                pass # do nothing, don't save
+
+
+        # Quantile Diff Figures: _____________________________________________________________________________________________ #
+        global_epoch = owning_pipeline_reference.filtered_epochs[global_epoch_name]
+        t_start, t_end = global_epoch.start_end_times
+        short_epoch = owning_pipeline_reference.filtered_epochs[short_epoch_name]
+        split_time_t: float = short_epoch.t_start
+        
+        all_epoch_bins_marginals_collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
+
+
+        return all_epoch_bins_marginals_collector
