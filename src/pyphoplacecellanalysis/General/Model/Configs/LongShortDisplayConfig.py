@@ -212,7 +212,7 @@ class PlottingHelpers:
     """
 
     @function_attributes(short_name=None, tags=['matplotlib', 'epoch', 'region'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-23 17:52', related_items=[])
-    def helper_matplotlib_add_long_short_epoch_indicator_regions(ax, t_split: float):
+    def helper_matplotlib_add_long_short_epoch_indicator_regions(ax, t_split: float, t_start=None, t_end=None):
         """ Draws the two indicator regions for the long and short track.
         analagous to `_helper_add_long_short_session_indicator_regions` but for matplotlib figures 
         
@@ -226,13 +226,18 @@ class PlottingHelpers:
         short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
 
         # Highlight the two epochs with their characteristic colors ['r','b'] - ideally this would be at the very back
-        x_start, x_stop = ax.get_xlim()
-        output_dict["long_region"] = ax.axvspan(x_start, t_split, color=long_epoch_config['facecolor'], alpha=0.2, zorder=0)
-        output_dict["short_region"] = ax.axvspan(t_split, x_stop, color=short_epoch_config['facecolor'], alpha=0.2, zorder=0)
-
+        if ((t_start is None) or (t_end is None)):
+            x_start_ax, x_stop_ax = ax.get_xlim()
+            t_start= (t_start or x_start_ax)
+            t_end = (t_end or x_stop_ax)
+        output_dict["long_region"] = ax.axvspan(t_start, t_split, color=long_epoch_config['facecolor'], alpha=0.2, zorder=0)
+        output_dict["short_region"] = ax.axvspan(t_split, t_end, color=short_epoch_config['facecolor'], alpha=0.2, zorder=0)
+        # Update the xlimits with the new bounds
+        ax.set_xlim(t_start, t_end)
+        
         # Draw the vertical epoch splitter line:
         required_epoch_bar_height = ax.get_ylim()[-1]
-        output_dict["divider_line"] = ax.vlines(t_split, ymin = 0, ymax=required_epoch_bar_height, color=(0,0,0,.25), zorder=25) # divider should be in very front
+        output_dict["divider_line"] = ax.vlines(t_split, ymin=0, ymax=required_epoch_bar_height, color=(0,0,0,.25), zorder=25) # divider should be in very front
         return output_dict
 
 
