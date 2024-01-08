@@ -1284,19 +1284,16 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
                 t_split, t_start, t_end)
                 """
                 a_collector.contexts.append(sub_context)
-                # Add epoch indicators
+                
                 for ax in (axes if isinstance(axes, Iterable) else [axes]):
                     # Update the xlimits with the new bounds
                     ax.set_ylim(0.0, 1.0)
-                    
+                    # Add epoch indicators
                     _tmp_output_dict = PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split, t_start=t_start, t_end=t_end)
-             
                     # Update the xlimits with the new bounds
                     ax.set_xlim(t_start, t_end)
-
                     # Draw a horizontal line at y=0.5
                     ax.axhline(y=0.5, color=(0,0,0,1)) # , linestyle='--'
-                        
                     ## This is figure level stuff and only needs to be done once:
                     # `flexitext` version:
                     text_formatter = FormattedFigureText()

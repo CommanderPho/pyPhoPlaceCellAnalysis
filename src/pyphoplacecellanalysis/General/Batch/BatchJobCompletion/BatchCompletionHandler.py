@@ -61,7 +61,7 @@ class BatchComputationProcessOptions(HDF_SerializationMixin):
 
 @custom_define(slots=False)
 class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
-    """ Class representing the specific results extratracted from the loaded pipeline and returned as return values from the post-execution callback function. """
+    """ Class representing the specific results extracted from the loaded pipeline and returned as return values from the post-execution callback function. """
     long_epoch_name: str = serialized_attribute_field()
     long_laps: Epoch = serialized_field()
     long_replays: Epoch = serialized_field()

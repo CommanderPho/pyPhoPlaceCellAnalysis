@@ -428,6 +428,11 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
 # import matplotlib.pyplot as plt
 @function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_format=False, write_png=True, debug_print=False):
+    """ 
+    
+    Generation and display of figures should produce as many as possible, not stopping after failing on one.
+    
+    """
     _bak_rcParams = mpl.rcParams.copy()
     mpl.rcParams['toolbar'] = 'None' # disable toolbars
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
