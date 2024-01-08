@@ -3149,10 +3149,15 @@ def plot_quantile_diffs(merged_complete_epoch_stats_df, t_start=None, t_split=10
                 
                 # Add epoch indicators
                 for ax in (axes if isinstance(axes, Iterable) else [axes]):
+                    # Update the ylims with the new bounds
+                    ax.set_ylim(-1.0, 1.0)
+                    # Add epoch indicators
                     PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split, t_start=t_start, t_end=t_end)
                     # Update the xlimits with the new bounds
                     ax.set_xlim(t_start, t_end)
-                    
+                    # Draw a horizontal line at y=0.5
+                    ax.axhline(y=0.0, color=(0,0,0,1))
+
                     # `flexitext` version:
                     text_formatter = FormattedFigureText()
                     ax.set_title('')
