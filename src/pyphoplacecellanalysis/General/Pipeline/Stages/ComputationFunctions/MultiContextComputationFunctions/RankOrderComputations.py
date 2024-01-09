@@ -2470,24 +2470,87 @@ class RankOrderAnalyses:
         """ 2023-12-20 - Candidate for moving into RankOrderComputations 
         
         """
-        active_selected_spikes_df = cls._subfn_build_all_pf_peak_x_columns(track_templates, selected_spikes_df=selected_spikes_df, override_decoder_aclu_peak_map_dict=override_decoder_aclu_peak_map_dict)
+        # active_selected_spikes_df = cls._subfn_build_all_pf_peak_x_columns(track_templates, selected_spikes_df=selected_spikes_df, override_decoder_aclu_peak_map_dict=override_decoder_aclu_peak_map_dict)
         
         #TODO 2023-12-18 13:20: - [ ] This assumes that `'Probe_Epoch_id'` is correct and consistent for both directions, yeah?
 
         ## Compute real values here:
         decoder_names = track_templates.get_decoder_names()
         
-        epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
-        spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
-        pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='pearson', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+        # epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
+        # spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+        # pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='pearson', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
 
-        real_stats_df = pd.concat((spearman_correlations, pearson_correlations), axis='columns')
+        # real_stats_df = pd.concat((spearman_correlations, pearson_correlations), axis='columns')
+        # real_stats_df = real_stats_df.loc[:, ~real_stats_df.columns.duplicated()] # drop duplicated 'Probe_Epoch_id' column
+        # # Change column type to uint64 for column: 'Probe_Epoch_id'
+        # real_stats_df = real_stats_df.astype({'Probe_Epoch_id': 'uint64'})
+        # # Rename column 'Probe_Epoch_id' to 'label'
+        # real_stats_df = real_stats_df.rename(columns={'Probe_Epoch_id': 'label'})
+        
+
+        ## Compute real values here:
+        epoch_id_grouped_selected_spikes_df = selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
+        
+        # Parallelize correlation computations if required
+        correlations = []
+        for method in ['spearman', 'pearson']:
+            correlations.append(
+                epoch_id_grouped_selected_spikes_df.apply(
+                    lambda group: RankOrderAnalyses._subfn_calculate_correlations(
+                        group, method=method, decoder_names=decoder_names)
+                )
+            )
+    
+        # Adjust and join all calculated correlations
+        real_stats_df = pd.concat(correlations, axis='columns').reset_index()
         real_stats_df = real_stats_df.loc[:, ~real_stats_df.columns.duplicated()] # drop duplicated 'Probe_Epoch_id' column
-        # Change column type to uint64 for column: 'Probe_Epoch_id'
-        real_stats_df = real_stats_df.astype({'Probe_Epoch_id': 'uint64'})
-        # Rename column 'Probe_Epoch_id' to 'label'
-        real_stats_df = real_stats_df.rename(columns={'Probe_Epoch_id': 'label'})
+
+        real_stats_df.rename(columns={'Probe_Epoch_id': 'label'}, inplace=True)
+        real_stats_df['label'] = real_stats_df['label'].astype('uint64')  # in-place type casting
+    
         return real_stats_df
+
+    # Determine the number of shuffles you want to do
+    @classmethod
+    def _new_perform_efficient_shuffle(cls, track_templates, active_selected_spikes_df, decoder_aclu_peak_map_dict, num_shuffles:int=5):
+        """ 2024-01-09 - Performs the shuffles in a simple way
+        
+        """
+        unique_Probe_Epoch_IDs = active_selected_spikes_df['Probe_Epoch_id'].unique()
+
+        # Create a list to hold the shuffled dataframes
+        shuffled_dfs = []
+        shuffled_stats_dfs = []
+
+        for i in range(num_shuffles):
+            # Working on a copy of the DataFrame
+            shuffled_df = active_selected_spikes_df.copy()
+
+            for a_probe_epoch_ID in unique_Probe_Epoch_IDs:
+                mask = (a_probe_epoch_ID == shuffled_df['Probe_Epoch_id'])
+                
+                # Shuffle 'aclu' values
+                shuffled_df.loc[mask, 'aclu'] = shuffled_df.loc[mask, 'aclu'].sample(frac=1).values
+                
+                # # Apply aclu peak map dictionary to 'aclu' column
+                # for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+                #     shuffled_df.loc[mask, f'{a_decoder_name}_pf_peak_x'] = shuffled_df.loc[mask, 'aclu'].map(a_aclu_peak_map)
+                
+
+            # end `for a_probe_epoch_ID`
+            # Once done, apply the aclu peak maps to shuffled_df's 'aclu' column:
+            for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+                shuffled_df[f'{a_decoder_name}_pf_peak_x'] = shuffled_df.aclu.map(a_aclu_peak_map)
+                
+            a_shuffle_stats_df = cls._compute_single_rank_order_shuffle(track_templates, active_selected_spikes_df=shuffled_df)
+            
+            # Adding the shuffled DataFrame to the list
+            shuffled_dfs.append(shuffled_df)
+            shuffled_stats_dfs.append(a_shuffle_stats_df)
+            
+        return shuffled_dfs, shuffled_stats_dfs
+
 
     @classmethod
     def _subfn_build_pandas_df_based_correlation_computations_column_rename_dict(cls, column_names: List[str], decoder_name_to_column_name_prefix_map:Optional[Dict[str,str]]=None) -> Dict[str,str]:
@@ -2544,39 +2607,51 @@ class RankOrderAnalyses:
         decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict()
         # long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
 
-        real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=selected_spikes_df)
+        ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
+        active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': RankOrderAnalyses._label_column_type}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+        # _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
+        _pf_peak_x_column_names = [f'{a_decoder_name}_pf_peak_x' for a_decoder_name in track_templates.get_decoder_names()]
+        active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[RankOrderAnalyses._NaN_Type, RankOrderAnalyses._NaN_Type, RankOrderAnalyses._NaN_Type, RankOrderAnalyses._NaN_Type]], index=active_selected_spikes_df.index)
+        real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=active_selected_spikes_df) # new `_new_perform_efficient_shuffle`
+        # real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=selected_spikes_df) # old
         combined_variable_names = list(set(real_stats_df.columns) - set(['label'])) # ['RL_Short_spearman', 'RL_Long_pearson', 'RL_Short_pearson', 'LR_Long_spearman', 'LR_Short_pearson', 'LR_Long_pearson', 'LR_Short_spearman', 'RL_Long_spearman']
         real_stacked_arrays = real_stats_df[combined_variable_names].to_numpy() # for compatibility
 
         # ==================================================================================================================== #
         # PERFORM SHUFFLE HERE:                                                                                                #
         # ==================================================================================================================== #
-        # On-the-fly shuffling mode using shuffle_helper:
 
-        all_decoder_aclus_map_keys_dict = {a_decoder_name:np.array(list(a_map.keys())) for a_decoder_name, a_map in decoder_aclu_peak_map_dict.items()} # list of four elements
-        all_decoder_aclus_map_values_dict = {a_decoder_name:np.array(list(a_map.values())) for a_decoder_name, a_map in decoder_aclu_peak_map_dict.items()} # list of four elements
+
+        # _new_perform_efficient_shuffle method: _____________________________________________________________________________ #
+        shuffled_dfs, shuffled_stats_dfs = cls._new_perform_efficient_shuffle(track_templates, active_selected_spikes_df, decoder_aclu_peak_map_dict, num_shuffles=num_shuffles)
+        output_active_epoch_computed_values = shuffled_stats_dfs
+
+        # # On-the-fly shuffling mode using shuffle_helper:
+        # all_decoder_aclus_map_keys_dict = {a_decoder_name:np.array(list(a_map.keys())) for a_decoder_name, a_map in decoder_aclu_peak_map_dict.items()} # list of four elements
+        # all_decoder_aclus_map_values_dict = {a_decoder_name:np.array(list(a_map.values())) for a_decoder_name, a_map in decoder_aclu_peak_map_dict.items()} # list of four elements
         
-        ## This is build the shuffle indicies ahead of time:
-        all_shuffled_decoder_aclus_map_keys_dict = {a_decoder_name:build_shuffled_ids(a_map_keys, num_shuffles=num_shuffles, seed=None)[0] for a_decoder_name, a_map_keys in all_decoder_aclus_map_keys_dict.items()} # [0] only gets the shuffled_aclus themselves, which are of shape .shape: ((num_shuffles, n_neurons[i]) where i is the decoder_index
+        # ## This is build the shuffle indicies ahead of time:
+        # all_shuffled_decoder_aclus_map_keys_dict = {a_decoder_name:build_shuffled_ids(a_map_keys, num_shuffles=num_shuffles, seed=None)[0] for a_decoder_name, a_map_keys in all_decoder_aclus_map_keys_dict.items()} # [0] only gets the shuffled_aclus themselves, which are of shape .shape: ((num_shuffles, n_neurons[i]) where i is the decoder_index
 
-        # all_shuffled_override_decoder_aclu_peak_map_dict: one for each shuffle.
-        all_shuffled_override_decoder_aclu_peak_map_dict = [{a_decoder_name:dict(zip(a_decoder_specific_shuffled_aclus_arr[shuffle_IDX], all_decoder_aclus_map_values_dict[a_decoder_name])) for a_decoder_name, a_decoder_specific_shuffled_aclus_arr in all_shuffled_decoder_aclus_map_keys_dict.items()} for shuffle_IDX in np.arange(num_shuffles)]
+        # # all_shuffled_override_decoder_aclu_peak_map_dict: one for each shuffle.
+        # all_shuffled_override_decoder_aclu_peak_map_dict = [{a_decoder_name:dict(zip(a_decoder_specific_shuffled_aclus_arr[shuffle_IDX], all_decoder_aclus_map_values_dict[a_decoder_name])) for a_decoder_name, a_decoder_specific_shuffled_aclus_arr in all_shuffled_decoder_aclus_map_keys_dict.items()} for shuffle_IDX in np.arange(num_shuffles)]
 
         ## USES selected_spikes_df
         ## Shuffle a single map, but will eventually need one for each of the four decoders::
         # epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = build_shuffled_ids(list(long_LR_aclu_peak_map.keys()), num_shuffles=num_shuffles, seed=None) # .shape: ((num_shuffles, n_neurons), (num_shuffles, n_neurons))
 
-        output_active_epoch_computed_values = []
+        # ## OLD:
+        # output_active_epoch_computed_values = []
 
-        for shuffle_IDX in np.arange(num_shuffles):
-            # """ within the loop we modify: 
-            #     active_selected_spikes_df, active_epochs 
+        # for shuffle_IDX in np.arange(num_shuffles):
+        #     # """ within the loop we modify: 
+        #     #     active_selected_spikes_df, active_epochs 
                 
-            #     From active_selected_spikes_df I only need: ['t_rel_seconds', 'aclu', 'Probe_Epoch_id', 'label']  ## 'Probe_Epoch_id' goes up to 610 for some reason?!?!? It does NOT seem to be 'label'
+        #     #     From active_selected_spikes_df I only need: ['t_rel_seconds', 'aclu', 'Probe_Epoch_id', 'label']  ## 'Probe_Epoch_id' goes up to 610 for some reason?!?!? It does NOT seem to be 'label'
                 
-            # """
-            shuffle_real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=selected_spikes_df, override_decoder_aclu_peak_map_dict=all_shuffled_override_decoder_aclu_peak_map_dict[shuffle_IDX]) # pre-compute
-            output_active_epoch_computed_values.append(shuffle_real_stats_df)
+        #     # """
+        #     shuffle_real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=selected_spikes_df, override_decoder_aclu_peak_map_dict=all_shuffled_override_decoder_aclu_peak_map_dict[shuffle_IDX]) # pre-compute
+        #     output_active_epoch_computed_values.append(shuffle_real_stats_df)
 
 
         # Build the output `stacked_arrays`: _________________________________________________________________________________ #
