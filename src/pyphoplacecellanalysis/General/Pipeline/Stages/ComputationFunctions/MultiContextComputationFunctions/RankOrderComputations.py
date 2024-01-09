@@ -1360,8 +1360,8 @@ class RankOrderAnalyses:
         # active_spikes_df: pd.DataFrame = active_spikes_df.copy()
         active_spikes_df = active_spikes_df[np.isin(active_spikes_df['Probe_Epoch_id'], final_good_Probe_Epoch_ids)]
 
-        active_epochs_df: pd.DataFrame = filtered_active_epochs.copy()
-        active_epochs_df = active_epochs_df[np.isin(active_epochs_df['label'], final_good_Probe_Epoch_ids)]
+        # active_epochs_df: pd.DataFrame = filtered_active_epochs.copy()
+        filtered_active_epochs = filtered_active_epochs[np.isin(filtered_active_epochs['label'], final_good_Probe_Epoch_ids)]
 
         ## OUTPUT DICTS:
         # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
@@ -2178,7 +2178,6 @@ class RankOrderAnalyses:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
 
-        
         # track templates:
         track_templates: TrackTemplates = active_directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
         any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
