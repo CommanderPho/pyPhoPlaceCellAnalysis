@@ -1354,7 +1354,7 @@ class RankOrderAnalyses:
 
         # TODO 2023-11-21 05:42: - [ ] todo_description want the aclus as well, not just the `long_pf_peak_ranks`
 
-        #TODO 2023-12-08 12:53: - [ ] Drop epochs with fewer than the minimum active aclus
+        #TODO 2023-12-08 12:53: - [X] Drop epochs with fewer than the minimum active aclus
 
         #TODO 2023-12-10 19:40: - [ ] Need to save the epochs that were used to compute.
 
@@ -1708,7 +1708,7 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['subfn', 'rank-order', 'merged_decoder', 'directional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-04 12:47', related_items=[])
+    @function_attributes(short_name=None, tags=['subfn', 'rank-order', 'merged_decoder', 'merged_pseduo2D_decoder', 'active', 'directional'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-04 12:47', related_items=[])
     def epoch_directionality_merged_pseduo2D_decoder_evidence(cls, decoders_dict, ripple_marginals, ripple_directional_likelihoods_tuple, combined_best_direction_indicies, epochs_df: pd.DataFrame):
         """ 2024-01-04 - Replay Direction Decoder-based Classification
         Used to classify replays as LR/RL
@@ -1945,28 +1945,6 @@ class RankOrderAnalyses:
 
             active_LR_ripple_long_z_score, active_RL_ripple_long_z_score, active_LR_ripple_short_z_score, active_RL_ripple_short_z_score = ripple_combined_epoch_stats_df.LR_Long_spearman_Z, ripple_combined_epoch_stats_df.RL_Long_spearman_Z, ripple_combined_epoch_stats_df.LR_Short_spearman_Z, ripple_combined_epoch_stats_df.RL_Short_spearman_Z
 
-            
-            # LR_ripple_epoch_accumulated_evidence, LR_ripple_epoch_rate_dfs, active_replay_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_replay_epochs_df)
-
-
-            # ## Long/Short Independent Version:
-            # long_best_direction_indicies = active_replay_epochs_df['Long_best_direction_indicies'].to_numpy()
-            # short_best_direction_indicies = active_replay_epochs_df['Short_best_direction_indicies'].to_numpy()
-            
-            # # `combined_best_direction_indicies` method:
-            # assert 'combined_best_direction_indicies' in active_replay_epochs_df, f"active_replay_epochs_df needs combined_best_direction_indicies"
-            # combined_best_direction_indicies = deepcopy(active_replay_epochs_df['combined_best_direction_indicies'])
-            # assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.ripple_combined_epoch_stats_df)[0]
-            # long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
-            # short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
-            
-            # ripple_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=active_replay_epochs_df['Long_normed_LR_evidence'].to_numpy(),
-            #                                                                                                        short_relative_direction_likelihoods=active_replay_epochs_df['Short_normed_RL_evidence'].to_numpy(),
-            #                                 long_best_direction_indices=long_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int), 
-            #                                 short_best_direction_indices=short_best_direction_indicies, #(LR_ripple_epochs_df['normed_LR_evidence'].to_numpy()>=LR_ripple_epochs_df['normed_RL_evidence'].to_numpy()).astype(int)
-            #                                 )
-
-
             ## 2024-01-04 - DirectionalMergedDecoders version:
             # NOTE: ripple_most_likely_direction_from_decoder comes with with more epochs than the already filtered `rank_order_results.ripple_combined_epoch_stats_df` version. We'll get only the active indicies from `rank_order_results.ripple_combined_epoch_stats_df.index`
             # needs: rank_order_results, ripple_most_likely_direction_from_decoder, ripple_directional_all_epoch_bins_marginal, 
@@ -2037,27 +2015,6 @@ class RankOrderAnalyses:
             active_laps_epochs_df = deepcopy(rank_order_results.LR_laps.epochs_df)
             
             active_LR_laps_long_z_score, active_RL_laps_long_z_score, active_LR_laps_short_z_score, active_RL_laps_short_z_score = laps_combined_epoch_stats_df.LR_Long_spearman_Z, laps_combined_epoch_stats_df.RL_Long_spearman_Z, laps_combined_epoch_stats_df.LR_Short_spearman_Z, laps_combined_epoch_stats_df.RL_Short_spearman_Z
-
-            # LR_laps_epoch_accumulated_evidence, LR_laps_epoch_rate_dfs, active_laps_epochs_df = cls.epoch_directionality_active_set_evidence(decoders_dict, active_laps_epochs_df)
-
-            # long_best_direction_indicies = active_laps_epochs_df['Long_best_direction_indicies'].to_numpy()
-            # short_best_direction_indicies = active_laps_epochs_df['Short_best_direction_indicies'].to_numpy()
-            
-            # ## Long/Short Independent Version:
-            # long_best_direction_indicies = active_replay_epochs_df['Long_best_direction_indicies'].to_numpy()
-            # short_best_direction_indicies = active_replay_epochs_df['Short_best_direction_indicies'].to_numpy()
-            
-            # # `combined_best_direction_indicies` method:
-            # assert 'combined_best_direction_indicies' in active_laps_epochs_df, f"active_laps_epochs_df needs combined_best_direction_indicies"
-            # combined_best_direction_indicies = deepcopy(active_laps_epochs_df['combined_best_direction_indicies'])
-            # assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.laps_combined_epoch_stats_df)[0]
-            # long_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
-            # short_best_direction_indicies = combined_best_direction_indicies.copy() # use same (globally best) indicies for Long/Short
-            
-            # laps_directional_likelihoods_tuple: DirectionalRankOrderLikelihoods = DirectionalRankOrderLikelihoods(long_relative_direction_likelihoods=active_laps_epochs_df['Long_normed_LR_evidence'].to_numpy(),
-            #                                                                                 short_relative_direction_likelihoods=active_laps_epochs_df['Short_normed_RL_evidence'].to_numpy(),
-            #                                                                                 long_best_direction_indices=long_best_direction_indicies, 
-            #                                                                                 short_best_direction_indices=short_best_direction_indicies)
 
             ## 2024-01-04 - DirectionalMergedDecoders version:
             # NOTE: laps_most_likely_direction_from_decoder comes with with more epochs than the already filtered `rank_order_results.laps_combined_epoch_stats_df` version. We'll get only the active indicies from `rank_order_results.ripple_combined_epoch_stats_df.index`
@@ -2423,6 +2380,11 @@ class RankOrderAnalyses:
     def _subfn_build_all_pf_peak_x_columns(cls, track_templates, selected_spikes_df: pd.DataFrame, override_decoder_aclu_peak_map_dict=None, _MODERN_INTERNAL_SHUFFLE: bool = True):
         """ 2023-12-20 - Returns `active_selected_spikes_df` but with its `f'{a_decoder_name}_pf_peak_x'` columns all shuffled according to `override_decoder_aclu_peak_map_dict` (which was previously shuffled)
         
+        _MODERN_INTERNAL_SHUFFLE: bool - A parameter added on 2024-01-09 to allow bypassing the old shuffling method, which was strangely failing for certain sessions and it turned out to be from periods with too few unique active cells in them.
+            _MODERN_INTERNAL_SHUFFLE: False - the pre-2024-01-09 method of shuffling where the provided `override_decoder_aclu_peak_map_dict` are used.
+            _MODERN_INTERNAL_SHUFFLE: True - a temporary workaround on 2024-01-09 that shuffles only amongst the aclus within each Probe_Epoch_id instead of pre-shuffling the  `override_decoder_aclu_peak_map_dict`. I thought this was what was leading to NaNs in the calculation, because some of these peaks don't occur on one of the tracks.
+            
+        
         """
         # long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
         is_shuffle: bool = False
@@ -2448,32 +2410,32 @@ class RankOrderAnalyses:
 
         # 2023-01-09 Shuffle Amongst only Probe_Epoch_ID
         if is_shuffle:
-            unique_Probe_Epoch_IDs = active_selected_spikes_df['Probe_Epoch_id'].unique()
-            for a_probe_epoch_ID in unique_Probe_Epoch_IDs:
-                # probe_epoch_df = active_selected_spikes_df[a_probe_epoch_ID == active_selected_spikes_df['Probe_Epoch_id']]
-                # epoch_unique_aclus = probe_epoch_df.aclu.unique()
-                for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+            if _MODERN_INTERNAL_SHUFFLE:
+                unique_Probe_Epoch_IDs = active_selected_spikes_df['Probe_Epoch_id'].unique()
+                for a_probe_epoch_ID in unique_Probe_Epoch_IDs:
+                    # probe_epoch_df = active_selected_spikes_df[a_probe_epoch_ID == active_selected_spikes_df['Probe_Epoch_id']]
+                    # epoch_unique_aclus = probe_epoch_df.aclu.unique()
                     mask = (a_probe_epoch_ID == active_selected_spikes_df['Probe_Epoch_id'])
                     # epoch_unique_aclus = active_selected_spikes_df.loc[mask, 'aclu'].unique()
                     for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
                         # Shuffle aclus here:
                         active_selected_spikes_df.loc[mask, 'aclu'] = active_selected_spikes_df.loc[mask, 'aclu'].sample(frac=1).values
                         active_selected_spikes_df.loc[mask, f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.loc[mask, 'aclu'].map(a_aclu_peak_map)
-                        
-                    # ## Shuffle aclus here:
-                    # # probe_epoch_df.aclu.sample(1000)
-                    # # a_aclu_peak_map
-                    # # Assuming 'df' is your DataFrame and 'column_name' is the column you want to shuffle
-                    # probe_epoch_df['aclu'] = probe_epoch_df['aclu'].sample(frac=1).reset_index(drop=True)
 
-                    # probe_epoch_df[f'{a_decoder_name}_pf_peak_x'] = probe_epoch_df.aclu.map(a_aclu_peak_map)
+                        # ## Shuffle aclus here:
+                        # # probe_epoch_df.aclu.sample(1000)
+                        # # a_aclu_peak_map
+                        # # Assuming 'df' is your DataFrame and 'column_name' is the column you want to shuffle
+                        # probe_epoch_df['aclu'] = probe_epoch_df['aclu'].sample(frac=1).reset_index(drop=True)
 
-                    # active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
+                        # probe_epoch_df[f'{a_decoder_name}_pf_peak_x'] = probe_epoch_df.aclu.map(a_aclu_peak_map)
+
+                        # active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
         
-                
-            # Pre 2023-01-09 - Shuffle Amongst all: ______________________________________________________________________________ #
-            # for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
-            #     active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
+            else:            
+                # Pre 2023-01-09 - Shuffle Amongst all: ______________________________________________________________________________ #
+                for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+                    active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
 
             # end if is_shuffle
         else:
