@@ -312,6 +312,8 @@ class SaveStringGenerator:
 def save_rank_order_results(curr_active_pipeline, day_date: str='2023-12-19_729pm', override_output_parent_path: Optional[Path]=None):
     """ saves out the rnak-order and directional laps results to disk.
     
+    rank_order_output_path, directional_laps_output_path, directional_merged_decoders_output_path, out_filename_str
+    
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
     ## Uses `SaveStringGenerator.generate_save_suffix` and the current rank_order_result's parameters to build a reasonable save name:
@@ -321,12 +323,29 @@ def save_rank_order_results(curr_active_pipeline, day_date: str='2023-12-19_729p
     out_filename_str = SaveStringGenerator.generate_save_suffix(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, day_date=day_date)
     print(f'save_rank_order_results(...): out_filename_str: "{out_filename_str}"')
     output_parent_path: Path = (override_output_parent_path or curr_active_pipeline.get_output_path()).resolve()
-    directional_laps_output_path = output_parent_path.joinpath(f'{out_filename_str}DirectionalLaps.pkl').resolve()
-    saveData(directional_laps_output_path, (curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']))
-    rank_order_output_path = output_parent_path.joinpath(f'{out_filename_str}RankOrder.pkl').resolve()
-    saveData(rank_order_output_path, (curr_active_pipeline.global_computation_results.computed_data['RankOrder']))
 
-    return rank_order_output_path, directional_laps_output_path, out_filename_str
+    try:
+        directional_laps_output_path = output_parent_path.joinpath(f'{out_filename_str}DirectionalLaps.pkl').resolve()
+        saveData(directional_laps_output_path, (curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']))
+    except BaseException as e:
+        print(f'issue saving "{directional_laps_output_path}": error: {e}')
+        pass
+    
+    try:
+        rank_order_output_path = output_parent_path.joinpath(f'{out_filename_str}RankOrder.pkl').resolve()
+        saveData(rank_order_output_path, (curr_active_pipeline.global_computation_results.computed_data['RankOrder']))
+    except BaseException as e:
+        print(f'issue saving "{directional_laps_output_path}": error: {e}')
+        pass
+
+    try:
+        directional_merged_decoders_output_path = output_parent_path.joinpath(f'{out_filename_str}DirectionalMergedDecoders.pkl').resolve()
+        saveData(directional_merged_decoders_output_path, (curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']))
+    except BaseException as e:
+        print(f'issue saving "{directional_laps_output_path}": error: {e}')
+        pass
+    
+    return rank_order_output_path, directional_laps_output_path, directional_merged_decoders_output_path, out_filename_str
     
 
 
