@@ -206,7 +206,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         return computation_result
 
-    @function_attributes(short_name=None, tags=['decoding', 'recursive', 'latent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 17:34', related_items=[],
+    @function_attributes(short_name='recursive_latent_pf_decoding', tags=['decoding', 'recursive', 'latent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 17:34', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_RecursiveLatent'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_RecursiveLatent']), is_global=False)
     def _perform_recursive_latent_placefield_decoding(computation_result: ComputationResult, **kwargs):
         """ note that currently the pf1D_Decoders are not built or used. 
