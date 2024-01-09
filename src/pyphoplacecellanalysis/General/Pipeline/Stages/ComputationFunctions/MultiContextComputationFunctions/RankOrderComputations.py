@@ -1849,8 +1849,10 @@ class RankOrderAnalyses:
 
         ## 2023-12-23 Method:        
         # recover from the valid stacked arrays: `valid_stacked_arrays`
-        output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.laps_new_output_tuple      
-            quantile_results_dict_laps = compute_percentiles_from_shuffle_results(combined_variable_names, valid_stacked_arrays, real_stacked_arrays)
+        output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.laps_new_output_tuple
+        assert (n_valid_shuffles > 0), f'ERR: n_valid_shuffles: {n_valid_shuffles} == 0!'
+
+        quantile_results_dict_laps = compute_percentiles_from_shuffle_results(combined_variable_names, valid_stacked_arrays, real_stacked_arrays)
         
         # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_pearson_Z'][0], shuffled_results_output_dict['short_LR_pearson_Z'][0])])
         # new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_pearson_Z'][0], shuffled_results_output_dict['short_RL_pearson_Z'][0])])
@@ -2016,7 +2018,7 @@ class RankOrderAnalyses:
             rank_order_results.ripple_combined_epoch_stats_df['Short_BestDir_spearman'] = ripple_evts_short_best_dir_raw_stats_values
 
 
-        except (AttributeError, KeyError, IndexError, ValueError):
+        except (AttributeError, KeyError, IndexError, ValueError, ZeroDivisionError):
             raise # fail for ripples, but not for laps currently
             ripple_result_tuple = None
 
@@ -2107,7 +2109,7 @@ class RankOrderAnalyses:
             rank_order_results.laps_combined_epoch_stats_df['Long_BestDir_spearman'] = laps_evts_long_best_dir_raw_stats_values
             rank_order_results.laps_combined_epoch_stats_df['Short_BestDir_spearman'] = laps_evts_short_best_dir_raw_stats_values
             
-        except (AttributeError, KeyError, IndexError, ValueError):
+        except (AttributeError, KeyError, IndexError, ValueError, ZeroDivisionError):
             raise
             laps_result_tuple = None
 
@@ -2426,8 +2428,8 @@ class RankOrderAnalyses:
                 # use the default from track_templates
                 decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict()
             else:
-            # use the provided one, for example during a shuffle:
-            decoder_aclu_peak_map_dict = override_decoder_aclu_peak_map_dict
+                # use the provided one, for example during a shuffle:
+                decoder_aclu_peak_map_dict = override_decoder_aclu_peak_map_dict
             is_shuffle = True # if the dict is passed, it is a shuffle
         else:
             # use the default from track_templates
@@ -2449,7 +2451,7 @@ class RankOrderAnalyses:
                 for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
                     mask = (a_probe_epoch_ID == active_selected_spikes_df['Probe_Epoch_id'])
                     # epoch_unique_aclus = active_selected_spikes_df.loc[mask, 'aclu'].unique()
-                for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+                    for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
                         # Shuffle aclus here:
                         active_selected_spikes_df.loc[mask, 'aclu'] = active_selected_spikes_df.loc[mask, 'aclu'].sample(frac=1).values
                         active_selected_spikes_df.loc[mask, f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.loc[mask, 'aclu'].map(a_aclu_peak_map)
@@ -2472,9 +2474,9 @@ class RankOrderAnalyses:
             # end if is_shuffle
         else:
             # Non-shuffle:
-        for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
-            active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
-
+            for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+                active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
+        
         return active_selected_spikes_df
     
 
@@ -2661,7 +2663,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
     @function_attributes(short_name='rank_order_shuffle_analysis', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['RankOrder'],
-		validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
+        validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
     def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2], skip_laps=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
