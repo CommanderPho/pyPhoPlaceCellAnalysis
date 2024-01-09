@@ -2377,7 +2377,7 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['subfn', 'correlation', 'spearman', 'rank-order', 'pearson'], input_requires=[], output_provides=[], uses=[], used_by=['pandas_df_based_correlation_computations'], creation_date='2023-12-13 03:47', related_items=[])
+    @function_attributes(short_name=None, tags=['subfn', 'correlation', 'spearman', 'rank-order', 'pearson'], input_requires=[], output_provides=[], uses=[], used_by=['_compute_single_rank_order_shuffle', 'pandas_df_based_correlation_computations'], creation_date='2023-12-13 03:47', related_items=[])
     def _subfn_calculate_correlations(cls, group, method='spearman', decoder_names: List[str]=None) -> pd.Series:
         """ computes the pearson correlations between the spiketimes during a specific epoch (identified by each 'Probe_Epoch_id' group) and that spike's pf_peak_x location in the template.
 
