@@ -2390,6 +2390,7 @@ class RankOrderAnalyses:
         _output_column_names = [f'{a_decoder_name}_{method}' for a_decoder_name in decoder_names]
         # correlations = {f'{a_decoder_name}_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group[f'{a_decoder_name}_pf_peak_x'], method=method) for a_decoder_name in _decoder_names}
         # Encountered `AttributeError: 'float' object has no attribute 'shape'` and fixed by using .astype(float) as suggested here: `https://stackoverflow.com/questions/53200129/attributeerror-float-object-has-no-attribute-shape-when-using-linregress`
+        # TypeError: float() argument must be a string or a number, not 'NAType'
         correlations = {an_output_col_name:group['t_rel_seconds'].rank(method="dense").astype(float).corr(group[a_pf_peak_x_column_name].astype(float), method=method) for a_decoder_name, a_pf_peak_x_column_name, an_output_col_name in zip(decoder_names, _pf_peak_x_column_names, _output_column_names)}
 
         return pd.Series(correlations)
@@ -2476,17 +2477,18 @@ class RankOrderAnalyses:
 
         ## Compute real values here:
         decoder_names = track_templates.get_decoder_names()
-        
-        # epoch_id_grouped_selected_spikes_df =  active_selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
-        # spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
-        # pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='pearson', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
 
-        # real_stats_df = pd.concat((spearman_correlations, pearson_correlations), axis='columns')
-        # real_stats_df = real_stats_df.loc[:, ~real_stats_df.columns.duplicated()] # drop duplicated 'Probe_Epoch_id' column
-        # # Change column type to uint64 for column: 'Probe_Epoch_id'
-        # real_stats_df = real_stats_df.astype({'Probe_Epoch_id': 'uint64'})
-        # # Rename column 'Probe_Epoch_id' to 'label'
-        # real_stats_df = real_stats_df.rename(columns={'Probe_Epoch_id': 'label'})
+            
+        epoch_id_grouped_selected_spikes_df =  selected_spikes_df.groupby('Probe_Epoch_id') # I can even compute this outside the loop?
+        spearman_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='spearman', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+        pearson_correlations = epoch_id_grouped_selected_spikes_df.apply(lambda group: RankOrderAnalyses._subfn_calculate_correlations(group, method='pearson', decoder_names=decoder_names)).reset_index() # Reset index to make 'Probe_Epoch_id' a column
+
+        real_stats_df = pd.concat((spearman_correlations, pearson_correlations), axis='columns')
+        real_stats_df = real_stats_df.loc[:, ~real_stats_df.columns.duplicated()] # drop duplicated 'Probe_Epoch_id' column
+        # Change column type to uint64 for column: 'Probe_Epoch_id'
+        real_stats_df = real_stats_df.astype({'Probe_Epoch_id': 'uint64'})
+        # Rename column 'Probe_Epoch_id' to 'label'
+        real_stats_df = real_stats_df.rename(columns={'Probe_Epoch_id': 'label'})
         
 
         ## Compute real values here:
@@ -2543,7 +2545,7 @@ class RankOrderAnalyses:
             for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
                 shuffled_df[f'{a_decoder_name}_pf_peak_x'] = shuffled_df.aclu.map(a_aclu_peak_map)
                 
-            a_shuffle_stats_df = cls._compute_single_rank_order_shuffle(track_templates, active_selected_spikes_df=shuffled_df)
+            a_shuffle_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=shuffled_df)
             
             # Adding the shuffled DataFrame to the list
             shuffled_dfs.append(shuffled_df)
@@ -2612,7 +2614,12 @@ class RankOrderAnalyses:
         # _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
         _pf_peak_x_column_names = [f'{a_decoder_name}_pf_peak_x' for a_decoder_name in track_templates.get_decoder_names()]
         active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[RankOrderAnalyses._NaN_Type, RankOrderAnalyses._NaN_Type, RankOrderAnalyses._NaN_Type, RankOrderAnalyses._NaN_Type]], index=active_selected_spikes_df.index)
-        real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=active_selected_spikes_df) # new `_new_perform_efficient_shuffle`
+                
+        real_spikes_df = active_selected_spikes_df.copy()
+        for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+            real_spikes_df[f'{a_decoder_name}_pf_peak_x'] = real_spikes_df.aclu.map(a_aclu_peak_map)
+    
+        real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=real_spikes_df) # new `_new_perform_efficient_shuffle`
         # real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=selected_spikes_df) # old
         combined_variable_names = list(set(real_stats_df.columns) - set(['label'])) # ['RL_Short_spearman', 'RL_Long_pearson', 'RL_Short_pearson', 'LR_Long_spearman', 'LR_Short_pearson', 'LR_Long_pearson', 'LR_Short_spearman', 'RL_Long_spearman']
         real_stacked_arrays = real_stats_df[combined_variable_names].to_numpy() # for compatibility
