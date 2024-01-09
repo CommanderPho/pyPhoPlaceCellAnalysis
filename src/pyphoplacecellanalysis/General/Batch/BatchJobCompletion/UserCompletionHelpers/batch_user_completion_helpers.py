@@ -137,6 +137,9 @@ def MAIN_get_template_string():
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import MAIN_get_template_string
     
 
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import MAIN_get_template_string
+    
+    custom_user_completion_function_template_code, custom_user_completion_functions_dict = MAIN_get_template_string()
 
     """
     # custom_user_completion_functions = [a_test_completion_function]
