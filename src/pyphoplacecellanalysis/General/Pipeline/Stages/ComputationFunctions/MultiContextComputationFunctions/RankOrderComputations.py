@@ -1248,7 +1248,7 @@ class RankOrderAnalyses:
 
 
     @classmethod
-    def select_and_rank_spikes(cls, active_spikes_df: pd.DataFrame, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment: str, time_variable_name_override: Optional[str]=None):
+    def select_and_rank_spikes(cls, active_spikes_df: pd.DataFrame, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment: str, time_variable_name_override: Optional[str]=None, min_num_unique_aclu_inclusions: int=5):
         """Selects and ranks spikes based on rank_alignment, and organizes them into structured dictionaries.
 
 
@@ -1263,6 +1263,34 @@ class RankOrderAnalyses:
             time_variable_name_override = active_spikes_df.spikes.time_variable_name
         # Determine which spikes to use to represent the order
         selected_spikes, selected_spikes_only_df = cls.select_chosen_spikes(active_spikes_df=active_spikes_df, rank_alignment=rank_alignment, time_variable_name_override=time_variable_name_override)
+
+        ## After selection, drop any epochs that are less than min_num_unique_aclu_inclusions
+        initial_selected_spikes = np.shape(selected_spikes)[0]
+        initial_selected_spikes_only_df = np.shape(selected_spikes_only_df)[0]
+        
+        ## #TODO 2024-01-09 04:40: - [ ] Remove under-powered laps
+        active_selected_spikes_df: pd.DataFrame = deepcopy(selected_spikes_only_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': 'int'}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+        active_num_unique_aclus_df = active_selected_spikes_df.groupby(['Probe_Epoch_id']).agg(aclu_count=('aclu', 'count')).reset_index()
+        active_num_unique_aclus_df = active_num_unique_aclus_df[active_num_unique_aclus_df['aclu_count'] >= min_num_unique_aclu_inclusions] # Filter rows based on column: 'aclu_count'
+        final_good_Probe_Epoch_ids: NDArray = active_num_unique_aclus_df.Probe_Epoch_id.unique()
+        
+
+        ## Drop the entries in active_selected_spikes_df that have Probe_Epoch_id correspodnding to the dropped epochs
+        selected_spikes_only_df = selected_spikes_only_df[np.isin(selected_spikes_only_df['Probe_Epoch_id'], final_good_Probe_Epoch_ids)]
+        selected_spikes = selected_spikes[np.isin(deepcopy(selected_spikes).reset_index()['Probe_Epoch_id'], final_good_Probe_Epoch_ids)]
+
+        # Drop the bad ones.
+        final_num_selected_spikes = np.shape(selected_spikes)[0]
+        final_num_selected_spikes_only_df = np.shape(selected_spikes_only_df)[0]
+        
+        # num_dropped = final_num_selected_spikes - initial_selected_spikes
+        num_dropped = final_num_selected_spikes_only_df - initial_selected_spikes_only_df
+        if num_dropped > 0:
+            # print(f'num_dropped: {num_dropped} = final_num_selected_spikes: {final_num_selected_spikes} - initial_selected_spikes: {initial_selected_spikes}') 
+            print(f'num_dropped: {num_dropped} = final_num_selected_spikes_only_df: {final_num_selected_spikes_only_df} - initial_selected_spikes_only_df: {initial_selected_spikes_only_df}') 
+
+
+       
 
         # Rank the aclu values by their first t value in each Probe_Epoch_id
         ranked_aclus = selected_spikes.groupby('Probe_Epoch_id').rank(method='dense')  # Resolve ties in ranking
@@ -1291,7 +1319,7 @@ class RankOrderAnalyses:
         epoch_ranked_fragile_linear_neuron_IDX_dict = {epoch_id: np.array(vals) for epoch_id, vals in epoch_ranked_fragile_linear_neuron_IDX_dict.items()}
         epoch_selected_spikes_fragile_linear_neuron_IDX_dict = {epoch_id: np.array(vals) for epoch_id, vals in epoch_selected_spikes_fragile_linear_neuron_IDX_dict.items()} # selected:
 
-        return epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df
+        return epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df, final_good_Probe_Epoch_ids
 
 
 
@@ -1326,7 +1354,14 @@ class RankOrderAnalyses:
         #TODO 2023-12-10 19:40: - [ ] Need to save the epochs that were used to compute.
 
         # Select and rank spikes
-        epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df = cls.select_and_rank_spikes(active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment)
+        epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df, final_good_Probe_Epoch_ids = cls.select_and_rank_spikes(active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions)
+
+        ## Drop the entries in active_selected_spikes_df that have Probe_Epoch_id correspodnding to the dropped epochs
+        active_spikes_df: pd.DataFrame = active_spikes_df.copy()
+        active_spikes_df = active_spikes_df[np.isin(active_spikes_df['Probe_Epoch_id'], final_good_Probe_Epoch_ids)]
+
+        active_epochs_df: pd.DataFrame = filtered_active_epochs.copy()
+        active_epochs_df = active_epochs_df[np.isin(active_epochs_df['label'], final_good_Probe_Epoch_ids)]
 
         ## OUTPUT DICTS:
         # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
