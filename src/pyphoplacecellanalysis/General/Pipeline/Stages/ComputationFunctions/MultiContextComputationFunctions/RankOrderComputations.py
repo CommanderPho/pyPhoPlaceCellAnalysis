@@ -1357,7 +1357,7 @@ class RankOrderAnalyses:
         epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df, final_good_Probe_Epoch_ids = cls.select_and_rank_spikes(active_spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment, min_num_unique_aclu_inclusions=min_num_unique_aclu_inclusions)
 
         ## Drop the entries in active_selected_spikes_df that have Probe_Epoch_id correspodnding to the dropped epochs
-        active_spikes_df: pd.DataFrame = active_spikes_df.copy()
+        # active_spikes_df: pd.DataFrame = active_spikes_df.copy()
         active_spikes_df = active_spikes_df[np.isin(active_spikes_df['Probe_Epoch_id'], final_good_Probe_Epoch_ids)]
 
         active_epochs_df: pd.DataFrame = filtered_active_epochs.copy()
