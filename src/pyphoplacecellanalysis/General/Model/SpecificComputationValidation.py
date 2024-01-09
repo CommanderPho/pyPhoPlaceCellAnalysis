@@ -1,7 +1,7 @@
 from attrs import define, Factory, field, fields
 from typing import Callable, List, Dict, Optional
 
-@define(slots=False, repr=False)
+@define(slots=False, repr=True)
 class SpecificComputationResultsSpecification:
     """ This encapsulates the specification for required/provided global results 
 
@@ -63,7 +63,7 @@ class SpecificComputationResultsSpecification:
             
 
 
-@define(slots=False, repr=False)
+@define(slots=False, repr=True)
 class SpecificComputationValidator:
     """ This encapsulates the logic for testing if a computation already complete or needs to be completed, and calling the compute function if needed.
 
@@ -89,12 +89,12 @@ class SpecificComputationValidator:
 
 
     """
-    short_name:str # 'long_short_post_decoding'
-    computation_fn_name:str # '_perform_long_short_post_decoding_analysis'
-    validate_computation_test:Callable # lambda curr_active_pipeline, computation_filter_name='maze'
-    results_specification: SpecificComputationResultsSpecification = Factory(SpecificComputationResultsSpecification) # (provides_global_keys=['DirectionalMergedDecoders']) # results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders'])
-    computation_fn_kwargs:dict = Factory(dict) # {'perform_cache_load': False}]`
-    is_global:bool = False
+    short_name:str = field() # 'long_short_post_decoding'
+    computation_fn_name:str = field() # '_perform_long_short_post_decoding_analysis'
+    validate_computation_test:Callable = field(repr=False) # lambda curr_active_pipeline, computation_filter_name='maze'
+    results_specification: SpecificComputationResultsSpecification = field(default=Factory(SpecificComputationResultsSpecification), repr=False) # (provides_global_keys=['DirectionalMergedDecoders']) # results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders'])
+    computation_fn_kwargs:dict = field(default=Factory(dict), repr=True)  # {'perform_cache_load': False}]`
+    is_global:bool = field(default=False)
     
     @property
     def has_results_spec(self) -> bool:
@@ -135,6 +135,7 @@ class SpecificComputationValidator:
         return cls(short_name=a_fn.short_name, computation_fn_name=a_fn.__name__, validate_computation_test=a_fn.validate_computation_test, results_specification=results_specification, is_global=a_fn.is_global)
         
 
+    # Main Operation Functions ___________________________________________________________________________________________ #
     def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
         return self._perform_try_computation_if_needed(self, curr_active_pipeline, **kwargs)
 
@@ -186,6 +187,7 @@ class SpecificComputationValidator:
             return None
 
 
+    # Implementations ____________________________________________________________________________________________________ #
     @classmethod
     def _perform_try_computation_if_needed(cls, comp_specifier: "SpecificComputationValidator", curr_active_pipeline, computation_filter_name:str, on_already_computed_fn=None, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False):
         """ 2023-06-08 - tries to perform the computation if the results are missing and it's needed. 
