@@ -2407,7 +2407,8 @@ class RankOrderAnalyses:
         _pf_peak_x_column_names = [f'{a_decoder_name}_pf_peak_x' for a_decoder_name in decoder_names]
         _output_column_names = [f'{a_decoder_name}_{method}' for a_decoder_name in decoder_names]
         # correlations = {f'{a_decoder_name}_{method}': shuffle_fn(group['t_rel_seconds']).rank(method="dense").corr(group[f'{a_decoder_name}_pf_peak_x'], method=method) for a_decoder_name in _decoder_names}
-        correlations = {an_output_col_name:group['t_rel_seconds'].rank(method="dense").corr(group[a_pf_peak_x_column_name], method=method) for a_decoder_name, a_pf_peak_x_column_name, an_output_col_name in zip(decoder_names, _pf_peak_x_column_names, _output_column_names)}
+        # Encountered `AttributeError: 'float' object has no attribute 'shape'` and fixed by using .astype(float) as suggested here: `https://stackoverflow.com/questions/53200129/attributeerror-float-object-has-no-attribute-shape-when-using-linregress`
+        correlations = {an_output_col_name:group['t_rel_seconds'].rank(method="dense").astype(float).corr(group[a_pf_peak_x_column_name].astype(float), method=method) for a_decoder_name, a_pf_peak_x_column_name, an_output_col_name in zip(decoder_names, _pf_peak_x_column_names, _output_column_names)}
 
         return pd.Series(correlations)
 
