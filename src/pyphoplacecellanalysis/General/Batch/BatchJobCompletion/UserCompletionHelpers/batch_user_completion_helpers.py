@@ -1,69 +1,6 @@
-import os
-import sys
-from copy import deepcopy
-from typing import List, Dict, Optional, Union, Callable
+from typing import List, Dict, Tuple, Optional, Callable
+
 from pathlib import Path
-import pathlib
-import numpy as np
-import pandas as pd
-import tables as tb
-from copy import deepcopy
-from datetime import datetime, timedelta
-from attrs import define, field, Factory
-
-## Pho's Custom Libraries:
-from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
-from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.print_helpers import CapturedException
-
-# Jupyter interactivity:
-import ipywidgets as widgets
-from IPython.display import display
-from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import JupyterButtonRowWidget
-
-# pyPhoPlaceCellAnalysis:
-# NeuroPy (Diba Lab Python Repo) Loading
-from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
-from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
-from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormat
-from neuropy.core.session.Formats.Specific.HiroDataSessionFormat import HiroDataSessionFormatRegisteredClass
-from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
-
-## For computation parameters:
-from neuropy.utils.result_context import IdentifyingContext
-from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
-from neuropy.core import Epoch
-
-from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
-import pyphoplacecellanalysis.General.Batch.runBatch
-from pyphoplacecellanalysis.General.Batch.runBatch import BatchRun, BatchResultDataframeAccessor, run_diba_batch, BatchComputationProcessOptions, BatchSessionCompletionHandler, SavingOptions
-from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
-
-from neuropy.core.user_annotations import UserAnnotationsManager
-from pyphoplacecellanalysis.General.Batch.runBatch import SessionBatchProgress
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults, AcrossSessionTables, AcrossSessionsVisualizations
-
-from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
-
-from pyphocorehelpers.print_helpers import CapturedException
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import InstantaneousFiringRatesDataframeAccessor
-from pyphoplacecellanalysis.General.Batch.runBatch import PipelineCompletionResult, BatchSessionCompletionHandler
-
-from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata, get_file_metadata
-from pyphocorehelpers.Filesystem.path_helpers import discover_data_files, generate_copydict, copy_movedict, copy_file, save_copydict_to_text_file, read_copydict_from_text_file, invert_filedict
-from pyphoplacecellanalysis.General.Batch.runBatch import get_file_str_if_file_exists
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import check_output_h5_files, copy_files_in_filelist_to_dest
-from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder, BackupMethods
-
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots, BatchPhoJonathanFiguresHelper
-from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PAPER_FIGURE_figure_1_add_replay_epoch_rasters, PAPER_FIGURE_figure_1_full, PAPER_FIGURE_figure_3, main_complete_figure_generations
-
-from neuropy.core.neuron_identities import NeuronIdentityDataframeAccessor
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import build_merged_neuron_firing_rate_indicies
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPlacefieldGlobalComputationFunctions, DirectionalLapsHelpers
-from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget
-
 
 # %% [markdown]
 # ## Build Processing Scripts:
@@ -167,7 +104,7 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
     print(f'compute_and_export_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-    BATCH_DATE_TO_USE = '2024-01-08_GL' # TODO: Change this as needed, templating isn't actually doing anything rn.
+    BATCH_DATE_TO_USE = '2024-01-09_GL' # TODO: Change this as needed, templating isn't actually doing anything rn.
     # collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve() # Linux
     collected_outputs_path = Path('/home/halechr/cloud/turbo/Data/Outputcollected_outputs').resolve() # GreatLakes
     # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve() # Apogee
@@ -193,32 +130,46 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
 
     return across_session_results_extended_dict
 
-# custom_user_completion_functions = [a_test_completion_function]
 
-custom_user_completion_functions_dict = {
-                                    # "export_rank_order_results_completion_function": export_rank_order_results_completion_function,
-                                    # "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
-                                    # "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function,
-                                    }
 
-# _template_defn_string: str = '\n\n'.join([inspect.getsource(a_fn) for a_name, a_fn in custom_user_completion_functions_dict.items()])
+def MAIN_get_template_string():
+    """ 
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import MAIN_get_template_string
     
-## Build the template string:
-template_str: str = f"""
-custom_user_completion_functions = []
-"""
 
-for a_name, a_fn in custom_user_completion_functions_dict.items():
-    fcn_defn_str: str = inspect.getsource(a_fn)
-    template_str = f"{template_str}\n{fcn_defn_str}\ncustom_user_completion_functions.append({a_name})\n\n"
-    
-template_str
 
-# template_str: str = f"""
-# {inspect.getsource(export_rank_order_results_completion_function)}
-# custom_user_completion_functions = [export_rank_order_results_completion_function]
-# """
+    """
+    # custom_user_completion_functions = [a_test_completion_function]
 
-custom_user_completion_function_template_code = template_str
-print(custom_user_completion_function_template_code)
+    custom_user_completion_functions_dict = {
+                                        # "export_rank_order_results_completion_function": export_rank_order_results_completion_function,
+                                        # "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
+                                        # "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function,
+                                        }
+
+
+    # _template_defn_string: str = '\n\n'.join([inspect.getsource(a_fn) for a_name, a_fn in custom_user_completion_functions_dict.items()])
+        
+    ## Build the template string:
+    template_str: str = f"""
+    custom_user_completion_functions = []
+    """
+
+    for a_name, a_fn in custom_user_completion_functions_dict.items():
+        fcn_defn_str: str = inspect.getsource(a_fn)
+        template_str = f"{template_str}\n{fcn_defn_str}\ncustom_user_completion_functions.append({a_name})\n\n"
+        
+    template_str
+
+    # template_str: str = f"""
+    # {inspect.getsource(export_rank_order_results_completion_function)}
+    # custom_user_completion_functions = [export_rank_order_results_completion_function]
+    # """
+
+    custom_user_completion_function_template_code = template_str
+    print(custom_user_completion_function_template_code)
+    return custom_user_completion_function_template_code, custom_user_completion_functions_dict
+
+
+
 
