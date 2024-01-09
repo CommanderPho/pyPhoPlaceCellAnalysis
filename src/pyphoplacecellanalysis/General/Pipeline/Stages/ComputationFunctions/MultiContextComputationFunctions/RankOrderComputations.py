@@ -23,7 +23,7 @@ from attrs import asdict, define, field, Factory, astuple
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 
-from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_paired_t_test
+
 from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
 import scipy.stats
 from scipy import ndimage
@@ -2086,6 +2086,7 @@ class RankOrderAnalyses:
     @function_attributes(short_name=None, tags=['rank-order', 'ripples', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-01 20:20', related_items=[])
     @classmethod
     def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first', minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2,4,9]):
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_paired_t_test
 
         global_spikes_df, (odd_shuffle_helper, even_shuffle_helper), active_directional_laps_results = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
@@ -2122,7 +2123,6 @@ class RankOrderAnalyses:
     @classmethod
     def main_laps_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='median', minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2,4,9]):
         """
-
         _laps_outputs = RankOrderAnalyses.main_laps_analysis(curr_active_pipeline, num_shuffles=1000, rank_alignment='median')
 
         # Unwrap
@@ -2131,8 +2131,9 @@ class RankOrderAnalyses:
         odd_laps_epoch_ranked_aclus_stats_dict, odd_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (odd_laps_long_z_score_values, odd_laps_short_z_score_values, odd_laps_long_short_z_score_diff_values) = odd_outputs
         even_laps_epoch_ranked_aclus_stats_dict, even_laps_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, (even_laps_long_z_score_values, even_laps_short_z_score_values, even_laps_long_short_z_score_diff_values) = even_outputs
 
-
         """
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_paired_t_test
+        
         ## Shared:
         global_spikes_df, (odd_shuffle_helper, even_shuffle_helper), active_directional_laps_results = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
@@ -2522,7 +2523,7 @@ class RankOrderAnalyses:
         # stacked_df = pd.concat(output_active_epoch_computed_values, axis='index')
 
         ## Drop any shuffle indicies where NaNs are returned for any of the stats values.
-        is_valid_row = np.logical_not(np.isnan(stacked_arrays)).all(axis=(1,2)) # 
+        is_valid_row = np.logical_not(np.isnan(stacked_arrays)).all(axis=(1,2)) # row [0, 66, :] is bad, ... so is [1, 66, :], ... [20, 66, :], ... they are repeated!!
         n_valid_shuffles = np.sum(is_valid_row)
         if debug_print:
             print(f'n_valid_shuffles: {n_valid_shuffles}')
