@@ -453,7 +453,12 @@ class RankOrderResult(ComputedResult):
             example_item = list(state['ranked_aclus_stats_dict'].values())[0] # first item
             if not isinstance(example_item, LongShortStatsItem):
                 # convert all to stats items:
-                state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v._asdict()) for k,v in state['ranked_aclus_stats_dict'].items()}
+                try:
+                    state['ranked_aclus_stats_dict'] = {k:LongShortStatsItem(**v._asdict()) for k,v in state['ranked_aclus_stats_dict'].items()} # AttributeError: 'LongShortStatsItem' object has no attribute '_asdict'
+                except AttributeError:
+                    state['ranked_aclus_stats_dict'] = {k:v for k,v in state['ranked_aclus_stats_dict'].items()}
+                    
+
             state['ranked_aclus_stats_dict'] = {k:v.__getstate__() for k,v in state['ranked_aclus_stats_dict'].items()} # call the .__getstate__() for each dict entry
 
         return state
