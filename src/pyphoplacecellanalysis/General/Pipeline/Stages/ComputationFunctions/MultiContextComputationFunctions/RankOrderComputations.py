@@ -2383,9 +2383,11 @@ class RankOrderAnalyses:
         
         """
         # long_LR_aclu_peak_map, long_RL_aclu_peak_map, short_LR_aclu_peak_map, short_RL_aclu_peak_map = track_templates.get_decoder_aclu_peak_maps()
+        is_shuffle: bool = False
         if override_decoder_aclu_peak_map_dict is not None:
             # use the provided one, for example during a shuffle:
             decoder_aclu_peak_map_dict = override_decoder_aclu_peak_map_dict
+            is_shuffle = True # if the dict is passed, it is a shuffle
         else:
             # use the default from track_templates
             decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict()
@@ -2397,6 +2399,30 @@ class RankOrderAnalyses:
         _pf_peak_x_column_names = [f'{a_decoder_name}_pf_peak_x' for a_decoder_name in track_templates.get_decoder_names()]
         active_selected_spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[cls._NaN_Type, cls._NaN_Type, cls._NaN_Type, cls._NaN_Type]], index=active_selected_spikes_df.index)
 
+        # 2023-01-09 Shuffle Amongst only Probe_Epoch_ID
+        if is_shuffle:
+            unique_Probe_Epoch_IDs = active_selected_spikes_df['Probe_Epoch_id'].unique()
+            for a_probe_epoch_ID in unique_Probe_Epoch_IDs:
+                probe_epoch_df = active_selected_spikes_df[a_probe_epoch_ID == active_selected_spikes_df['Probe_Epoch_id']]
+                epoch_unique_aclus = probe_epoch_df.aclu.unique()
+                for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+                    ## Shuffle aclus here:
+                    # probe_epoch_df.aclu.sample(1000)
+                    # a_aclu_peak_map
+                    # Assuming 'df' is your DataFrame and 'column_name' is the column you want to shuffle
+                    probe_epoch_df['aclu'] = probe_epoch_df['aclu'].sample(frac=1).reset_index(drop=True)
+
+                    probe_epoch_df[f'{a_decoder_name}_pf_peak_x'] = probe_epoch_df.aclu.map(a_aclu_peak_map)
+
+                    # active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
+        
+                
+            # Pre 2023-01-09 - Shuffle Amongst all: ______________________________________________________________________________ #
+            # for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+            #     active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
+
+        else:
+            # Non-shuffle:
         for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
             active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
 
