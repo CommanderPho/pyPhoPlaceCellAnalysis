@@ -6,7 +6,9 @@ from copy import deepcopy
 from collections import namedtuple
 from typing import Iterable, List, Dict, Optional, Tuple
 from pathlib import Path
+from datetime import datetime, date, timedelta
 
+from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -1088,15 +1090,16 @@ class DirectionalMergedDecodersResult(ComputedResult):
         
         active_context = curr_active_pipeline.get_session_context()
         """
+        output_date_str: str = get_now_rounded_time_str()
+
         # Export CSVs:
         def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)'):
-            """ captures `active_context`, `parent_output_path`
-
+            """ captures `active_context`, `parent_output_path`. 'output_date_str'
             """
             # parent_output_path: Path = Path('output').resolve()
             # active_context = curr_active_pipeline.get_session_context()
             session_identifier_str: str = active_context.get_description()
-            output_date_str: str = f'2024-01-04'
+            assert output_date_str is not None
             out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04|kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
             out_filename = f"{out_basename}.csv"
             out_path = parent_output_path.joinpath(out_filename).resolve()
