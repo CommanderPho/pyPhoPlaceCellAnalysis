@@ -424,16 +424,11 @@ class BatchSessionCompletionHandler:
             assert self.global_computations_options.should_compute, f"currently  SavingOptions.ALWAYS requires that self.global_computations_options.should_compute == True also but this is not the case!"
 
 
-        
-        
         # Computation ________________________________________________________________________________________________________ #
         if self.global_computations_options.should_compute:
             # build computation functions to compute list:
             active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
             force_recompute_override_computations_includelist = self.force_recompute_override_computations_includelist or []
-            if (len(force_recompute_override_computations_includelist) > 0) and (not self.force_global_recompute):
-                # split out the forced computations:
-                active_extended_computations_include_includelist = [k for k in active_extended_computations_include_includelist if k not in force_recompute_override_computations_includelist] # exclude the forced recomputations from the main `active_extended_computations_include_includelist`
 
             try:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
