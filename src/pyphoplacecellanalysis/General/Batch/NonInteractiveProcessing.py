@@ -284,6 +284,13 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
     batch_extended_computations(include_includelist=['merged_directional_placefields'], include_global_functions=True)
+    
+    WARNING: `force_recompute_override_computations_includelist` must be a subset of the items in `include_includelist`
+    include_includelist = ['pf_computation', 'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis']
+    force_recompute_override_computations_includelist = ['pf_computation', 'split_to_directional_laps']
+    
+    The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true.
+    
     """
     #TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
     #TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
@@ -301,6 +308,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     newly_computed_values = []
     force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
     
+    
     non_global_comp_names = ['pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
     global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis',
                          'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis'] # , 'long_short_rate_remapping'
@@ -313,6 +321,14 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         include_includelist = non_global_comp_names + global_comp_names
     else:
         print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
+
+    #TODO 2024-01-09 21:41: - [ ] I don't enforce that every member of  `force_recompute_override_computations_includelist` is in `include_includelist` because one might be specified in a "_comp_specifier.short_name" format while the other a "_comp_specifier.computation_fn_name", so they wouldn't literally match.
+    # If the function is specified in `force_recompute_override_computations_includelist` it should NOT be omitted from `include_includelist`.
+    # #  The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true, so check.
+    # for a_name in force_recompute_override_computations_includelist:
+    #     assert (not (a_name not in ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)))), f'WARNING: function "{a_name}" specified in `force_recompute_override_computations_includelist` is missing from `include_includelist`: ({include_includelist})! If this is the case, the function will never be computed (forced or otherwise).\nIf the function is specified in `force_recompute_override_computations_includelist` it should not be omitted from `included_computation_filter_names`.'            
+    #     # print(f'WARNING: function "{a_name}" specified in `force_recompute_override_computations_includelist` is missing from `include_includelist`: ({include_includelist})! If this is the case, the function will never be computed (forced or otherwise).')
+    assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
 
     ## Get computed relative entropy measures:
     _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
