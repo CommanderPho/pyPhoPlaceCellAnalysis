@@ -9,6 +9,20 @@ from pathlib import Path
 # %%
 import inspect
 
+
+""" In general, results of your callback can be added to the output dict like:
+
+    across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
+
+and can be extracted from batch output by:
+
+    # Extracts the callback results 'determine_computation_datetimes_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_computation_datetimes_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+
+"""
+    
+
 curr_context_template: str = """ 
     BATCH_DATE_TO_USE = '2024-01-04_Lab' # TODO: Change this as needed, templating isn't actually doing anything rn.
     collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve()
@@ -136,6 +150,12 @@ def determine_computation_datetimes_completion_function(self, global_data_root_p
     """ 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import determine_computation_datetimes_completion_function
     
+    Results can be extracted from batch output by 
+    
+    # Extracts the callback results 'determine_computation_datetimes_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_computation_datetimes_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+
     """
     # print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')

@@ -1171,6 +1171,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
 
     if post_run_callback_fn is not None:
         if fail_on_exception:
+            # run the callback without exception handling. exception in callback => exception here.
             post_run_callback_fn_output = post_run_callback_fn(global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline)
         else:
             try:
