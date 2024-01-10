@@ -135,8 +135,10 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
 
     active_context = curr_active_pipeline.get_session_context()
     _out = directional_merged_decoders_result.compute_and_export_marginals_df_csvs(parent_output_path=collected_outputs_path, active_context=active_context)
+    print(f'successfully exported marginals_df_csvs to {collected_outputs_path}!')
+    (laps_marginals_df, laps_out_path), (ripple_marginals_df, ripple_out_path) = _out
+    print(f'\tlaps_out_path: {laps_out_path}\n\tripple_out_path: {ripple_out_path}\n\tdone.')
 
-    print(f'successfully exported marginals_df_csvs!')
     # add to output dict
     # across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
 
