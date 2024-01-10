@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import List, Dict, Tuple, Optional, Callable
 
 from pathlib import Path
@@ -129,6 +130,34 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
+
+
+def determine_computation_datetimes_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+    """ 
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import determine_computation_datetimes_completion_function
+    
+    """
+    # print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'determine_computation_datetimes_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
+    
+    global_pickle_path = curr_active_pipeline.global_computation_results_pickle_path.resolve()
+    assert global_pickle_path.exists()
+    global_pickle_path
+
+    callback_outputs = {
+     'global_pickle_path': global_pickle_path   
+    }
+
+    across_session_results_extended_dict['determine_computation_datetimes_completion_function'] = callback_outputs
+    
+
+    # print(f'>>\t done with {curr_session_context}')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    return across_session_results_extended_dict
+
 
 
 
