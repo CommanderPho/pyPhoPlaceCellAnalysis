@@ -642,7 +642,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         if contains_any_global_functions:
             assert np.all([v.is_global for v in active_computation_functions]), 'ERROR: cannot mix global and non-global functions in a single call to perform_specific_computation'
 
-            if self.global_computation_results is None or not isinstance(self.global_computation_results, ComputationResult):
+            if self.global_computation_results is None or (not isinstance(self.global_computation_results, ComputationResult)):
                 print(f'global_computation_results is None. Building initial global_computation_results...')
                 self.global_computation_results = None # clear existing results
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
@@ -650,8 +650,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
         if contains_any_global_functions:
             # global computation functions:
-            if self.global_computation_results is None or not isinstance(self.global_computation_results, ComputationResult):
-                print(f'global_computation_results is None. Building initial global_computation_results...')
+            if self.global_computation_results is None or (not isinstance(self.global_computation_results, ComputationResult)):
+                print(f'global_computation_results is None or not a `ComputationResult` object. Building initial global_computation_results...') #TODO 2024-01-10 15:12: - [ ] Check that `self.global_computation_results.keys()` are empty
                 self.global_computation_results = None # clear existing results
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
             ## TODO: what is this about?
@@ -821,7 +821,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 assert isinstance(previous_computation_result, ComputationResult)
 
             # Add the computation_time to the computation result:
-            previous_computation_result.computation_times |= (computation_times or {})
+            previous_computation_result.computation_times |= (computation_times or {}) # are they not being set?
             # for k,v in (computation_times or {}).items():
             #     previous_computation_result.computation_times[k] = v
         
@@ -854,7 +854,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             if debug_print:
                 print(f'No registered_computation_functions, skipping extended computations.')
             return previous_computation_result # just return the unaltered result
-                
+
+
     @classmethod    
     def continue_computations_if_needed(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, debug_print=False):
         """ continues computations for a pipeline 
