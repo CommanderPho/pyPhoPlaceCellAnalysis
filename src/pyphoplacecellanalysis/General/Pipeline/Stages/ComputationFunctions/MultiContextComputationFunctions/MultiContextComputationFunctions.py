@@ -1,3 +1,4 @@
+from neuropy.core.epoch import NamedTimerange
 import numpy as np
 import pandas as pd
 from functools import wraps
