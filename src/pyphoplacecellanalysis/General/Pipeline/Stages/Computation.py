@@ -382,7 +382,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         each_epoch_latest_computation_time = {} # the most recent computation for each of the epochs
         # find update time of latest function:
         for k, v in self.computation_results.items():
-            extracted_computation_times_dict = v['computation_times']
+            extracted_computation_times_dict = v.computation_times
             each_epoch_each_result_computation_completion_times[k] = {k.__name__:v for k,v in extracted_computation_times_dict.items()}
             each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()), default=datetime.min)
 
