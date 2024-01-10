@@ -119,9 +119,9 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
     print(f'compute_and_export_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-    BATCH_DATE_TO_USE = '2024-01-09_GL' # TODO: Change this as needed, templating isn't actually doing anything rn.
+    BATCH_DATE_TO_USE = '2024-01-10_GL' # TODO: Change this as needed, templating isn't actually doing anything rn.
     # collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve() # Linux
-    collected_outputs_path = Path('/home/halechr/cloud/turbo/Data/Outputcollected_outputs').resolve() # GreatLakes
+    collected_outputs_path = Path('/home/halechr/cloud/turbo/Data/Output/collected_outputs').resolve() # GreatLakes
     # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve() # Apogee
     assert collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
@@ -136,7 +136,8 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
     active_context = curr_active_pipeline.get_session_context()
     _out = directional_merged_decoders_result.compute_and_export_marginals_df_csvs(parent_output_path=collected_outputs_path, active_context=active_context)
 
-    # add to output dict    
+    print(f'successfully exported marginals_df_csvs!')
+    # add to output dict
     # across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
 
     print(f'>>\t done with {curr_session_context}')
