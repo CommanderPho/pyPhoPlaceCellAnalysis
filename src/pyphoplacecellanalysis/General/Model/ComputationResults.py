@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import sys
 import typing
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Union
 from datetime import datetime # for VersionedResultMixin
 
 from attrs import define, field, Factory, asdict # used for `ComputedResult`
@@ -159,6 +159,10 @@ class VersionedResultMixin:
                 state['result_version'] = result_version # set result version
 
     """
+    
+    _VersionedResultMixin_version: str = "2024.01.01_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
+
     @classmethod
     def _VersionedResultMixin_parse_result_version_string(cls, v0_str: str) -> Tuple[datetime, int]:
         date_str, version_num = v0_str.split('_')
@@ -180,16 +184,71 @@ class VersionedResultMixin:
             return (v0_date < v1_date)
 
 
-    def get_parsed_result_version(self):
+    def get_parsed_result_version(self) -> Tuple[datetime, int]:
         """ parses the result version from the string format to something comparable. """
         return VersionedResultMixin._VersionedResultMixin_parse_result_version_string(self.result_version)
     
-    def is_result_version_earlier_than(self, v1_str: str) -> bool:
+
+    def is_result_version_earlier_than(self, v1: Union[str, Tuple[datetime, int], datetime]) -> bool:
         """
             returns True if self.result_version is earlier than a minimum `v1_str`
         """
-        return self._VersionedResultMixin_compare_result_version_strings(self.result_version, v1_str)
+        if isinstance(v1, str):
+            return self._VersionedResultMixin_compare_result_version_strings(self.result_version, v1)
+        elif isinstance(v1, Tuple):
+            v0_date, v0_num = self.get_parsed_result_version()
+            v1_date, v1_num = v1
+            return (v0_date < v1_date) or (v0_date == v1_date and v0_num < v1_num)
+        elif isinstance(v1, datetime):
+            v0_date, v0_num = self.get_parsed_result_version()
+            return v0_date < v1
 
+    def is_result_version_newer_than(self, v1: Union[str, Tuple[datetime, int], datetime]) -> bool:
+        """
+            returns True if self.result_version is newer than the given `v1_str`
+        """
+        if isinstance(v1, str):
+            return not self._VersionedResultMixin_compare_result_version_strings(self.result_version, v1) and self.result_version != v1
+        elif isinstance(v1, Tuple):
+            v0_date, v0_num = self.get_parsed_result_version()
+            v1_date, v1_num = v1
+            return (v0_date > v1_date) or (v0_date == v1_date and v0_num > v1_num)
+        elif isinstance(v1, datetime):
+            v0_date, v0_num = self.get_parsed_result_version()
+            return v0_date > v1
+
+    def is_result_version_equal_to(self, v1: Union[str, Tuple[datetime, int], datetime]) -> bool:
+        """
+            returns True if self.result_version is equal to the given `v1_str`
+        """
+        if isinstance(v1, str):
+            return (self.result_version == v1)
+        elif isinstance(v1, Tuple):
+            v0_date, v0_num = self.get_parsed_result_version()
+            v1_date, v1_num = v1
+            return (v0_date == v1_date and v0_num == v1_num)
+        elif isinstance(v1, datetime):
+            v0_date, v0_num = self.get_parsed_result_version()
+            return v0_date == v1
+
+    def _VersionedResultMixin__setstate__(self, state):
+        """ 
+        Updates: self.__dict__['result_version']
+        """
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        result_version: str = state.get('result_version', None)
+        if result_version is None:
+            result_version = "2024.01.01_0"
+            state['result_version'] = result_version # set result version
+            
+        self.__dict__['result_version'] = result_version
+        
+        # don't call because the implementor should control this
+
+        # self.__dict__.update(state) 
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(VersionedResultMixin, self).__init__()
+        
 
 
 @define(slots=False, repr=False)
