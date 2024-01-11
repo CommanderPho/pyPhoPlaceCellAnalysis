@@ -384,7 +384,7 @@ class Zhang_Two_Step:
 
 
 @custom_define(slots=False, repr=False)
-class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
+class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
     
     This class stores results from decoding from multiple non-contiguous time epochs, each containing many time bins (a variable number according to their length)
@@ -401,19 +401,19 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         [1, 1, 0.277354, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.277354, 0.277354, 0.277354, 0.277354, 1, 1, 0.277354, 0.277354, 0.277354, 1, 1, 1, 1, 0.277354, 1, 1, 1, 1]]), 'most_likely_positions_1D': array([1.5, 1.5, 0.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 0.5, 1.5, 1.5, 1.5, 1.5])})
        
     """
-    decoding_time_bin_size: float # the time bin_size in seconds
-    filter_epochs: pd.DataFrame # the filter epochs themselves
-    num_filter_epochs: int # depends on the number of epochs (`n_epochs`)
-    most_likely_positions_list: list = field(metadata={'shape': ('n_epochs',)})
-    p_x_given_n_list: list = field(metadata={'shape': ('n_epochs',)})
-    marginal_x_list: list = field(metadata={'shape': ('n_epochs',)})
-    marginal_y_list: list = field(metadata={'shape': ('n_epochs',)})
-    most_likely_position_indicies_list: list = field(metadata={'shape': ('n_epochs',)})
-    spkcount: list = field(metadata={'shape': ('n_epochs',)})
-    nbins: np.ndarray = field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
-    time_bin_containers: list = field(metadata={'shape': ('n_epochs',)})
-    time_bin_edges: list = field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
-    epoch_description_list: list[str] = field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
+    decoding_time_bin_size: float = serialized_attribute_field() # the time bin_size in seconds
+    filter_epochs: pd.DataFrame = serialized_field() # the filter epochs themselves
+    num_filter_epochs: int = serialized_attribute_field() # depends on the number of epochs (`n_epochs`)
+    most_likely_positions_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    p_x_given_n_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    marginal_x_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    marginal_y_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    most_likely_position_indicies_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    spkcount: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    nbins: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
+    time_bin_containers: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    time_bin_edges: list = non_serialized_field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
+    epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
 
     def flatten(self):
