@@ -2202,10 +2202,15 @@ class RankOrderAnalyses:
         if ('LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df):
             return False
 
-
         laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
         if laps_combined_epoch_stats_df is None:
             return False
+
+        for a_combined_epoch_stats_df_name, a_combined_epoch_stats_df in {'laps_combined_epoch_stats_df': laps_combined_epoch_stats_df, 'ripple_combined_epoch_stats_df': ripple_combined_epoch_stats_df}.items():
+            for a_column in ('Long_BestDir_quantile', 'Short_BestDir_quantile', 'combined_best_direction_indicies', 'LR_Long_pearson_percentile', 'LR_Short_percentile', 'RL_Long_percentile', 'RL_Short_percentile'):
+                if not a_column in a_combined_epoch_stats_df.columns:
+                    print(f'`{a_combined_epoch_stats_df_name}` is missing quantile column "{a_column}". Has columns {list(a_combined_epoch_stats_df.columns)}')
+                    return False
 
         return True
 
@@ -2282,6 +2287,9 @@ class RankOrderAnalyses:
             return False
         
         # rank_order_results.included_qclu_values
+
+
+
 
         if minimum_inclusion_fr_Hz is not None:
             return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
