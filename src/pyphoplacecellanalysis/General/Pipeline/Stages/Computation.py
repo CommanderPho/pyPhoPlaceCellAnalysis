@@ -378,18 +378,23 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times, (global_computations_latest_computation_time, global_computation_completion_times) = curr_active_pipeline.stage.get_computation_times()
             each_epoch_latest_computation_time
         """
+        
+        # inverse_computation_times_key_fn = lambda fn_key: str(fn_key.__name__) # to be used if raw-function references are used.
+        inverse_computation_times_key_fn = lambda fn_key: fn_key # Use only the functions name. I think this makes the .computation_times field picklable
+        
+
         each_epoch_each_result_computation_completion_times = {}
         each_epoch_latest_computation_time = {} # the most recent computation for each of the epochs
         # find update time of latest function:
         for k, v in self.computation_results.items():
             extracted_computation_times_dict = v.computation_times
-            each_epoch_each_result_computation_completion_times[k] = {k.__name__:v for k,v in extracted_computation_times_dict.items()}
+            each_epoch_each_result_computation_completion_times[k] = {inverse_computation_times_key_fn(k):v for k,v in extracted_computation_times_dict.items()}
             each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()), default=datetime.min)
 
         non_global_any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values()), default=datetime.min) # newest computation out of any of the epochs
 
         ## Global computations:
-        global_computation_completion_times = {k.__name__:v for k,v in self.global_computation_results.computation_times.items()}
+        global_computation_completion_times = {inverse_computation_times_key_fn(k):v for k,v in self.global_computation_results.computation_times.items()}
         global_computations_latest_computation_time: datetime = max(list(global_computation_completion_times.values()), default=datetime.min)
 
         ## Any (global or non-global) computation most recent time):
@@ -746,6 +751,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             computation_kwargs_list = [{} for _ in active_computation_functions]
         assert len(computation_kwargs_list) == len(active_computation_functions)
 
+        # computation_times_key_fn = lambda fn: fn
+        computation_times_key_fn = lambda fn: str(fn.__name__) # Use only the functions name. I think this makes the .computation_times field picklable
+        
         if (len(active_computation_functions) > 0):
             if debug_print:
                 print(f'Performing _execute_computation_functions(...) with {len(active_computation_functions)} registered_computation_functions...')
@@ -770,7 +778,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
                     previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i])
                     # Log the computation copmlete time:
-                    computation_times[f] = datetime.now()
+                    computation_times[computation_times_key_fn(f)] = datetime.now()
                 
                 # Since there's no error handling, gettin ghere means that there were no accumulated errors
                 accumulated_errors = None
@@ -805,8 +813,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                         previous_computation_result = temp_result
                         if progress_logger_callback is not None:
                             progress_logger_callback('\t done.')
-                        # Log the computation copmlete time:
-                        computation_times[f] = datetime.now()
+                        # Log the computation complete time:
+                        computation_times[computation_times_key_fn(f)] = datetime.now()
 
             
             if debug_print:
