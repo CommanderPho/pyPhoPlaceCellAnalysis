@@ -475,7 +475,6 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
 
 
-
     def filtered_by_epochs(self, included_epoch_indicies):
         """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
         subset = deepcopy(self)
