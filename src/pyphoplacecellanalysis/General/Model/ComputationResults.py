@@ -3,7 +3,8 @@
 from dataclasses import dataclass
 import sys
 import typing
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
+from datetime import datetime # for VersionedResultMixin
 
 from attrs import define, field, Factory, asdict # used for `ComputedResult`
 
@@ -130,6 +131,64 @@ class ComputationResult(HDF_SerializationMixin):
         """ TEMPORARY WORK AROUND: workaround after conversion from DynamicParameters-based class. """
         print(f'DEPRICATION WARNING: workaround to allow subscripting ComputationResult objects. Will be depricated. key: {key}')
         return getattr(self, key)
+
+
+
+
+
+class VersionedResultMixin:
+    """ Implementors keep track of the version of the class by which they are instantiated.
+
+    Allows comparing the .result_version of a deseralized object to the current result version, and take actions (like adding/removing/changing fields or values as needed).
+
+    `result_verion` is stored as a string like "2024.01.11_0" in the format "{YYYY_MM_DD_DATE_STR}_{VERSION_NUM}"
+        the VERSION_NUM part is only used when the dates are equal (indicating multiple versions from the same day)
+        
+        
+    Implementors typically have:
+    
+        result_version: str = serialized_attribute_field(default='2024.01.11_0', is_computable=False, repr=False) # this field specfies the version of the result. 
+
+        
+        def __setstate__(self, state):
+            # Restore instance attributes (i.e., _mapping and _keys_at_init).
+
+            result_version: str = state.get('result_version', None)
+            if result_version is None:
+                result_version = "2024.01.10_0"
+                state['result_version'] = result_version # set result version
+
+    """
+    @classmethod
+    def _VersionedResultMixin_parse_result_version_string(cls, v0_str: str) -> Tuple[datetime, int]:
+        date_str, version_num = v0_str.split('_')
+        date = datetime.strptime(date_str, '%Y.%m.%d')
+        return date, int(version_num)
+
+
+    @classmethod
+    def _VersionedResultMixin_compare_result_version_strings(cls, v0_str: str, v1_str: str) -> bool:
+        """
+        returns True if v0_str preceeds v1_str
+        """
+        v0_date, v0_num = cls._VersionedResultMixin_parse_result_version_string(v0_str)
+        v1_date, v1_num = cls._VersionedResultMixin_parse_result_version_string(v1_str)
+        if (v0_date == v1_date):
+            # the _num part is only used when the dates are equal (indicating multiple versions from the same day)
+            return (v0_num < v1_num)
+        else:
+            return (v0_date < v1_date)
+
+
+    def get_parsed_result_version(self):
+        """ parses the result version from the string format to something comparable. """
+        return VersionedResultMixin._VersionedResultMixin_parse_result_version_string(self.result_version)
+    
+    def is_result_version_earlier_than(self, v1_str: str) -> bool:
+        """
+            returns True if self.result_version is earlier than a minimum `v1_str`
+        """
+        return self._VersionedResultMixin_compare_result_version_strings(self.result_version, v1_str)
 
 
 
