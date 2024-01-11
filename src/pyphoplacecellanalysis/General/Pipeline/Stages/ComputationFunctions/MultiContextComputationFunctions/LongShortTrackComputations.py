@@ -330,7 +330,9 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
     """ 2023-05-10 - holds the results of a leave-one-out decoding analysis of the long and short track 
     Usage:
         leave_one_out_decoding_analysis_obj = LeaveOneOutDecodingAnalysis(long_decoder, short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj)
-    """    
+    """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     long_decoder: BayesianPlacemapPositionDecoder = serialized_field()
     short_decoder: BayesianPlacemapPositionDecoder = serialized_field()
     long_replays: pd.DataFrame = serialized_field()
@@ -354,6 +356,7 @@ class ExpectedVsObservedResult(ComputedResult):
     expected_v_observed_result_obj = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
     expected_v_observed_result_obj
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     Flat_epoch_time_bins_mean: np.ndarray = serialized_field()
     Flat_decoder_time_bin_centers: np.ndarray
@@ -400,6 +403,8 @@ class RateRemappingResult(ComputedResult):
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import RateRemappingResult
 
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     rr_df: pd.DataFrame = serialized_field()
     high_only_rr_df: pd.DataFrame = serialized_field(is_computable=True)
     considerable_remapping_threshold: float = serialized_attribute_field(default=0.7)
@@ -467,6 +472,8 @@ class TruncationCheckingResults(ComputedResult):
         global_computation_results.computed_data['long_short_endcap'].disappearing_endcap_aclus = disappearing_endcap_cells_df.index
         
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     disappearing_endcap_aclus: pd.Index = serialized_field()
     non_disappearing_endcap_aclus: pd.Index = serialized_field()
     significant_distant_remapping_endcap_aclus: pd.Index = serialized_field()

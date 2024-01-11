@@ -438,6 +438,8 @@ class RankOrderResult(ComputedResult):
 
 
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     # is_global: bool = non_serialized_field(default=True, repr=False)
     ranked_aclus_stats_dict: Dict[int, LongShortStatsItem] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v))) # , serialization_fn=(lambda f, k, v: _convert_dict_to_hdf_attrs_fn(f, k, v))
     selected_spikes_fragile_linear_neuron_IDX_dict: Dict[int, NDArray] = serialized_field(repr=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v)))
@@ -451,6 +453,9 @@ class RankOrderResult(ComputedResult):
 
     selected_spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
     extra_info_dict: Dict = non_serialized_field(default=Factory(dict), repr=False)
+
+    result_version: str = serialized_attribute_field(default='2024.01.11_0', is_computable=False, repr=False) # this field specfies the version of the result. 
+
 
     @property
     def epoch_template_active_aclus(self) -> Dict[int, NDArray]:
@@ -484,7 +489,13 @@ class RankOrderResult(ComputedResult):
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        
+
+        result_version: str = state.get('result_version', None)
+        if result_version is None:
+            result_version = "2024.01.10_0"
+            state['result_version'] = result_version # set result version
+
+
         # convert from old named-tuple based items to LongShortStatsItem (2024-01-02):
         if len(state['ranked_aclus_stats_dict']) > 0:
             example_item = list(state['ranked_aclus_stats_dict'].values())[0] # first item
@@ -662,6 +673,8 @@ class RankOrderComputationsContainer(ComputedResult):
         curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_rank_order_result, even_ripple=even_ripple_rank_order_result, odd_laps=odd_laps_rank_order_result, even_laps=even_laps_rank_order_result)
 
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     LR_ripple: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
     RL_ripple: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
     LR_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)

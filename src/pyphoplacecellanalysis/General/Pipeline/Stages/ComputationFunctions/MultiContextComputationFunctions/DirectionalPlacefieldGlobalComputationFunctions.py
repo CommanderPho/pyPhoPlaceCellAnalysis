@@ -251,6 +251,8 @@ class DirectionalLapsResult(ComputedResult):
     long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [directional_laps_results.__dict__[k] for k in ['long_LR_shared_aclus_only_one_step_decoder_1D', 'long_RL_shared_aclus_only_one_step_decoder_1D', 'short_LR_shared_aclus_only_one_step_decoder_1D', 'short_RL_shared_aclus_only_one_step_decoder_1D']]
 
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     directional_lap_specific_configs: Dict = non_serialized_field(default=Factory(dict))
     split_directional_laps_dict: Dict = non_serialized_field(default=Factory(dict))
     split_directional_laps_contexts_dict: Dict = non_serialized_field(default=Factory(dict))
@@ -677,6 +679,8 @@ class DirectionalMergedDecodersResult(ComputedResult):
     ripple_all_epoch_bins_marginals_df = directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df
 
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     all_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
     all_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
     long_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)

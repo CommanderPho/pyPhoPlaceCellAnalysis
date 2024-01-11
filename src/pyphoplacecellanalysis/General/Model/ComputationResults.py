@@ -252,7 +252,7 @@ class VersionedResultMixin:
 
 
 @define(slots=False, repr=False)
-class ComputedResult(HDFMixin):
+class ComputedResult(VersionedResultMixin, HDFMixin):
     """ 2023-05-10 - an object to replace DynamicContainers and static dicts for holding specific computed results
     
     Usage:
@@ -277,8 +277,11 @@ class ComputedResult(HDFMixin):
 
             
     """
+    _VersionedResultMixin_version: str = "2024.01.01_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     is_global: bool = non_serialized_field(default=False, repr=False, is_computable=True)
-     
+    result_version: str = serialized_attribute_field(default='2024.01.01_0', repr=False, is_computable=False) # this field specfies the version of the result. 
+    
     # field(default=False, metadata={'is_hdf_handled_custom': True, 'serialization': {'hdf': False, 'csv': False, 'pkl': True}})
 
     ## For serialization/pickling:
@@ -289,6 +292,10 @@ class ComputedResult(HDFMixin):
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
+
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+
         self.__dict__.update(state)
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         super(ComputedResult, self).__init__()
