@@ -46,7 +46,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg # pyqtgraph
 import matplotlib.pyplot as plt
 
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_surprise_results, fig_remapping_cells
-
+from pyphocorehelpers.indexing_helpers import list_of_dicts_to_dict_of_lists
 
 # Testing:
 
@@ -54,16 +54,6 @@ from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_su
 _bak_rcParams = mpl.rcParams.copy()
 # mpl.rcParams['toolbar'] = 'None' # disable toolbars
 # %matplotlib qt
-
-def list_of_dicts_to_dict_of_lists(list_of_dicts):
-    dict_of_lists = {}
-    for item in list_of_dicts:
-        for key, value in item.items():
-            if key in dict_of_lists:
-                dict_of_lists[key].append(value)
-            else:
-                dict_of_lists[key] = [value]
-    return dict_of_lists
 
 
 # ==================================================================================================================== #
