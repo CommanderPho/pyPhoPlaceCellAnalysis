@@ -98,9 +98,13 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
     if file_extension == ExportFiletype.PNG.value:
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
         exporter = ImageExporter(graphics_item)
+        bg = pg.mkColor(0,0,0,0.0) # clear color unless a different one is specified
+        kwargs = ({'background': bg} | kwargs) # add 'width' to kwargs if not specified
         kwargs = ({'width': 4096} | kwargs) # add 'width' to kwargs if not specified
     elif file_extension == ExportFiletype.SVG.value:
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.SVGExporter import SVGExporter
+        bg = pg.mkColor(0,0,0,0.0) # clear color unless a different one is specified
+        kwargs = ({'background': bg} | kwargs) # add 'width' to kwargs if not specified
         exporter = SVGExporter(graphics_item)
     else:
         print(f'Unknown file_extension: {file_extension}')
