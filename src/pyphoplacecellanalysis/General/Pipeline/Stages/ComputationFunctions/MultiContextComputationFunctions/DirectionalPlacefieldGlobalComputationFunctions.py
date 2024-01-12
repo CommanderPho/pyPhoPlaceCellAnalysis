@@ -35,6 +35,8 @@ from nptyping import NDArray
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability
+
 # Define the namedtuple
 DirectionalDecodersTuple = namedtuple('DirectionalDecodersTuple', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
 
@@ -825,6 +827,55 @@ class DirectionalMergedDecodersResult(ComputedResult):
         ripple_epochs_df = directional_merged_decoders_result.ripple_epochs_df
 
         return True
+
+
+    @classmethod
+    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result, debug_print=False):
+        """ only works for the all-directional coder with the four items
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+
+            active_decoder = all_directional_pf1D_Decoder
+            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                                                        )
+                                    
+                                                        
+        0: LR
+        1: RL
+        
+        """
+        custom_curr_unit_marginal_list = []
+        
+        for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
+            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
+            curr_array_shape = np.shape(a_p_x_given_n)
+            if debug_print:
+                print(f'a_p_x_given_n.shape: {curr_array_shape}')
+
+            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
+
+            if debug_print:
+                print(f'np.shape(input_array): {np.shape(curr_array_shape)}')
+                
+            curr_unit_posterior_list = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_posterior_list.p_x_given_n = a_p_x_given_n
+            
+            if debug_print:
+                print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_posterior_list.p_x_given_n)}')
+            
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_posterior_list.p_x_given_n.ndim == 0:
+                curr_unit_posterior_list.p_x_given_n = curr_unit_posterior_list.p_x_given_n.reshape(1, 1)
+            elif curr_unit_posterior_list.p_x_given_n.ndim == 1:
+                curr_unit_posterior_list.p_x_given_n = curr_unit_posterior_list.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_posterior_list.p_x_given_n.shape}')
+            custom_curr_unit_marginal_list.append(curr_unit_posterior_list)
+        return custom_curr_unit_marginal_list
 
 
     @classmethod
@@ -2181,6 +2232,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                         return out_plot_tuple
                     
+                    if render_merged_pseudo2D_decoder_laps:
+                        # Merged Pseduo2D Decoder Posteriors:
+                        _main_context = {'decoded_epochs': 'Laps', 'Pseudo2D': 'Posterior'}
+                        global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
+                        graphics_output_dict['raw_posterior_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
+                            global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
+                            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                            name='Directional_Posterior',
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_non_marginalized_raw_posteriors(filter_epochs_decoder_result),
+                            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
+                            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+                            _mod_plot_kwargs=dict(final_context=_main_context),
+                            **deepcopy(kwargs)
+                        )
+                        
 
                     if render_directional_marginal_laps:
                         # Laps Direction (LR/RL) Marginal:

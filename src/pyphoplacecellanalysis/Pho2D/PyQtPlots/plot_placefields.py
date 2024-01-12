@@ -283,7 +283,7 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
         **overriding_dict_with(lhs_dict={'subplots': (40, 3), 'fig_column_width': 8.0, 'fig_row_height': 1.0, 'resolution_multiplier': 1.0, 'max_screen_figure_size': (None, None), 'last_figure_subplots_same_layout': True, 'debug_print': True}, **figure_format_config))
 
     active_xbins = active_pf_2D.xbin
-    active_ybins = active_pf_2D.ybin    
+    active_ybins = active_pf_2D.ybin
     out = None
     # New page-based version:
     for page_idx in np.arange(num_pages):
