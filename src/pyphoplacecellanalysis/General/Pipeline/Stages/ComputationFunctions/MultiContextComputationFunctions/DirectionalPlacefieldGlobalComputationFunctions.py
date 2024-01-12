@@ -695,7 +695,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
     all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = serialized_field(default=None)
 
     # Marginalized posteriors computed from above posteriors:
-    laps_directional_marginals_tuple: Tuple = serialized_field(default=None)
+    laps_directional_marginals_tuple: Tuple = serialized_field(default=None) # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
     laps_track_identity_marginals_tuple: Tuple = serialized_field(default=None)
     
     ripple_directional_marginals_tuple: Tuple = serialized_field(default=None)
@@ -859,22 +859,27 @@ class DirectionalMergedDecodersResult(ComputedResult):
             assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
 
             if debug_print:
-                print(f'np.shape(input_array): {np.shape(curr_array_shape)}')
+                print(f'np.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
                 
-            curr_unit_posterior_list = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
-            curr_unit_posterior_list.p_x_given_n = a_p_x_given_n
+            curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)
             
             if debug_print:
-                print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_posterior_list.p_x_given_n)}')
+                print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
             
+            # y-axis marginal:
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=1, keepdims=True) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+
             ## Ensures that the marginal posterior is at least 2D:
-            if curr_unit_posterior_list.p_x_given_n.ndim == 0:
-                curr_unit_posterior_list.p_x_given_n = curr_unit_posterior_list.p_x_given_n.reshape(1, 1)
-            elif curr_unit_posterior_list.p_x_given_n.ndim == 1:
-                curr_unit_posterior_list.p_x_given_n = curr_unit_posterior_list.p_x_given_n[:, np.newaxis]
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
                 if debug_print:
-                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_posterior_list.p_x_given_n.shape}')
-            custom_curr_unit_marginal_list.append(curr_unit_posterior_list)
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
+            custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
         return custom_curr_unit_marginal_list
 
 
@@ -1012,34 +1017,34 @@ class DirectionalMergedDecodersResult(ComputedResult):
             if debug_print:
                 print(f'np.shape(input_array): {np.shape(input_array)}')
             # custom marginal over long/short, leaving only LR/RL:
-            curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
-            curr_unit_marginal_y.p_x_given_n = input_array
+            curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_x.p_x_given_n = input_array
             
             # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
             # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, 1)) # sum over all y. Result should be [x_bins x time_bins]
             # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
         
             # y-axis marginal:
-            curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(input_array, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
             # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=1, keepdims=True) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
 
-            curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
 
             # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=1)) # sum over all x. Result should be [y_bins x time_bins]
             # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
             if debug_print:
-                print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_y.p_x_given_n)}')
+                print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
             
             ## Ensures that the marginal posterior is at least 2D:
             # print(f"curr_unit_marginal_y.p_x_given_n.ndim: {curr_unit_marginal_y.p_x_given_n.ndim}")
             # assert curr_unit_marginal_y.p_x_given_n.ndim >= 2
-            if curr_unit_marginal_y.p_x_given_n.ndim == 0:
-                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n.reshape(1, 1)
-            elif curr_unit_marginal_y.p_x_given_n.ndim == 1:
-                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
                 if debug_print:
-                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
-            custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
+            custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
         return custom_curr_unit_marginal_list
     
 

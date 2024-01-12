@@ -287,7 +287,16 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         
             curr_active_pipeline.output_figure(final_context, a_plot.getViewBox())
         
+            
+        You can obtain outputs like:
+        
+        out_figs_dict = self.export_all_plots(curr_active_pipeline)
+        out_figs_paths = [v[0][0] for v in list(out_figs_dict.values())] # [0] is for first figure (there's only one), [0] is for the .png version or [1] for the .svg version
+        out_figs_paths
+
         """
+        out_figs_dict = {}
+        
         for a_name in self.plot_names:
             # Adjust the size of the text for the item by passing formatted text
             a_plot: pg.PlotItem = self.plots[a_name].mainPlotItem # PlotItem 
@@ -296,5 +305,6 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             # a_plo
             # active_context , epochs='replays', decoder='long_results_obj'	
             final_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='directional_merged_pfs', subplot=a_name)
-            curr_active_pipeline.output_figure(final_context, a_plot.getViewBox())
+            out_figs_dict[a_name] = curr_active_pipeline.output_figure(final_context, a_plot.getViewBox())
             
+        return out_figs_dict
