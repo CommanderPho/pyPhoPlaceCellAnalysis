@@ -381,7 +381,7 @@ class Zhang_Two_Step:
     def compute_bayesian_two_step_prob_single_timestep(cls, one_step_p_x_given_n, x_prev, all_x, sigma_t, C, k):
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
     
-
+from pyphocorehelpers.print_helpers import strip_type_str_to_classname
 
 @custom_define(slots=False, repr=False)
 class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
@@ -415,6 +415,39 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     time_bin_edges: list = non_serialized_field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
     epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+            DecodedFilterEpochsResult(decoding_time_bin_size: float,
+                filter_epochs: neuropy.core.epoch.Epoch,
+                num_filter_epochs: int,
+                most_likely_positions_list: list | shape (n_epochs),
+                p_x_given_n_list: list | shape (n_epochs),
+                marginal_x_list: list | shape (n_epochs),
+                marginal_y_list: list | shape (n_epochs),
+                most_likely_position_indicies_list: list | shape (n_epochs),
+                spkcount: list | shape (n_epochs),
+                nbins: numpy.ndarray | shape (n_epochs),
+                time_bin_containers: list | shape (n_epochs),
+                time_bin_edges: list | shape (n_epochs),
+                epoch_description_list: list | shape (n_epochs)
+            )
+        """
+        # content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
+        # return f"{type(self).__name__}({content}\n)"
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+
+    
+
 
     def flatten(self):
         """ flattens the result over all epochs to produce one per time bin """
