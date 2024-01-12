@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 import attrs
 from attrs import define, field, Factory, asdict, astuple
@@ -24,10 +25,12 @@ def _add_bin_ticks(plot_item, xbins=None, ybins=None):
     if xbins is not None:
         xticks = [(idx, label) for idx, label in enumerate(xbins)]
         for side in ('top','bottom'):
+            plot_item.getAxis(side).setStyle(showValues=False)
             plot_item.getAxis(side).setTicks((xticks, [])) # add list of major ticks; no minor ticks        
     if ybins is not None:
         yticks = [(idx, label) for idx, label in enumerate(ybins)]
         for side in ('left','right'):
+            plot_item.getAxis(side).setStyle(showValues=False)
             plot_item.getAxis(side).setTicks((yticks, [])) # add list of major ticks; no minor ticks
     plot_item.showGrid(x = True, y = True, alpha = 0.65)
     return plot_item
@@ -103,7 +106,13 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         NOTE:
             Label for `title` is too large, needs to changed to a smaller font
     """
-    
+
+    @property
+    def plot_names(self) -> List[str]:
+        """The plot_names property."""
+        return [v for v in list(self.plots.keys()) if v not in ('name', 'context')]
+
+
     def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity',
                  drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, defer_show=False, **kwargs):
         super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
@@ -204,7 +213,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         active_num_rows = row+1 # get the number of rows after adding the data (adding one to go from an index to a count)
 
         if self.params.scrollability_mode.is_scrollable:
-            self.params.single_plot_fixed_height = 100.0
+            self.params.single_plot_fixed_height = 80.0
             self.params.all_plots_height = float(active_num_rows) * float(self.params.single_plot_fixed_height)
             self.ui.graphics_layout.setFixedHeight(self.params.all_plots_height)
             # self.ui.graphics_layout.setMinimumHeight(self.params.all_plots_height)
@@ -266,3 +275,26 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
                 hLine.setPos(mousePoint.y())
 
         self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, rateLimit=60, slot=mouseMoved)
+        
+
+
+    def export_all_plots(self, curr_active_pipeline):
+        """ Exports each subplot individually to file using `curr_active_pipeline.output_figure(final_context, a_plot.getViewBox())`
+        
+        NOTE: creates many outputs, one for each subplot
+        
+        curr_active_pipeline is only used to call 
+        
+            curr_active_pipeline.output_figure(final_context, a_plot.getViewBox())
+        
+        """
+        for a_name in self.plot_names:
+            # Adjust the size of the text for the item by passing formatted text
+            a_plot: pg.PlotItem = self.plots[a_name].mainPlotItem # PlotItem 
+            # if (a_plot is not None) and (not isinstance(a_plot, str)):
+            # a_plot.setTitle(f"<span style = 'font-size : 12px;' >{a_name}</span>")
+            # a_plo
+            # active_context , epochs='replays', decoder='long_results_obj'	
+            final_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='directional_merged_pfs', subplot=a_name)
+            curr_active_pipeline.output_figure(final_context, a_plot.getViewBox())
+            
