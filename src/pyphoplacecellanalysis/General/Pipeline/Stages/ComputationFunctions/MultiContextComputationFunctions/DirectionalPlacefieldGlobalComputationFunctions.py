@@ -2030,7 +2030,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         
         for active_context, active_pf_2D in active_merged_pf_plots_data_dict.items():
             # figure_format_config = {} # empty dict for config
-            figure_format_config = {} # kwargs # kwargs as default figure_format_config
+            figure_format_config = {'scrollability_mode': LayoutScrollability.NON_SCROLLABLE} # kwargs # kwargs as default figure_format_config
             out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config) # output is BasicBinnedImageRenderingWindow
             # Set the window title from the context
             out_all_pf_2D_pyqtgraph_binned_image_fig.setWindowTitle(f'{active_context.get_description()}')
@@ -2080,10 +2080,14 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             perform_write_to_file_callback = kwargs.pop('perform_write_to_file_callback', (lambda final_context, fig: owning_pipeline_reference.output_figure(final_context, fig)))
             # Extract kwargs for figure rendering
+            render_merged_pseudo2D_decoder_laps = kwargs.pop('render_merged_pseudo2D_decoder_laps', False)
+            
             render_directional_marginal_laps = kwargs.pop('render_directional_marginal_laps', True)
             render_directional_marginal_ripples = kwargs.pop('render_directional_marginal_ripples', False)
             render_track_identity_marginal_laps = kwargs.pop('render_track_identity_marginal_laps', False)
             render_track_identity_marginal_ripples = kwargs.pop('render_track_identity_marginal_ripples', False)
+
+
 
             # figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
             # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={})
@@ -2285,6 +2289,5 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         split_time_t: float = short_epoch.t_start
         
         all_epoch_bins_marginals_collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
-
 
         return all_epoch_bins_marginals_collector
