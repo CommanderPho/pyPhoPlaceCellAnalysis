@@ -1957,8 +1957,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     ["ax_pf_tuning_curve"],
                     ["ax_pf_occupancy"],
                 ]
-            fig = plt.figure(layout="constrained")
+            fig = plt.figure() # layout="constrained"
             subfigures_dict = dict(zip(list(decoders_dict.keys()), fig.subfigures(nrows=1, ncols=4)))
+            # plt.subplots_adjust(top=0.88, bottom=0.11, left=0.125, right=0.9, hspace=0.2, wspace=0.2)
+            # plt.tight_layout()
+            
             display_outputs = {}
             
             for a_name, a_subfigure in subfigures_dict.items():
