@@ -14,7 +14,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_common import pyqtplot_common_setup
 
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
 
 
 @function_attributes(short_name='pyqtplot_plot_image_array', tags=['display','pyqtgraph','plot','image','binned','2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-09-29 00:00')
@@ -197,7 +197,7 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
         
         active_pf_2D.ratemap.tuning_curves || active_pf_2D.ratemap.spikes_maps
 
-        
+        LayoutScrollability.NON_SCROLLABLE
         
     Usage:
         out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config)
@@ -219,6 +219,9 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     drop_below_threshold = figure_format_config.get('drop_below_threshold', 0.0000001) # try to get the 'drop_below_threshold' argument
     included_unit_indicies = figure_format_config.get('included_unit_indicies', None)
     included_unit_neuron_IDs = figure_format_config.get('included_unit_neuron_IDs', None)
+    scrollability_mode = figure_format_config.get('scrollability_mode', LayoutScrollability.SCROLLABLE) 
+    
+    
 
     missing_aclu_string_formatter = figure_format_config.get('missing_aclu_string_formatter', None)
     # missing_aclu_string_formatter: a lambda function that takes the current aclu string and returns a modified string that reflects that this aclu value is missing from the current result (e.g. missing_aclu_string_formatter('3') -> '3 <shared>')
@@ -321,7 +324,7 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
 
             if out is None:
                 # first iteration only
-                out = BasicBinnedImageRenderingWindow(pfmap, active_xbins, active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string, wants_crosshairs=wants_crosshairs, color_map=color_map, color_bar_mode=color_bar_mode)
+                out = BasicBinnedImageRenderingWindow(pfmap, active_xbins, active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string, wants_crosshairs=wants_crosshairs, color_map=color_map, color_bar_mode=color_bar_mode, scrollability_mode=scrollability_mode)
             else:
                 out.add_data(row=curr_page_relative_row, col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string)
         

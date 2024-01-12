@@ -99,6 +99,9 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             out.add_data(row=2, col=0, matrix=active_pf_2D.ratemap.occupancy, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='occupancy_seconds', title='Seconds Occupancy', variable_label='seconds')
             out.add_data(row=3, col=0, matrix=active_simpler_pf_densities_analysis.n_neurons_meeting_firing_critiera_by_position_bins_2D, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='n_neurons_meeting_firing_critiera_by_position_bins_2D', title='# neurons > 1Hz per Pos (X, Y)', variable_label='# neurons')
 
+            
+        NOTE:
+            Label for `title` is too large, needs to changed to a smaller font
     """
     
     def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity',
@@ -156,8 +159,20 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         if not defer_show:
             self.show()
 
+
+    def build_formatted_title_string(self, title: str) -> str:
+        return f"<span style = 'font-size : 12px;' >{title}</span>"
+        
+
     def add_data(self, row=1, col=0, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001):
+        """ adds a new data subplot to the output
+        """
         newPlotItem = self.ui.graphics_layout.addPlot(title=title, row=row, col=col) # add PlotItem to the main GraphicsLayoutWidget
+        
+        # Set the plot title:
+        formatted_title = self.build_formatted_title_string(title=title)        
+        newPlotItem.setTitle(formatted_title)
+        
         newPlotItem.setDefaultPadding(0.0)  # plot without padding data range
         newPlotItem.setMouseEnabled(x=False, y=False)
         newPlotItem = _add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins)
@@ -171,7 +186,12 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         self.plots_data[name] = local_plots_data
         self.plots[name] = local_plots
         self.plots[name].mainPlotItem = newPlotItem
-        
+
+        # # Set the plot title:
+        # formatted_title = self.build_formatted_title_string(title=title)
+        # self.plots[name].mainPlotItem.setTitle(formatted_title)
+                
+
         if self.params.color_bar_mode == 'one':
             self.plots[name].colorBarItem = self.params.shared_colorBarItem # shared colorbar item
             self._update_global_shared_colorbaritem()
@@ -189,8 +209,6 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             self.ui.graphics_layout.setFixedHeight(self.params.all_plots_height)
             # self.ui.graphics_layout.setMinimumHeight(self.params.all_plots_height)
             
-
-
     def _update_global_shared_colorbaritem(self):
         ## Add Global Colorbar for single colorbar mode:
         # Get all data for the purpose of computing global min/max:
@@ -220,9 +238,6 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         shared_colorBarItem.setLevels(low=global_data_min, high=global_data_max)
 
 
-        
-        
-        
     def add_crosshairs(self, plot_item, matrix, name):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value."""
         vLine = pg.InfiniteLine(angle=90, movable=False)
