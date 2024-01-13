@@ -276,7 +276,7 @@ def export_active_relative_entropy_results_videos(active_relative_entropy_result
 
 	"""
 	import cv2
-	from pyphocorehelpers.plotting.video_output_helpers import save_array_as_video
+	from pyphocorehelpers.plotting.media_output_helpers import save_array_as_video
 
 	video_output_parent_path = Path('output/videos').resolve()
 	video_output_dict = {}
