@@ -593,7 +593,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # 2023-05-16 - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions:
         # is_certain_properly_constrained = True
 
-
         if not is_certain_properly_constrained:
             print(f'WARN: _perform_long_short_decoding_analyses: Not certain if pipeline results are properly constrained. Need to recompute and update.')
             owning_pipeline_reference = constrain_to_laps(owning_pipeline_reference) # Constrains placefields to laps

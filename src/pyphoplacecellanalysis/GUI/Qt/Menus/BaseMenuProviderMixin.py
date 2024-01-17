@@ -18,6 +18,11 @@ def initialize_global_menu_ui_variables_if_needed(a_main_window):
 class BaseMenuCommand:
     """
     An abstract base command to be executed from a Menu item
+    The primary goal of the menu `*Command(BaseMenuCommand)` subclasses is to hold a reference back to any objects that the command needs to successfully execute (or determine whether it should be allowed to execute). 
+
+    The windows, and their accompanying menus, are attached from a `_display_*` function, which necessarily ensures that the computation stage has already been performed (so the results are available) while building the menu commands.
+    The windows themselves shouldn't hold references to computed results outside of their scope (e.g. Spike2DRaster should only have access to the `spikes_df` and a few other properties that it needs to perform its task -- in this case positions, binned firing rates, etc. are far out of scope of this class itself).
+
     """
     # def __init__(self) -> None:
     #     pass
