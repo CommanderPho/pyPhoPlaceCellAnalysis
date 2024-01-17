@@ -1100,41 +1100,14 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
     @classmethod
     def validate_lap_dir_estimations(cls, global_session, active_global_laps_df, laps_is_most_likely_direction_LR_dir):
-        def _subfn_compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df):
-            """ uses the smoothed velocity to determine the proper lap direction
-
-            for LR_dir, values become more positive with time
-
-            global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
-            global_laps = compute_lap_dir_from_smoothed_velocity(global_session)
-            global_laps
-
-            """
-            # global_session.laps.to_dataframe()
-            # if active_global_laps_df is None:
-            #     active_global_laps = deepcopy(global_session.laps)
-            #     active_global_laps_df = global_laps._df
-
-            n_laps = np.shape(active_global_laps_df)[0]
-
-            global_pos = global_session.position
-            global_pos.compute_higher_order_derivatives()
-            global_pos.compute_smoothed_position_info()
-            pos_df: pd.DataFrame = global_pos.to_dataframe()
-
-            # Filter rows based on column: 'lap'
-            pos_df = pos_df[pos_df['lap'].notna()]
-            # Performed 1 aggregation grouped on column: 'lap'
-            is_LR_dir = ((pos_df.groupby(['lap']).agg(speed_mean=('velocity_x_smooth', 'mean'))).reset_index()['speed_mean'] > 0.0).to_numpy() # increasing values => LR_dir
-            active_global_laps_df['is_LR_dir'] = is_LR_dir
-            # global_laps._df['direction_consistency'] = 0.0
-            assert np.all(active_global_laps_df[(active_global_laps_df['is_LR_dir'].astype(int) == np.logical_not(active_global_laps_df['lap_dir'].astype(int)))])
-            return active_global_laps_df
-
+        """ validates the lap direction and track estimations. 
+        """
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
         # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
-        active_global_laps_df = _subfn_compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df=active_global_laps_df)
+        # active_global_laps_df = _subfn_compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df=active_global_laps_df)
+        active_global_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(active_global_laps_df, global_session=global_session) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
+
         # Validate Laps:
         # ground_truth_lap_dirs = active_global_laps_df['lap_dir'].to_numpy()
         ground_truth_lap_is_LR_dir = active_global_laps_df['is_LR_dir'].to_numpy()
@@ -1593,7 +1566,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in owning_pipeline_reference.sess.epochs is 'maze1' without the '_any' part.
-        global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used in 
+        
+        unfiltered_session = deepcopy(owning_pipeline_reference.sess)
+        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used in 
 
         # Unwrap the naturally produced directional placefields:
         long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
@@ -1659,7 +1634,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
          # Validate Laps:
         try:
             laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = directional_merged_decoders_result.laps_directional_marginals_tuple
-            percent_laps_estimated_correctly = DirectionalMergedDecodersResult.validate_lap_dir_estimations(global_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
+            percent_laps_estimated_correctly = DirectionalMergedDecodersResult.validate_lap_dir_estimations(unfiltered_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
             print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
         except (AssertionError, ValueError) as err:
             print(F'fails due to some types thing?')
@@ -2352,7 +2327,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
 
-
             graphics_output_dict = {}
 
             # Shared active_decoder, global_session:
@@ -2586,22 +2560,19 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     def _perform_add_new_decoded_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_decoder, a_decoded_result=None):
         """ adds a single decoded row to the matplotlib dynamic output
         
+        # a_decoder_name: str = "long_LR"
+
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
         
         ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = f'{a_decoder_name}_ContinuousDecode'
         print(f'identifier_name: {identifier_name}')
-        widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(300, 20), display_config=a_dock_config)
+        widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(65, 200), display_config=a_dock_config)
         an_ax = matplotlib_fig_axes[0]
 
-        # all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
-
-        # a_decoder_name: str = "long_LR"
         # _active_config_name = None
         variable_name: str = a_decoder_name
-        # active_decoder = deepcopy(all_directional_pf1D_Decoder_dict[a_decoder_name]) # computation_result.computed_data['pf2D_Decoder']
         active_decoder = deepcopy(a_decoder)
         
         if a_decoded_result is not None:
@@ -2638,8 +2609,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
         
-
-        showCloseButton = False
+        showCloseButton = True
         dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton),
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton))))
 
