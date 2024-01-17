@@ -258,7 +258,6 @@ class ZhangReconstructionImplementation:
             use_flat_computation_mode: bool - if True, a more memory efficient accumulating computation is performed that avoids `MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64` caused by allocating the full `cell_prob` matrix
             debug_intermediates_mode: bool - if True, the intermediate computations are stored and returned for debugging purposes. MUCH slower.
 
-
         NOTES: Flat vs. Full computation modes:
         Originally 
             cell_prob = np.zeros((nFlatPositionBins, nTimeBins, nCells)) 
@@ -268,7 +267,6 @@ class ZhangReconstructionImplementation:
             cell_prob = np.ones((nFlatPositionBins, nTimeBins))
 
         Note: This means that the "Flat" implementation may be more susceptible to numerical underflow, as the intermediate products can become very small, whereas the "Full" implementation does not have this issue. However, the "Flat" implementation can be more efficient in terms of memory usage and computation time, as it avoids creating a large number of intermediate arrays.
-
 
         2023-04-19 - I'm confused by the lack of use of P_x in the calculation. According to my written formula P_x was used as the occupancy and multiplied in the output equation. After talking to Kourosh and the lab, it seems that the typical modern approach is to use a uniform `P_x` as to not bias the decoded position.
             But when I went to change my code to try a uniform P_x, it seems that P_x isn't used in the computation at all, and instead only its size is used?
