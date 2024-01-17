@@ -1,8 +1,10 @@
 from copy import deepcopy
 import time
+from typing import Tuple, List, Dict, Optional
 import sys
 from indexed import IndexedOrderedDict
-
+from matplotlib.axis import Axis
+from matplotlib.figure import Figure
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.function_helpers import function_attributes
@@ -455,7 +457,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
         self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
         self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
-
 
         # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
         self._setupUI_matplotlib_render_plots()
@@ -977,7 +978,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.ui.matplotlib_view_widgets = {} # empty dictionary
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
-    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget'):
+    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         """
@@ -993,14 +994,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
             
             ## Add to dynamic_docked_widget_container:
-            min_width = 500
-            min_height = 50
+            # min_width = 500
+            # min_height = 50
             # if _last_dock_outer_nested_item is not None:
             #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
             #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
             # else:
-            dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
-            _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=(min_width, min_height), display_config=FigureWidgetDockDisplayConfig(showCloseButton=True),
+            # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
+            
+            if display_config is None:
+                display_config = FigureWidgetDockDisplayConfig(showCloseButton=True)
+            
+            _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=dockSize, display_config=display_config,
                                                                                     widget=self.ui.matplotlib_view_widgets[name], dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
             dDisplayItem.setOrientation('horizontal', force=True)
             dDisplayItem.updateStyle()
