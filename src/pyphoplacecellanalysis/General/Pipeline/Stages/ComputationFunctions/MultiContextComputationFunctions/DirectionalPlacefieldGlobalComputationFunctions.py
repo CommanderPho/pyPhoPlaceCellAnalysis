@@ -2569,7 +2569,7 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCo
 @define(slots=False)
 class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-17 
-    Adds four rows to the output
+    Adds four rows to the SpikeRaster2D showing the continuously decoded posterior for each of the four 1D decoders
 
 
     Usage:
@@ -2583,7 +2583,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     _display_output = field(default=Factory(dict))
 
     @classmethod
-    def _perform_add_new_decoded_row(cls, curr_active_pipeline, active_2d_plot, a_decoder_name: str, a_decoder, a_dock_config):
+    def _perform_add_new_decoded_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_decoder, a_decoded_result=None):
         """ adds a single decoded row to the matplotlib dynamic output
         
         """
@@ -2603,8 +2603,16 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         variable_name: str = a_decoder_name
         # active_decoder = deepcopy(all_directional_pf1D_Decoder_dict[a_decoder_name]) # computation_result.computed_data['pf2D_Decoder']
         active_decoder = deepcopy(a_decoder)
-        # active_result = deepcopy(_out_continuously_decoded_dict[a_decoder_name]) # already decoded
-        active_marginals = active_decoder.marginal.x
+        
+        if a_decoded_result is not None:
+            active_result = deepcopy(a_decoded_result) # already decoded
+            assert (active_result.num_filter_epochs == 1), f"currently only supports decoded results (DecodedFilterEpochsResult) computed with a single epoch for all time bins, but active_result.num_filter_epochs: {active_result.num_filter_epochs}"
+            active_marginals = active_result.marginal_x_list[0]
+        else:
+            # no previously decoded result, fallback to the decoder's internal properties        
+            active_marginals = active_decoder.marginal.x
+            
+
         active_bins = active_decoder.xbin
 
         # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
@@ -2628,41 +2636,49 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
         
+
         showCloseButton = False
         dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton),
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton))))
 
-        # Unpack all directional variables:
-        ## {"even": "RL", "odd": "LR"}
-        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-        (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
 
-        all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+        print(f'time_bin_size: {time_bin_size}')
+        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_dict
+        all_directional_continuously_decoded_dict = continuously_decoded_dict or {}
 
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-        single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
-        global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=0) # does not do shuffling
-        spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+        # # Unpack all directional variables:
+        # ## {"even": "RL", "odd": "LR"}
+        # long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        # # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
 
+        # all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
 
-
-
-        _out_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=spikes_df, filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
-
-
-        active_result = deepcopy(_out_continuously_decoded_dict[a_decoder_name]) # already decoded
-
+        # print(f'add_directional_decoder_decoded_epochs(...): decoding continuous epochs for each directional decoder.')
+        # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
+        # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=0) # does not do shuffling
+        # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+        # all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=spikes_df, filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+        # print(f'\t computation done.')
+        
         # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
 
         for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
             a_dock_config = dock_configs[a_decoder_name]
-            _out_tuple = cls._perform_add_new_decoded_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_decoder_name=a_decoder_name, a_decoder=a_decoder, a_dock_config=a_dock_config)
+            a_decoded_result = all_directional_continuously_decoded_dict.get(a_decoder_name, None) # already decoded
+            _out_tuple = cls._perform_add_new_decoded_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
             # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
             output_dict[a_decoder_name] = _out_tuple
 
@@ -2681,17 +2697,19 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             if active_2d_plot is None:
                 raise ValueError("active_2d_plot is None!")
 
-            # Unpack all directional variables:
-            long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-            # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-            (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-            (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-            (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
-            # assert all([v is not None for v in (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder)])
-            if not all([v is not None for v in (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder)]):
-                raise ValueError("One or more of the Decoders is None!")
+            return DirectionalDecodersDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
+            
+            # # Unpack all directional variables:
+            # long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+            # # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+            # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+            # (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+            # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+            # # assert all([v is not None for v in (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder)])
+            # if not all([v is not None for v in (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder)]):
+            #     raise ValueError("One or more of the Decoders is None!")
 
-            return True # if we got here without issues, return True
+            # return True # if we got here without issues, return True
 
         except Exception as e:
             print(f'Exception {e} occured in validate_can_display(), returning False')
