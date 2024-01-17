@@ -1201,6 +1201,70 @@ class DirectionalMergedDecodersResult(ComputedResult):
         return (laps_marginals_df, laps_out_path), (ripple_marginals_df, ripple_out_path)
 
 
+@define(slots=False, repr=False)
+class DirectionalDecodersDecodedResult(ComputedResult):
+    """ a container containing a dict containing the four pf1D_Decoders and a Dict that can be used to cache the results of decoding across all time-bins (continuously) for each decoder in the dict.
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersDecodedResult
+
+    ## Get the result after computation:
+    directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+    all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+    # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+    time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+    print(f'time_bin_size: {time_bin_size}')
+    continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_dict
+    
+        
+    """
+    _VersionedResultMixin_version: str = "2024.01.16_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
+    pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+    
+    # Posteriors computed via the all_directional decoder:
+    continuously_decoded_result_cache_dict: Dict[float, Dict[str, DecodedFilterEpochsResult]] = serialized_field(default=None) # key is the t_bin_size in seconds
+    
+    @property
+    def last_decoding_time_bin_size(self) -> Optional[float]:
+        """Gets the last cached continuously_decoded_dict property."""
+        if ((self.continuously_decoded_result_cache_dict is None) or (len(self.continuously_decoded_result_cache_dict or {}) < 1)):
+            return None
+        else:
+            last_time_bin_size: float = list(self.continuously_decoded_result_cache_dict.keys())[-1]
+            return last_time_bin_size   
+        
+
+    @property
+    def continuously_decoded_dict(self) -> Optional[Dict[str, DecodedFilterEpochsResult]]:
+        """Gets the last cached continuously_decoded_dict property."""
+        last_time_bin_size = self.last_decoding_time_bin_size
+        if (last_time_bin_size is None):
+            return None
+        else:
+            # otherwise return the result            
+            return self.continuously_decoded_result_cache_dict[last_time_bin_size]         
+
+
+    @classmethod
+    def validate_has_directional_decoded_continuous_epochs(cls, curr_active_pipeline, computation_filter_name='maze') -> bool:
+        """ Validates that the decoding is complete
+        """
+        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        if len(continuously_decoded_result_cache_dict) < 1:
+            return False
+    
+        time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+        if time_bin_size is None:
+            return False
+
+        continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_dict
+        if continuously_decoded_dict is None:
+            return False
+
+        return True
+
 
 import pandas as pd
 import plotly.express as px
@@ -1613,6 +1677,145 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         
         """
         return global_computation_results
+    
+
+    @function_attributes(short_name='directional_decoders_decode_continuous', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-17 09:05', related_items=[],
+        requires_global_keys=['DirectionalLaps', 'RankOrder'], provides_global_keys=['DirectionalDecodersDecoded'],
+        validate_computation_test=DirectionalDecodersDecodedResult.validate_has_directional_decoded_continuous_epochs, is_global=True)
+    def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None):
+        """
+
+        Requires:
+            ['sess']
+
+        Provides:
+            global_computation_results.computed_data['pf1D_Decoder_dict']
+                ['DirectionalDecodersDecoded']['directional_lap_specific_configs']
+                ['DirectionalDecodersDecoded']['continuously_decoded_result_cache_dict']
+
+
+                from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersDecodedResult
+
+                directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+                all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+                # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+                time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+                print(f'time_bin_size: {time_bin_size}')
+                continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_dict
+
+
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+        from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
+        from neuropy.core.epoch import Epoch
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
+                
+        # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
+
+        # Unpack all directional variables:
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+
+        all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+
+
+        t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+        # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+        single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
+        single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+        ## Build Epoch object across whole sessions:
+        if time_bin_size is None:
+            # use default time_bin_size from the previous decoder
+            time_bin_size = long_LR_pf1D_Decoder.time_bin_size
+            
+        # time_binning_container: BinningContainer = deepcopy(long_LR_pf1D_Decoder.time_binning_container)
+        # time_binning_container
+        # time_binning_container.edges # array([31.8648, 31.8978, 31.9308, ..., 1203.56, 1203.6, 1203.63])
+        # time_binning_container.centers # array([31.8813, 31.9143, 31.9473, ..., 1203.55, 1203.58, 1203.61])
+        print(f'time_bin_size: {time_bin_size}')
+
+        # Get proper global_spikes_df:
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        rank_order_results = owning_pipeline_reference.global_computation_results.computed_data['RankOrder'] # "RankOrderComputationsContainer"
+        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+        global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df).spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
+        # alternatively if importing `RankOrderAnalyses` is okay, we can do:
+        # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
+        
+        spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+
+        # print(f'add_directional_decoder_decoded_epochs(...): decoding continuous epochs for each directional decoder.')
+        # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+        # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
+        # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
+        # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+        all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=spikes_df, filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+        # print(f'\t computation done.')
+        
+        continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict}
+
+        # Store all_directional_pf1D_Decoder_dict, all_directional_continuously_decoded_dict
+        
+        ## Create or update the global directional_decoders_decode_result:
+        directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
+        directional_decoders_decode_result.__dict__.update(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict)
+        directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size] = all_directional_continuously_decoded_dict # update the entry for this time_bin_size
+
+        # Set the global result:
+        global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
+        
+
+        """ Usage:
+        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersDecodedResult
+
+        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+        print(f'time_bin_size: {time_bin_size}')
+        continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_dict
+        
+        """
+        return global_computation_results
+
+
+
+
+
+
+    
+
+
+        # # Unpack all directional variables:
+        # ## {"even": "RL", "odd": "LR"}
+        # long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        # # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+
+        # all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+
+
+        # print(f'add_directional_decoder_decoded_epochs(...): decoding continuous epochs for each directional decoder.')
+        # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
+        # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=0) # does not do shuffling
+        # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+        # all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=spikes_df, filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+        # print(f'\t computation done.')
+        
 
 
 # ==================================================================================================================== #
