@@ -201,8 +201,17 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
 
     def get_current_jump_target_series_selection(self):
         """ gets the currently selected jump-target series """
-        ## Capture the previous selection:
-        selected_index, selected_item_text = self.get_current_combo_item_selection(self.ui.comboActiveJumpTargetSeries, debug_print=False)
+        ## Capture the previous selection: `AttributeError: 'Spike3DRasterBottomPlaybackControlBar' object has no attribute 'ui'` 
+        # NOTE: has `self.comboActiveJumpTargetSeries` but not `self.ui.comboActiveJumpTargetSeries`
+        try:
+            selected_index, selected_item_text = self.get_current_combo_item_selection(self.ui.comboActiveJumpTargetSeries, debug_print=False)
+        except AttributeError as e:
+            # handle missing `self.ui`
+            # self.ui.comboActiveJumpTargetSeries
+            selected_index, selected_item_text = self.get_current_combo_item_selection(self.comboActiveJumpTargetSeries, debug_print=False)
+            pass
+            # Alternatively, return (-1, '')
+        
         return (selected_index, selected_item_text)
 
 

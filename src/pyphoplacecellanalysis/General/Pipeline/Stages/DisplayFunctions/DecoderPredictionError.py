@@ -1091,8 +1091,16 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # If no plot to render on, do this:
         widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget(name='MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons')
+        if isinstance(matplotlib_fig_ax, (list, tuple)):
+            assert len(matplotlib_fig_ax) > 0, f"matplotlib_fig_ax is a list but is also empty! matplotlib_fig_ax: {matplotlib_fig_ax}"
+            # unwrap
+            assert len(matplotlib_fig_ax) == 1, f"matplotlib_fig_ax is a list is not of length 1! len(matplotlib_fig_ax): {len(matplotlib_fig_ax)}, matplotlib_fig_ax: {matplotlib_fig_ax}"
+            matplotlib_fig_ax = matplotlib_fig_ax[0]
+        
         # most_likely_positions_mode: 'standard'|'corrected'
-        fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=matplotlib_fig_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
+        fig, curr_ax = self._active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=matplotlib_fig_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
+        
+        # `self._curr_active_pipeline` -> `self._active_pipeline``
         # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
         # active_2d_plot.ui.matplotlib_view_widget.draw()
         widget.draw() # alternative to accessing through full path?
