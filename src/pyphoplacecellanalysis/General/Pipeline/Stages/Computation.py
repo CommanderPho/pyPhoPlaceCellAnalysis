@@ -3,7 +3,7 @@ import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
 import typing
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 from warnings import warn
 import numpy as np
 import pandas as pd
@@ -464,6 +464,24 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         long_epoch_name, short_epoch_name, global_epoch_name = known_epoch_names # unwrap
 
         return long_epoch_name, short_epoch_name, global_epoch_name
+
+
+    def find_LongShortDelta_times(self) -> Tuple[float, float, float]:
+        """ Helper function to returns the [t_start, t_delta, t_end] session times. They must exist.
+        Usage:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        """
+        long_epoch_name, short_epoch_name, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+        long_epoch_obj, short_epoch_obj = [Epoch(self.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
+        assert short_epoch_obj.n_epochs > 0, f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}'
+        assert long_epoch_obj.n_epochs > 0, f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}'
+        # Uses: long_epoch_obj, short_epoch_obj
+        t_start = long_epoch_obj.t_start
+        t_delta = short_epoch_obj.t_start
+        t_end = short_epoch_obj.t_stop
+        return t_start, t_delta, t_end
+
+
 
 
     def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
@@ -1157,7 +1175,14 @@ class PipelineWithComputedPipelineStageMixin:
         """
         return self.stage.find_LongShortGlobal_epoch_names()
 
-        # print(f'\tpost keys: {list(self.active_configs.keys())}')
+
+    def find_LongShortDelta_times(self) -> Tuple[float, float, float]:
+        """ Helper function to returns the [t_start, t_delta, t_end] session times. They must exist.
+        Usage:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        """
+        return self.stage.find_LongShortDelta_times()
+
 
     def get_output_path(self) -> Path:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """

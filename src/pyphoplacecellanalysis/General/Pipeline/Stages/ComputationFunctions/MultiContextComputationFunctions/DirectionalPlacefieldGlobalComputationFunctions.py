@@ -2440,6 +2440,20 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
         all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
+        global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=0) # does not do shuffling
+        spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+
+
+
+
+        _out_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=spikes_df, filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+
+
+        active_result = deepcopy(_out_continuously_decoded_dict[a_decoder_name]) # already decoded
+
         # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
 
