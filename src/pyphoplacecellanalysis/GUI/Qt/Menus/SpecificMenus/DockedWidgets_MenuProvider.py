@@ -107,20 +107,14 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Custom...", name="actionNewDockedCustom", tooltip="", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
         
-        
         # ==================================================================================================================== #
         # Connect the relevent actions to each action:
         
         curr_actions_dict['actionNewDockedMatplotlibView'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
         curr_actions_dict['actionNewDockedContextNested'].triggered.connect(CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
         curr_actions_dict['actionLongShortDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
-
-
-
-
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
-
         # ==================================================================================================================== #
         # Now Create the Menus for each QAction:
         

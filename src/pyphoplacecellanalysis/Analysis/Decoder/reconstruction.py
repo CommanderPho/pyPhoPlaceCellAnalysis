@@ -731,7 +731,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     # ==================================================================================================================== #
     @function_attributes(short_name='decode_specific_epochs', tags=['decode'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'], used_by=[])
-    def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
+    def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, debug_print=False) -> DecodedFilterEpochsResult:
         """ 
         Uses:
             BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...)
@@ -744,7 +744,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     @function_attributes(short_name='decode', tags=['decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions', 'ZhangReconstructionImplementation.neuropy_bayesian_prob'],
         used_by=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'])
-    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, output_flat_versions=False, debug_print=True):
+    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size:float, output_flat_versions=False, debug_print=True):
         """ decodes the neural activity from its internal placefields, returning its posterior and the predicted position 
         Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
         

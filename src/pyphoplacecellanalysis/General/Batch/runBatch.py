@@ -1113,8 +1113,6 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     # Replace the print function within this scope
     # _backup_print = print
     # print = new_print
-
-
     new_print(f'{_line_sweep} runBatch STARTING {_line_sweep}')
     new_print(f'\tglobal_data_root_parent_path: {str(global_data_root_parent_path)}')
     new_print(f'\tsession_context: {curr_session_context}')
