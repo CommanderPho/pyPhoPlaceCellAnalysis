@@ -11,6 +11,7 @@ from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
 
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 
@@ -654,7 +655,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
             if register_output_file_fn is not None:
                 register_output_file_fn(output_path=fig_vector_save_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig), **additional_output_metadata})
             if progress_print:
-                print(f'\t saved {fig_vector_save_path}')
+                print(f'\t saved "{file_uri_from_path(fig_vector_save_path)}"')
             active_out_figure_paths.append(fig_vector_save_path)
 
         except Exception as e:
@@ -676,7 +677,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
             if register_output_file_fn is not None:
                 register_output_file_fn(output_path=fig_png_out_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig)})
             if progress_print:
-                print(f'\t saved {fig_png_out_path}')
+                print(f'\t saved "{file_uri_from_path(fig_png_out_path)}"')
             active_out_figure_paths.append(fig_png_out_path)
         except Exception as e:
             print(f'Error occured while writing .png for fig. {e}. Skipping.')
