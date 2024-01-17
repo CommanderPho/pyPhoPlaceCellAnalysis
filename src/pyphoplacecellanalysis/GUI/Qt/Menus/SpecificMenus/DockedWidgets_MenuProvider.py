@@ -18,6 +18,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
     """ The most up-to-date (as of 2022-09-29) method of building custom menu items. 
     
+    Conceptually, DockedWidgets are widgets that initially are docked within the main SpikeRaster2D window (usually as dockItems) and are synchronized with the scrolling of the time window.
+     
+    
+    
     .ui.menus.global_window_menus.debug_menu_provider.top_level_menu
     
     .ui.menus.global_window_menus.docked_widgets.actions_dict

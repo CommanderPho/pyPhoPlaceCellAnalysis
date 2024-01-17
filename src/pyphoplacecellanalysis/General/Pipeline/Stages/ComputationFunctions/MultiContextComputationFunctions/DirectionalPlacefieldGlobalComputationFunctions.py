@@ -2356,3 +2356,130 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         all_epoch_bins_marginals_collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
 
         return all_epoch_bins_marginals_collector
+
+
+
+## Build Dock Widgets:
+from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand
+
+
+@define(slots=False)
+class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
+	""" 2024-01-17 
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand
+
+    """
+	_spike_raster_window = field()
+	_active_pipeline = field(alias='curr_active_pipeline')
+	_active_config_name = field(default=None)
+	_context = field(default=None, alias="active_context")
+	_display_output = field(default=Factory(dict))
+
+	@classmethod
+	def _perform_add_new_decoded_row(cls, curr_active_pipeline, active_2d_plot, a_decoder_name: str, a_decoder, a_dock_config):
+		""" captures dock_configs 
+		
+		"""
+		from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+		
+		## ✅ Add a new row for each of the four 1D directional decoders:
+		identifier_name: str = f'{a_decoder_name}_ContinuousDecode'
+		print(f'identifier_name: {identifier_name}')
+		widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(300, 20), display_config=a_dock_config)
+		an_ax = matplotlib_fig_axes[0]
+
+		# all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+		# all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+
+		# a_decoder_name: str = "long_LR"
+		# _active_config_name = None
+		variable_name: str = a_decoder_name
+		# active_decoder = deepcopy(all_directional_pf1D_Decoder_dict[a_decoder_name]) # computation_result.computed_data['pf2D_Decoder']
+		active_decoder = deepcopy(a_decoder)
+		# active_result = deepcopy(_out_continuously_decoded_dict[a_decoder_name]) # already decoded
+		active_marginals = active_decoder.marginal.x
+		active_bins = active_decoder.xbin
+
+		# active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
+		active_most_likely_positions = None
+		active_posterior = active_marginals.p_x_given_n
+
+		# most_likely_positions_mode: 'standard'|'corrected'
+		# fig, curr_ax = curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', _active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=an_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
+		## Actual plotting portion:
+		fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
+																posterior=active_posterior,
+																active_most_likely_positions_1D=active_most_likely_positions,
+																ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False)
+
+		# print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
+		# active_2d_plot.ui.matplotlib_view_widget.draw()
+		widget.draw() # alternative to accessing through full path?
+		active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+		return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
+
+	@classmethod
+	def add_directional_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False):
+		""" adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
+		# from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # Actual most general
+		# from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
+		from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+		from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig
+		
+		showCloseButton = False
+		dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton),
+						CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton))))
+
+
+		# Unpack all directional variables:
+		## {"even": "RL", "odd": "LR"}
+		long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+		# Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+		(long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+		# long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
+		# (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
+		(long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+		# (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+		# (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
+		# (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
+		(long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+
+		all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+		all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+
+		# Need all_directional_pf1D_Decoder_dict
+		output_dict = {}
+
+		for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
+			a_dock_config = dock_configs[a_decoder_name]
+			_out_tuple = cls._perform_add_new_decoded_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_decoder_name=a_decoder_name, a_decoder=a_decoder, a_dock_config=a_dock_config)
+			# identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
+			output_dict[a_decoder_name] = _out_tuple
+
+		return output_dict
+
+
+	def execute(self, *args, **kwargs) -> None:
+		## To begin, the destination plot must have a matplotlib widget plot to render to:
+		# print(f'AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand.execute(...)')
+		active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+		# If no plot to render on, do this:
+		output_dict = self.add_directional_decoder_decoded_epochs(self._active_pipeline, active_2d_plot) # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+		# Update display output dict:
+		for a_decoder_name, an_output_tuple in output_dict.items():
+			identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
+			self._display_output[identifier_name] = an_output_tuple
+
+		# self._display_output['long_decoded_replay_tuple'] = long_decoded_replay_tuple
+		# self._display_output['short_decoded_replay_tuple'] = short_decoded_replay_tuple
+
+		# widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget(name='MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons')
+		# # most_likely_positions_mode: 'standard'|'corrected'
+		# fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=matplotlib_fig_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
+		# # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
+		# # active_2d_plot.ui.matplotlib_view_widget.draw()
+		# widget.draw() # alternative to accessing through full path?
+		# active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
+		print(f'\t AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand.execute() is done.')
+		
