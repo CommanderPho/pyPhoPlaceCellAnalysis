@@ -1620,6 +1620,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         ## Decode Laps:
         laps_decoding_time_bin_size: float = 0.075
         global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_any_name].computation_config.pf_params.computation_epochs) # global_any_name='maze_any' (? same as global_epoch_name?)
+        
+
         directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
         
         ## Decode Ripples:        
@@ -2292,7 +2294,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             active_context = kwargs.pop('active_context', None)
             if active_context is not None:
                 # Update the existing context:
-                display_context = active_context.adding_context('display_fn', display_fn_name='plot_directional_merged_pf_decoded_epochs')
+                display_context = active_context.adding_context('display_fn', display_fn_name='directional_merged_pf_decoded_epochs')
             else:
                 active_context = owning_pipeline_reference.sess.get_context()
                 # Build the active context directly:
@@ -2315,6 +2317,18 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             render_track_identity_marginal_laps = kwargs.pop('render_track_identity_marginal_laps', False)
             render_track_identity_marginal_ripples = kwargs.pop('render_track_identity_marginal_ripples', False)
 
+            directional_merged_decoders_result = kwargs.pop('directional_merged_decoders_result', None)
+            if directional_merged_decoders_result is not None:
+                print("WARN: User provided a custom directional_merged_decoders_result as a kwarg. This will be used instead of the computed result global_computation_results.computed_data['DirectionalMergedDecoders'].")
+                
+            else:
+                directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+
+
+            # get the time bin size from the decoder:
+            laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
+            ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
+
 
 
             # figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
@@ -2322,7 +2336,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             # Recover from the saved global result:
             # directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-            directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+            # directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
 
             # requires `laps_is_most_likely_direction_LR_dir` from `laps_marginals`
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
@@ -2351,7 +2365,13 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         _main_context = _mod_plot_kwargs['final_context']
                         assert _main_context is not None
                         # Build the rest of the properties:
-                        sub_context = owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
+                        sub_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('directional_merged_pf_decoded_epochs', **_main_context)
+                        sub_context_str: str = sub_context.get_description(subset_includelist=['t_bin'], include_property_names=True) # 't-bin_0.5' # str(sub_context.get_description())
+                        modified_name: str = subfn_kwargs.pop('name', '')
+                        if len(sub_context_str) > 0:
+                            modified_name = f"{modified_name}_{sub_context_str}"
+                        subfn_kwargs['name'] = modified_name # update the name by appending 't-bin_0.5'
+                        
                         # Call the main plot function:
                         out_plot_tuple = plot_decoded_epoch_slices(*args, skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions, **subfn_kwargs)
                         # Post-plot call:
@@ -2410,7 +2430,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     
                     if render_merged_pseudo2D_decoder_laps:
                         # Merged Pseduo2D Decoder Posteriors:
-                        _main_context = {'decoded_epochs': 'Laps', 'Pseudo2D': 'Posterior'}
+                        _main_context = {'decoded_epochs': 'Laps', 'Pseudo2D': 'Posterior', 't_bin': laps_decoding_time_bin_size}
                         global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
                         graphics_output_dict['raw_posterior_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
                             global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
@@ -2426,7 +2446,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                     if render_directional_marginal_laps:
                         # Laps Direction (LR/RL) Marginal:
-                        _main_context = {'decoded_epochs': 'Laps', 'Marginal': 'Direction'}
+                        _main_context = {'decoded_epochs': 'Laps', 'Marginal': 'Direction', 't_bin': laps_decoding_time_bin_size}
                         global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
                         graphics_output_dict['directional_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
                             global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
@@ -2441,7 +2461,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                     if render_directional_marginal_ripples:
                         # Ripple Direction (LR/RL) Marginal:
-                        _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'Direction'}
+                        _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'Direction', 't_bin': ripple_decoding_time_bin_size}
                         # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
                         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
                         graphics_output_dict['directional_ripples_plot_tuple'] = _mod_plot_decoded_epoch_slices(
@@ -2457,7 +2477,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                     if render_track_identity_marginal_laps:
                         # Laps Track-identity (Long/Short) Marginal:
-                        _main_context = {'decoded_epochs': 'Laps', 'Marginal': 'TrackID'}
+                        _main_context = {'decoded_epochs': 'Laps', 'Marginal': 'TrackID', 't_bin': laps_decoding_time_bin_size}
                         global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any'
                         # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
                         graphics_output_dict['track_identity_marginal_laps_plot_tuple'] = _mod_plot_decoded_epoch_slices(
@@ -2474,7 +2494,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
                     if render_track_identity_marginal_ripples:
                         # Ripple Track-identity (Long/Short) Marginal:
-                        _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID'}
+                        _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': ripple_decoding_time_bin_size}
                         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
                         # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
                         graphics_output_dict['track_identity_marginal_ripples_plot_tuple'] = _mod_plot_decoded_epoch_slices(
