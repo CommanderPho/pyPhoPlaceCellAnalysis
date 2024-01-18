@@ -625,14 +625,40 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
     Inputs:
         register_output_file_fn: Callable[output_path:Path, output_metadata:dict] - function called to register outputs, by default should be `curr_active_pipeline.register_output_file`
         
+        ## Replace any '.' characters with a suitable alternative so that .with_suffix('.pdf') doesn't incorrect replace everything after the period (overwriting floating-point values in the basename, for example)
+        ·
+        •
+        •
+        ⁃
+        ∙
+        ➗
     """
+    # period_replacement_char: str = '-'
+    # period_replacement_char: str = '➗'
+    period_replacement_char: str = '•'
+    
     active_out_figure_paths = []
     write_any_figs = write_vector_format or write_png
     if not write_any_figs:
         return active_out_figure_paths # return empty list if no output formats are requested.
 
     assert final_fig_save_basename_path is not None, f"Disabled automatic parent output path generation."
-    
+    ## Replace any '.' characters with a suitable alternative so that .with_suffix('.pdf') doesn't incorrect replace everything after the period (overwriting floating-point values in the basename, for example)
+    erronious_suffixes = final_fig_save_basename_path.suffixes # ['.5']
+    if len(erronious_suffixes) > 0:
+        if debug_print:
+            print(f'final_fig_save_basename_path should have no suffixes because it is a basename, but it has erronious_suffixes: {erronious_suffixes}\nfinal_fig_save_basename_path: {final_fig_save_basename_path}')
+        filename_replaced = str(final_fig_save_basename_path).replace('.', period_replacement_char)
+        if debug_print:
+            print(f'filename_replaced: {filename_replaced}')
+        final_fig_save_basename_path = Path(filename_replaced).resolve()
+        if debug_print:
+            print(f'final_fig_save_basename_path: {final_fig_save_basename_path}')
+        # check the suffixes again:
+        erronious_suffixes = final_fig_save_basename_path.suffixes
+        assert len(erronious_suffixes) == 0, f"erronious_suffixes: {erronious_suffixes} is still not empty after renaming!"
+        
+
     is_matplotlib_figure = isinstance(a_fig, plt.FigureBase)
     # PDF: .pdf versions:
     if write_vector_format:
