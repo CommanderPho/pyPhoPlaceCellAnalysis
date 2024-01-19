@@ -1111,7 +1111,7 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
 
 @define(slots=False)
 class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
-    """ 2023-10-17. """
+    """ 2023-10-17. Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.  """
     _spike_raster_window = field()
     _active_pipeline = field(alias='curr_active_pipeline')
     _active_config_name = field(default=None)

@@ -1184,9 +1184,9 @@ class DirectionalDecodersDecodedResult(ComputedResult):
     directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
     all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
     # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-    time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+    time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
     print(f'time_bin_size: {time_bin_size}')
-    continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_dict
+    continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
     
         
     """
@@ -1198,7 +1198,7 @@ class DirectionalDecodersDecodedResult(ComputedResult):
     continuously_decoded_result_cache_dict: Dict[float, Dict[str, DecodedFilterEpochsResult]] = serialized_field(default=None) # key is the t_bin_size in seconds
     
     @property
-    def last_decoding_time_bin_size(self) -> Optional[float]:
+    def most_recent_decoding_time_bin_size(self) -> Optional[float]:
         """Gets the last cached continuously_decoded_dict property."""
         if ((self.continuously_decoded_result_cache_dict is None) or (len(self.continuously_decoded_result_cache_dict or {}) < 1)):
             return None
@@ -1208,9 +1208,9 @@ class DirectionalDecodersDecodedResult(ComputedResult):
         
 
     @property
-    def continuously_decoded_dict(self) -> Optional[Dict[str, DecodedFilterEpochsResult]]:
+    def most_recent_continuously_decoded_dict(self) -> Optional[Dict[str, DecodedFilterEpochsResult]]:
         """Gets the last cached continuously_decoded_dict property."""
-        last_time_bin_size = self.last_decoding_time_bin_size
+        last_time_bin_size = self.most_recent_decoding_time_bin_size
         if (last_time_bin_size is None):
             return None
         else:
@@ -1228,11 +1228,11 @@ class DirectionalDecodersDecodedResult(ComputedResult):
         if len(continuously_decoded_result_cache_dict) < 1:
             return False
     
-        time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
         if time_bin_size is None:
             return False
 
-        continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_dict
+        continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
         if continuously_decoded_dict is None:
             return False
 
@@ -1685,9 +1685,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
                 all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
                 # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-                time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+                time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
                 print(f'time_bin_size: {time_bin_size}')
-                continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_dict
+                continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
 
 
         """
@@ -1767,19 +1767,14 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-        time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
         print(f'time_bin_size: {time_bin_size}')
-        continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_dict
+        continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
         
         """
         return global_computation_results
 
 
-
-
-
-
-    
 
 
         # # Unpack all directional variables:
@@ -2641,9 +2636,9 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-        time_bin_size: float = directional_decoders_decode_result.last_decoding_time_bin_size
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
         print(f'time_bin_size: {time_bin_size}')
-        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_dict
+        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
         all_directional_continuously_decoded_dict = continuously_decoded_dict or {}
 
         # Need all_directional_pf1D_Decoder_dict
