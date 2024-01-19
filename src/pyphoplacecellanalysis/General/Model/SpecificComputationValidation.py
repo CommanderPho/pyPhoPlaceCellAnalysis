@@ -199,8 +199,30 @@ class SpecificComputationValidator:
         #TODO 2023-08-31 11:08: - [ ] Made for global computations, but `computation_filter_name` was just added post-hoc. Needs to be updated to use computation_filter_name in perform_specific_computation for non-global functions
                 
         """
+        def _subfn_try_validate(validate_fail_on_exception:bool=False, is_post_recompute:bool=False) -> bool:
+            """ captures: comp_specifier, curr_active_pipeline, computation_filter_name, debug_print """
+            try:
+                # try the validation again.
+                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
+                return True
+            except (AttributeError, KeyError, TypeError, ValueError, AssertionError) as validation_err:
+                # Handle the inner exception
+                if is_post_recompute:
+                    print(f'Exception occured while validating (`validate_computation_test(...)`) after recomputation:\n Validation exception: {validation_err}')
+                if validate_fail_on_exception:
+                    raise validation_err
+                if debug_print:
+                    import traceback # for stack trace formatting
+                    print(f'\t encountered error while validating (is_post_recompute: {is_post_recompute}):\n\tValidation exception: {validation_err}\n{traceback.format_exc()}\n.')
+            except BaseException:
+                raise # unhandled exception
+            return False
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         comp_short_name: str = comp_specifier.short_name
         newly_computed_values = []
+        did_successfully_validate: bool = False
         
         if force_recompute:
             ## Remove any existing results:
@@ -209,24 +231,20 @@ class SpecificComputationValidator:
             if (removed_results_dict is not None) and len(removed_results_dict) > 0:
                 print(f'removed results: {list(removed_results_dict.keys())} because force_recompute was True.')
 
-
         # Check for existing result:
         is_known_missing_provided_keys: bool = comp_specifier.try_check_missing_provided_keys(curr_active_pipeline)
 
-        try:
-            if (is_known_missing_provided_keys):
-                raise ValueError(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
-            else:
-                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
-                if on_already_computed_fn is not None:
-                    on_already_computed_fn(comp_short_name, computation_filter_name)
-        except (AttributeError, KeyError, TypeError, ValueError, AttributeError, AssertionError) as initial_validation_err:
+        if (is_known_missing_provided_keys):
+                print(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
+        
+        did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)
+        
+        needs_computation: bool = ((not did_successfully_validate) or is_known_missing_provided_keys)
+        
+        if needs_computation:
             ## validate_computation_test(...) failed, so we need to recompute.
             if progress_print or debug_print:
                 print(f'{comp_short_name} missing.')
-            if debug_print:
-                import traceback # for stack trace formatting
-                print(f'\t encountered error while initially validating: initial_validation_err: {initial_validation_err}\n{traceback.format_exc()}\n.')
             if progress_print or debug_print:
                 print(f'\t Recomputing {comp_short_name}...')
             # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
@@ -234,19 +252,23 @@ class SpecificComputationValidator:
                 curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[comp_specifier.computation_fn_name], computation_kwargs_list=[comp_specifier.computation_fn_kwargs], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
                 if progress_print or debug_print:
                     print(f'\t done.')
-                # try the validation again.
-                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
-                newly_computed_values.append((comp_short_name, computation_filter_name))
-            except (AttributeError, KeyError, TypeError, ValueError, AttributeError, AssertionError) as inner_e:
+            except (AttributeError, KeyError, TypeError, ValueError, AssertionError) as inner_e:
                 # Handle the inner exception
-                print(f'Exception occured while computing (`perform_specific_computation(...)`) or validating (`validate_computation_test(...)`) after recomputation:\n Inner exception: {inner_e}')
+                print(f'Exception occured while computing (`perform_specific_computation(...)`):\n Inner exception: {inner_e}')
                 if fail_on_exception:
                     raise inner_e
             except BaseException:
                 raise # unhandled exception
+        
+            # Re-validate after computation ______________________________________________________________________________________ #
+            did_successfully_validate: bool = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=True)
 
-        except BaseException:
-            raise
+        else:
+            if debug_print:
+                print(f'\t no recomputation needed! did_successfully_validate: {did_successfully_validate}.\t done.')
+
+        if did_successfully_validate:
+            newly_computed_values.append((comp_short_name, computation_filter_name))
 
         return newly_computed_values
 
