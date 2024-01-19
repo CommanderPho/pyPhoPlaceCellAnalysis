@@ -182,9 +182,8 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     """
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'determine_session_t_delta_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
-    
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    print(f'\t{curr_active_pipeline.session_name}:\tt_start: {t_start}, t_delta: {t_delta}, t_end: {t_end}')
+    print(f'\t{curr_session_basedir}:\tt_start: {t_start}, t_delta: {t_delta}, t_end: {t_end}')
     
     callback_outputs = {
      't_start': t_start, 't_delta':t_delta, 't_end': t_end   
