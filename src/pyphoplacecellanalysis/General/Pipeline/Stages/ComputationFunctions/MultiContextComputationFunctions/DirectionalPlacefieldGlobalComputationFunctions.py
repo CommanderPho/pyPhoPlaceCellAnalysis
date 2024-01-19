@@ -1371,6 +1371,15 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
     if active_context is not None:
         display_context = active_context.adding_context('display_fn', display_fn_name='plot_all_epoch_bins_marginal_predictions')
         
+    # These subset contexts are used to filter out lap/ripple only keys.
+    # e.g. active_context=curr_active_pipeline.build_display_context_for_session('directional_merged_pf_decoded_epochs', laps_t_bin=laps_decoding_time_bin_size, ripple_t_bin=ripple_decoding_time_bin_size)
+        # only want laps_t_bin on the laps plot and ripple_t_bin on the ripples plot
+    laps_only_keys = [item for item in display_context.keys() if 'lap' in item] # items exclusive to laps: ['laps_t_bin']
+    ripple_only_keys = [item for item in display_context.keys() if 'ripple' in item]
+    laps_display_context = display_context.get_subset(subset_excludelist=ripple_only_keys) # laps specific context filtering out the ripple keys
+    ripple_display_context = display_context.get_subset(subset_excludelist=laps_only_keys) # ripple specific context filtering out the laps keys
+
+
     with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42,
                           "axes.spines.left": False, "axes.spines.right": False, "axes.spines.bottom": False, "axes.spines.top": False,
                           "axes.edgecolor": "none", "xtick.bottom": False, "xtick.top": False, "ytick.left": False, "ytick.right": False}):
@@ -1425,7 +1434,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
                 y='P_Long',
                 # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
             )
-            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='Laps all_epoch_binned Marginals'), 
+            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=laps_display_context.adding_context('subplot', subplot_name='Laps all_epoch_binned Marginals'), 
                                         title=f'<size:22> Laps <weight:bold>all_epoch_binned</> Marginals</>')
             
             fig, ax = collector.subplots(num='Ripple_Marginal', clear=True)
@@ -1436,7 +1445,7 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
                 y='P_Long',
                 # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
             )
-            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=display_context.adding_context('subplot', subplot_name='Ripple all_epoch_binned Marginals'), 
+            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=ripple_display_context.adding_context('subplot', subplot_name='Ripple all_epoch_binned Marginals'), 
                             title=f'<size:22> Ripple <weight:bold>all_epoch_binned</> Marginals</>')
 
 
@@ -2528,14 +2537,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         if include_includelist is None:
             include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
-        long_epoch_name = include_includelist[0] # 'maze1_PYR'
-        short_epoch_name = include_includelist[1] # 'maze2_PYR'
-        assert len(include_includelist) > 2
-        global_epoch_name = include_includelist[-1] # 'maze_PYR'
-
-        directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-        ## Get the result after computation:
-        directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
+        directional_merged_decoders_result = kwargs.pop('directional_merged_decoders_result', None)
+        if directional_merged_decoders_result is not None:
+            print("WARN: User provided a custom `directional_merged_decoders_result` as a kwarg. This will be used instead of the computed result global_computation_results.computed_data['DirectionalMergedDecoders'].")
+            
+        else:
+            directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
 
         def _perform_write_to_file_callback(final_context, fig):
             if save_figure:
@@ -2545,12 +2552,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
         # Quantile Diff Figures: _____________________________________________________________________________________________ #
-        global_epoch = owning_pipeline_reference.filtered_epochs[global_epoch_name]
-        t_start, t_end = global_epoch.start_end_times
-        short_epoch = owning_pipeline_reference.filtered_epochs[short_epoch_name]
-        split_time_t: float = short_epoch.t_start
-        
-        all_epoch_bins_marginals_collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
+        t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+        all_epoch_bins_marginals_collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=t_start, t_split=t_delta, t_end=t_end, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback)
 
         return all_epoch_bins_marginals_collector
 
