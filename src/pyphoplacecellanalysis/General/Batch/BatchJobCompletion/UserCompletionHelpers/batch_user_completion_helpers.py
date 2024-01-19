@@ -175,8 +175,8 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     
     Results can be extracted from batch output by 
     
-    # Extracts the callback results 'determine_computation_datetimes_completion_function':
-    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_computation_datetimes_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+    # Extracts the callback results 'determine_session_t_delta_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
 
     """
@@ -184,11 +184,11 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     print(f'determine_session_t_delta_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    print(f'\t{curr_active_pipeline.session_name}:\tt_start: {t_start}, t_delta: {t_delta}, t_end: {t_end}')
     
     callback_outputs = {
      't_start': t_start, 't_delta':t_delta, 't_end': t_end   
     }
-
     across_session_results_extended_dict['determine_session_t_delta_completion_function'] = callback_outputs
     
     # print(f'>>\t done with {curr_session_context}')
