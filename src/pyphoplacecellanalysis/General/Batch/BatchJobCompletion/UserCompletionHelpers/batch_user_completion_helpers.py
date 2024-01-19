@@ -2,12 +2,21 @@ from copy import deepcopy
 from typing import List, Dict, Tuple, Optional, Callable
 
 from pathlib import Path
+import inspect
+from jinja2 import Template
 
 # %% [markdown]
 # ## Build Processing Scripts:
 
 # %%
-import inspect
+
+
+# get like: generated_header_code = curr_runtime_context_header_template.render(BATCH_DATE_TO_USE=BATCH_DATE_TO_USE, collected_outputs_path_str=str(collected_outputs_path))
+curr_runtime_context_header_template: str = Template("""
+BATCH_DATE_TO_USE = '{{ BATCH_DATE_TO_USE }}'
+collected_outputs_path = Path('{{ collected_outputs_path_str }}').resolve()
+""")
+
 
 
 """ In general, results of your callback can be added to the output dict like:
@@ -20,27 +29,16 @@ and can be extracted from batch output by:
     extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_computation_datetimes_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
 
+
+    All capture:
+        BATCH_DATE_TO_USE, collected_outputs_path
 """
 
-
-
-curr_context_template: str = """ 
-    BATCH_DATE_TO_USE = '2024-01-04_Lab' # TODO: Change this as needed, templating isn't actually doing anything rn.
-    collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve()
-    assert collected_outputs_path.exists()
-    curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
-    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
-"""
-
-def _helper_get_curr_batch_context(curr_active_pipeline):
-    BATCH_DATE_TO_USE = '2024-01-04_Lab' # TODO: Change this as needed, templating isn't actually doing anything rn.
-    collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve()
-    assert collected_outputs_path.exists()
-    curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
-    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
-    return CURR_BATCH_OUTPUT_PREFIX, curr_session_name, collected_outputs_path, BATCH_DATE_TO_USE
+## These are temporary captured references that should never appear in generated code or runtime, they're just here to prevent typechecking errors in the editor
+BATCH_DATE_TO_USE: str = '0000-00-00_Fake' # TODO: Change this as needed, templating isn't actually doing anything rn.
+# collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve() # Linux
+collected_outputs_path: Path = Path('/home/halechr/cloud/turbo/Data/Output/collected_outputs').resolve() # GreatLakes
+# collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve() # Apogee
 
 
 def export_rank_order_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
@@ -49,8 +47,6 @@ def export_rank_order_results_completion_function(self, global_data_root_parent_
     print(f'export_rank_order_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-    BATCH_DATE_TO_USE = '2024-01-04_Lab' # TODO: Change this as needed, templating isn't actually doing anything rn.
-    collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve()
     assert collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
     CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
@@ -90,13 +86,10 @@ def export_rank_order_results_completion_function(self, global_data_root_parent_
 
 def figures_rank_order_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderGlobalDisplayFunctions
-    # print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'figures_rank_order_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-    BATCH_DATE_TO_USE = '2024-01-04_Lab' # TODO: Change this as needed, templating isn't actually doing anything rn.
-    collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve()
     assert collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
     CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
@@ -115,15 +108,10 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
 
 
 def compute_and_export_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
-    # print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-
-    BATCH_DATE_TO_USE = '2024-01-10_GL' # TODO: Change this as needed, templating isn't actually doing anything rn.
-    # collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve() # Linux
-    collected_outputs_path = Path('/home/halechr/cloud/turbo/Data/Output/collected_outputs').resolve() # GreatLakes
-    # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve() # Apogee
+    
     assert collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
     CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
@@ -161,7 +149,6 @@ def determine_computation_datetimes_completion_function(self, global_data_root_p
 
 
     """
-    # print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'determine_computation_datetimes_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     
@@ -182,10 +169,61 @@ def determine_computation_datetimes_completion_function(self, global_data_root_p
 
     return across_session_results_extended_dict
 
+def determine_session_t_delta_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+    """ 
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import determine_computation_datetimes_completion_function
+    
+    Results can be extracted from batch output by 
+    
+    # Extracts the callback results 'determine_computation_datetimes_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_computation_datetimes_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+
+    """
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'determine_session_t_delta_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
+    
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    
+    callback_outputs = {
+     't_start': t_start, 't_delta':t_delta, 't_end': t_end   
+    }
+
+    across_session_results_extended_dict['determine_session_t_delta_completion_function'] = callback_outputs
+    
+    # print(f'>>\t done with {curr_session_context}')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    return across_session_results_extended_dict
 
 
 
-def MAIN_get_template_string():
+
+_pre_user_completion_functions_header_template_str: str = f"""
+# ==================================================================================================================== #
+# BEGIN USER COMPLETION FUNCTIONS                                                                                      #
+# ==================================================================================================================== #
+custom_user_completion_functions = []
+"""
+
+_post_user_completion_functions_footer_template_str: str = f"""
+# ==================================================================================================================== #
+# END USER COMPLETION FUNCTIONS                                                                                        #
+# ==================================================================================================================== #
+"""
+
+def write_test_script(custom_user_completion_function_template_code: str, script_file_override: Optional[Path]=None):
+    """Save out the generated `custom_user_completion_function_template_code` string to file for testing"""
+    test_python_script_path = script_file_override or Path('output/test_script.py').resolve()
+    with open(test_python_script_path, 'w') as script_file:
+        script_content = custom_user_completion_function_template_code
+        script_file.write(script_content)
+    print(f'wrote: {test_python_script_path}')
+    return test_python_script_path
+
+
+def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path, override_custom_user_completion_functions_dict: Optional[Dict]=None):
     """ 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import MAIN_get_template_string
     
@@ -195,35 +233,27 @@ def MAIN_get_template_string():
     custom_user_completion_function_template_code, custom_user_completion_functions_dict = MAIN_get_template_string()
 
     """
-    # custom_user_completion_functions = [a_test_completion_function]
+    custom_user_completion_functions_dict = override_custom_user_completion_functions_dict or {
+                                    "export_rank_order_results_completion_function": export_rank_order_results_completion_function,
+                                    "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
+                                    "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function,
+                                    'determine_session_t_delta_completion_function': determine_session_t_delta_completion_function,
+                                    }
+    
+    generated_header_code: str = curr_runtime_context_header_template.render(BATCH_DATE_TO_USE=BATCH_DATE_TO_USE, collected_outputs_path_str=str(collected_outputs_path))
 
-    custom_user_completion_functions_dict = {
-                                        # "export_rank_order_results_completion_function": export_rank_order_results_completion_function,
-                                        # "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
-                                        # "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function,
-                                        }
-
-
-    # _template_defn_string: str = '\n\n'.join([inspect.getsource(a_fn) for a_name, a_fn in custom_user_completion_functions_dict.items()])
-        
     ## Build the template string:
-    template_str: str = f"""
-    custom_user_completion_functions = []
-    """
+    template_str: str = f"{generated_header_code}\n{_pre_user_completion_functions_header_template_str}"
 
     for a_name, a_fn in custom_user_completion_functions_dict.items():
         fcn_defn_str: str = inspect.getsource(a_fn)
-        template_str = f"{template_str}\n{fcn_defn_str}\ncustom_user_completion_functions.append({a_name})\n\n"
+        template_str = f"{template_str}\n{fcn_defn_str}\ncustom_user_completion_functions.append({a_name})\n# END `{a_name}` USER COMPLETION FUNCTION  _______________________________________________________________________________________ #\n\n"
         
-    template_str
-
-    # template_str: str = f"""
-    # {inspect.getsource(export_rank_order_results_completion_function)}
-    # custom_user_completion_functions = [export_rank_order_results_completion_function]
-    # """
+    template_str += _post_user_completion_functions_footer_template_str 
 
     custom_user_completion_function_template_code = template_str
-    print(custom_user_completion_function_template_code)
+
+    # print(custom_user_completion_function_template_code)
     return custom_user_completion_function_template_code, custom_user_completion_functions_dict
 
 
