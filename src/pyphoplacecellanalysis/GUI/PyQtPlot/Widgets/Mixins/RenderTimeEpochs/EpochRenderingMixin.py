@@ -311,7 +311,7 @@ class EpochRenderingMixin:
         for a_plot, a_rect_item in extant_rects_plot_item.items():
             if not isinstance(a_plot, str):
                 if child_plots_removal_list is not None:
-                    if a_plot in child_plots_removal_list:
+                    if (a_plot in child_plots_removal_list):
                         # only remove if the plot is in the child plots:
                         self._perform_remove_render_item(a_plot, a_rect_item)
                         items_to_remove_from_rendered_epochs.append(a_plot)
