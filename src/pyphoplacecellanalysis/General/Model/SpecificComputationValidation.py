@@ -133,7 +133,15 @@ class SpecificComputationValidator:
                 results_specification.requires_global_keys = a_fn.requires_global_keys
     
         return cls(short_name=a_fn.short_name, computation_fn_name=a_fn.__name__, validate_computation_test=a_fn.validate_computation_test, results_specification=results_specification, is_global=a_fn.is_global)
-        
+
+    def does_name_match(self, name_str: str) -> bool:
+        """ checks if either short_name or computation_name"""        
+        return ((self.short_name == name_str) or (self.computation_fn_name == name_str))
+    
+    def is_name_in(self, name_list: List[str]) -> bool:
+        """ checks if either short_name or computation_name is contained in the name_list provided. """        
+        return ((self.short_name in name_list) or (self.computation_fn_name in name_list))
+
 
     # Main Operation Functions ___________________________________________________________________________________________ #
     def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
