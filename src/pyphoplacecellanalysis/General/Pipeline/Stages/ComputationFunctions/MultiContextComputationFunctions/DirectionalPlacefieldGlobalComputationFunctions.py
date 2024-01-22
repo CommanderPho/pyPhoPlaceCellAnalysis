@@ -1190,12 +1190,13 @@ class DirectionalDecodersDecodedResult(ComputedResult):
     
         
     """
-    _VersionedResultMixin_version: str = "2024.01.16_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2024.01.22_0" # to be updated in your IMPLEMENTOR to indicate its version
     
-    pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+    pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"})
+    spikes_df: pd.DataFrame = serialized_field(default=None, metadata={'field_added': "2024.01.22_0"}) # global
     
     # Posteriors computed via the all_directional decoder:
-    continuously_decoded_result_cache_dict: Dict[float, Dict[str, DecodedFilterEpochsResult]] = serialized_field(default=None) # key is the t_bin_size in seconds
+    continuously_decoded_result_cache_dict: Dict[float, Dict[str, DecodedFilterEpochsResult]] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"}) # key is the t_bin_size in seconds
     
     @property
     def most_recent_decoding_time_bin_size(self) -> Optional[float]:
@@ -1698,63 +1699,113 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 
         # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
 
-        # Unpack all directional variables:
-        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-        (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
-
-        all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+        
+        # Store all_directional_pf1D_Decoder_dict, all_directional_continuously_decoded_dict
+        
+        ## Create or update the global directional_decoders_decode_result:
+        directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
+        had_existing_DirectionalDecodersDecoded_result: bool = (directional_decoders_decode_result is not None)
 
 
+        ## Currently used for both cases to decode:
         t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
         single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
         # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
         single_global_epoch: Epoch = Epoch(single_global_epoch_df)
-        ## Build Epoch object across whole sessions:
-        if time_bin_size is None:
-            # use default time_bin_size from the previous decoder
-            time_bin_size = long_LR_pf1D_Decoder.time_bin_size
+
+
+        if (not had_existing_DirectionalDecodersDecoded_result):
+            ## Build a new result
+            print(f'\thad_existing_DirectionalDecodersDecoded_result == False. New DirectionalDecodersDecodedResult will be built...')
+            # Unpack all directional variables:
+            long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+            # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+            (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+            (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+            (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+
+            all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+
+        
+            ## Build Epoch object across whole sessions:
+            if time_bin_size is None:
+                # use default time_bin_size from the previous decoder
+                time_bin_size = long_LR_pf1D_Decoder.time_bin_size
+                
+            # time_binning_container: BinningContainer = deepcopy(long_LR_pf1D_Decoder.time_binning_container)
+            # time_binning_container
+            # time_binning_container.edges # array([31.8648, 31.8978, 31.9308, ..., 1203.56, 1203.6, 1203.63])
+            # time_binning_container.centers # array([31.8813, 31.9143, 31.9473, ..., 1203.55, 1203.58, 1203.61])
+            print(f'\ttime_bin_size: {time_bin_size}')
+
+            # Get proper global_spikes_df:
+            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+            rank_order_results = owning_pipeline_reference.global_computation_results.computed_data['RankOrder'] # "RankOrderComputationsContainer"
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+            directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+            any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+            global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df).spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
+            # alternatively if importing `RankOrderAnalyses` is okay, we can do:
+            # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
             
-        # time_binning_container: BinningContainer = deepcopy(long_LR_pf1D_Decoder.time_binning_container)
-        # time_binning_container
-        # time_binning_container.edges # array([31.8648, 31.8978, 31.9308, ..., 1203.56, 1203.6, 1203.63])
-        # time_binning_container.centers # array([31.8813, 31.9143, 31.9473, ..., 1203.55, 1203.58, 1203.61])
-        print(f'time_bin_size: {time_bin_size}')
+            spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
 
-        # Get proper global_spikes_df:
-        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-        rank_order_results = owning_pipeline_reference.global_computation_results.computed_data['RankOrder'] # "RankOrderComputationsContainer"
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-        included_qclu_values: List[int] = rank_order_results.included_qclu_values
-        directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
-        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-        any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
-        global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df).spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
-        # alternatively if importing `RankOrderAnalyses` is okay, we can do:
-        # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
-        
-        spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+            # print(f'add_directional_decoder_decoded_epochs(...): decoding continuous epochs for each directional decoder.')
+            # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+            # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
+            # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
+            # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+            all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+            continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict} # result is a single time_bin_size
+            print(f'\t computation done. Creating new DirectionalDecodersDecodedResult....')
+            directional_decoders_decode_result = DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, spikes_df=deepcopy(global_spikes_df), continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict)
 
-        # print(f'add_directional_decoder_decoded_epochs(...): decoding continuous epochs for each directional decoder.')
-        # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
-        # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
-        # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
-        # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
-        all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=spikes_df, filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
-        # print(f'\t computation done.')
-        
-        continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict}
+        else:
+            # had_existing_DirectionalDecodersDecoded_result == True
+            print(f'\thad_existing_DirectionalDecodersDecoded_result == True. Using existing result and updating.')
+            ## Try to get the existing results to reuse:
+            all_directional_pf1D_Decoder_dict = directional_decoders_decode_result.pf1D_Decoder_dict
+            spikes_df = directional_decoders_decode_result.spikes_df
+            continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+            previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
+            
+            # In future could extract `single_global_epoch` from the previously decoded result:
+            # first_decoded_result = continuously_decoded_result_cache_dict[previously_decoded_keys[0]]
 
-        # Store all_directional_pf1D_Decoder_dict, all_directional_continuously_decoded_dict
+            ## Get the current time_bin_size:
+            if time_bin_size is None:
+                # use default time_bin_size from the previous decoder
+                first_decoder = list(all_directional_pf1D_Decoder_dict.values())[0]
+                time_bin_size = first_decoder.time_bin_size
+                
+            # time_binning_container: BinningContainer = deepcopy(long_LR_pf1D_Decoder.time_binning_container)
+            # time_binning_container
+            # time_binning_container.edges # array([31.8648, 31.8978, 31.9308, ..., 1203.56, 1203.6, 1203.63])
+            # time_binning_container.centers # array([31.8813, 31.9143, 31.9473, ..., 1203.55, 1203.58, 1203.61])
+            print(f'\ttime_bin_size: {time_bin_size}')
+            
+            needs_recompute = (time_bin_size not in previously_decoded_keys)
+            if needs_recompute:
+                print(f'\t\trecomputing for time_bin_size: {time_bin_size}...')
+                ## Recompute here only:
+                all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+                
+                # directional_decoders_decode_result.__dict__.update(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict)
+                directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size] = all_directional_continuously_decoded_dict # update the entry for this time_bin_size
+                
+            else:
+                print(f'(time_bin_size == {time_bin_size}) already found in cache. Not recomputing.')
+
+
+
         
-        ## Create or update the global directional_decoders_decode_result:
-        directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
-        directional_decoders_decode_result.__dict__.update(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict)
-        directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size] = all_directional_continuously_decoded_dict # update the entry for this time_bin_size
+
+        
+
 
         # Set the global result:
         global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
