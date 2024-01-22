@@ -684,9 +684,10 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 # this has been fine for all the global functions so far because the majority of the properties are defined on the stage anyway, but any pipeline properties will be missing! 
             global_kwargs = dict(owning_pipeline_reference=self, global_computation_results=previous_computation_result, computation_results=self.computation_results, active_configs=self.active_configs, include_includelist=enabled_filter_names, debug_print=debug_print)
     
-            assert (not has_custom_kwargs_list), f"#TODO 2023-11-22 23:41: - [ ] perform_specific_computation(...) computation_kwargs_list seems to have no effect in global functions, maybe fix? For now, just throw an error so you don't think your custom kwargs are working when they aren't."
-
-            self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
+            # assert (not has_custom_kwargs_list), f"#TODO 2023-11-22 23:41: - [ ] perform_specific_computation(...) computation_kwargs_list seems to have no effect in global functions, maybe fix? For now, just throw an error so you don't think your custom kwargs are working when they aren't."
+            if has_custom_kwargs_list:
+                print(f"WARNING: #TODO 2023-11-22 23:41: - [ ] perform_specific_computation(...) computation_kwargs_list seems to have no effect in global functions, maybe fix? For now, just throw an error so you don't think your custom kwargs are working when they aren't.")
+            self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
         else:
             # Non-global functions:
             for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
