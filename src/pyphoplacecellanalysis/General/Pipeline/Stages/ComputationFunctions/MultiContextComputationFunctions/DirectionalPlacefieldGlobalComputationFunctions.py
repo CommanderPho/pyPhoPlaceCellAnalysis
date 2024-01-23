@@ -1241,7 +1241,7 @@ class DirectionalDecodersDecodedResult(ComputedResult):
         continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
         if continuously_decoded_dict is None:
             return False
-        pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.pop('pseudo2D', None)
+        pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo2D', None)
         if pseudo2D_decoder_continuously_decoded_result is None:
             return False
 
@@ -1700,7 +1700,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
                 print(f'time_bin_size: {time_bin_size}')
                 continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
-                pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.pop('pseudo2D', None)
+                pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo2D', None)
 
 
 
