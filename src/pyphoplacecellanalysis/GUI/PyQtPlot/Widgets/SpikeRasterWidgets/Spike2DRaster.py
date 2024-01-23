@@ -358,6 +358,26 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
         """
         self.logger.debug(f'Spike2DRaster._buildGraphics()')
+        
+        # create a splitter
+        
+        self.ui.main_content_splitter = pg.QtWidgets.QSplitter(0)
+        self.ui.main_content_splitter.setObjectName('main_content_splitter')
+        self.ui.main_content_splitter.setHandleWidth(10)
+        self.ui.main_content_splitter.setOrientation(0) # pg.Qt.Vertical
+        # Qt.Horizontal
+        self.ui.main_content_splitter.setStyleSheet("""
+                QSplitter::handle {
+                    background: rgb(255, 0, 4);
+                }
+                QSplitter::handle:horizontal {
+                    width: 15px;
+                }
+                QSplitter::handle:vertical {
+                    height: 15px;
+                }
+            """)
+
         ##### Main Raster Plot Content Top ##########
         
         self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
@@ -365,8 +385,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.ui.main_graphics_layout_widget.useOpenGL(True)
         self.ui.main_graphics_layout_widget.resize(1000,600)
         # Add the main widget to the layout in the (0, 0) location:
-        self.ui.layout.addWidget(self.ui.main_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        # self.ui.layout.addWidget(self.ui.main_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
         
+        # add the GLViewWidget to the splitter
+        self.ui.main_content_splitter.addWidget(self.ui.main_graphics_layout_widget)
+
         # self.ui.main_gl_widget.clicked.connect(self.play_pause)
         # self.ui.main_gl_widget.doubleClicked.connect(self.toggle_full_screen)
         # self.ui.main_gl_widget.wheel.connect(self.wheel_handler)
@@ -452,10 +475,33 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.ui.main_time_curves_view_widget = None
         self.ui.main_time_curves_view_legend = None
         
+        # Create a QWidget to act as a wrapper
+        self.ui.wrapper_widget = pg.QtWidgets.QWidget()
+        self.ui.wrapper_widget.setObjectName("wrapper_widget")
+        self.ui.wrapper_widget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+
+        # Create a layout for the wrapper (you may want a different layout depending on your needs)
+        self.ui.wrapper_layout = pg.QtWidgets.QVBoxLayout(self.ui.wrapper_widget)
+        self.ui.wrapper_layout.setSpacing(0)
+        self.ui.wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        
+        
         ## Add the container to hold dynamic matplotlib plot widgets:
         self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
         self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
-        self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
+        # self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
+        # add the GLViewWidget to the splitter
+        # self.ui.main_content_splitter.addWidget(self.ui.dynamic_docked_widget_container)
+
+        # Add the container to the wrapper layout
+        self.ui.wrapper_layout.addWidget(self.ui.dynamic_docked_widget_container)
+
+        # Add the wrapper_widget to the splitter
+        self.ui.main_content_splitter.addWidget(self.ui.wrapper_widget)
+        
+
+        # add the splitter into your layout
+        self.ui.layout.addWidget(self.ui.main_content_splitter, 0, 0)  # add the splitter to the main layout at 0, 0
 
         # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
         self._setupUI_matplotlib_render_plots()
