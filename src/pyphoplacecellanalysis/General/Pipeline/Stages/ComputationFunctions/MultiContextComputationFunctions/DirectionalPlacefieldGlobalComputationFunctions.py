@@ -2748,8 +2748,8 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     _context = field(default=None, alias="active_context")
     _display_output = field(default=Factory(dict))
 
-
-    def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_pseudo2D_decoder, a_1D_posterior):
+    @classmethod
+    def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_pseudo2D_decoder, time_window_centers, a_1D_posterior):
         """ used with `add_pseudo2D_decoder_decoded_epochs` - adds a single decoded row to the matplotlib dynamic output
         
         # a_decoder_name: str = "long_LR"
@@ -2768,7 +2768,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         active_decoder = a_pseudo2D_decoder # deepcopy(a_pseudo2D_decoder)
         
         active_bins = deepcopy(active_decoder.xbin)
-        time_window_centers = deepcopy(active_decoder.time_window_centers)
+        # time_window_centers = deepcopy(active_decoder.time_window_centers)
         
 
 
@@ -2817,6 +2817,8 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         assert len(pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list) == 1
         p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]
         # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+        time_bin_containers = pseudo2D_decoder_continuously_decoded_result.time_bin_containers[0]
+        time_window_centers = time_bin_containers.centers
         p_x_given_n.shape # (62, 4, 209389)
 
         
@@ -2829,7 +2831,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
         for a_decoder_name, a_1D_posterior in split_pseudo2D_posteriors_dict.items():
             a_dock_config = dock_configs[a_decoder_name]
-            _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_pseudo2D_decoder=pseudo2D_decoder, a_1D_posterior=a_1D_posterior)
+            _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_pseudo2D_decoder=pseudo2D_decoder, time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior)
             # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
             output_dict[a_decoder_name] = _out_tuple
 
