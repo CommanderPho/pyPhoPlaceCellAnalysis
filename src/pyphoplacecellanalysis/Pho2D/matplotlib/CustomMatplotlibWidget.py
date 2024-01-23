@@ -63,7 +63,9 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.params.disable_toolbar = disable_toolbar
         self.params.scrollable_figure = scrollable_figure
         self.params.scrollAreaContents_MinimumHeight = kwargs.pop('scrollAreaContents_MinimumHeight', None)
-        
+        self.params.verticalScrollBarPolicy = kwargs.pop('verticalScrollBarPolicy', pg.QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.params.horizontalScrollBarPolicy = kwargs.pop('horizontalScrollBarPolicy', pg.QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
         # Extract figure_kwargs:
         self.params.figure_kwargs = get_dict_subset(kwargs, ['figsize', 'dpi', 'facecolor', 'edgecolor', 'linewidth', 'frameon', 'subplotpars', 'tight_layout', 'constrained_layout', 'layout']) 
         self.params.figure_kwargs['figsize'] = size
@@ -89,9 +91,6 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
             self._buildUI_buildScrollableWidget()
         else:
             self._buildUI_buildNonScrollableWidget()
-
-        # self.setWindowTitle(self.params.window_title) # sets the window's title
-
 
     def _buildUI_buildNonScrollableWidget(self):
         """ sets up the widget to contain a basic layout with no scrollability """
@@ -132,7 +131,7 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.ui.scrollAreaWidget = QtWidgets.QScrollArea() # Scroll Area which contains the widgets, set as the centralWidget
         
         #Scroll Area Properties
-        self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn) #  Qt.ScrollBarAlwaysOn
+        self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn) #  Qt.ScrollBarAlwaysOn, ScrollBarAsNeeded
         self.ui.scrollAreaWidget.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff) # Qt.ScrollBarAlwaysOff
         self.ui.scrollAreaWidget.setWidgetResizable(True)
         # self.ui.scrollAreaContentsWidget = widget # Widget that contains the collection of Vertical Box
@@ -145,7 +144,11 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         # Set the minimumHeight to the
         if self.params.scrollAreaContents_MinimumHeight is not None:
             self.ui.scrollAreaContentsWidget.setMinimumHeight(self.params.scrollAreaContents_MinimumHeight)
-        
+        if self.params.verticalScrollBarPolicy is not None:
+            self.ui.scrollAreaWidget.setVerticalScrollBarPolicy(self.params.verticalScrollBarPolicy)
+        if self.params.horizontalScrollBarPolicy is not None:
+            self.ui.scrollAreaWidget.setHorizontalScrollBarPolicy(self.params.horizontalScrollBarPolicy)
+            
         
     @property
     def fig(self):
