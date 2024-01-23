@@ -2808,7 +2808,6 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
         
-
         # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
@@ -2871,3 +2870,137 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             self._display_output[identifier_name] = an_output_tuple
 
         print(f'\t AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand.execute() is done.')
+
+
+
+
+@define(slots=False)
+class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand):
+    """ 2024-01-23
+    Adds four rows to the SpikeRaster2D showing the continuously decoded posterior for each of the four 1D decoders
+
+    Usage:
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand
+
+    """
+    _spike_raster_window = field()
+    _active_pipeline = field(alias='curr_active_pipeline')
+    _active_config_name = field(default=None)
+    _context = field(default=None, alias="active_context")
+    _display_output = field(default=Factory(dict))
+
+    @classmethod
+    def _perform_add_new_decoded_posterior_marginal_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_variable_name: str, time_window_centers, xbin, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
+        """ used with `add_pseudo2D_decoder_decoded_epoch_marginals` - adds a single decoded row to the matplotlib dynamic output
+        
+        # a_decoder_name: str = "long_LR"
+
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        
+        ## ✅ Add a new row for each of the four 1D directional decoders:
+        identifier_name: str = f'{a_variable_name}_ContinuousDecode'
+        if extended_dock_title_info is not None:
+            identifier_name += extended_dock_title_info
+        print(f'identifier_name: {identifier_name}')
+        widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config)
+        an_ax = matplotlib_fig_axes[0]
+
+        variable_name: str = a_variable_name
+        
+        # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
+        active_most_likely_positions = None
+        active_posterior = deepcopy(a_1D_posterior)
+        
+        # most_likely_positions_mode: 'standard'|'corrected'
+        # fig, curr_ax = curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', _active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=an_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
+        ## Actual plotting portion:
+        fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
+                                                                posterior=active_posterior,
+                                                                active_most_likely_positions_1D=active_most_likely_positions,
+                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False)
+
+        widget.draw() # alternative to accessing through full path?
+        active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+        return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
+    
+    @classmethod
+    def add_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False):
+        """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
+        
+        
+        showCloseButton = True
+        result_names = ('non_marginalized_raw_result', 'marginal_over_direction', 'marginal_over_track_ID')
+        dock_configs = dict(zip(result_names, (CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey),
+                                               CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey),
+                                                CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey))))
+
+        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
+        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+        print(f'time_bin_size: {time_bin_size}')
+        
+        info_string: str = f" - t_bin_size: {time_bin_size}"
+
+        most_recent_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = deepcopy(directional_decoders_decode_result.most_recent_continuously_decoded_dict)
+        # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
+        pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = most_recent_continuously_decoded_dict.get('pseudo2D', None)
+        assert len(pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list) == 1
+        non_marginalized_raw_result = DirectionalMergedDecodersResult.build_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        marginal_over_direction = DirectionalMergedDecodersResult.build_custom_marginal_over_direction(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        marginal_over_track_ID = DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        # non_marginalized_raw_result.shape # (4, 128672)
+        # marginal_over_direction.shape # (2, 128672)
+        # marginal_over_track_ID.shape # (2, 128672)
+
+        # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]
+        # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+        time_bin_containers = pseudo2D_decoder_continuously_decoded_result.time_bin_containers[0]
+        time_window_centers = time_bin_containers.centers
+        # p_x_given_n.shape # (62, 4, 209389)
+        
+        ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
+        # assert p_x_given_n.shape[1] == 4, f"expected the 4 pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
+        # split_pseudo2D_posteriors_dict = {k:np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(('long_LR', 'long_RL', 'short_LR', 'short_RL'))}
+
+        # Need all_directional_pf1D_Decoder_dict
+        output_dict = {}
+
+        a_posterior_name: str = 'non_marginalized_raw_result'
+        output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name],
+                                                                                             a_variable_name=a_posterior_name, xbin=np.arange(4), time_window_centers=time_window_centers, a_1D_posterior=non_marginalized_raw_result, extended_dock_title_info=info_string)
+
+        # result_names
+        a_posterior_name: str = 'marginal_over_direction'
+        output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name],
+                                                                                             a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_direction, extended_dock_title_info=info_string)
+        
+        a_posterior_name: str = 'marginal_over_track_ID'
+        output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name],
+                                                                                             a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_track_ID, extended_dock_title_info=info_string)
+        
+        return output_dict
+
+
+
+    def execute(self, *args, **kwargs) -> None:
+        ## To begin, the destination plot must have a matplotlib widget plot to render to:
+        # print(f'AddNewDecodedEpochMarginal_MatplotlibPlotCommand.execute(...)')
+        active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+
+        output_dict = self.add_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot)
+        
+        # Update display output dict:
+        for a_decoder_name, an_output_tuple in output_dict.items():
+            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
+            self._display_output[identifier_name] = an_output_tuple
+
+        print(f'\t AddNewDecodedEpochMarginal_MatplotlibPlotCommand.execute() is done.')
+
+

@@ -89,7 +89,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         self.ui.actionCombineTimeSynchronizedPlotterWindow
         
         """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand, AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand, AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand, AddNewDecodedEpochMarginal_MatplotlibPlotCommand
         
         spike_raster_window = kwargs.get('spike_raster_window', None)
         # active_pf_2D_dt = kwargs.get('active_pf_2D_dt', None)
@@ -113,9 +113,10 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Directional Decoded Epochs in Matplotlib Views", name="actionDirectionalDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
-        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Decoded Epochs in Matplotlib Views", name="actionPseudo2DDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Epochs in Matplotlib Views", name="actionPseudo2DDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
-        
+        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Marginals in Matplotlib Views", name="actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+        addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Custom...", name="actionNewDockedCustom", tooltip="", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
         
@@ -127,6 +128,8 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         curr_actions_dict['actionLongShortDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
         curr_actions_dict['actionDirectionalDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
         curr_actions_dict['actionPseudo2DDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'].triggered.connect(AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+        
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
 
