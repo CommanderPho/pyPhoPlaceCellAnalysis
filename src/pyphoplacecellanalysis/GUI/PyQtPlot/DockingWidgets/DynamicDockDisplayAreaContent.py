@@ -1,3 +1,4 @@
+from typing import Optional, Dict, List, Tuple
 from collections import OrderedDict
 from enum import Enum
 
@@ -6,6 +7,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
+
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
 
@@ -218,7 +221,7 @@ class DynamicDockDisplayAreaContentMixin:
     """
     
     @property
-    def dynamic_display_dict(self):
+    def dynamic_display_dict(self) -> OrderedDict:
         """The dynamic_display_dict property."""
         return self._dynamic_display_output_dict
     @dynamic_display_dict.setter
@@ -226,7 +229,7 @@ class DynamicDockDisplayAreaContentMixin:
         self._dynamic_display_output_dict = value
     
     @property
-    def displayDockArea(self):
+    def displayDockArea(self) -> "DockArea":
         """The displayDockArea property."""
         return self.ui.area
     @displayDockArea.setter
@@ -371,7 +374,7 @@ class DynamicDockDisplayAreaContentMixin:
         # self.dynamic_display_dict[identifier] = {"dock":dDisplayItem, "widget":new_view_widget}        
         return widget, dDisplayItem
     
-    def find_display_dock(self, identifier):
+    def find_display_dock(self, identifier) -> Optional[Dock]:
         """ returns the first found Dock with the specified title equal to the identifier , or None if it doesn't exist. """
         curr_display_dock_items = self.displayDockArea.findChildren(Dock) # find all dock-type children
         for a_dock_item in curr_display_dock_items:
