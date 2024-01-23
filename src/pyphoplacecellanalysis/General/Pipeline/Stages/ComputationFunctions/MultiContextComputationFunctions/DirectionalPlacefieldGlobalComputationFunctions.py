@@ -1141,6 +1141,16 @@ class DirectionalMergedDecodersResult(ComputedResult):
             marginals_df.to_csv(out_path)
             return out_path 
 
+        def _build_per_time_bin_marginals(a_decoder_result: DecodedFilterEpochsResult, active_marginals) -> pd.DataFrame:
+            flat_time_bin_centers_column = np.concatenate([curr_epoch_time_bin_container.centers for curr_epoch_time_bin_container in a_decoder_result.time_bin_containers])
+            epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
+            n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
+            epoch_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            epoch_time_bin_marginals_df = pd.DataFrame(np.hstack((epoch_extracted_posteriors)).T, columns=['P_Long', 'P_Short'])
+            epoch_time_bin_marginals_df['epoch_idx'] = epoch_idx_column
+            epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column)
+            return epoch_time_bin_marginals_df
+        
 
         ## Laps:
         laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs).to_dataframe()
@@ -1149,13 +1159,26 @@ class DirectionalMergedDecodersResult(ComputedResult):
         laps_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
         
+        ## Build the per-time-bin results:
+        laps_time_bin_marginals_df: pd.DataFrame = _build_per_time_bin_marginals(a_decoder_result=self.all_directional_laps_filter_epochs_decoder_result, active_marginals=track_identity_marginals)
+        laps_time_bin_marginals_out_path = export_marginals_df_csv(laps_time_bin_marginals_df, data_identifier_str=f'(laps_time_bin_marginals_df)')
+
+
         laps_marginals_df: pd.DataFrame = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
         laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
         laps_marginals_df
+        
+        
+        # epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in track_identity_marginals]
+        # n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
+        # epoch_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+        # epoch_time_bin_marginals_df = pd.DataFrame(np.hstack((epoch_extracted_posteriors)).T, columns=['P_Long', 'P_Short'])
+        # epoch_time_bin_marginals_df['epoch_idx'] = epoch_idx_column
+        # epoch_time_bin_marginals_df['t_bin_center'] = flat_time_bin_centers_column
+        
 
         laps_out_path = export_marginals_df_csv(laps_marginals_df, data_identifier_str=f'(laps_marginals_df)')
-
 
         ## Ripples:
         ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
@@ -1164,6 +1187,11 @@ class DirectionalMergedDecodersResult(ComputedResult):
         ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = ripple_marginals
         ripple_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
         ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals
+
+        ## Build the per-time-bin results:
+        ripple_time_bin_marginals_df: pd.DataFrame = _build_per_time_bin_marginals(a_decoder_result=self.all_directional_ripple_filter_epochs_decoder_result, active_marginals=ripple_directional_marginals)
+        ripple_time_bin_marginals_out_path = export_marginals_df_csv(ripple_time_bin_marginals_df, data_identifier_str=f'(ripple_time_bin_marginals_df)')
+
 
         ## Ripple marginals_df:
         ripple_marginals_df: pd.DataFrame = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
