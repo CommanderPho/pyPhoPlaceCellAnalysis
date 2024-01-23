@@ -35,8 +35,10 @@ class NestedDockAreaWidget(DynamicDockDisplayAreaContentMixin, QtWidgets.QWidget
         self.ui.area = DockArea()
         # Use self.ui.area as central widget:
         self.ui.layout = QtWidgets.QGridLayout()
+        self.ui.layout.setContentsMargins(0,0,0,0)
+        self.ui.layout.setVerticalSpacing(2)
         self.setLayout(self.ui.layout)
-        self.ui.layout.addWidget(self.ui.area, 0, 0)        
+        self.ui.layout.addWidget(self.ui.area, 0, 0)
         self.DynamicDockDisplayAreaContentMixin_on_setup()
         
         
