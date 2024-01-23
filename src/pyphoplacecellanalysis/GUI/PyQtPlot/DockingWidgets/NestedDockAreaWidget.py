@@ -6,9 +6,6 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
 
-
-
-
 class NestedDockAreaWidget(DynamicDockDisplayAreaContentMixin, QtWidgets.QWidget):
     """ a custom QWidget subclass that contains a DockArea as its central view and allows adding nested dock items dynamically
     
@@ -17,9 +14,11 @@ class NestedDockAreaWidget(DynamicDockDisplayAreaContentMixin, QtWidgets.QWidget
     Usage:
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
   
+        pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget.NestedDockAreaWidget
+        
     """
     @property
-    def area(self):
+    def area(self) -> DockArea:
         return self.ui.area
 
     def __init__(self, *args, **kwargs):
