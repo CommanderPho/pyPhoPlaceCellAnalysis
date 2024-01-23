@@ -1143,23 +1143,57 @@ class PipelineWithComputedPipelineStageMixin:
             # if no includelist specified, get all computed keys:
             config_names_includelist = self.active_completed_computation_result_names # ['maze1_PYR', 'maze2_PYR', 'maze_PYR']
         
+
+        ## Global:
+        global_dropped_keys = []
+        global_not_found_keys_to_drop = []
+
+        for a_key_to_drop in computed_data_keys_to_drop:
+            curr_global_computation_results = self.global_computation_results
+            curr_global_computed_data = curr_global_computation_results.computed_data
+            # curr_global_computed_data
+            a_result_to_drop = curr_global_computed_data.pop(a_key_to_drop, None) # AttributeError: 'ComputationResult' object has no attribute 'pop'
+            ## TODO: Should we drop from curr_computed_results.accumulated_errors in addition to curr_computed_results.computed_data? Probably fine not to.
+            if a_result_to_drop is not None:
+                # Successfully dropped
+                print(f"\t Dropped global_computation_results.computed_data['{a_key_to_drop}'].")
+                global_dropped_keys.append(a_key_to_drop)
+                # remove from .computation_times, .accumulated_errors as well
+                curr_global_computation_results.computation_times.pop(a_key_to_drop, None)
+                curr_global_computation_results.accumulated_errors.pop(a_key_to_drop, None)
+                
+            else:
+                print(f"\t global_computation_results.computed_data['{a_key_to_drop}'] did not exist.")
+                global_not_found_keys_to_drop.append(a_key_to_drop) # key might be local
+
+
+        # only check locals for global_not_found_keys
+        
+        
+        local_dropped_keys = []
+        local_not_found_keys_to_drop = []
+        
         ## Loop across all computed contexts
         for a_config_name, curr_computed_results in self.computation_results.items():
             if a_config_name in config_names_includelist:            
                 # remove the results from this config
-                for a_key_to_drop in computed_data_keys_to_drop:
-                    a_result_to_drop = curr_computed_results.pop(a_key_to_drop, None) # AttributeError: 'ComputationResult' object has no attribute 'pop'
+                for a_key_to_drop in global_not_found_keys_to_drop:
+                    a_result_to_drop = curr_computed_results.pop(a_key_to_drop, []) # AttributeError: 'ComputationResult' object has no attribute 'pop'
                     ## TODO: Should we drop from curr_computed_results.accumulated_errors in addition to curr_computed_results.computed_data? Probably fine not to.
-                    if a_result_to_drop is not None:
+                    if a_result_to_drop is not []:
                         # Successfully dropped
                         print(f"\t Dropped computation_results['{a_config_name}'].computed_data['{a_key_to_drop}'].")
+                        local_dropped_keys.append(a_key_to_drop)
                     else:
                         print(f"\t computation_results['{a_config_name}'].computed_data['{a_key_to_drop}'] did not exist.")
-                        pass
+                        local_not_found_keys_to_drop.append(a_key_to_drop)
             else:
                 # Otherwise skip it if it isn't in the includelist
                 if debug_print:
                     print(f'skipping {a_config_name} because it is not in the context includelist.')
+                local_not_found_keys_to_drop.append(a_key_to_drop)
+
+        return global_dropped_keys, local_dropped_keys
 
     def find_LongShortGlobal_epoch_names(self):
         """ Returns the [long, short, global] epoch names. They must exist.
