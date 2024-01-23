@@ -207,7 +207,9 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
 def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
-    
+    from copy import deepcopy
+    import numpy as np
+    import pandas as pd
     from neuropy.utils.debug_helpers import parameter_sweeps
     from neuropy.core.laps import Laps
     from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
@@ -302,8 +304,12 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     laps_obj: Laps = curr_active_pipeline.sess.laps
     laps_df = laps_obj.to_dataframe()
-    laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
-    
+    laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps   
+    # # computes 'track_id' from t_start, t_delta, and t_end where t_delta corresponds to the transition point (track change).
+    # laps_df = Laps._update_dataframe_maze_id_if_needed(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end)
+    # ## computes proper 'is_LR_dir' and 'lap_dir' columns:
+    # laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=laps_df, global_session=curr_active_pipeline.sess) # adds 'is_LR_dir'
+
     # Uses: session_ctxt_key, all_param_sweep_options
     output_alt_directional_merged_decoders_result = {} # empty dict
     output_laps_decoding_accuracy_results_dict = {} # empty dict
@@ -358,6 +364,9 @@ _pre_user_completion_functions_header_template_str: str = f"""
 # ==================================================================================================================== #
 # BEGIN USER COMPLETION FUNCTIONS                                                                                      #
 # ==================================================================================================================== #
+from copy import deepcopy
+
+
 custom_user_completion_functions = []
 """
 
