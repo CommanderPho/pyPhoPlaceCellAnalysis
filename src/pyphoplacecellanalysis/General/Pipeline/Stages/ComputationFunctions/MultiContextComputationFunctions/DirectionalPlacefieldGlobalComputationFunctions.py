@@ -1710,14 +1710,21 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         from neuropy.core.epoch import Epoch
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
                 
+        should_disable_cache: bool = True # when True, always recomputes and does not attempt to use the cache.
+        
         # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
 
         
         # Store all_directional_pf1D_Decoder_dict, all_directional_continuously_decoded_dict
         
-        ## Create or update the global directional_decoders_decode_result:
+        ## Create or update the global directional_decoders_decode_result:            
         directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
         had_existing_DirectionalDecodersDecoded_result: bool = (directional_decoders_decode_result is not None)
+
+        if should_disable_cache:
+            print(f'should_disable_cache == True so setting had_existing_DirectionalDecodersDecoded_result = False')
+            had_existing_DirectionalDecodersDecoded_result = False
+            directional_decoders_decode_result = None # set to None
 
 
         ## Currently used for both cases to decode:
