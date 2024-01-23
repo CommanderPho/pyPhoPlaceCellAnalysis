@@ -239,22 +239,23 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         return directional_merged_decoders_result
         
 
-    def _update_result_laps(a_result: DecodedFilterEpochsResult, laps_df: pd.DataFrame):
+    def _update_result_laps(a_result: DecodedFilterEpochsResult, laps_df: pd.DataFrame) -> pd.DataFrame:
         """ captures nothing. Can reusing the same laps_df as it makes no modifications to it. 
+        
+        e.g. a_result=output_alt_directional_merged_decoders_result[a_sweep_tuple]
         """
+        result_laps_epochs_df: pd.DataFrame = a_result.laps_epochs_df
         ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
         result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
         ## add the 'is_LR_dir' groud-truth column in:
         result_laps_epochs_df['is_LR_dir'] = laps_df['is_LR_dir'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
-
-        result_laps_epochs_df: pd.DataFrame = a_result.laps_epochs_df
-        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = a_result.laps_directional_marginals_tuple
+        
+        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = a_result.laps_directional_marginals_tuple
         laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = a_result.laps_track_identity_marginals_tuple
         ## Add the decoded results to the laps df:
         result_laps_epochs_df['is_most_likely_track_identity_Long'] = laps_is_most_likely_track_identity_Long
         result_laps_epochs_df['is_most_likely_direction_LR'] = laps_is_most_likely_direction_LR_dir
         return result_laps_epochs_df
-    
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     assert collected_outputs_path.exists()
@@ -344,7 +345,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     # add to output dict
     # across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
-    across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = (output_alt_directional_merged_decoders_result, output_laps_decoding_accuracy_results_dict)
+    across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = (out_path, output_laps_decoding_accuracy_results_df)
 
     print(f'>>\t done with {curr_session_context}')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
