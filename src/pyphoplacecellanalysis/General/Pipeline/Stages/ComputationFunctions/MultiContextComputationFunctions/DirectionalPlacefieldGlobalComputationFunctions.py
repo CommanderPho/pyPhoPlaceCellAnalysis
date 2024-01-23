@@ -705,7 +705,11 @@ class DirectionalMergedDecodersResult(ComputedResult):
     # Computed Properties ________________________________________________________________________________________________ #
     @property
     def laps_epochs_df(self) -> pd.DataFrame:
-        return deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs).to_dataframe()
+        a_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
+        if isinstance(a_df, pd.DataFrame):
+            return a_df
+        else:
+            return a_df.to_dataframe()
 
     @property
     def ripple_epochs_df(self) -> pd.DataFrame:
@@ -808,7 +812,10 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         """
         # Computes and initializes the marginal properties:
-        laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs).to_dataframe()
+        laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
+        if not isinstance(laps_epochs_df, pd.DataFrame):
+            laps_epochs_df = laps_epochs_df.to_dataframe()
+        
         self.laps_directional_marginals_tuple = DirectionalMergedDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
         self.laps_track_identity_marginals_tuple = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
@@ -1223,10 +1230,11 @@ class DirectionalMergedDecodersResult(ComputedResult):
             return out_path 
 
 
-        
-
         ## Laps:
-        laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs).to_dataframe()
+        laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
+        if not isinstance(laps_epochs_df, pd.DataFrame):
+            laps_epochs_df = laps_epochs_df.to_dataframe()
+        
         laps_directional_marginals_tuple = DirectionalMergedDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
         laps_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
