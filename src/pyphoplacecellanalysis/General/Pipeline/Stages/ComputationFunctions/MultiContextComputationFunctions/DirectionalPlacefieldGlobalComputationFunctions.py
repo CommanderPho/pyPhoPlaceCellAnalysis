@@ -782,6 +782,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         self.laps_track_identity_marginals_tuple = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
 
+        ## Simple Scatterplot:
         laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
         laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
@@ -794,6 +795,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         self.ripple_track_identity_marginals_tuple = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
         ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
 
+        ## Simple Scatterplot:
         ## Ripple marginals_df:
         ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
@@ -1622,7 +1624,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # takes 6.3 seconds
 
         ## Great or update the global directional_merged_decoders_result:
-        directional_merged_decoders_result = global_computation_results.computed_data.get('DirectionalMergedDecoders', DirectionalMergedDecodersResult(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
+        directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data.get('DirectionalMergedDecoders', DirectionalMergedDecodersResult(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
                                                       long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
                                                       short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder))
 
