@@ -1289,10 +1289,13 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         debug_print_temporal_info(self, prefix_string='', indent_string=indent_string)
         
         ## Time Curves: main_time_curves_view_widget:
-        print(f'Time Curves:')
-        main_tc_view_rect = self.ui.main_time_curves_view_widget.viewRect() # PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)
-        debug_print_QRect(main_tc_view_rect, prefix_string='main_time_curves_view_widget.viewRect(): ', indent_string=indent_string)
-        
+        if self.ui.main_time_curves_view_widget is not None:
+            print(f'Time Curves:')
+            main_tc_view_rect = self.ui.main_time_curves_view_widget.viewRect() # PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)
+            debug_print_QRect(main_tc_view_rect, prefix_string='main_time_curves_view_widget.viewRect(): ', indent_string=indent_string)
+        else:
+            print(f'No Time Curves added.')
+
         ## UI Properties:
         print(f'UI/Graphics Properties:')
         self.debug_print_spike_raster_2D_specific_plots_info(indent_string = '\t')
