@@ -1149,7 +1149,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         laps_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
         
-        laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        laps_marginals_df: pd.DataFrame = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
         laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
         laps_marginals_df
@@ -1166,7 +1166,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals
 
         ## Ripple marginals_df:
-        ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        ripple_marginals_df: pd.DataFrame = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
         ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
         ripple_marginals_df
@@ -2298,10 +2298,13 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         History: this is the Post 2022-10-22 display_all_pf_2D_pyqtgraph_binned_image_rendering-based method:
         """
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array, display_all_pf_2D_pyqtgraph_binned_image_rendering
+        from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow 
+        
 
         defer_render = kwargs.pop('defer_render', False)
-        directional_merged_decoders_result = global_computation_results.computed_data['DirectionalMergedDecoders']
-
+        directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
+        active_merged_pf_plots_data_dict = {} #empty dict
+        
         if plot_all_directions:
             active_merged_pf_plots_data_dict[owning_pipeline_reference.build_display_context_for_session(track_config='All-Directions', display_fn_name='display_all_pf_2D_pyqtgraph_binned_image_rendering')] = directional_merged_decoders_result.all_directional_pf1D_Decoder.pf # all-directions
         if plot_long_directional:
@@ -2314,10 +2317,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         for active_context, active_pf_2D in active_merged_pf_plots_data_dict.items():
             # figure_format_config = {} # empty dict for config
             figure_format_config = {'scrollability_mode': LayoutScrollability.NON_SCROLLABLE} # kwargs # kwargs as default figure_format_config
-            out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config) # output is BasicBinnedImageRenderingWindow
+            out_all_pf_2D_pyqtgraph_binned_image_fig: BasicBinnedImageRenderingWindow  = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config) # output is BasicBinnedImageRenderingWindow
+        
             # Set the window title from the context
             out_all_pf_2D_pyqtgraph_binned_image_fig.setWindowTitle(f'{active_context.get_description()}')
             out_plots_dict[active_context] = out_all_pf_2D_pyqtgraph_binned_image_fig
+
+            # Tries to update the display of the item:
+            names_list = [v for v in list(out_all_pf_2D_pyqtgraph_binned_image_fig.plots.keys()) if v not in ('name', 'context')]
+            for a_name in names_list:
+                # Adjust the size of the text for the item by passing formatted text
+                a_plot: pg.PlotItem = out_all_pf_2D_pyqtgraph_binned_image_fig.plots[a_name].mainPlotItem # PlotItem 
+                # no clue why 2 is a good value for this...
+                a_plot.titleLabel.setMaximumHeight(2)
+                a_plot.layout.setRowFixedHeight(0, 2)
+                
 
             if not defer_render:
                 out_all_pf_2D_pyqtgraph_binned_image_fig.show()
