@@ -89,7 +89,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         self.ui.actionCombineTimeSynchronizedPlotterWindow
         
         """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand, AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand
         
         spike_raster_window = kwargs.get('spike_raster_window', None)
         # active_pf_2D_dt = kwargs.get('active_pf_2D_dt', None)
@@ -125,8 +125,8 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         curr_actions_dict['actionNewDockedMatplotlibView'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
         curr_actions_dict['actionNewDockedContextNested'].triggered.connect(CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
         curr_actions_dict['actionLongShortDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
-        curr_actions_dict['actionDirectionalDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_sub_command="separate_1D"))
-        curr_actions_dict['actionPseudo2DDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_sub_command="pseudo2D"))
+        curr_actions_dict['actionDirectionalDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionPseudo2DDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
 
