@@ -706,10 +706,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
     @property
     def laps_epochs_df(self) -> pd.DataFrame:
         a_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
-        if isinstance(a_df, pd.DataFrame):
-            return a_df
-        else:
-            return a_df.to_dataframe()
+        if not isinstance(a_df, pd.DataFrame):
+            a_df = a_df.to_dataframe()
+        return a_df
 
     @property
     def ripple_epochs_df(self) -> pd.DataFrame:
@@ -1599,6 +1598,35 @@ def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result,
     # result = tuple(collector.created_figures)
 
     return collector
+
+
+def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame, debug_print=True):
+    """ 2024-01-17 - Validates the performance of the pseudo2D decoder posteriors using the laps data.
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
+    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
+    
+    """
+    # Check 'maze_id' decoding accuracy
+    n_laps = np.shape(result_laps_epochs_df)[0]
+    is_decoded_track_correct = (result_laps_epochs_df['maze_id'] == result_laps_epochs_df['is_most_likely_track_identity_Long'].apply(lambda x: 0 if x else 1))
+    percent_laps_track_identity_estimated_correctly = (np.sum(is_decoded_track_correct) / n_laps)
+    if debug_print:
+        print(f'percent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly}')
+    # Check 'is_LR_dir' decoding accuracy:
+    is_decoded_dir_correct = (result_laps_epochs_df['is_LR_dir'].apply(lambda x: 0 if x else 1) == result_laps_epochs_df['is_most_likely_direction_LR'].apply(lambda x: 0 if x else 1))
+    percent_laps_direction_estimated_correctly = (np.sum(is_decoded_dir_correct) / n_laps)
+    if debug_print:
+        print(f'percent_laps_direction_estimated_correctly: {percent_laps_direction_estimated_correctly}')
+
+    # Both should be correct
+    are_both_decoded_properties_correct = np.logical_and(is_decoded_track_correct, is_decoded_dir_correct)
+    percent_laps_estimated_correctly = (np.sum(are_both_decoded_properties_correct) / n_laps)
+    if debug_print:
+        print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
+
+    return (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
+
 
 
 
