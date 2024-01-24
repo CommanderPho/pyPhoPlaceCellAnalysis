@@ -31,6 +31,16 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     _computationPrecidence = 1 # must be done after PlacefieldComputations
     _is_global = False
 
+    @function_attributes(short_name='lap_direction_determination', tags=['laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-24 13:04', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe(), curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe()['is_LR_dir']), is_global=False)
+    def _perform_lap_direction_determination(computation_result: ComputationResult, **kwargs):
+        """ Adds the 'is_LR_dir' column to the laps dataframe and updates 'lap_dir' if needed.        
+        """
+        computation_result.sess.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position)
+        # computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position)
+        # curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end) # this doesn't make sense for the filtered sessions unfortunately.
+        return computation_result # no changes except to the internal sessions
+    
 
     @function_attributes(short_name='position_decoding', tags=['decoding', 'position'], input_requires=["computed_data['pf1D']", "computed_data['pf2D']"], output_provides=[], uses=['BayesianPlacemapPositionDecoder'], used_by=[], creation_date='2023-09-12 17:30', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_Decoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_Decoder']), is_global=False)

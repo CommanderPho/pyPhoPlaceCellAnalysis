@@ -385,8 +385,12 @@ class DirectionalLapsHelpers:
         long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
         long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders()
 
+        # determine if needs
+        has_updated_laps_dirs = ('is_LR_dir' in curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe().columns)
+        
+        has_matching_filter_name = (computation_filter_name in split_directional_laps_config_names)
         # assert (computation_filter_name in computed_base_epoch_names), f'computation_filter_name: {computation_filter_name} is missing from computed_base_epoch_names: {computed_base_epoch_names} '
-        return (computation_filter_name in split_directional_laps_config_names)
+        return (has_matching_filter_name and has_updated_laps_dirs)
         # return (computation_filter_name in computed_base_epoch_names)
 
     @classmethod
@@ -534,6 +538,28 @@ class DirectionalLapsHelpers:
         was_modified = was_modified or DirectionalLapsHelpers.fix_computation_epochs_if_needed(curr_active_pipeline)
         return was_modified
 
+    @classmethod
+    def update_lap_directions_properties(cls, curr_active_pipeline, debug_print=False) -> bool:
+        """2024-01-24 - Updates laps for all filtered and unfiltered sessions with new column definitions session and filtered versions:"""
+        was_modified = False
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        curr_sess = curr_active_pipeline.sess
+        origin_lap_df = curr_sess.laps.to_dataframe()
+        added_column = ('is_LR_dir' not in origin_lap_df.columns)
+        was_modified = was_modified or added_column
+        curr_sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=curr_sess.position)
+        curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+        
+        for an_epoch_name, curr_sess in curr_active_pipeline.filtered_sessions.items():
+            origin_lap_df = curr_sess.laps.to_dataframe()
+            added_column = ('is_LR_dir' not in origin_lap_df.columns)
+            curr_sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=curr_sess.position)
+            curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+            was_modified = was_modified or added_column
+
+        return was_modified # just always assume they changed.
+
+
 
     @classmethod
     def build_global_directional_result_from_natural_epochs(cls, curr_active_pipeline, progress_print=False) -> "DirectionalLapsResult":
@@ -572,6 +598,7 @@ class DirectionalLapsHelpers:
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         was_modified = cls.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
         was_modified = was_modified or DirectionalLapsHelpers.post_fixup_filtered_contexts(curr_active_pipeline)
+        was_modified = was_modified or DirectionalLapsHelpers.update_lap_directions_properties(curr_active_pipeline)
         print(f'build_global_directional_result_from_natural_epochs(...): was_modified: {was_modified}')
 
         # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
@@ -1641,8 +1668,11 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         provides_global_keys=['DirectionalLaps'],
         validate_computation_test=DirectionalLapsHelpers.validate_has_directional_laps, is_global=True)
     def _split_to_directional_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
-        """
-
+        """ Splits the existing laps into directional versions
+    
+        laps_obj.update_lap_dir_from_smoothed_velocity(pos_input=curr_active_pipeline.sess.position)
+        laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+    
         Requires:
             ['sess']
 

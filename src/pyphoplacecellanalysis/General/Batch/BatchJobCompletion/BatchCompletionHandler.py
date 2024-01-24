@@ -161,7 +161,7 @@ class BatchSessionCompletionHandler:
     session_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
 
     global_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
-    extended_computations_include_includelist: list = field(default=['pf_computation', 'pfdt_computation', 'firing_rate_trends',
+    extended_computations_include_includelist: list = field(default=['lap_direction_determination', 'pf_computation', 'pfdt_computation', 'firing_rate_trends',
                                                                     # 'pf_dt_sequential_surprise',
                                                                     'extended_stats',
                                         'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',

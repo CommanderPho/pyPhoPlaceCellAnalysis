@@ -304,7 +304,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     laps_obj: Laps = curr_active_pipeline.sess.laps
     laps_obj.update_lap_dir_from_smoothed_velocity(pos_input=curr_active_pipeline.sess.position)
-    laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end, replace_existing=True)
+    laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
     laps_df = laps_obj.to_dataframe()
     # laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess, replace_existing=True) # NOTE: .sess is used because global_session is missing the last two laps   
     # # computes 'track_id' from t_start, t_delta, and t_end where t_delta corresponds to the transition point (track change).
