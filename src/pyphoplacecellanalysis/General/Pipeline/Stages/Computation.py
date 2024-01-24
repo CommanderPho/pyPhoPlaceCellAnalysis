@@ -1314,7 +1314,7 @@ class PipelineWithComputedPipelineStageMixin:
     def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, debug_print:bool=True):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
         Usage:
-            split_save_folder, split_save_paths, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
+            split_save_folder, split_save_paths, split_save_output_types, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
             
         #TODO 2023-11-22 18:54: - [ ] One major is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
         # Update result with correct type:
@@ -1358,28 +1358,32 @@ class PipelineWithComputedPipelineStageMixin:
         
         computed_data = self.global_computation_results.computed_data
         split_save_paths = {}
+        split_save_output_types = {}
         failed_keys = []
         for k, v in computed_data.items():
             curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
             if debug_print:
                 print(f'curr_split_result_pickle_path: {curr_split_result_pickle_path}')
             was_save_success = False
+            curr_item_type = type(v)
             try:
-                ## try get as dict
+                ## try get as dict                
                 v_dict = v.__dict__ #__getstate__()
-                saveData(curr_split_result_pickle_path, (v_dict))
+                # saveData(curr_split_result_pickle_path, (v_dict))
+                saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
                 was_save_success = True
             except KeyError as e:
                 print(f'{k} encountered {e} while trying to save {k}. Skipping')
                 pass
             if was_save_success:
                 split_save_paths[k] = curr_split_result_pickle_path
+                split_save_output_types[k] = curr_item_type
             else:
                 failed_keys.append(k)
                 
         if len(failed_keys) > 0:
             print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
-        return split_save_folder, split_save_paths, failed_keys
+        return split_save_folder, split_save_paths, split_save_output_types, failed_keys
         
 
     def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
@@ -1525,7 +1529,16 @@ class PipelineWithComputedPipelineStageMixin:
             if should_apply:
                 # apply the loaded result to the computed_data.
                 sucessfully_updated_keys.append(curr_result_key)
-                self.global_computation_results.computed_data[curr_result_key] = loaded_value
+                if isinstance(loaded_value, dict):
+                    loaded_result_dict = loaded_value
+                elif isinstance(loaded_value, tuple):
+                    assert len(loaded_value) == 3
+                    # saved with 2024-01-24 - (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)
+                    loaded_result_dict, curr_item_type_module, curr_item_type_name = loaded_value
+                    print(f'curr_item_type_module: {curr_item_type_module}, curr_item_type_name: {curr_item_type_name}')
+                    # TODO: use thse to unarchive the object into the correct format:
+
+                self.global_computation_results.computed_data[curr_result_key] = loaded_result_dict
 
         return sucessfully_updated_keys, successfully_loaded_keys, found_split_paths
     
