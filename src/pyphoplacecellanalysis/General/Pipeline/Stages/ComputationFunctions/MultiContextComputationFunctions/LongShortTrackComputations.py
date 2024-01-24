@@ -1379,8 +1379,6 @@ def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_
 ## 2023-04-07 - Builds the laps using estimation_session_laps(...) if needed for each epoch, and then sets the decoder's .epochs property to the laps object so the occupancy is correct.
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
-from neuropy.analyses.laps import build_lap_computation_epochs # used in `DirectionalLapsHelpers.split_to_directional_laps`
-
 
 
 def constrain_to_laps(curr_active_pipeline):
