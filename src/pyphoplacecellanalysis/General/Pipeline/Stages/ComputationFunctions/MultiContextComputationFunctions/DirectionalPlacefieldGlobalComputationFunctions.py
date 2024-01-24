@@ -1235,7 +1235,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
 
     def compute_and_export_marginals_df_csvs(self, parent_output_path: Path, active_context):
-        """ 
+        """ Builds the four dataframes from the marginal distributions and exports them to .csv files.
         
         active_context = curr_active_pipeline.get_session_context()
         """
