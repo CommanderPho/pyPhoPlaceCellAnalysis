@@ -769,7 +769,12 @@ class H5FileAggregator:
         
         """
         if short_name_list is None:
-            short_name_list = [a_file.filename for a_file in file_list]
+            try:
+                short_name_list = [a_file.filename for a_file in file_list]
+            except AttributeError:
+                # for Path inputs:
+                short_name_list = [a_file.name for a_file in file_list]
+                
         assert len(short_name_list) == len(file_list)
         if table_key_list is not None:
             assert len(table_key_list) == len(file_list)
