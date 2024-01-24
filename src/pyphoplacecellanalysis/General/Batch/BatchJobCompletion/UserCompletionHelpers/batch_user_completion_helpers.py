@@ -268,7 +268,9 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     active_context = curr_active_pipeline.get_session_context()
     session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
     
-    all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=np.linspace(0.125, 1.0, num=20), use_single_time_bin_per_epoch=[False], desired_ripple_decoding_time_bin_size=[None])
+    # desired_laps_decoding_time_bin_sizes = np.linspace(0.125, 1.0, num=20) # [0.125, 0.171053, 0.217105, 0.263158, 0.309211, 0.355263, 0.401316, 0.447368, 0.493421, 0.539474, 0.585526, 0.631579, 0.677632, 0.723684, 0.769737, 0.815789, 0.861842, 0.907895, 0.953947, 1]
+    desired_laps_decoding_time_bin_sizes = np.arange(start=0.125, step=0.125, stop=1.5) # [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1, 1.125, 1.25, 1.375]
+    all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=desired_laps_decoding_time_bin_sizes, use_single_time_bin_per_epoch=[False], desired_ripple_decoding_time_bin_size=[None])
     # len(all_param_sweep_options)
     
     ## Perfrom the computations:
