@@ -752,6 +752,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
     @property
     def laps_all_epoch_bins_marginals_df(self) -> pd.DataFrame:
         """ same quantities computed by `compute_and_export_marginals_df_csvs(...)` 
+        the `*_all_epoch_bins_marginals_df` has a row per epoch. 
 
         all_epoch_bins_marginal
 
@@ -767,6 +768,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
     @property
     def ripple_all_epoch_bins_marginals_df(self) -> pd.DataFrame:
         """ same quantities computed by `compute_and_export_marginals_df_csvs(...)` 
+        the `*_all_epoch_bins_marginals_df` has a row per epoch. 
         """
         ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
         ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
@@ -782,8 +784,8 @@ class DirectionalMergedDecodersResult(ComputedResult):
     def laps_time_bin_marginals_df(self) -> pd.DataFrame:
         """ same quantities computed by `compute_and_export_marginals_df_csvs(...)` 
 
-        all_epoch_bins_marginal
-
+        the `*_time_bin_marginals_df` has a row per time bin instead of per epoch. 
+        
         """
         laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
         laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
@@ -799,6 +801,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
     @property
     def ripple_time_bin_marginals_df(self) -> pd.DataFrame:
         """ same quantities computed by `compute_and_export_marginals_df_csvs(...)` 
+        the `*_time_bin_marginals_df` has a row per time bin instead of per epoch. 
         """
         ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
         ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
@@ -1194,6 +1197,12 @@ class DirectionalMergedDecodersResult(ComputedResult):
         _build_multiple_per_time_bin_marginals(a_decoder_result=a_decoder_result, active_marginals_tuple=(laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short']))
         
         """
+        filter_epochs_df = deepcopy(a_decoder_result.filter_epochs)
+        if not isinstance(filter_epochs_df, pd.DataFrame):
+            filter_epochs_df = filter_epochs_df.to_dataframe()
+            
+        filter_epochs_df['center_t'] = (filter_epochs_df['start'] + (filter_epochs_df['duration']/2.0))
+        
         flat_time_bin_centers_column = np.concatenate([curr_epoch_time_bin_container.centers for curr_epoch_time_bin_container in a_decoder_result.time_bin_containers])
         all_columns = []
         all_epoch_extracted_posteriors = []
@@ -1208,9 +1217,31 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         all_epoch_extracted_posteriors = np.vstack(all_epoch_extracted_posteriors) # (4, n_time_bins) - (4, 5495)
         epoch_time_bin_marginals_df = pd.DataFrame(all_epoch_extracted_posteriors.T, columns=all_columns)
-
         epoch_time_bin_marginals_df['epoch_idx'] = epoch_idx_column
-        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column)
+        
+        if (len(flat_time_bin_centers_column) < len(epoch_time_bin_marginals_df)):
+            # bin errors are occuring:
+            print(f'encountering bin issue! flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}. len(epoch_time_bin_marginals_df): {len(epoch_time_bin_marginals_df)}. Attempting to fix.')
+            # find where the indicies are less than two bins
+            # miscentered_bin_indicies = np.where(n_epoch_time_bins < 2)
+            # replace those centers with just the center of the epoch
+            t_bin_centers_list = []
+            for epoch_idx, curr_epoch_time_bin_container in enumerate(a_decoder_result.time_bin_containers):
+                curr_epoch_n_time_bins = n_epoch_time_bins[epoch_idx]
+                if (curr_epoch_n_time_bins < 2):
+                    an_epoch_center = filter_epochs_df['center_t'].to_numpy()[epoch_idx]
+                    t_bin_centers_list.append([an_epoch_center]) # list containing only the single epoch center
+                else:
+                    t_bin_centers_list.append(curr_epoch_time_bin_container.centers) 
+
+            flat_time_bin_centers_column = np.concatenate(t_bin_centers_list)
+            print(f'\t fixed flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}')
+
+        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column) # ValueError: Length of values (3393) does not match length of index (3420)
+        # except ValueError:
+            # epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(a_decoder_result.filter_epochs['center_t'].to_numpy()[miscentered_bin_indicies])
+        
+
         return epoch_time_bin_marginals_df
 
 
@@ -1813,7 +1844,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         
         directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
         
-        ## Decode Ripples:        
+        ## Decode Ripples:
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay))
         min_possible_time_bin_size: float = find_minimum_time_bin_duration(global_replays['duration'].to_numpy())
         # ripple_decoding_time_bin_size: float = min(0.010, min_possible_time_bin_size) # 10ms # 0.002
