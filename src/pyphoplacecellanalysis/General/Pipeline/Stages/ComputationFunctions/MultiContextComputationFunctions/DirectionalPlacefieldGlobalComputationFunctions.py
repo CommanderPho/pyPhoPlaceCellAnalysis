@@ -1220,6 +1220,8 @@ class DirectionalMergedDecodersResult(ComputedResult):
         epoch_time_bin_marginals_df['epoch_idx'] = epoch_idx_column
         
         if (len(flat_time_bin_centers_column) < len(epoch_time_bin_marginals_df)):
+            # 2024-01-25 - This fix DOES NOT HELP. The constructed size is the same as the existing `flat_time_bin_centers_column`.
+            
             # bin errors are occuring:
             print(f'encountering bin issue! flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}. len(epoch_time_bin_marginals_df): {len(epoch_time_bin_marginals_df)}. Attempting to fix.')
             # find where the indicies are less than two bins
