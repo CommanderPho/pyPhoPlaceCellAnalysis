@@ -202,8 +202,7 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
 
     return across_session_results_extended_dict
 
-
-def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, save_hdf=True) -> dict:
+def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, save_hdf=True, save_csvs=True) -> dict:
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     from copy import deepcopy
@@ -212,9 +211,92 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from neuropy.utils.debug_helpers import parameter_sweeps
     from neuropy.core.laps import Laps
     from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
+    from pyphocorehelpers.print_helpers import get_now_day_str
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalMergedDecodersResult
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+    # Export CSVs:
+    def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str, parent_output_path: Path, active_context):
+        """ captures nothing
+        """
+        # output_date_str: str = get_now_rounded_time_str()
+        output_date_str: str = get_now_day_str()
+        # parent_output_path: Path = Path('output').resolve()
+        # active_context = curr_active_pipeline.get_session_context()
+        session_identifier_str: str = active_context.get_description()
+        assert output_date_str is not None
+        out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04|kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        out_filename = f"{out_basename}.csv"
+        out_path = parent_output_path.joinpath(out_filename).resolve()
+        marginals_df.to_csv(out_path)
+        return out_path 
+
+
+    def _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context):
+        """ After the sweeps are complete and multiple (one for each time_bin_size swept) indepdnent dfs are had with the four results types this function concatenates each of the four into a single dataframe for all time_bin_size values with a column 'time_bin_size'. 
+        It also saves them out to CSVs in a manner similar to what `compute_and_export_marginals_dfs_completion_function` did to be compatible with `2024-01-23 - Across Session Point and YellowBlue Marginal CSV Exports.ipynb`
+        Captures: save_csvs
+        GLOBAL Captures: collected_outputs_path
+        
+        
+        """
+        several_time_bin_sizes_laps_time_bin_marginals_df_list = []
+        several_time_bin_sizes_laps_per_epoch_marginals_df_list = []
+
+        several_time_bin_sizes_ripple_time_bin_marginals_df_list = []
+        several_time_bin_sizes_ripple_per_epoch_marginals_df_list = []
+
+
+        # for a_sweep_tuple, (a_laps_time_bin_marginals_df, a_laps_all_epoch_bins_marginals_df) in output_extracted_result_tuples.items():
+        for a_sweep_tuple, (a_laps_time_bin_marginals_df, a_laps_all_epoch_bins_marginals_df, a_ripple_time_bin_marginals_df, a_ripple_all_epoch_bins_marginals_df) in output_extracted_result_tuples.items():
+            a_sweep_dict = dict(a_sweep_tuple)
+            
+            # Shared
+            desired_laps_decoding_time_bin_size = float(a_sweep_dict['desired_shared_decoding_time_bin_size'])
+            desired_ripple_decoding_time_bin_size = float(a_sweep_dict['desired_shared_decoding_time_bin_size'])
+            
+            # a_laps_time_bin_marginals_df.
+            df = a_laps_time_bin_marginals_df
+            df['time_bin_size'] = desired_laps_decoding_time_bin_size # desired_laps_decoding_time_bin_size
+            # df['session_name'] = session_name
+            df = a_laps_all_epoch_bins_marginals_df
+            df['time_bin_size'] = desired_laps_decoding_time_bin_size
+
+            df = a_ripple_time_bin_marginals_df
+            df['time_bin_size'] = desired_ripple_decoding_time_bin_size
+            df = a_ripple_all_epoch_bins_marginals_df
+            df['time_bin_size'] = desired_ripple_decoding_time_bin_size
+
+            several_time_bin_sizes_laps_time_bin_marginals_df_list.append(a_laps_time_bin_marginals_df)
+            several_time_bin_sizes_laps_per_epoch_marginals_df_list.append(a_laps_all_epoch_bins_marginals_df)
+            
+            several_time_bin_sizes_ripple_time_bin_marginals_df_list.append(a_ripple_time_bin_marginals_df)
+            several_time_bin_sizes_ripple_per_epoch_marginals_df_list.append(a_ripple_all_epoch_bins_marginals_df)
+
+
+        ## Build across_sessions join dataframes:
+        several_time_bin_sizes_time_bin_laps_df: pd.DataFrame = pd.concat(several_time_bin_sizes_laps_time_bin_marginals_df_list, axis='index', ignore_index=True)
+        several_time_bin_sizes_laps_df: pd.DataFrame = pd.concat(several_time_bin_sizes_laps_per_epoch_marginals_df_list, axis='index', ignore_index=True) # per epoch
+
+        several_time_bin_sizes_time_bin_ripple_df: pd.DataFrame = pd.concat(several_time_bin_sizes_ripple_time_bin_marginals_df_list, axis='index', ignore_index=True)
+        several_time_bin_sizes_ripple_df: pd.DataFrame = pd.concat(several_time_bin_sizes_ripple_per_epoch_marginals_df_list, axis='index', ignore_index=True) # per epoch
+
+        # Export time_bin_swept results to CSVs:
+        if save_csvs:
+            assert collected_outputs_path.exists()
+            assert active_context is not None
+            laps_time_bin_marginals_out_path = export_marginals_df_csv(several_time_bin_sizes_time_bin_laps_df, data_identifier_str=f'(laps_time_bin_marginals_df)', parent_output_path=collected_outputs_path, active_context=active_context)
+            laps_out_path = export_marginals_df_csv(several_time_bin_sizes_laps_df, data_identifier_str=f'(laps_marginals_df)', parent_output_path=collected_outputs_path, active_context=active_context)
+            ripple_time_bin_marginals_out_path = export_marginals_df_csv(several_time_bin_sizes_time_bin_ripple_df, data_identifier_str=f'(ripple_time_bin_marginals_df)', parent_output_path=collected_outputs_path, active_context=active_context)
+            ripple_out_path = export_marginals_df_csv(several_time_bin_sizes_ripple_df, data_identifier_str=f'(ripple_marginals_df)', parent_output_path=collected_outputs_path, active_context=active_context)
+        else:
+            laps_time_bin_marginals_out_path, laps_out_path, ripple_time_bin_marginals_out_path, ripple_out_path = None, None, None, None
+            
+        return (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path)
+        # (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path)
+        
+
 
     def add_session_df_columns(df: pd.DataFrame, session_name: str, curr_session_t_delta: Optional[float], time_col: str) -> pd.DataFrame:
         """ adds session-specific information to the marginal dataframes """
@@ -251,7 +333,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             laps_decoding_time_bin_size = None
         directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = directional_merged_decoders_result.all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=laps_epochs_df,
                                                                                                                                                         decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
-        
 
         ## Decode Ripples:
         if desired_ripple_decoding_time_bin_size is not None:
@@ -313,27 +394,11 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     active_context = curr_active_pipeline.get_session_context()
     session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
     
-    # desired_laps_decoding_time_bin_sizes = np.linspace(0.125, 1.0, num=20) # [0.125, 0.171053, 0.217105, 0.263158, 0.309211, 0.355263, 0.401316, 0.447368, 0.493421, 0.539474, 0.585526, 0.631579, 0.677632, 0.723684, 0.769737, 0.815789, 0.861842, 0.907895, 0.953947, 1]
-    # desired_laps_decoding_time_bin_sizes = np.arange(start=0.125, step=0.125, stop=1.5) # [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1, 1.125, 1.25, 1.375]
-    
-
-    # desired_laps_decoding_time_bin_sizes = np.arange(start=0.005, step=0.01, stop=0.05) # [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1, 1.125, 1.25, 1.375]
-    # desired_laps_decoding_time_bin_sizes = np.arange(start=0.005, step=0.01, stop=0.05) # [0.005, 0.015, 0.025, 0.035, 0.045]
-    # desired_laps_decoding_time_bin_sizes = np.arange(start=0.030, step=0.01, stop=0.10) # [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
-    
-    # desired_shared_decoding_time_bin_size = np.arange(start=0.030, step=0.01, stop=0.10) # [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
-    # desired_shared_decoding_time_bin_size = np.arange(start=0.050, step=0.01, stop=0.10) # [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
-    # desired_shared_decoding_time_bin_size = [0.005] # 5ms
-    # desired_shared_decoding_time_bin_size = [0.005, 0.01] # works
-    # desired_shared_decoding_time_bin_size = [0.025] # works
+    ## INPUT PARAMETER: time_bin_size sweep paraemters
     desired_shared_decoding_time_bin_size = np.linspace(start=0.030, stop=0.10, num=6)
     
-    # desired_ripple_decoding_time_bin_sizes = desired_laps_decoding_time_bin_sizes.copy() # [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
-
     # Shared time bin sizes
-    # all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=desired_laps_decoding_time_bin_sizes, use_single_time_bin_per_epoch=[False], desired_ripple_decoding_time_bin_size=[None])
     all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_shared_decoding_time_bin_size=desired_shared_decoding_time_bin_size, use_single_time_bin_per_epoch=[False], minimum_event_duration=[desired_shared_decoding_time_bin_size[-1]]) # with Ripples
-    # len(all_param_sweep_options)
     
     ## Perfrom the computations:
 
@@ -341,11 +406,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     ## Copy the default result:
     directional_merged_decoders_result: DirectionalMergedDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
     alt_directional_merged_decoders_result: DirectionalMergedDecodersResult = deepcopy(directional_merged_decoders_result)
-
-    # laps_decoding_time_bin_size = alt_directional_merged_decoders_result.laps_decoding_time_bin_size
-    # now_day_str: str = BATCH_DATE_TO_USE
-    # active_context: IdentifyingContext = curr_active_pipeline.get_session_context()
-    # data_identifier_str=f'(laps_time_bin_marginals_df)'
 
     # out_path_basename_str: str = f"{now_day_str}_{active_context}_time_bin_size-{laps_decoding_time_bin_size}_{data_identifier_str}"
     # out_path_basename_str: str = f"{now_day_str}_{active_context}_time_bin_size_sweep_results"
@@ -356,11 +416,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     out_path: Path = collected_outputs_path.resolve().joinpath(out_path_filenname_str).resolve()
     print(f'\out_path_str: "{out_path_filenname_str}"')
     print(f'\tout_path: "{out_path}"')
-
-    # time_bin_size-{laps_decoding_time_bin_size}
-    # curr_time_bin_size_str: str = f"time_bin_size-{laps_decoding_time_bin_size}"
-    # laps_time_bin_marginals_df: pd.DataFrame = alt_directional_merged_decoders_result.laps_time_bin_marginals_df.copy()
-    # laps_all_epoch_bins_marginals_df: pd.DataFrame = alt_directional_merged_decoders_result.laps_all_epoch_bins_marginals_df.copy()
     
     # Ensure it has the 'lap_track' column
     ## Compute the ground-truth information using the position information:
@@ -370,12 +425,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     laps_obj.update_lap_dir_from_smoothed_velocity(pos_input=curr_active_pipeline.sess.position)
     laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
     laps_df = laps_obj.to_dataframe()
-    # laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess, replace_existing=True) # NOTE: .sess is used because global_session is missing the last two laps   
-    # # computes 'track_id' from t_start, t_delta, and t_end where t_delta corresponds to the transition point (track change).
-    # laps_df = Laps._update_dataframe_maze_id_if_needed(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end)
-    # ## computes proper 'is_LR_dir' and 'lap_dir' columns:
-    # laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=laps_df, global_session=curr_active_pipeline.sess) # adds 'is_LR_dir'
-
+    
     # Uses: session_ctxt_key, all_param_sweep_options
     output_alt_directional_merged_decoders_result = {} # empty dict
     output_laps_decoding_accuracy_results_dict = {} # empty dict
@@ -429,16 +479,20 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
                             'percent_laps_direction_estimated_correctly',
                             'percent_laps_estimated_correctly'])
     output_laps_decoding_accuracy_results_df.index.name = 'laps_decoding_time_bin_size'
-    # output_laps_decoding_accuracy_results_df
     ## Save out the laps peformance result
     if save_hdf:
         output_laps_decoding_accuracy_results_df.to_hdf(out_path, key=f'{session_ctxt_key}/laps_decoding_accuracy_results', format='table', data_columns=True)
 
+    ## Call the subfunction to process the time_bin_size swept result and produce combined output dataframes:
+    combined_multi_timebin_outputs_tuple = _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context=curr_active_pipeline.get_session_context())
+    # Unpacking:    
+    # (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
+
     # add to output dict
     # across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
-    # across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = (out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples)
-    across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = (out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples)
-        
+    across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = (out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple)
+    # can unpack like:
+    (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
 
     print(f'>>\t done with {curr_session_context}')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
