@@ -332,6 +332,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             fig.add_trace(a_trace, row=1, col=3)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
 
+        ## Add the delta indicator:
         t_split: float = 0.0
         _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
         for a_shape_name, a_shape in _extras_output_dict.items():
