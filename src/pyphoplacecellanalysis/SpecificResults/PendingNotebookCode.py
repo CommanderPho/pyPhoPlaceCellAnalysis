@@ -215,7 +215,7 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
     return fig
 
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0, save_figures=False, figure_save_extension='.png'):
+def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0, save_figures=False, figure_save_extension='.png', debug_print=False):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
     Produces and then saves figures out the the f'{directory}/figures/' subfolder
 
@@ -257,14 +257,22 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
         post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
         # creating subplots
-        fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"])
+        fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True,
+                               column_titles=["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"],
+                               )
+        
+
 
         # Pre-Delta Histogram ________________________________________________________________________________________________ #
         # adding first histogram
         pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
-        print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
+        if debug_print:
+            print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
         # time_bin_sizes
         for a_trace in pre_delta_fig.data:
+            if debug_print:
+                print(f'a_trace.legend: {a_trace.legend}, a_trace.legendgroup: {a_trace.legendgroup}, a_trace.legendgrouptitle: {a_trace.legendgrouptitle}, a_trace.showlegend: {a_trace.showlegend}, a_trace.offsetgroup: {a_trace.offsetgroup}')
+            # a_trace.legend = "legend2"
             a_trace.showlegend = False
             # a_trace.legendgroup, a_trace.offsetgroup
             # a_trace.offsetgroup = 
@@ -276,15 +284,20 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
         # Scatter Plot _______________________________________________________________________________________________________ #
          
-        scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0])
+        scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0],
+                            labels={"session_name": "Session", "time_bin_size": "tbin_size"}
+                            )
         # # Create two shapes for the pre/post-delta periods. Requires earliest_delta_aligned_t_start, earliest_delta_aligned_t_start
         # t_split: float = 0.0
         # _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(scatter_fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end)
     
-        scatter_traces = scatter_fig.to_dict()['data']
+        # scatter_traces = scatter_fig.to_dict()['data']
         
-        for a_trace in scatter_traces:
-            a_trace['visible'] = 'legendonly' # 'legendonly', # this trace will be hidden initially
+        # for a_trace in scatter_traces:
+        for a_trace in scatter_fig.data:
+            # a_trace.legend = "legend"
+            a_trace['visible'] = 'legendonly'
+            # a_trace['visible'] = 'legendonly' # 'legendonly', # this trace will be hidden initially
             fig.add_trace(a_trace, row=1, col=2)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
         
@@ -294,6 +307,9 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
 
         for a_trace in post_delta_fig.data:
+            if debug_print:
+                print(f'a_trace.legend: {a_trace.legend}, a_trace.legendgroup: {a_trace.legendgroup}, a_trace.legendgrouptitle: {a_trace.legendgrouptitle}, a_trace.showlegend: {a_trace.showlegend}, a_trace.offsetgroup: {a_trace.offsetgroup}')
+            # a_trace.legend = "legend2"
             a_trace.showlegend = False
             fig.add_trace(a_trace, row=1, col=3)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
@@ -305,6 +321,23 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         # fig.update_layout(shapes=[output_dict["long_region"], output_dict["short_region"], output_dict["divider_line"]], xaxis=dict(range=[t_start, t_end]), yaxis=dict(range=[ymin, ymax]))
         # fig.update_layout(xaxis=dict(range=[earliest_delta_aligned_t_start, latest_delta_aligned_t_end]), yaxis=dict(range=[0.0, 1.0]))
 
+        # fig.update_layout(
+        #     legend={
+        #         "title": "By Session",
+        #         "xref": "container",
+        #         "yref": "container",
+        #         "y": 0.65,
+        #         "bgcolor": "Blue",
+        #     },
+        #     legend2={
+        #         "title": "By time_bin_size",
+        #         "xref": "container",
+        #         "yref": "container",
+        #         "y": 0.85,
+        #         "bgcolor": "Gold",
+        #     },
+        # )
+        
         return fig
 
 
