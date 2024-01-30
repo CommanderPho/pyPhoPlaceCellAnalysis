@@ -196,11 +196,29 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     return all_figures
 
 @function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str) -> None:
+def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, **kwargs) -> None:
     """ plots a set of two histograms in subplots, split at the delta for each session.
     from PendingNotebookCode import plot_histograms
     
     """
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
+    layout = kwargs.pop('layout', 'none')
+    defer_show = kwargs.pop('defer_show', False)
+    
+    fig = plt.figure(layout=layout, **kwargs) # layout="constrained", 
+    ax_dict = fig.subplot_mosaic(
+        [
+            ["epochs_pre_delta", ".", "epochs_post_delta"],
+        ],
+        # set the height ratios between the rows
+        # height_ratios=[8, 1],
+        # height_ratios=[1, 1],
+        # set the width ratios between the columns
+        # width_ratios=[1, 8, 8, 1],
+        sharey=True,
+        gridspec_kw=dict(wspace=0.25, hspace=0.25) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+    )
+
     histogram_kwargs = dict(orientation="horizontal", bins=25)
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
@@ -209,52 +227,67 @@ def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec:
     descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
     
     # plot pre-delta histogram
-    pre_delta_df.hist(column='P_Long', **histogram_kwargs)
-    plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
-    plt.show()
+    pre_delta_df.hist(ax=ax_dict['epochs_pre_delta'], column='P_Long', **histogram_kwargs)
+    ax_dict['epochs_pre_delta'].set_title(f'{descriptor_str} - pre-$\Delta$ time bins')
 
     # plot post-delta histogram
-    post_delta_df.hist(column='P_Long', **histogram_kwargs)
-    plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
-    plt.show()
+    post_delta_df.hist(ax=ax_dict['epochs_post_delta'], column='P_Long', **histogram_kwargs)
+    ax_dict['epochs_post_delta'].set_title(f'{descriptor_str} - post-$\Delta$ time bins')
+    if not defer_show:
+        fig.show()
+    return MatplotlibRenderPlots(name='plot_histograms', figures=[fig], axes=ax_dict)
+
 
 @function_attributes(short_name=None, tags=['histogram', 'stacked', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str) -> None:
+def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, **kwargs) -> None:
     """ plots a colorful stacked histogram for each of the many time-bin sizes
     """
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
+    layout = kwargs.pop('layout', 'none')
+    defer_show = kwargs.pop('defer_show', False)
+    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
+    figure_identifier: str = f"{descriptor_str}_PrePostDelta"
+
+    fig = plt.figure(num=figure_identifier, clear=True, figsize=(12, 2), layout=layout, **kwargs) # layout="constrained", 
+    fig.suptitle(f'{descriptor_str}')
+    
+    ax_dict = fig.subplot_mosaic(
+        [
+            # ["epochs_pre_delta", ".", "epochs_post_delta"],
+             ["epochs_pre_delta", "epochs_post_delta"],
+        ],
+        sharey=True,
+        gridspec_kw=dict(wspace=0.25, hspace=0.25) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+    )
+    
     histogram_kwargs = dict(orientation="horizontal", bins=25)
     
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
 
-    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
-    
-    # plot pre-delta histogram
     time_bin_sizes: int = pre_delta_df['time_bin_size'].unique()
     
-    figure_identifier: str = f"{descriptor_str}_preDelta"
-    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
+    # plot pre-delta histogram:
     for time_bin_size in time_bin_sizes:
         df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
-        df_tbs['P_Long'].hist(alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+        df_tbs['P_Long'].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
     
-    plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
-    plt.legend()
-    plt.show()
+    ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ time bins')
+    ax_dict['epochs_pre_delta'].legend()
 
-    # plot post-delta histogram
+    # plot post-delta histogram:
     time_bin_sizes: int = post_delta_df['time_bin_size'].unique()
-    figure_identifier: str = f"{descriptor_str}_postDelta"
-    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
     for time_bin_size in time_bin_sizes:
         df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
-        df_tbs['P_Long'].hist(alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+        df_tbs['P_Long'].hist(ax=ax_dict['epochs_post_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
     
-    plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
-    # plt.legend()
-    plt.show()
+    ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ time bins')
+    ax_dict['epochs_post_delta'].legend()
     
+    if not defer_show:
+        fig.show()
+    return MatplotlibRenderPlots(name='plot_stacked_histograms', figures=[fig], axes=ax_dict)
 
 
 
