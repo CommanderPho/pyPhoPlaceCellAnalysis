@@ -217,7 +217,7 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df,
                                           earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
-                                          enabled_time_bin_sizes=None,
+                                          enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session',
                                           laps_title_prefix: str = f"Laps", ripple_title_prefix: str = f"Ripples",
                                           save_figures=False, figure_save_extension='.png', debug_print=False):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
@@ -233,8 +233,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
-    enable_histograms: bool = True
-    enable_epoch_shading_shapes: bool = True
+    
     
 
     # def _subfn_build_figure(data, **build_fig_kwargs):
@@ -271,31 +270,43 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
         
         ## Build KWARGS
-        # main_plot_mode: str = 'default'
-        # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
-        # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
-        # px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
-        
-        # main_plot_mode: str = 'separate_facet_row_per_session'
-        # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
-        # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
-        #                     'facet_row': 'session_name', 'facet_row_spacing': 0.04, # 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
-        #                     'height': (num_unique_sessions*200), 'width': 1024,
-        #                     'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
-        # px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability', **{'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04, 'height': (num_unique_sessions*200), 'width': 1024,})
-        # enable_histograms: bool = False
-        # enable_epoch_shading_shapes: bool = False
+        known_main_plot_modes = ['default', 'separate_facet_row_per_session', 'separate_row_per_session']
+        assert main_plot_mode in known_main_plot_modes
+        print(f'main_plot_mode: {main_plot_mode}')
 
+        enable_histograms: bool = True
+        enable_epoch_shading_shapes: bool = True
+    
+        if (main_plot_mode == 'default'):
+            # main_plot_mode: str = 'default'
+            sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
+            px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+            px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
+            
+        elif (main_plot_mode == 'separate_facet_row_per_session'):
+            # main_plot_mode: str = 'separate_facet_row_per_session'
+            sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
+            px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
+                                'facet_row': 'session_name', 'facet_row_spacing': 0.04, # 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
+                                'height': (num_unique_sessions*200), 'width': 1024,
+                                'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+            px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability', **{'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04, 'height': (num_unique_sessions*200), 'width': 1024,})
+            enable_histograms = False
+            enable_epoch_shading_shapes = False
 
-        main_plot_mode: str = 'separate_row_per_session'
-        sp_make_subplots_kwargs = {'rows': num_unique_sessions, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'vertical_spacing': 0.04, 'shared_yaxes': True,
-                                    'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"],
-                                    # 'row_titles': [str(v) for v in unique_sessions],
-                                    }
-        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'range_y': [0.0, 1.0],
-                            'height': (num_unique_sessions*200), 'width': 1024,
-                            'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
-        px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
+        elif (main_plot_mode == 'separate_row_per_session'):
+            # main_plot_mode: str = 'separate_row_per_session'
+            sp_make_subplots_kwargs = {'rows': num_unique_sessions, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'vertical_spacing': 0.04, 'shared_yaxes': True,
+                                        'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"],
+                                        # 'row_titles': [str(v) for v in unique_sessions],
+                                        }
+            px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'range_y': [0.0, 1.0],
+                                'height': (num_unique_sessions*200), 'width': 1024,
+                                'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+            px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
+            histogram_trace_show_legend = True
+        else:
+            raise ValueError(f'main_plot_mode is not a known mode: main_plot_mode: "{main_plot_mode}", known modes: known_main_plot_modes: {known_main_plot_modes}')
         
 
         def __sub_subfn_plot_histogram(fig, histogram_data_df, hist_title="Post-delta", row=1, col=3):
