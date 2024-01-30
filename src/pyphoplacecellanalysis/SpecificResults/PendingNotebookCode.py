@@ -3,12 +3,112 @@
 from datetime import datetime
 from pathlib import Path
 import re
-from typing import  List, Optional, Dict, Tuple
+from typing import  List, Optional, Dict, Tuple, Any, Union
 import numpy as np
 import pandas as pd
 from attrs import define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
+
+
+# ==================================================================================================================== #
+# 2024-01-29 - Ideal Pho Plotting Interface - UNFINISHED                                                               #
+# ==================================================================================================================== #
+def map_dataframe_to_plot(df: pd.DataFrame, **kwargs):
+	""" 2024-01-29 - My ideal desired function that allows the user to map any column in a dataframe to a plot command, including rows/columns.
+	Not yet finished.
+	 maps any column in the dataframe to a property in a plot. 
+	 
+	 Usage:
+	 	fully_resolved_kwargs = map_dataframe_to_plot(df=all_sessions_laps_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size') # , title=f"Laps - {laps_title_string_suffix}"
+		fully_resolved_kwargs
+
+	"""
+	all_column_names: List[str] = list(df.columns)
+	all_kwargs_keys: List[str] = list(kwargs.keys())
+	all_kwargs_values: List[Union[str, Any]] = list(kwargs.values()) # expected to be either a column name to map or a literal.
+	num_rows: int = len(df)
+	
+	should_fully_extract_dataframe_values: bool = True # if True, extracts the values from the dataframe as an array
+	fully_resolved_kwargs = {}
+	
+	# for a_key in all_kwargs_keys:
+	# 	assert a_key in df.columns, f'key "{a_key}" specified in kwargs is not a column in df! \n\tdf.columns: {list(df.columns)}'
+	known_keys = ['x', 'y', 'color', 'size', 'row', 'column', 'page', 'xlabel', 'ylabel', 'title']
+	for a_key, a_value in kwargs.items():
+		if a_key not in known_keys:
+			print(f'WARN: key "{a_key}" is not in the known keys list: known_keys: {known_keys}')
+		if not isinstance(a_value, str):
+			# not a string
+			raise ValueError(f"value {a_value} is not a string and its length is not equal to the length of the dataframe.")
+			#TODO 2024-01-29 23:45: - [ ] Allow passing literal list-like values with the correct length to be passed directly
+			assert (len(a_value) == num_rows), f"(len(a_value) == num_rows) but (len(a_value): {len(a_value)} == num_rows: {num_rows})"
+			fully_resolved_kwargs[a_key] = a_value # Set the passed value directly
+			
+		else:
+			# it is a string, assume that it's a column in the dataframe
+			assert a_value in all_column_names, f'key:value pair <"{a_key}":"{a_value}"> specified in kwargs has a value that is not a valid column in df! \n\tspecified_value: {a_value}\n\tdf.columns: {list(df.columns)}'
+			if should_fully_extract_dataframe_values:
+				fully_resolved_kwargs[a_key] = df[a_value].to_numpy()
+			else:
+				# leave as the validated column name
+				fully_resolved_kwargs[a_key] = a_value
+				
+	return fully_resolved_kwargs
+
+
+def _embed_in_subplots(scatter_fig):
+    import plotly.subplots as sp
+    import plotly.graph_objs as go
+    # creating subplots
+    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01)
+
+    # adding first histogram
+    # Calculate the histogram data
+    hist1, bins1 = np.histogram(X[:split], bins='auto')
+
+    # Adding the first histogram as a bar graph and making x negative
+    fig.add_trace(
+        go.Bar(
+            x=-bins1[:-1],
+            y=hist1,
+            marker_color='#EB89B5',
+            name='first half',
+            orientation='h',
+        ),
+        row=1, col=1
+    )
+
+
+    # adding scatter plot
+    fig.add_trace(scatter_fig, row=1, col=2)
+    # fig.add_trace(
+    #     go.Scatter(
+    #         x=X,
+    #         y=Y,
+    #         mode='markers',
+    #         marker_color='rgba(152, 0, 0, .8)',
+    #     ),
+    #     row=1, col=2
+    # )
+
+    # adding the second histogram
+
+    # Calculate the histogram data for second half
+    hist2, bins2 = np.histogram(X[split:], bins='auto')
+
+    # Adding the second histogram
+    fig.add_trace(
+        go.Bar(
+            x=bins2[:-1],
+            y=hist2,
+            marker_color='#330C73',
+            name='second half',
+            orientation='h',
+        ),
+        row=1, col=3
+    )
+    return fig
 
 
 # ==================================================================================================================== #
@@ -31,9 +131,15 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     
     """
     import plotly.express as px
-    import plotly.graph_objects as go
+    # import plotly.graph_objects as go
+    import plotly.graph_objs as go
     from plotly.subplots import make_subplots
     
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+
+    def _subfn_build_figure(data, **build_fig_kwargs):
+        return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
+
     if not isinstance(directory, Path):
         directory = Path(directory).resolve()
     assert directory.exists()
@@ -76,7 +182,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     
     return all_figures
 
-@function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
+@function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str ) -> None:
     """ plots a set of two histograms in subplots, split at the delta for each session.
     from PendingNotebookCode import plot_histograms
@@ -396,21 +502,21 @@ def process_csv_file(file: str, session_name: str, curr_session_t_delta: Optiona
 
 @define(slots=False)
 class AcrossSessionCSVOutputFormat:
-	data_description = ["AcrossSession"]
-	epoch_description = ["Laps", "Ripple"]
-	granularity_description = ["per-Epoch", "per-TimeBin"]
-	
-	parts_names = ["export_date", "date_name", "epochs", "granularity"]
-	
-	def parse_filename(self, a_filename: str):
-		if a_filename.endswith('.csv'):
-			a_filename = a_filename.removesuffix('.csv') # drop the .csv suffix
-		# split on the underscore into the parts
-		parts = a_filename.split('_')
-		if len(parts) == 4:
-			export_date, date_name, epochs, granularity  = parts
-		else:
-			raise NotImplementedError(f"a_csv_filename: '{a_filename}' expected four parts but got {len(parts)} parts.\n\tparts: {parts}")
-		return export_date, date_name, epochs, granularity
-	
+    data_description = ["AcrossSession"]
+    epoch_description = ["Laps", "Ripple"]
+    granularity_description = ["per-Epoch", "per-TimeBin"]
+    
+    parts_names = ["export_date", "date_name", "epochs", "granularity"]
+    
+    def parse_filename(self, a_filename: str):
+        if a_filename.endswith('.csv'):
+            a_filename = a_filename.removesuffix('.csv') # drop the .csv suffix
+        # split on the underscore into the parts
+        parts = a_filename.split('_')
+        if len(parts) == 4:
+            export_date, date_name, epochs, granularity  = parts
+        else:
+            raise NotImplementedError(f"a_csv_filename: '{a_filename}' expected four parts but got {len(parts)} parts.\n\tparts: {parts}")
+        return export_date, date_name, epochs, granularity
+    
 
