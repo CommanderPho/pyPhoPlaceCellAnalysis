@@ -218,6 +218,7 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
 def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df,
                                           earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
                                           enabled_time_bin_sizes=None,
+                                          laps_title_prefix: str = f"Laps", ripple_title_prefix: str = f"Ripples",
                                           save_figures=False, figure_save_extension='.png', debug_print=False):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
     Produces and then saves figures out the the f'{directory}/figures/' subfolder
@@ -403,7 +404,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         fig.update_yaxes(range=[0.0, 1.0])
         return fig
 
-
+    
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     if not isinstance(directory, Path):
         directory = Path(directory).resolve()
@@ -424,7 +425,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     laps_num_unique_sessions: int = concatenated_laps_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
     laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
-    laps_title: str = f"Laps - {laps_title_string_suffix}"
+    laps_title: str = f"{laps_title_prefix} - {laps_title_string_suffix}"
     # fig_laps = go.Figure(px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=laps_title), layout_yaxis_range=[0.0, 1.0])
     fig_laps = _subfn_build_figure(data_results_df=concatenated_laps_df, title=laps_title)
 
@@ -432,7 +433,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
-    ripple_title: str = f"Ripples - {ripple_title_string_suffix}"
+    ripple_title: str = f"{ripple_title_prefix} - {ripple_title_string_suffix}"
     fig_ripples = _subfn_build_figure(data_results_df=concatenated_ripple_df, title=ripple_title)
         
     if save_figures:
@@ -448,10 +449,10 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             else:
                  a_save_fn = lambda a_fig, a_save_name: a_fig.write_image(a_save_name)
     
-            fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_laps_marginal{a_fig_save_extension}").resolve()
+            fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_{laps_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
             print(f'\tsaving "{fig_laps_name}"...')
             a_save_fn(fig_laps, fig_laps_name)
-            fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_ripples_marginal{a_fig_save_extension}").resolve()
+            fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_{ripple_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
             print(f'\tsaving "{fig_ripple_name}"...')
             a_save_fn(fig_ripples, fig_ripple_name)
             
