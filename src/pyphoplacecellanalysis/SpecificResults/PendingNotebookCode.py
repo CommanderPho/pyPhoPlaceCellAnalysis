@@ -112,6 +112,50 @@ def _embed_in_subplots(scatter_fig):
     return fig
 
 
+
+def plotly_plot_1D_most_likely_position_comparsions(time_window_centers, xbin, posterior): # , ax=None
+    """ 
+    Analagous to `plot_1D_most_likely_position_comparsions`
+    """
+    import plotly.graph_objects as go
+    
+    # Posterior distribution heatmap:
+    assert posterior is not None
+
+    # print(f'time_window_centers: {time_window_centers}, posterior: {posterior}')
+    # Compute extents
+    xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])
+    # x_first_extent = (xmin, xmax, ymin, ymax)
+    # active_extent = x_first_extent
+
+    # Create grid for X and Y
+    # X, Y = np.meshgrid(time_window_centers, xbin)
+
+    # Reshape posterior to 2D if it's not
+    # posterior = np.reshape(posterior, (len(xbin), len(time_window_centers))) # Replace with correct shape if not (len(xbin), len(time_window_centers))
+
+    # Create a heatmap
+    fig = go.Figure(data=go.Heatmap(
+                    z=posterior,
+                    x=time_window_centers,  y=xbin, 
+                    zmin=0, zmax=1,
+                    # colorbar=dict(title='z'),
+                    showscale=False,
+                    colorscale='Viridis', # The closest equivalent to Matplotlib 'viridis'
+                    hoverongaps = False))
+
+    # Update layout
+    fig.update_layout(
+        # width=800,
+        # height=700,
+        autosize=False,
+        xaxis=dict(type='linear', range=[xmin, xmax]),
+        yaxis=dict(type='linear', range=[ymin, ymax]))
+
+    return fig
+
+
+
 # ==================================================================================================================== #
 # 2024-01-29 - Across Session CSV Import and Plotting                                                                  #
 # ==================================================================================================================== #
