@@ -254,11 +254,16 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         # px_histogram_kwargs = dict(nbins=histogram_bins, barmode='stack', opacity=0.5, range_y=[0.0, 1.0])
         scatter_title = build_fig_kwargs.pop('title', None)
 
-
         # Filter dataframe by chosen bin sizes
         if (enabled_time_bin_sizes is not None) and (len(enabled_time_bin_sizes) > 0):
             print(f'filtering data_results_df to enabled_time_bin_sizes: {enabled_time_bin_sizes}...')
             data_results_df = data_results_df[data_results_df.time_bin_size.isin(enabled_time_bin_sizes)]
+            
+        data_results_df = deepcopy(data_results_df)
+        
+        # convert time_bin_sizes column to a string so it isn't colored continuously
+        data_results_df["time_bin_size"] = data_results_df["time_bin_size"].astype(str)
+
         
         unique_sessions = data_results_df['session_name'].unique()
         num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
