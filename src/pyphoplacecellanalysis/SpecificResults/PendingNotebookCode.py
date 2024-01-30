@@ -1,5 +1,6 @@
 # 2024-01-29 - A version of "PendingNotebookCode" that is inside the pyphoplacecellanalysis library so that it can be imported from notebook that are not in the root of Spike3D
 ## This file serves as overflow from active Jupyter-lab notebooks, to eventually be refactored.
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 import re
@@ -309,7 +310,6 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
                                 'height': (num_unique_sessions*200), 'width': 1024,
                                 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
             px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
-            histogram_trace_show_legend = True
         else:
             raise ValueError(f'main_plot_mode is not a known mode: main_plot_mode: "{main_plot_mode}", known modes: known_main_plot_modes: {known_main_plot_modes}')
         
@@ -318,13 +318,16 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             """ captures: px_histogram_kwargs, histogram_kwargs
             
             """
+            is_first_item: bool = ((row == 1) and (col == 1))
             a_hist_fig = px.histogram(histogram_data_df, y="P_Long", color="time_bin_size", **px_histogram_kwargs, title=hist_title)
 
             for a_trace in a_hist_fig.data:
                 if debug_print:
                     print(f'a_trace.legend: {a_trace.legend}, a_trace.legendgroup: {a_trace.legendgroup}, a_trace.legendgrouptitle: {a_trace.legendgrouptitle}, a_trace.showlegend: {a_trace.showlegend}, a_trace.offsetgroup: {a_trace.offsetgroup}')
-                # a_trace.legend = "legend2"
-                a_trace.showlegend = False
+                
+                if (not is_first_item):
+                    a_trace.showlegend = False
+                    
                 fig.add_trace(a_trace, row=row, col=col)
                 fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
                 
@@ -354,15 +357,20 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         if (main_plot_mode == 'separate_row_per_session'):
              for a_session_i, a_session_name in enumerate(unique_sessions):              
                  row_index: int = a_session_i + 1 # 1-indexed
+                 scatter_column: int = 2
+                 is_first_item: bool = ((row_index == 1) and (scatter_column == 1))
                  a_session_data_results_df: pd.DataFrame = data_results_df[data_results_df['session_name'] == a_session_name]
                  #  fig.add_scatter(x=a_session_data_results_df['delta_aligned_start_t'], y=a_session_data_results_df['P_Long'], row=row_index, col=2, name=a_session_name)
                  scatter_fig = px.scatter(a_session_data_results_df, **px_scatter_kwargs, title=f"{a_session_name}")
                  for a_trace in scatter_fig.data:
-                    fig.add_trace(a_trace, row=row_index, col=2)
+                    if (not is_first_item):
+                        a_trace.showlegend = False
+    
+                    fig.add_trace(a_trace, row=row_index, col=scatter_column)
                     # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
 
-                 fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=row_index, col=2)
-                #  fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=2)
+                 fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=row_index, col=scatter_column)
+                #  fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=scatter_column)
                  fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
                  
             #  fig.update_xaxes(matches='x')
