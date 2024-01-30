@@ -388,8 +388,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             required_figure_height = 700
             
         fig.update_layout(title_text=scatter_title, width=2048, height=required_figure_height)
-        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-        
+        fig.update_layout(yaxis=dict(range=[0.0, 1.0]), template='plotly_dark')
 
         return fig
 
