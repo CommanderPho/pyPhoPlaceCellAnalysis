@@ -113,47 +113,102 @@ def _embed_in_subplots(scatter_fig):
 
 
 
-def plotly_plot_1D_most_likely_position_comparsions(time_window_centers, xbin, posterior): # , ax=None
+# def plotly_plot_1D_most_likely_position_comparsions(time_window_centers, xbin, posterior): # , ax=None
+#     """ 
+#     Analagous to `plot_1D_most_likely_position_comparsions`
+#     """
+#     import plotly.graph_objects as go
+    
+#     # Posterior distribution heatmap:
+#     assert posterior is not None
+
+#     # print(f'time_window_centers: {time_window_centers}, posterior: {posterior}')
+#     # Compute extents
+#     xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])
+#     # Create a heatmap
+#     fig = go.Figure(data=go.Heatmap(
+#                     z=posterior,
+#                     x=time_window_centers,  y=xbin, 
+#                     zmin=0, zmax=1,
+#                     # colorbar=dict(title='z'),
+#                     showscale=False,
+#                     colorscale='Viridis', # The closest equivalent to Matplotlib 'viridis'
+#                     hoverongaps = False))
+
+#     # Update layout
+#     fig.update_layout(
+#         autosize=False,
+#         xaxis=dict(type='linear', range=[xmin, xmax]),
+#         yaxis=dict(type='linear', range=[ymin, ymax]))
+
+#     return fig
+
+def plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list, xbin, posterior_list): # , ax=None
     """ 
     Analagous to `plot_1D_most_likely_position_comparsions`
     """
     import plotly.graph_objects as go
-    
-    # Posterior distribution heatmap:
-    assert posterior is not None
+    import plotly.subplots as sp
+    # Ensure input lists are of the same length
+    assert len(time_window_centers_list) == len(posterior_list)
 
-    # print(f'time_window_centers: {time_window_centers}, posterior: {posterior}')
-    # Compute extents
-    xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])
-    # x_first_extent = (xmin, xmax, ymin, ymax)
-    # active_extent = x_first_extent
+    # Compute layout grid dimensions
+    num_rows = len(time_window_centers_list)
 
-    # Create grid for X and Y
-    # X, Y = np.meshgrid(time_window_centers, xbin)
+    # Create subplots
+    fig = sp.make_subplots(rows=num_rows, cols=1)
 
-    # Reshape posterior to 2D if it's not
-    # posterior = np.reshape(posterior, (len(xbin), len(time_window_centers))) # Replace with correct shape if not (len(xbin), len(time_window_centers))
+    for row_idx, (time_window_centers, posterior) in enumerate(zip(time_window_centers_list, posterior_list)):
+        # Compute extents
+        xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])
+        # Add heatmap trace to subplot
+        fig.add_trace(go.Heatmap(
+                        z=posterior,
+                        x=time_window_centers,  y=xbin, 
+                        zmin=0, zmax=1,
+                        # colorbar=dict(title='z'),
+                        showscale=False,
+                        colorscale='Viridis', # The closest equivalent to Matplotlib 'viridis'
+                        hoverongaps = False),
+                      row=row_idx+1, col=1)
 
-    # Create a heatmap
-    fig = go.Figure(data=go.Heatmap(
-                    z=posterior,
-                    x=time_window_centers,  y=xbin, 
-                    zmin=0, zmax=1,
-                    # colorbar=dict(title='z'),
-                    showscale=False,
-                    colorscale='Viridis', # The closest equivalent to Matplotlib 'viridis'
-                    hoverongaps = False))
-
-    # Update layout
-    fig.update_layout(
-        # width=800,
-        # height=700,
-        autosize=False,
-        xaxis=dict(type='linear', range=[xmin, xmax]),
-        yaxis=dict(type='linear', range=[ymin, ymax]))
+        # Update layout for each subplot
+        fig.update_xaxes(range=[xmin, xmax], row=row_idx+1, col=1)
+        fig.update_yaxes(range=[ymin, ymax], row=row_idx+1, col=1)
 
     return fig
 
+
+def plot_blue_yellow_points(a_df, specific_point_list):
+	""" 
+	specific_point_list: List[Dict] - specific_point_list = [{'session_name': 'kdiba_vvp01_one_2006-4-10_12-25-50', 'time_bin_size': 0.03, 'epoch_idx': 0, 'delta_aligned_start_t': -713.908702568122}]
+	"""
+	time_window_centers_list = []
+	posterior_list = []
+
+	# for a_single_epoch_row_idx, a_single_epoch_idx in enumerate(selected_epoch_idxs):
+	for a_single_epoch_row_idx, a_single_custom_data_dict in enumerate(specific_point_list):
+		# a_single_epoch_idx = selected_epoch_idxs[a_single_epoch_row_idx]
+		a_single_epoch_idx: int = int(a_single_custom_data_dict['epoch_idx'])
+		a_single_session_name: str = str(a_single_custom_data_dict['session_name'])
+		a_single_time_bin_size: float = float(a_single_custom_data_dict['time_bin_size'])
+		## Get the dataframe entries:
+		a_single_epoch_df = a_df.copy()
+		a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.epoch_idx == a_single_epoch_idx] ## filter by epoch idx
+		a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.session_name == a_single_session_name] ## filter by session
+		a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.time_bin_size == a_single_time_bin_size] ## filter by time-bin-size	
+
+		posterior = a_single_epoch_df[['P_Long', 'P_Short']].to_numpy().T
+		time_window_centers = a_single_epoch_df['delta_aligned_start_t'].to_numpy()
+		xbin = np.arange(2)
+		time_window_centers_list.append(time_window_centers)
+		posterior_list.append(posterior)
+		
+		# fig = plotly_plot_1D_most_likely_position_comparsions(time_window_centers=time_window_centers, xbin=xbin, posterior=posterior)
+		# fig.show()
+		
+	fig = plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list=time_window_centers_list, xbin=xbin, posterior_list=posterior_list)
+	return fig
 
 
 # ==================================================================================================================== #
