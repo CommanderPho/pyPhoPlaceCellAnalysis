@@ -222,16 +222,77 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     Unknowingly captured: session_name
     
     """
+    import plotly.subplots as sp
     import plotly.express as px
-    # import plotly.graph_objects as go
-    import plotly.graph_objs as go
-    from plotly.subplots import make_subplots
+    import plotly.graph_objects as go
+    # import plotly.graph_objs as go
     
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
-    def _subfn_build_figure(data, **build_fig_kwargs):
-        return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
+    # def _subfn_build_figure(data, **build_fig_kwargs):
+    #     return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
+    
+    # def _subfn_build_figure(data_results_df: pd.DataFrame, **build_fig_kwargs):
+    #     # return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
+    #     scatter_title = build_fig_kwargs.pop('title', None) 
+    #     return go.Figure(px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title), layout_yaxis_range=[0.0, 1.0])
 
+    def _subfn_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, **build_fig_kwargs):
+        """ adds scatterplots as well
+        """
+
+        scatter_title = build_fig_kwargs.pop('title', None)
+
+        unique_sessions = data_results_df['session_name'].unique()
+        num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+
+        ## Extract the unique time bin sizes:
+        time_bin_sizes: int = data_results_df['time_bin_size'].unique()
+        num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
+
+        print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
+        
+        # get the pre-delta epochs
+        pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+        post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+        # creating subplots
+        fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"])
+
+        # Pre-Delta Histogram ________________________________________________________________________________________________ #
+        # adding first histogram
+        pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
+        print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
+        # time_bin_sizes
+        for a_trace in pre_delta_fig.data:
+            fig.add_trace(a_trace, row=1, col=1)
+            fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+            
+
+        # Scatter Plot _______________________________________________________________________________________________________ #
+         
+        scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0])
+        scatter_traces = scatter_fig.to_dict()['data']
+        
+        for a_trace in scatter_traces:
+            fig.add_trace(a_trace, row=1, col=2)
+            fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+        
+
+        
+        # Post-Delta Histogram _______________________________________________________________________________________________ #
+        # adding the second histogram
+        post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
+
+        for a_trace in post_delta_fig.data:
+            fig.add_trace(a_trace, row=1, col=3)
+            fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+        
+        return fig
+
+
+
+
+    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     if not isinstance(directory, Path):
         directory = Path(directory).resolve()
     assert directory.exists()
@@ -251,8 +312,10 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     laps_num_unique_sessions: int = concatenated_laps_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
     laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
-    fig_laps = go.Figure(px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', title=f"Laps - {laps_title_string_suffix}", color='session_name', size='time_bin_size'), layout_yaxis_range=[0.0, 1.0])
-    
+    laps_title: str = f"Laps - {laps_title_string_suffix}"
+    # fig_laps = go.Figure(px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=laps_title), layout_yaxis_range=[0.0, 1.0])
+    fig_laps = _subfn_build_figure(data_results_df=concatenated_laps_df, title=laps_title)
+        
 
     # trace_laps = go.Scatter(x=concatenated_laps_df['delta_aligned_start_t'], y=concatenated_laps_df['P_Long'],
     #                          mode='markers', marker=dict(color=concatenated_laps_df['session_name'], size=concatenated_laps_df['time_bin_size']),
@@ -265,9 +328,12 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
+    ripple_title: str = f"Ripples - {ripple_title_string_suffix}"
     # trace_ripple = px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - {ripple_title_string_suffix}", color='session_name', size='time_bin_size', name='ripple')
-    fig_ripples = go.Figure(px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - {ripple_title_string_suffix}", color='session_name', size='time_bin_size'), layout_yaxis_range=[0.0, 1.0])
-    
+    # fig_ripples = go.Figure(px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=ripple_title), layout_yaxis_range=[0.0, 1.0])
+    fig_ripples = _subfn_build_figure(data_results_df=concatenated_ripple_df, title=ripple_title)
+        
+
     # trace_ripple = go.Scatter(x=concatenated_ripple_df['delta_aligned_start_t'], y=concatenated_ripple_df['P_Long'], mode='markers', marker=dict(color=concatenated_ripple_df['session_name'], size=concatenated_ripple_df['time_bin_size']), name='ripple')
     # fig_ripples = go.Figure(data=[trace_ripple], layout_yaxis_range=[0.0, 1.0])
     # fig_ripples = _subfn_build_figure(data=[trace_ripple])
