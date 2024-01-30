@@ -215,7 +215,7 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
     return fig
 
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df, save_figures=False, figure_save_extension='.png'):
+def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0, save_figures=False, figure_save_extension='.png'):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
     Produces and then saves figures out the the f'{directory}/figures/' subfolder
 
@@ -239,6 +239,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
     def _subfn_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, **build_fig_kwargs):
         """ adds scatterplots as well
+        Captures: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
         """
 
         scatter_title = build_fig_kwargs.pop('title', None)
@@ -271,13 +272,16 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         # Scatter Plot _______________________________________________________________________________________________________ #
          
         scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0])
+        # # Create two shapes for the pre/post-delta periods. Requires earliest_delta_aligned_t_start, earliest_delta_aligned_t_start
+        # t_split: float = 0.0
+        # _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(scatter_fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end)
+    
         scatter_traces = scatter_fig.to_dict()['data']
         
         for a_trace in scatter_traces:
             fig.add_trace(a_trace, row=1, col=2)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
         
-
         
         # Post-Delta Histogram _______________________________________________________________________________________________ #
         # adding the second histogram
@@ -286,7 +290,14 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         for a_trace in post_delta_fig.data:
             fig.add_trace(a_trace, row=1, col=3)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-        
+
+        t_split: float = 0.0
+        _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
+        for a_shape_name, a_shape in _extras_output_dict.items():
+            fig.add_shape(a_shape, name=a_shape_name, row=1, col=2)
+        # fig.update_layout(shapes=[output_dict["long_region"], output_dict["short_region"], output_dict["divider_line"]], xaxis=dict(range=[t_start, t_end]), yaxis=dict(range=[ymin, ymax]))
+        # fig.update_layout(xaxis=dict(range=[earliest_delta_aligned_t_start, latest_delta_aligned_t_end]), yaxis=dict(range=[0.0, 1.0]))
+
         return fig
 
 

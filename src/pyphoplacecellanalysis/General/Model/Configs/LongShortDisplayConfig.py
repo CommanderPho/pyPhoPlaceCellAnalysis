@@ -268,7 +268,7 @@ class PlottingHelpers:
 
 
     @function_attributes(short_name=None, tags=['plotly', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 23:03', related_items=[])
-    def helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split: float = 0.0, t_start: float=0.0, t_end: float=666.0, yrange=[0.0, 1.0]):
+    def helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split: float = 0.0, t_start: float=0.0, t_end: float=666.0, yrange=[0.0, 1.0], build_only:bool=False):
         """ Draws the two indicator regions for the long and short track.
         analagous to `_helper_add_long_short_session_indicator_regions` but for plotly figures 
         
@@ -302,8 +302,9 @@ class PlottingHelpers:
         output_dict["long_region"] = blue_shape
         output_dict["short_region"] = red_shape
         output_dict["divider_line"] = vertical_divider_line
-        
-        fig.update_layout(shapes=[blue_shape, red_shape, vertical_divider_line], xaxis=dict(range=[t_start, t_end]), yaxis=dict(range=[ymin, ymax]))
-
+        if not build_only:
+            fig.update_layout(shapes=[output_dict["long_region"], output_dict["short_region"], output_dict["divider_line"]], xaxis=dict(range=[t_start, t_end]), yaxis=dict(range=[ymin, ymax]))
+        else:
+            print(f'WARN: build_only == True so fig.update_layout(...) will not be called.')
         return output_dict
 
