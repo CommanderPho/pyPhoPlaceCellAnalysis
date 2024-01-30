@@ -160,12 +160,25 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
     laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
     fig_laps = go.Figure(px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', title=f"Laps - {laps_title_string_suffix}", color='session_name', size='time_bin_size'), layout_yaxis_range=[0.0, 1.0])
+    
+
+    # trace_laps = go.Scatter(x=concatenated_laps_df['delta_aligned_start_t'], y=concatenated_laps_df['P_Long'],
+    #                          mode='markers', marker=dict(color=concatenated_laps_df['session_name'], size=concatenated_laps_df['time_bin_size']),
+    #                         title=f"Laps - {laps_title_string_suffix}", name='laps')
+    # fig_laps = go.Figure(data=[trace_laps], layout_yaxis_range=[0.0, 1.0])
+    # fig_laps = _subfn_build_figure(data=[trace_laps]) # , layout_yaxis_range=[0.0, 1.0]
+
 
     # Create a bubble chart for ripples
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
+    # trace_ripple = px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - {ripple_title_string_suffix}", color='session_name', size='time_bin_size', name='ripple')
     fig_ripples = go.Figure(px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - {ripple_title_string_suffix}", color='session_name', size='time_bin_size'), layout_yaxis_range=[0.0, 1.0])
+    
+    # trace_ripple = go.Scatter(x=concatenated_ripple_df['delta_aligned_start_t'], y=concatenated_ripple_df['P_Long'], mode='markers', marker=dict(color=concatenated_ripple_df['session_name'], size=concatenated_ripple_df['time_bin_size']), name='ripple')
+    # fig_ripples = go.Figure(data=[trace_ripple], layout_yaxis_range=[0.0, 1.0])
+    # fig_ripples = _subfn_build_figure(data=[trace_ripple])
 
     if save_figures:
         # Save the figures to the 'figures' subfolder
