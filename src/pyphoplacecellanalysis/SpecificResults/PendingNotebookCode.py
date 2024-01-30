@@ -289,9 +289,22 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
                             'height': (num_unique_sessions*200), 'width': 1024,
                             'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
-        px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability', **{'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04})
+        px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
 
+        def __sub_subfn_plot_histogram(fig, histogram_data_df, hist_title="Post-delta", row=1, col=3):
+            """ captures: px_histogram_kwargs, histogram_kwargs
+            
+            """
+            a_hist_fig = px.histogram(histogram_data_df, y="P_Long", color="time_bin_size", **px_histogram_kwargs, title=hist_title)
 
+            for a_trace in a_hist_fig.data:
+                if debug_print:
+                    print(f'a_trace.legend: {a_trace.legend}, a_trace.legendgroup: {a_trace.legendgroup}, a_trace.legendgrouptitle: {a_trace.legendgrouptitle}, a_trace.showlegend: {a_trace.showlegend}, a_trace.offsetgroup: {a_trace.offsetgroup}')
+                # a_trace.legend = "legend2"
+                a_trace.showlegend = False
+                fig.add_trace(a_trace, row=row, col=col)
+                fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
+                
 
         # get the pre-delta epochs
         pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
@@ -301,22 +314,15 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         
         # Pre-Delta Histogram ________________________________________________________________________________________________ #
         # adding first histogram
-        pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", title="Pre-delta", **px_histogram_kwargs)
-        if debug_print:
-            print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
-        # time_bin_sizes
-        for a_trace in pre_delta_fig.data:
-            if debug_print:
-                print(f'a_trace.legend: {a_trace.legend}, a_trace.legendgroup: {a_trace.legendgroup}, a_trace.legendgrouptitle: {a_trace.legendgrouptitle}, a_trace.showlegend: {a_trace.showlegend}, a_trace.offsetgroup: {a_trace.offsetgroup}')
-            # a_trace.legend = "legend2"
-            a_trace.showlegend = False
-            # a_trace.legendgroup, a_trace.offsetgroup
-            # a_trace.offsetgroup = 
-            # a_trace.legendonly = True
-            # a_trace.visible = 'legendonly', # this trace will be hidden initially
-            fig.add_trace(a_trace, row=1, col=1)
-            fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
-            
+        if (main_plot_mode == 'separate_row_per_session'):
+             for a_session_i, a_session_name in enumerate(unique_sessions):              
+                row_index: int = a_session_i + 1 # 1-indexed
+                a_session_pre_delta_df: pd.DataFrame = pre_delta_df[pre_delta_df['session_name'] == a_session_name]
+                __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_pre_delta_df, hist_title="Pre-delta", row=row_index, col=1)
+                 
+        else:
+            __sub_subfn_plot_histogram(fig, histogram_data_df=pre_delta_df, hist_title="Pre-delta", row=1, col=1)
+        
 
         # Scatter Plot _______________________________________________________________________________________________________ #
         
@@ -346,24 +352,44 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
         # Post-Delta Histogram _______________________________________________________________________________________________ #
         # adding the second histogram
-        post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", title="Post-delta", **px_histogram_kwargs)
+        if (main_plot_mode == 'separate_row_per_session'):
+            for a_session_i, a_session_name in enumerate(unique_sessions):              
+                row_index: int = a_session_i + 1 # 1-indexed
+                a_session_post_delta_df: pd.DataFrame = post_delta_df[post_delta_df['session_name'] == a_session_name]
+                __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_post_delta_df, hist_title="Post-delta", row=row_index, col=3)                
+        else:
+            __sub_subfn_plot_histogram(fig, histogram_data_df=post_delta_df, hist_title="Post-delta", row=1, col=3)
+            
+        # post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", title="Post-delta", **px_histogram_kwargs)
 
-        for a_trace in post_delta_fig.data:
-            if debug_print:
-                print(f'a_trace.legend: {a_trace.legend}, a_trace.legendgroup: {a_trace.legendgroup}, a_trace.legendgrouptitle: {a_trace.legendgrouptitle}, a_trace.showlegend: {a_trace.showlegend}, a_trace.offsetgroup: {a_trace.offsetgroup}')
-            # a_trace.legend = "legend2"
-            a_trace.showlegend = False
-            fig.add_trace(a_trace, row=1, col=3)
-            fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
+        # for a_trace in post_delta_fig.data:
+        #     if debug_print:
+        #         print(f'a_trace.legend: {a_trace.legend}, a_trace.legendgroup: {a_trace.legendgroup}, a_trace.legendgrouptitle: {a_trace.legendgrouptitle}, a_trace.showlegend: {a_trace.showlegend}, a_trace.offsetgroup: {a_trace.offsetgroup}')
+        #     # a_trace.legend = "legend2"
+        #     a_trace.showlegend = False
+        #     fig.add_trace(a_trace, row=1, col=3)
+        #     fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
 
         ## Add the delta indicator:
         t_split: float = 0.0
         _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
         for a_shape_name, a_shape in _extras_output_dict.items():
-            fig.add_shape(a_shape, name=a_shape_name, row=1, col=2)
+            if (main_plot_mode == 'separate_row_per_session'):
+                for a_session_i, a_session_name in enumerate(unique_sessions):    
+                    row_index: int = a_session_i + 1 # 1-indexed
+                    fig.add_shape(a_shape, name=a_shape_name, row=row_index, col=2)
+            else:
+                fig.add_shape(a_shape, name=a_shape_name, row=1, col=2)
         
         # Update title and height
-        fig.update_layout(title_text=scatter_title, height=700)
+        if (main_plot_mode == 'separate_row_per_session'):
+            required_figure_height = (num_unique_sessions*200)
+        else:
+            required_figure_height = 700
+            
+        fig.update_layout(title_text=scatter_title, width=2048, height=required_figure_height)
+        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+        
 
         return fig
 
