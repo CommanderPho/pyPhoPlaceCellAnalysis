@@ -6,6 +6,7 @@ import re
 from typing import  List, Optional, Dict, Tuple
 import numpy as np
 import pandas as pd
+from attrs import define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
 
@@ -21,6 +22,7 @@ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_acro
 
 import matplotlib.pyplot as plt
 
+@function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df, save_figures=False, figure_save_extension='.png'):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
     Produces and then saves figures out the the f'{directory}/figures/' subfolder
@@ -31,7 +33,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     import plotly.express as px
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
-
+    
     if not isinstance(directory, Path):
         directory = Path(directory).resolve()
     assert directory.exists()
@@ -51,19 +53,13 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     laps_num_unique_sessions: int = concatenated_laps_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
     laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
-    fig_laps = px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', title=f"Laps - {laps_title_string_suffix}", color='session_name', size='time_bin_size')
+    fig_laps = go.Figure(px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', title=f"Laps - {laps_title_string_suffix}", color='session_name', size='time_bin_size'), layout_yaxis_range=[0.0, 1.0])
 
     # Create a bubble chart for ripples
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
-    fig_ripples = px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - {ripple_title_string_suffix}", color='session_name', size='time_bin_size')
-
-    
-    # # Create a bubble chart for laps
-    # fig_laps = px.scatter(concatenated_laps_df, x='lap_start_t', y='P_Long', title=f"Laps - Session: {session_name}", color='session_name')
-    # # Create a bubble chart for ripples
-    # fig_ripples = px.scatter(concatenated_ripple_df, x='ripple_start_t', y='P_Long', title=f"Ripples - Session: {session_name}", color='session_name')
+    fig_ripples = go.Figure(px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - {ripple_title_string_suffix}", color='session_name', size='time_bin_size'), layout_yaxis_range=[0.0, 1.0])
 
     if save_figures:
         # Save the figures to the 'figures' subfolder
@@ -80,7 +76,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     
     return all_figures
 
-
+@function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str ) -> None:
     """ plots a set of two histograms in subplots, split at the delta for each session.
     from PendingNotebookCode import plot_histograms
@@ -96,7 +92,6 @@ def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataF
     # plot pre-delta histogram
     pre_delta_df.hist(column='P_Long', **histogram_kwargs)
     plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
-    # plt.xticks(rotation=90)
     plt.show()
 
     # plot post-delta histogram
@@ -104,6 +99,7 @@ def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataF
     plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
     plt.show()
 
+@function_attributes(short_name=None, tags=['histogram', 'stacked', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_stacked_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
     """ plots a colorful stacked histogram for each of the many time-bin sizes
     """
@@ -140,6 +136,10 @@ def plot_stacked_histograms(data_type: str, session_spec: str, data_results_df: 
     # plt.legend()
     plt.show()
     
+
+
+
+
 
 # Plot the time_bin marginals:
 
@@ -392,4 +392,25 @@ def process_csv_file(file: str, session_name: str, curr_session_t_delta: Optiona
     if curr_session_t_delta is not None:
         df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
     return df
+
+
+@define(slots=False)
+class AcrossSessionCSVOutputFormat:
+	data_description = ["AcrossSession"]
+	epoch_description = ["Laps", "Ripple"]
+	granularity_description = ["per-Epoch", "per-TimeBin"]
+	
+	parts_names = ["export_date", "date_name", "epochs", "granularity"]
+	
+	def parse_filename(self, a_filename: str):
+		if a_filename.endswith('.csv'):
+			a_filename = a_filename.removesuffix('.csv') # drop the .csv suffix
+		# split on the underscore into the parts
+		parts = a_filename.split('_')
+		if len(parts) == 4:
+			export_date, date_name, epochs, granularity  = parts
+		else:
+			raise NotImplementedError(f"a_csv_filename: '{a_filename}' expected four parts but got {len(parts)} parts.\n\tparts: {parts}")
+		return export_date, date_name, epochs, granularity
+	
 

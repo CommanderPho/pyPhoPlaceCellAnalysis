@@ -267,5 +267,43 @@ class PlottingHelpers:
         return long_epoch_indicator_region_items, short_epoch_indicator_region_items
 
 
+    @function_attributes(short_name=None, tags=['plotly', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 23:03', related_items=[])
+    def helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split: float = 0.0, t_start: float=0.0, t_end: float=666.0, yrange=[0.0, 1.0]):
+        """ Draws the two indicator regions for the long and short track.
+        analagous to `_helper_add_long_short_session_indicator_regions` but for plotly figures 
+        
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        
+        t_split: float = 0.0
+        _laps_extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig_laps, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end)
+        
+        
+        """
+        assert (yrange is not None) and (len(yrange) == 2)
+        ymin, ymax = yrange # unpack y-range
+        assert (ymin < ymax)
 
+        output_dict = {}
+        ## Get the track configs for the colors:
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        # long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+        # short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+
+        # long_epoch_kwargs = dict(fillcolor="blue")
+        # short_epoch_kwargs = dict(fillcolor="red")
+        long_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.long_epoch_config.mpl_color)
+        short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config.mpl_color)
+        
+        
+        blue_shape = dict(type="rect", xref="x", yref="paper", x0=t_start, y0=ymin, x1=t_split, y1=ymax, opacity=0.5, layer="below", line_width=1, **long_epoch_kwargs) 
+        red_shape = dict(type="rect", xref="x", yref="paper", x0=t_split, y0=ymin, x1=t_end, y1=ymax, opacity=0.5, layer="below", line_width=1, **short_epoch_kwargs)
+        vertical_divider_line = dict(type="line", x0=t_split, y0=ymin, x1=t_split, y1=ymax, line=dict(color="rgba(0,0,0,.25)", width=3, ), )
+            
+        output_dict["long_region"] = blue_shape
+        output_dict["short_region"] = red_shape
+        output_dict["divider_line"] = vertical_divider_line
+        
+        fig.update_layout(shapes=[blue_shape, red_shape, vertical_divider_line], xaxis=dict(range=[t_start, t_end]), yaxis=dict(range=[ymin, ymax]))
+
+        return output_dict
 
