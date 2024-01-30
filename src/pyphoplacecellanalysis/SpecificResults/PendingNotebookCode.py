@@ -196,7 +196,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     return all_figures
 
 @function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str ) -> None:
+def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str) -> None:
     """ plots a set of two histograms in subplots, split at the delta for each session.
     from PendingNotebookCode import plot_histograms
     
@@ -219,7 +219,7 @@ def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataF
     plt.show()
 
 @function_attributes(short_name=None, tags=['histogram', 'stacked', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_stacked_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
+def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str) -> None:
     """ plots a colorful stacked histogram for each of the many time-bin sizes
     """
     histogram_kwargs = dict(orientation="horizontal", bins=25)
