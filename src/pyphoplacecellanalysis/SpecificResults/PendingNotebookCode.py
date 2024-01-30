@@ -215,7 +215,10 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
     return fig
 
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0, save_figures=False, figure_save_extension='.png', debug_print=False):
+def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df,
+                                          earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
+                                          enabled_time_bin_sizes=None,
+                                          save_figures=False, figure_save_extension='.png', debug_print=False):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
     Produces and then saves figures out the the f'{directory}/figures/' subfolder
 
@@ -229,6 +232,9 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
+
+    
+
     # def _subfn_build_figure(data, **build_fig_kwargs):
     #     return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
     
@@ -239,7 +245,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
     def _subfn_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, **build_fig_kwargs):
         """ adds scatterplots as well
-        Captures: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
+        Captures: earliest_delta_aligned_t_start, latest_delta_aligned_t_end, enabled_time_bin_sizes
         """
         barmode='overlay'
         # barmode='stack'
@@ -249,6 +255,11 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         
         scatter_title = build_fig_kwargs.pop('title', None)
 
+        # Filter dataframe by chosen bin sizes
+        if (enabled_time_bin_sizes is not None) and (len(enabled_time_bin_sizes) > 0):
+            print(f'filtering data_results_df to enabled_time_bin_sizes: {enabled_time_bin_sizes}...')
+            data_results_df = data_results_df[data_results_df.time_bin_size.isin(enabled_time_bin_sizes)]
+        
         unique_sessions = data_results_df['session_name'].unique()
         num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
 
