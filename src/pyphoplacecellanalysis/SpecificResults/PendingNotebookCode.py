@@ -169,7 +169,7 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
 
     # Pre-Delta Histogram ________________________________________________________________________________________________ #
     # adding first histogram
-    pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
+    pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
     print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
     # time_bin_sizes
     for a_trace in pre_delta_fig.data:
@@ -196,7 +196,7 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
 
     # Post-Delta Histogram _______________________________________________________________________________________________ #
     # adding the second histogram
-    post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
+    post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
 
     for a_trace in post_delta_fig.data:
         fig.add_trace(a_trace, row=1, col=3)
@@ -212,7 +212,7 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
     # )
 
     # fig.update_layout(layout_yaxis_range=[0.0, 1.0])
-    fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+    fig.update_layout(yaxis=dict(range=[0.0, 1.0]), barmode='overlay')
     return fig
 
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
