@@ -265,6 +265,11 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
         # time_bin_sizes
         for a_trace in pre_delta_fig.data:
+            a_trace.showlegend = False
+            # a_trace.legendgroup, a_trace.offsetgroup
+            # a_trace.offsetgroup = 
+            # a_trace.legendonly = True
+            # a_trace.visible = 'legendonly', # this trace will be hidden initially
             fig.add_trace(a_trace, row=1, col=1)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
             
@@ -279,6 +284,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         scatter_traces = scatter_fig.to_dict()['data']
         
         for a_trace in scatter_traces:
+            a_trace['visible'] = 'legendonly' # 'legendonly', # this trace will be hidden initially
             fig.add_trace(a_trace, row=1, col=2)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
         
@@ -288,6 +294,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
 
         for a_trace in post_delta_fig.data:
+            a_trace.showlegend = False
             fig.add_trace(a_trace, row=1, col=3)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
 
