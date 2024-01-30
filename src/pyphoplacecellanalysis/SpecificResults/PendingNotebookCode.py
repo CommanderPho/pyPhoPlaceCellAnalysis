@@ -232,7 +232,8 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
-
+    enable_histograms: bool = True
+    enable_epoch_shading_shapes: bool = True
     
 
     # def _subfn_build_figure(data, **build_fig_kwargs):
@@ -277,19 +278,24 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         # main_plot_mode: str = 'separate_facet_row_per_session'
         # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
         # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
-        #                     'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
+        #                     'facet_row': 'session_name', 'facet_row_spacing': 0.04, # 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
         #                     'height': (num_unique_sessions*200), 'width': 1024,
         #                     'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
-        # px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability', **{'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04})
-        
+        # px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability', **{'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04, 'height': (num_unique_sessions*200), 'width': 1024,})
+        # enable_histograms: bool = False
+        # enable_epoch_shading_shapes: bool = False
+
+
         main_plot_mode: str = 'separate_row_per_session'
         sp_make_subplots_kwargs = {'rows': num_unique_sessions, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'vertical_spacing': 0.04, 'shared_yaxes': True,
                                     'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"],
-                                    'row_titles': [str(v) for v in unique_sessions]}
-        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
+                                    # 'row_titles': [str(v) for v in unique_sessions],
+                                    }
+        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'range_y': [0.0, 1.0],
                             'height': (num_unique_sessions*200), 'width': 1024,
                             'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
         px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
+        
 
         def __sub_subfn_plot_histogram(fig, histogram_data_df, hist_title="Post-delta", row=1, col=3):
             """ captures: px_histogram_kwargs, histogram_kwargs
@@ -314,14 +320,16 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         
         # Pre-Delta Histogram ________________________________________________________________________________________________ #
         # adding first histogram
-        if (main_plot_mode == 'separate_row_per_session'):
-             for a_session_i, a_session_name in enumerate(unique_sessions):              
-                row_index: int = a_session_i + 1 # 1-indexed
-                a_session_pre_delta_df: pd.DataFrame = pre_delta_df[pre_delta_df['session_name'] == a_session_name]
-                __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_pre_delta_df, hist_title="Pre-delta", row=row_index, col=1)
-                 
-        else:
-            __sub_subfn_plot_histogram(fig, histogram_data_df=pre_delta_df, hist_title="Pre-delta", row=1, col=1)
+        if enable_histograms:
+            if (main_plot_mode == 'separate_row_per_session'):
+                for a_session_i, a_session_name in enumerate(unique_sessions):              
+                    row_index: int = a_session_i + 1 # 1-indexed
+                    a_session_pre_delta_df: pd.DataFrame = pre_delta_df[pre_delta_df['session_name'] == a_session_name]
+                    __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_pre_delta_df, hist_title="Pre-delta", row=row_index, col=1)
+                    fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=1)
+                                    
+            else:
+                __sub_subfn_plot_histogram(fig, histogram_data_df=pre_delta_df, hist_title="Pre-delta", row=1, col=1)
         
 
         # Scatter Plot _______________________________________________________________________________________________________ #
@@ -330,10 +338,18 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
              for a_session_i, a_session_name in enumerate(unique_sessions):              
                  row_index: int = a_session_i + 1 # 1-indexed
                  a_session_data_results_df: pd.DataFrame = data_results_df[data_results_df['session_name'] == a_session_name]
-                 fig.add_scatter(x=a_session_data_results_df['delta_aligned_start_t'], y=a_session_data_results_df['P_Long'], row=row_index, col=2, name=a_session_name)
+                 #  fig.add_scatter(x=a_session_data_results_df['delta_aligned_start_t'], y=a_session_data_results_df['P_Long'], row=row_index, col=2, name=a_session_name)
+                 scatter_fig = px.scatter(a_session_data_results_df, **px_scatter_kwargs, title=f"{a_session_name}")
+                 for a_trace in scatter_fig.data:
+                    fig.add_trace(a_trace, row=row_index, col=2)
+                    # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+
                  fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=row_index, col=2)
+                #  fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=2)
                  fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
                  
+            #  fig.update_xaxes(matches='x')
+        
         else:
             # scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0], labels={"session_name": "Session", "time_bin_size": "tbin_size"})
             scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
@@ -352,47 +368,40 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
         # Post-Delta Histogram _______________________________________________________________________________________________ #
         # adding the second histogram
-        if (main_plot_mode == 'separate_row_per_session'):
-            for a_session_i, a_session_name in enumerate(unique_sessions):              
-                row_index: int = a_session_i + 1 # 1-indexed
-                a_session_post_delta_df: pd.DataFrame = post_delta_df[post_delta_df['session_name'] == a_session_name]
-                __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_post_delta_df, hist_title="Post-delta", row=row_index, col=3)                
-        else:
-            __sub_subfn_plot_histogram(fig, histogram_data_df=post_delta_df, hist_title="Post-delta", row=1, col=3)
-            
-        # post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", title="Post-delta", **px_histogram_kwargs)
-
-        # for a_trace in post_delta_fig.data:
-        #     if debug_print:
-        #         print(f'a_trace.legend: {a_trace.legend}, a_trace.legendgroup: {a_trace.legendgroup}, a_trace.legendgrouptitle: {a_trace.legendgrouptitle}, a_trace.showlegend: {a_trace.showlegend}, a_trace.offsetgroup: {a_trace.offsetgroup}')
-        #     # a_trace.legend = "legend2"
-        #     a_trace.showlegend = False
-        #     fig.add_trace(a_trace, row=1, col=3)
-        #     fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
-
-        ## Add the delta indicator:
-        t_split: float = 0.0
-        _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
-        for a_shape_name, a_shape in _extras_output_dict.items():
+        if enable_histograms:
             if (main_plot_mode == 'separate_row_per_session'):
-                for a_session_i, a_session_name in enumerate(unique_sessions):    
+                for a_session_i, a_session_name in enumerate(unique_sessions):              
                     row_index: int = a_session_i + 1 # 1-indexed
-                    fig.add_shape(a_shape, name=a_shape_name, row=row_index, col=2)
+                    a_session_post_delta_df: pd.DataFrame = post_delta_df[post_delta_df['session_name'] == a_session_name]
+                    __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_post_delta_df, hist_title="Post-delta", row=row_index, col=3)                
             else:
-                fig.add_shape(a_shape, name=a_shape_name, row=1, col=2)
+                __sub_subfn_plot_histogram(fig, histogram_data_df=post_delta_df, hist_title="Post-delta", row=1, col=3)
+            
+        ## Add the delta indicator:
+        if enable_epoch_shading_shapes:
+            t_split: float = 0.0
+            _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
+            for a_shape_name, a_shape in _extras_output_dict.items():
+                if (main_plot_mode == 'separate_row_per_session'):
+                    for a_session_i, a_session_name in enumerate(unique_sessions):    
+                        row_index: int = a_session_i + 1 # 1-indexed
+                        fig.add_shape(a_shape, name=a_shape_name, row=row_index, col=2)
+                else:
+                    fig.add_shape(a_shape, name=a_shape_name, row=1, col=2)
         
         # Update title and height
         if (main_plot_mode == 'separate_row_per_session'):
+            required_figure_height = (num_unique_sessions*300)
+        elif (main_plot_mode == 'separate_facet_row_per_session'):
             required_figure_height = (num_unique_sessions*200)
         else:
             required_figure_height = 700
             
         fig.update_layout(title_text=scatter_title, width=2048, height=required_figure_height)
         fig.update_layout(yaxis=dict(range=[0.0, 1.0]), template='plotly_dark')
-
+        # Update y-axis range for all created figures
+        fig.update_yaxes(range=[0.0, 1.0])
         return fig
-
-
 
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
@@ -419,33 +428,19 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     # fig_laps = go.Figure(px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=laps_title), layout_yaxis_range=[0.0, 1.0])
     fig_laps = _subfn_build_figure(data_results_df=concatenated_laps_df, title=laps_title)
 
-    # trace_laps = go.Scatter(x=concatenated_laps_df['delta_aligned_start_t'], y=concatenated_laps_df['P_Long'],
-    #                          mode='markers', marker=dict(color=concatenated_laps_df['session_name'], size=concatenated_laps_df['time_bin_size']),
-    #                         title=f"Laps - {laps_title_string_suffix}", name='laps')
-    # fig_laps = go.Figure(data=[trace_laps], layout_yaxis_range=[0.0, 1.0])
-    # fig_laps = _subfn_build_figure(data=[trace_laps]) # , layout_yaxis_range=[0.0, 1.0]
-
     # Create a bubble chart for ripples
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
     ripple_title: str = f"Ripples - {ripple_title_string_suffix}"
-    # trace_ripple = px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - {ripple_title_string_suffix}", color='session_name', size='time_bin_size', name='ripple')
-    # fig_ripples = go.Figure(px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=ripple_title), layout_yaxis_range=[0.0, 1.0])
     fig_ripples = _subfn_build_figure(data_results_df=concatenated_ripple_df, title=ripple_title)
         
-    # trace_ripple = go.Scatter(x=concatenated_ripple_df['delta_aligned_start_t'], y=concatenated_ripple_df['P_Long'], mode='markers', marker=dict(color=concatenated_ripple_df['session_name'], size=concatenated_ripple_df['time_bin_size']), name='ripple')
-    # fig_ripples = go.Figure(data=[trace_ripple], layout_yaxis_range=[0.0, 1.0])
-    # fig_ripples = _subfn_build_figure(data=[trace_ripple])
-
     if save_figures:
         # Save the figures to the 'figures' subfolder
         assert figure_save_extension is not None
-             
         if isinstance(figure_save_extension, str):
              figure_save_extension = [figure_save_extension] # a list containing only this item
         
-
         print(f'\tsaving figures...')
         for a_fig_save_extension in figure_save_extension:
             if a_fig_save_extension.lower() == '.html':
@@ -456,10 +451,8 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_laps_marginal{a_fig_save_extension}").resolve()
             print(f'\tsaving "{fig_laps_name}"...')
             a_save_fn(fig_laps, fig_laps_name)
-            # fig_laps.write_image(fig_laps_name)
             fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_ripples_marginal{a_fig_save_extension}").resolve()
             print(f'\tsaving "{fig_ripple_name}"...')
-            # fig_ripples.write_image(fig_ripple_name)
             a_save_fn(fig_ripples, fig_ripple_name)
             
 
