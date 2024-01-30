@@ -255,6 +255,8 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         
         scatter_title = build_fig_kwargs.pop('title', None)
 
+
+
         # Filter dataframe by chosen bin sizes
         if (enabled_time_bin_sizes is not None) and (len(enabled_time_bin_sizes) > 0):
             print(f'filtering data_results_df to enabled_time_bin_sizes: {enabled_time_bin_sizes}...')
@@ -269,15 +271,22 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
         print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
         
+        ## Build KWARGS
+        sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
+        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+
+
         # get the pre-delta epochs
         pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
         post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
         # creating subplots
-        fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True,
-                               column_titles=["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"],
-                               )
+                 
+        # **(sp_make_subplots_kwargs | kwargs)
+        # fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True,
+        #                        column_titles=["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"],
+        #                        )
+        fig = sp.make_subplots(**sp_make_subplots_kwargs)
         
-
         # Pre-Delta Histogram ________________________________________________________________________________________________ #
         # adding first histogram
         pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", title="Pre-delta", **px_histogram_kwargs)
@@ -298,16 +307,11 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             
 
         # Scatter Plot _______________________________________________________________________________________________________ #
-         
-        scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0],
-                            labels={"session_name": "Session", "time_bin_size": "tbin_size"}
-                            )
-        # # Create two shapes for the pre/post-delta periods. Requires earliest_delta_aligned_t_start, earliest_delta_aligned_t_start
-        # t_split: float = 0.0
-        # _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(scatter_fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end)
-    
-        # scatter_traces = scatter_fig.to_dict()['data']
         
+        
+        # scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0], labels={"session_name": "Session", "time_bin_size": "tbin_size"})
+        scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
+
         # for a_trace in scatter_traces:
         for a_trace in scatter_fig.data:
             # a_trace.legend = "legend"
@@ -337,25 +341,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
         for a_shape_name, a_shape in _extras_output_dict.items():
             fig.add_shape(a_shape, name=a_shape_name, row=1, col=2)
-        # fig.update_layout(shapes=[output_dict["long_region"], output_dict["short_region"], output_dict["divider_line"]], xaxis=dict(range=[t_start, t_end]), yaxis=dict(range=[ymin, ymax]))
-        # fig.update_layout(xaxis=dict(range=[earliest_delta_aligned_t_start, latest_delta_aligned_t_end]), yaxis=dict(range=[0.0, 1.0]))
-
-        # fig.update_layout(
-        #     legend={
-        #         "title": "By Session",
-        #         "xref": "container",
-        #         "yref": "container",
-        #         "y": 0.65,
-        #         "bgcolor": "Blue",
-        #     },
-        #     legend2={
-        #         "title": "By time_bin_size",
-        #         "xref": "container",
-        #         "yref": "container",
-        #         "y": 0.85,
-        #         "bgcolor": "Gold",
-        #     },
-        # )
+        
         # Update title and height
         fig.update_layout(title_text=scatter_title, height=700)
 
