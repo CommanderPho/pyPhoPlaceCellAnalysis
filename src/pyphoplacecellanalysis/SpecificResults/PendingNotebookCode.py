@@ -281,14 +281,25 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         print(f'main_plot_mode: {main_plot_mode}')
 
         enable_histograms: bool = True
+        enable_scatter_plot: bool = True
         enable_epoch_shading_shapes: bool = True
         px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0]} #, 'histnorm': 'probability density'
         
 
         if (main_plot_mode == 'default'):
             # main_plot_mode: str = 'default'
-            sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
-            px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+            enable_scatter_plot: bool = False
+            num_cols: int = int(enable_scatter_plot) + 2 * int(enable_histograms) # 2 histograms and one scatter
+            print(f'num_cols: {num_cols}')
+            is_col_included = np.array([enable_histograms, enable_scatter_plot, enable_histograms])
+            column_widths = list(np.array([0.1, 0.8, 0.1])[is_col_included])
+            column_titles = ["Pre-delta", f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]
+            
+            # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': column_titles}
+            sp_make_subplots_kwargs = {'rows': 1, 'cols': num_cols, 'column_widths': column_widths, 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': list(np.array(column_titles)[is_col_included])}
+            # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+            px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+            
             # px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability'}
             
         elif (main_plot_mode == 'separate_facet_row_per_session'):
@@ -350,82 +361,95 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
         # creating subplots
         fig = sp.make_subplots(**sp_make_subplots_kwargs)
+        next_subplot_col_idx: int = 1 
         
         # Pre-Delta Histogram ________________________________________________________________________________________________ #
         # adding first histogram
         if enable_histograms:
+            histogram_col_idx: int = next_subplot_col_idx
             if (main_plot_mode == 'separate_row_per_session'):
                 for a_session_i, a_session_name in enumerate(unique_sessions):              
                     row_index: int = a_session_i + 1 # 1-indexed
                     a_session_pre_delta_df: pd.DataFrame = pre_delta_df[pre_delta_df['session_name'] == a_session_name]
-                    __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_pre_delta_df, hist_title="Pre-delta", row=row_index, col=1)
+                    __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_pre_delta_df, hist_title="Pre-delta", row=row_index, col=histogram_col_idx)
                     fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=1)
                                     
             else:
-                __sub_subfn_plot_histogram(fig, histogram_data_df=pre_delta_df, hist_title="Pre-delta", row=1, col=1)
-        
+                __sub_subfn_plot_histogram(fig, histogram_data_df=pre_delta_df, hist_title="Pre-delta", row=1, col=histogram_col_idx)
+            next_subplot_col_idx = next_subplot_col_idx + 1 # increment the next column
 
         # Scatter Plot _______________________________________________________________________________________________________ #
-        
-        if (main_plot_mode == 'separate_row_per_session'):
-             for a_session_i, a_session_name in enumerate(unique_sessions):              
-                 row_index: int = a_session_i + 1 # 1-indexed
-                 scatter_column: int = 2
-                 is_first_item: bool = ((row_index == 1) and (scatter_column == 1))
-                 a_session_data_results_df: pd.DataFrame = data_results_df[data_results_df['session_name'] == a_session_name]
-                 #  fig.add_scatter(x=a_session_data_results_df['delta_aligned_start_t'], y=a_session_data_results_df['P_Long'], row=row_index, col=2, name=a_session_name)
-                 scatter_fig = px.scatter(a_session_data_results_df, **px_scatter_kwargs, title=f"{a_session_name}")
-                 for a_trace in scatter_fig.data:
-                    if (not is_first_item):
-                        a_trace.showlegend = False
-    
-                    fig.add_trace(a_trace, row=row_index, col=scatter_column)
-                    # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-
-                 fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=row_index, col=scatter_column)
-                #  fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=scatter_column)
-                 fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-                 
-            #  fig.update_xaxes(matches='x')
-        
-        else:
-            # scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0], labels={"session_name": "Session", "time_bin_size": "tbin_size"})
-            scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
-
-            # for a_trace in scatter_traces:
-            for a_trace in scatter_fig.data:
-                # a_trace.legend = "legend"
-                # a_trace['visible'] = 'legendonly'
-                # a_trace['visible'] = 'legendonly' # 'legendonly', # this trace will be hidden initially
-                fig.add_trace(a_trace, row=1, col=2)
-                fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+        if enable_scatter_plot:
+            scatter_column: int = next_subplot_col_idx # default 2
             
-            # Update xaxis properties
-            fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=1, col=2)
+            if (main_plot_mode == 'separate_row_per_session'):
+                for a_session_i, a_session_name in enumerate(unique_sessions):              
+                    row_index: int = a_session_i + 1 # 1-indexed
+                    is_first_item: bool = ((row_index == 1) and (scatter_column == 1))
+                    a_session_data_results_df: pd.DataFrame = data_results_df[data_results_df['session_name'] == a_session_name]
+                    #  fig.add_scatter(x=a_session_data_results_df['delta_aligned_start_t'], y=a_session_data_results_df['P_Long'], row=row_index, col=2, name=a_session_name)
+                    scatter_fig = px.scatter(a_session_data_results_df, **px_scatter_kwargs, title=f"{a_session_name}")
+                    for a_trace in scatter_fig.data:
+                        if (not is_first_item):
+                            a_trace.showlegend = False
         
+                        fig.add_trace(a_trace, row=row_index, col=scatter_column)
+                        # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+
+                    fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=row_index, col=scatter_column)
+                    #  fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=scatter_column)
+                    fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+                    
+                #  fig.update_xaxes(matches='x')
+            
+            else:
+                # scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0], labels={"session_name": "Session", "time_bin_size": "tbin_size"})
+                scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
+
+                # for a_trace in scatter_traces:
+                for a_trace in scatter_fig.data:
+                    # a_trace.legend = "legend"
+                    # a_trace['visible'] = 'legendonly'
+                    # a_trace['visible'] = 'legendonly' # 'legendonly', # this trace will be hidden initially
+                    fig.add_trace(a_trace, row=1, col=scatter_column)
+                    fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+                
+                # Update xaxis properties
+                fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=1, col=scatter_column)
+                
+            next_subplot_col_idx = next_subplot_col_idx + 1 # increment the next column
+        # else:
+        #     # no scatter
+        #     next_subplot_col_idx = next_subplot_col_idx
+            
 
         # Post-Delta Histogram _______________________________________________________________________________________________ #
         # adding the second histogram
         if enable_histograms:
+            histogram_col_idx: int = next_subplot_col_idx #default 3
+            
             if (main_plot_mode == 'separate_row_per_session'):
                 for a_session_i, a_session_name in enumerate(unique_sessions):              
                     row_index: int = a_session_i + 1 # 1-indexed
                     a_session_post_delta_df: pd.DataFrame = post_delta_df[post_delta_df['session_name'] == a_session_name]
-                    __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_post_delta_df, hist_title="Post-delta", row=row_index, col=3)                
+                    __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_post_delta_df, hist_title="Post-delta", row=row_index, col=histogram_col_idx)                
             else:
-                __sub_subfn_plot_histogram(fig, histogram_data_df=post_delta_df, hist_title="Post-delta", row=1, col=3)
+                __sub_subfn_plot_histogram(fig, histogram_data_df=post_delta_df, hist_title="Post-delta", row=1, col=histogram_col_idx)
             
+            next_subplot_col_idx = next_subplot_col_idx + 1 # increment the next column
+            
+
         ## Add the delta indicator:
-        if enable_epoch_shading_shapes:
+        if (enable_scatter_plot and enable_epoch_shading_shapes):
             t_split: float = 0.0
             _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
             for a_shape_name, a_shape in _extras_output_dict.items():
                 if (main_plot_mode == 'separate_row_per_session'):
                     for a_session_i, a_session_name in enumerate(unique_sessions):    
                         row_index: int = a_session_i + 1 # 1-indexed
-                        fig.add_shape(a_shape, name=a_shape_name, row=row_index, col=2)
+                        fig.add_shape(a_shape, name=a_shape_name, row=row_index, col=scatter_column)
                 else:
-                    fig.add_shape(a_shape, name=a_shape_name, row=1, col=2)
+                    fig.add_shape(a_shape, name=a_shape_name, row=1, col=scatter_column)
         
         # Update title and height
         if (main_plot_mode == 'separate_row_per_session'):
