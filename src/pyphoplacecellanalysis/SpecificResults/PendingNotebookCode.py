@@ -269,26 +269,34 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
         
         ## Build KWARGS
+        # main_plot_mode: str = 'default'
         # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
         # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
         # px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
         
+        # main_plot_mode: str = 'separate_facet_row_per_session'
+        # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
+        # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
+        #                     'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
+        #                     'height': (num_unique_sessions*200), 'width': 1024,
+        #                     'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+        # px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability', **{'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04})
+        
         main_plot_mode: str = 'separate_row_per_session'
-        sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
+        sp_make_subplots_kwargs = {'rows': num_unique_sessions, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'vertical_spacing': 0.04, 'shared_yaxes': True,
+                                    'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"],
+                                    'row_titles': [str(v) for v in unique_sessions]}
         px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
-                            'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
                             'height': (num_unique_sessions*200), 'width': 1024,
                             'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
         px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability', **{'facet_row': 'session_name', 'facet_row_spacing': 0.04, 'facet_col_wrap': 2, 'facet_col_spacing': 0.04})
+
 
 
         # get the pre-delta epochs
         pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
         post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
         # creating subplots
-        # fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True,
-        #                        column_titles=["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"],
-        #                        )
         fig = sp.make_subplots(**sp_make_subplots_kwargs)
         
         # Pre-Delta Histogram ________________________________________________________________________________________________ #
@@ -312,20 +320,28 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
         # Scatter Plot _______________________________________________________________________________________________________ #
         
-        
-        # scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0], labels={"session_name": "Session", "time_bin_size": "tbin_size"})
-        scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
+        if (main_plot_mode == 'separate_row_per_session'):
+             for a_session_i, a_session_name in enumerate(unique_sessions):              
+                 row_index: int = a_session_i + 1 # 1-indexed
+                 a_session_data_results_df: pd.DataFrame = data_results_df[data_results_df['session_name'] == a_session_name]
+                 fig.add_scatter(x=a_session_data_results_df['delta_aligned_start_t'], y=a_session_data_results_df['P_Long'], row=row_index, col=2, name=a_session_name)
+                 fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=row_index, col=2)
+                 fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+                 
+        else:
+            # scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0], labels={"session_name": "Session", "time_bin_size": "tbin_size"})
+            scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
 
-        # for a_trace in scatter_traces:
-        for a_trace in scatter_fig.data:
-            # a_trace.legend = "legend"
-            # a_trace['visible'] = 'legendonly'
-            # a_trace['visible'] = 'legendonly' # 'legendonly', # this trace will be hidden initially
-            fig.add_trace(a_trace, row=1, col=2)
-            fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-        
-        # Update xaxis properties
-        fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=1, col=2)
+            # for a_trace in scatter_traces:
+            for a_trace in scatter_fig.data:
+                # a_trace.legend = "legend"
+                # a_trace['visible'] = 'legendonly'
+                # a_trace['visible'] = 'legendonly' # 'legendonly', # this trace will be hidden initially
+                fig.add_trace(a_trace, row=1, col=2)
+                fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+            
+            # Update xaxis properties
+            fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=1, col=2)
         
 
         # Post-Delta Histogram _______________________________________________________________________________________________ #
