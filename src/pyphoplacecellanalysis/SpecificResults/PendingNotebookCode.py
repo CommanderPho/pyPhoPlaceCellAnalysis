@@ -375,14 +375,12 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     laps_title: str = f"Laps - {laps_title_string_suffix}"
     # fig_laps = go.Figure(px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=laps_title), layout_yaxis_range=[0.0, 1.0])
     fig_laps = _subfn_build_figure(data_results_df=concatenated_laps_df, title=laps_title)
-        
 
     # trace_laps = go.Scatter(x=concatenated_laps_df['delta_aligned_start_t'], y=concatenated_laps_df['P_Long'],
     #                          mode='markers', marker=dict(color=concatenated_laps_df['session_name'], size=concatenated_laps_df['time_bin_size']),
     #                         title=f"Laps - {laps_title_string_suffix}", name='laps')
     # fig_laps = go.Figure(data=[trace_laps], layout_yaxis_range=[0.0, 1.0])
     # fig_laps = _subfn_build_figure(data=[trace_laps]) # , layout_yaxis_range=[0.0, 1.0]
-
 
     # Create a bubble chart for ripples
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
@@ -393,7 +391,6 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
     # fig_ripples = go.Figure(px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=ripple_title), layout_yaxis_range=[0.0, 1.0])
     fig_ripples = _subfn_build_figure(data_results_df=concatenated_ripple_df, title=ripple_title)
         
-
     # trace_ripple = go.Scatter(x=concatenated_ripple_df['delta_aligned_start_t'], y=concatenated_ripple_df['P_Long'], mode='markers', marker=dict(color=concatenated_ripple_df['session_name'], size=concatenated_ripple_df['time_bin_size']), name='ripple')
     # fig_ripples = go.Figure(data=[trace_ripple], layout_yaxis_range=[0.0, 1.0])
     # fig_ripples = _subfn_build_figure(data=[trace_ripple])
