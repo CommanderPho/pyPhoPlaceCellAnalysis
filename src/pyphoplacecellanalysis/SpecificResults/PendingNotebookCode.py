@@ -241,7 +241,12 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         """ adds scatterplots as well
         Captures: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
         """
-
+        barmode='overlay'
+        # barmode='stack'
+        histogram_kwargs = dict(barmode=barmode)
+        # px_histogram_kwargs = dict(nbins=histogram_bins, barmode='stack', opacity=0.5, range_y=[0.0, 1.0])
+        px_histogram_kwargs = dict(nbins=histogram_bins, barmode=barmode, opacity=0.5, range_y=[0.0, 1.0], histnorm='probability')
+        
         scatter_title = build_fig_kwargs.pop('title', None)
 
         unique_sessions = data_results_df['session_name'].unique()
@@ -262,10 +267,9 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
                                )
         
 
-
         # Pre-Delta Histogram ________________________________________________________________________________________________ #
         # adding first histogram
-        pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
+        pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", title="Pre-delta", **px_histogram_kwargs)
         if debug_print:
             print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
         # time_bin_sizes
@@ -279,7 +283,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             # a_trace.legendonly = True
             # a_trace.visible = 'legendonly', # this trace will be hidden initially
             fig.add_trace(a_trace, row=1, col=1)
-            fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+            fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
             
 
         # Scatter Plot _______________________________________________________________________________________________________ #
@@ -301,10 +305,13 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             fig.add_trace(a_trace, row=1, col=2)
             fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
         
+        # Update xaxis properties
+        fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=1, col=2)
         
+
         # Post-Delta Histogram _______________________________________________________________________________________________ #
         # adding the second histogram
-        post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins)
+        post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", title="Post-delta", **px_histogram_kwargs)
 
         for a_trace in post_delta_fig.data:
             if debug_print:
@@ -312,7 +319,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
             # a_trace.legend = "legend2"
             a_trace.showlegend = False
             fig.add_trace(a_trace, row=1, col=3)
-            fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+            fig.update_layout(yaxis=dict(range=[0.0, 1.0]), **histogram_kwargs)
 
         t_split: float = 0.0
         _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
@@ -337,7 +344,9 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         #         "bgcolor": "Gold",
         #     },
         # )
-        
+        # Update title and height
+        fig.update_layout(title_text=scatter_title, height=700)
+
         return fig
 
 
@@ -391,18 +400,35 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
     if save_figures:
         # Save the figures to the 'figures' subfolder
+        assert figure_save_extension is not None
+             
+        if isinstance(figure_save_extension, str):
+             figure_save_extension = [figure_save_extension] # a list containing only this item
+        
+
         print(f'\tsaving figures...')
-        fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_laps_marginal{figure_save_extension}").resolve()
-        print(f'\tsaving "{fig_laps_name}"...')
-        fig_laps.write_image(fig_laps_name)
-        fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_ripples_marginal{figure_save_extension}").resolve()
-        print(f'\tsaving "{fig_ripple_name}"...')
-        fig_ripples.write_image(fig_ripple_name)
+        for a_fig_save_extension in figure_save_extension:
+            if a_fig_save_extension.lower() == '.html':
+                 a_save_fn = lambda a_fig, a_save_name: a_fig.write_html(a_save_name)
+            else:
+                 a_save_fn = lambda a_fig, a_save_name: a_fig.write_image(a_save_name)
     
+            fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_laps_marginal{a_fig_save_extension}").resolve()
+            print(f'\tsaving "{fig_laps_name}"...')
+            a_save_fn(fig_laps, fig_laps_name)
+            # fig_laps.write_image(fig_laps_name)
+            fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_ripples_marginal{a_fig_save_extension}").resolve()
+            print(f'\tsaving "{fig_ripple_name}"...')
+            # fig_ripples.write_image(fig_ripple_name)
+            a_save_fn(fig_ripples, fig_ripple_name)
+            
+
     # Append both figures to the list
     all_figures.append((fig_laps, fig_ripples))
     
     return all_figures
+
+
 
 @function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, **kwargs) -> None:
