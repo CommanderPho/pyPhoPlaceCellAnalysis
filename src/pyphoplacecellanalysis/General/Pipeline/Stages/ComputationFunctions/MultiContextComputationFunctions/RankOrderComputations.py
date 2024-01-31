@@ -2463,16 +2463,6 @@ class RankOrderAnalyses:
                         active_selected_spikes_df.loc[mask, 'aclu'] = active_selected_spikes_df.loc[mask, 'aclu'].sample(frac=1).values
                         active_selected_spikes_df.loc[mask, f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.loc[mask, 'aclu'].map(a_aclu_peak_map)
 
-                        # ## Shuffle aclus here:
-                        # # probe_epoch_df.aclu.sample(1000)
-                        # # a_aclu_peak_map
-                        # # Assuming 'df' is your DataFrame and 'column_name' is the column you want to shuffle
-                        # probe_epoch_df['aclu'] = probe_epoch_df['aclu'].sample(frac=1).reset_index(drop=True)
-
-                        # probe_epoch_df[f'{a_decoder_name}_pf_peak_x'] = probe_epoch_df.aclu.map(a_aclu_peak_map)
-
-                        # active_selected_spikes_df[f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.aclu.map(a_aclu_peak_map)
-        
             else:            
                 # Pre 2023-01-09 - Shuffle Amongst all: ______________________________________________________________________________ #
                 for a_decoder_name, a_aclu_peak_map in decoder_aclu_peak_map_dict.items():
