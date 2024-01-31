@@ -131,7 +131,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
 
     @function_attributes(short_name='3d_image_plotter', tags=['display', 'image', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00', is_global=False)
     def _display_3d_image_plotter(computation_result, active_config, **kwargs):
-        """ 
+        """ Plots an existing image in a 3D environment
         Inputs: {'extant_plotter': None} 
         Outputs: {'plotter'}
         """

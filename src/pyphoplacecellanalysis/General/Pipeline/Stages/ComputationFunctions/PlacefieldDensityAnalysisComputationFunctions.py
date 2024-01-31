@@ -352,7 +352,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             
             return computation_result
 
-    @function_attributes(short_name='ratemap_peaks_prominence2d', tags=['pf', 'peaks', 'promienence', '2d', 'ratemap'], input_requires=["computed_data['pf2D']"], output_provides=["computed_data['RatemapPeaksAnalysis']['PeakProminence2D']"], uses=["compute_prominence_contours"], used_by=[], creation_date='2023-09-12 17:21', related_items=[],
+    @function_attributes(short_name='ratemap_peaks_prominence2d', tags=['pf', 'peaks', 'promienence', '2d', 'ratemap', 'Eloy'], input_requires=["computed_data['pf2D']"], output_provides=["computed_data['RatemapPeaksAnalysis']['PeakProminence2D']"], uses=["compute_prominence_contours"], used_by=[], creation_date='2023-09-12 17:21', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']), is_global=False)
     def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
             """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
