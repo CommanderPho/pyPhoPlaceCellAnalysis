@@ -180,7 +180,8 @@ def plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list, xb
 
 
 def plot_blue_yellow_points(a_df, specific_point_list):
-	""" 
+	""" Renders a figure containing one or more yellow-blue plots (marginals) for a given hoverred point. Used with Dash app.
+    
 	specific_point_list: List[Dict] - specific_point_list = [{'session_name': 'kdiba_vvp01_one_2006-4-10_12-25-50', 'time_bin_size': 0.03, 'epoch_idx': 0, 'delta_aligned_start_t': -713.908702568122}]
 	"""
 	time_window_centers_list = []
@@ -517,7 +518,6 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         
         next_subplot_col_idx = next_subplot_col_idx + 1 # increment the next column
         
-
     ## Add the delta indicator:
     if (enable_scatter_plot and enable_epoch_shading_shapes):
         t_split: float = 0.0
@@ -531,10 +531,14 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
                 fig.add_shape(a_shape, name=a_shape_name, row=1, col=scatter_column)
     
     # Update title and height
+    
+    
     if (main_plot_mode == 'separate_row_per_session'):
-        required_figure_height = (num_unique_sessions*300)
+        row_height = 250
+        required_figure_height = (num_unique_sessions*row_height)
     elif (main_plot_mode == 'separate_facet_row_per_session'):
-        required_figure_height = (num_unique_sessions*200)
+        row_height = 200
+        required_figure_height = (num_unique_sessions*row_height)
     else:
         required_figure_height = 700
         
@@ -542,6 +546,15 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     fig.update_layout(yaxis=dict(range=[0.0, 1.0]), template='plotly_dark')
     # Update y-axis range for all created figures
     fig.update_yaxes(range=[0.0, 1.0])
+
+    # Add a footer
+    fig.update_layout(
+        legend_title_text='tBin Size',
+        # annotations=[
+        #     dict(x=0.5, y=-0.15, showarrow=False, text="Footer text here", xref="paper", yref="paper")
+        # ],
+        # margin=dict(b=140), # increase bottom margin to show the footer
+    )
     return fig
 
     
