@@ -1199,6 +1199,11 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
         assert ('instantaneous_time_bin_size_seconds' in global_computation_results.computation_config)
         ## TODO: get from active_configs or something similar
+        if global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
+            print(f'global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None!')
+            global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.02 # 20ms
+            print(f'TEMP TODO: overriding since it is None.')
+            
         instantaneous_time_bin_size_seconds: float = global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
         
         sess = owning_pipeline_reference.sess 
