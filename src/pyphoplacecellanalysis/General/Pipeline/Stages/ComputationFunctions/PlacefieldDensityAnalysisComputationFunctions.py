@@ -378,7 +378,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['result_tuples']: (slab, peaks, idmap, promap, parentmap)
                     
                     flat_peaks_df
-                    
+                    filtered_flat_peaks_df
                     
                     peak_counts
                         raw

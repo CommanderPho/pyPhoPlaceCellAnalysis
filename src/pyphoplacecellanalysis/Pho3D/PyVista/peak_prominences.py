@@ -47,7 +47,16 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
             curr_slices = a_peak['level_slices']
             levels_list = list(curr_slices.keys())
             if included_level_indicies is not None:
-                filtered_levels_list = [levels_list[i] for i in included_level_indicies]  
+                try:
+                    filtered_levels_list = [levels_list[i] for i in included_level_indicies]  
+                except IndexError as e:
+                     # list index out of range
+                    print(f'WARN: levels_list: {levels_list} does not contain all included_level_indicies: {included_level_indicies}. Skipping.')
+                    filtered_levels_list = levels_list
+                    
+                except Exception as e:
+                    # unhandled exception
+                    raise e
             else:
                 filtered_levels_list = levels_list
 
@@ -63,7 +72,11 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
             peak_label = f'{peak_id}|{peak_height}|{prominence}'
             peak_labels.append(peak_label)
             
-            peak_levels[i,:] = filtered_levels_list
+            if len(filtered_levels_list) > 0:
+                peak_levels[i,:] = filtered_levels_list
+            else:
+                print(f'2024-01-31 - WARN - cannot set peak levels because filtered_levels_list is empty. Skipping.')
+                
             for level_idx, level_value in enumerate(filtered_levels_list):
                 curr_slice = curr_slices[level_value]
                 curr_contour = curr_slice['contour']
@@ -153,10 +166,18 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     curr_pdata = curr_neuron_plot_data['pdata_currActiveNeuronTuningCurve']
     curr_contours_mesh_name = f'pf[{valid_neuron_id}]_contours'
     curr_contours = curr_pdata.contour(isosurfaces=ipcDataExplorer.params.zScalingFactor*flat_peak_levels) # I really don't know why we need to multiply by zScalingFactor (~2000.0) again.
-    contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color="white", line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
-    out_pf_contours_data[curr_contours_mesh_name] = curr_contours
-    out_pf_contours_actors[curr_contours_mesh_name] = contours_mesh_actor
-    
+    try:
+        contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color="white", line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
+        out_pf_contours_data[curr_contours_mesh_name] = curr_contours
+        out_pf_contours_actors[curr_contours_mesh_name] = contours_mesh_actor
+    except ValueError as e:
+        #  Empty meshes cannot be plotted. Input mesh has zero points.
+        out_pf_contours_data[curr_contours_mesh_name] = curr_contours
+        # out_pf_contours_actors[curr_contours_mesh_name] = None # do NOT include this entry
+        
+    except BaseException as e:
+        raise e # unhandled exception
+        
     ### Add simple bounding boxes to the plot:
     if debug_print:
         print(f'np.shape(peak_level_bboxes): {np.shape(peak_level_bboxes)}') # (2, 1, 4)
