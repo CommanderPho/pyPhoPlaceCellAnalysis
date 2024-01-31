@@ -279,8 +279,8 @@ class ComputedResult(VersionedResultMixin, HDFMixin):
     """
     _VersionedResultMixin_version: str = "2024.01.01_0" # to be updated in your IMPLEMENTOR to indicate its version
     
-    is_global: bool = non_serialized_field(default=False, repr=False, is_computable=True)
-    result_version: str = serialized_attribute_field(default='2024.01.01_0', repr=False, is_computable=False) # this field specfies the version of the result. 
+    is_global: bool = non_serialized_field(default=False, repr=False, is_computable=True, kw_only=True) # init=False
+    result_version: str = serialized_attribute_field(default='2024.01.01_0', repr=False, is_computable=False, kw_only=True) # this field specfies the version of the result. 
     
     # field(default=False, metadata={'is_hdf_handled_custom': True, 'serialization': {'hdf': False, 'csv': False, 'pkl': True}})
 

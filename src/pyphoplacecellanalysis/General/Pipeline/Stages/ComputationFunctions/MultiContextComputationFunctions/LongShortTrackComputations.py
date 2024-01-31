@@ -345,7 +345,7 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
     n_neurons: int = serialized_attribute_field()
     long_results_obj: LeaveOneOutDecodingAnalysisResult = serialized_field()
     short_results_obj: LeaveOneOutDecodingAnalysisResult = serialized_field()
-    is_global: bool = serialized_attribute_field(default=True)
+    is_global: bool = serialized_attribute_field(default=True, kw_only=True)
 
 
 @custom_define(slots=False, kw_only=True) # NOTE: kw_only=True prevents errors from only assigning some of the attributes with a specific field
@@ -1582,9 +1582,25 @@ def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_
     # with VizTracer(output_file=f"viztracer_{get_now_time_str()}-full_session_LOO_decoding_analysis.json", min_duration=200, tracer_entries=3000000, ignore_frozen=True) as tracer:
     long_results_obj = perform_full_session_leave_one_out_decoding_analysis(global_session, original_1D_decoder=long_shared_aclus_only_decoder, decoding_time_bin_size=decoding_time_bin_size, cache_suffix = '_long', perform_cache_load=perform_cache_load) # , perform_cache_load=False
     short_results_obj = perform_full_session_leave_one_out_decoding_analysis(global_session, original_1D_decoder=short_shared_aclus_only_decoder, decoding_time_bin_size=decoding_time_bin_size, cache_suffix = '_short', perform_cache_load=perform_cache_load) # , perform_cache_load=False
-
-    leave_one_out_decoding_analysis_obj = LeaveOneOutDecodingAnalysis(long_decoder, short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global=True)
-
+    ## This is very verboose but the new version properties mess up the *arg attribute initializer
+    # Potentially useful assingment kwargs string: `# long_decoder=long_decoder, short_decoder=short_decoder, long_replays=long_replays, short_replays=short_replays, global_replays=global_replays, long_shared_aclus_only_decoder=long_shared_aclus_only_decoder, short_shared_aclus_only_decoder=short_shared_aclus_only_decoder, shared_aclus=shared_aclus, long_short_pf_neurons_diff=long_short_pf_neurons_diff, n_neurons=n_neurons, long_results_obj=long_results_obj, short_results_obj=short_results_obj`
+    leave_one_out_decoding_analysis_obj: LeaveOneOutDecodingAnalysis = LeaveOneOutDecodingAnalysis(is_global=True)
+    leave_one_out_decoding_analysis_obj.long_decoder = long_decoder
+    leave_one_out_decoding_analysis_obj.short_decoder = short_decoder
+    leave_one_out_decoding_analysis_obj.long_replays = long_replays
+    leave_one_out_decoding_analysis_obj.short_replays = short_replays
+    leave_one_out_decoding_analysis_obj.global_replays = global_replays
+    leave_one_out_decoding_analysis_obj.long_shared_aclus_only_decoder = long_shared_aclus_only_decoder
+    leave_one_out_decoding_analysis_obj.short_shared_aclus_only_decoder = short_shared_aclus_only_decoder
+    leave_one_out_decoding_analysis_obj.shared_aclus = shared_aclus
+    leave_one_out_decoding_analysis_obj.long_short_pf_neurons_diff = long_short_pf_neurons_diff
+    leave_one_out_decoding_analysis_obj.n_neurons = n_neurons
+    leave_one_out_decoding_analysis_obj.long_results_obj = long_results_obj
+    leave_one_out_decoding_analysis_obj.short_results_obj = short_results_obj
+    
+    # long_decoder=long_decoder, short_decoder=short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj
+    # long_decoder=long_decoder, short_decoder=short_decoder, long_replays=long_replays, short_replays=short_replays, global_replays=global_replays, long_shared_aclus_only_decoder=long_shared_aclus_only_decoder, short_shared_aclus_only_decoder=short_shared_aclus_only_decoder, shared_aclus=shared_aclus, long_short_pf_neurons_diff=long_short_pf_neurons_diff, n_neurons=n_neurons, long_results_obj=long_results_obj, short_results_obj=short_results_obj
+    
     return leave_one_out_decoding_analysis_obj
 
 # ==================================================================================================================== #
