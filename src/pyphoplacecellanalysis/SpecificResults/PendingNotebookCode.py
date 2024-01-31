@@ -211,6 +211,220 @@ def plot_blue_yellow_points(a_df, specific_point_list):
 	fig = plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list=time_window_centers_list, xbin=xbin, posterior_list=posterior_list)
 	return fig
 
+def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, latest_delta_aligned_t_end: float):
+    """ builds an interactive Across Sessions Dash app
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _build_dash_app
+    
+    app = _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
+    """
+    from dash import Dash, html, dash_table, dcc, callback, Output, Input, State
+    from dash.dash_table import DataTable, FormatTemplate
+    from dash.dash_table.Format import Format, Padding
+
+    import dash_bootstrap_components as dbc
+    import pandas as pd
+    from pathlib import Path
+    # import plotly.express as px
+    import plotly.io as pio
+    template: str = 'plotly_dark' # set plotl template
+    pio.templates.default = template
+
+
+    ## DATA:    
+    options_list = list(final_dfs_dict.keys())
+    initial_option = options_list[0]
+    initial_dataframe: pd.DataFrame = final_dfs_dict[initial_option].copy()
+    unique_sessions: List[str] = initial_dataframe['session_name'].unique().tolist()
+    num_unique_sessions: int = initial_dataframe['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+    assert 'epoch_idx' in initial_dataframe.columns
+
+    ## Extract the unique time bin sizes:
+    time_bin_sizes: List[float] = initial_dataframe['time_bin_size'].unique().tolist()
+    num_unique_time_bins: int = initial_dataframe.time_bin_size.nunique(dropna=True)
+    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
+    enabled_time_bin_sizes = [time_bin_sizes[0], time_bin_sizes[-1]] # [0.03, 0.058, 0.10]
+
+    ## prune to relevent columns:
+    all_column_names = [
+        ['P_Long', 'P_Short', 'P_LR', 'P_RL'],
+        ['delta_aligned_start_t'], # 'lap_idx', 
+        ['session_name'],
+        ['time_bin_size'],
+        ['epoch_idx'],
+    ]
+    all_column_names_flat = [item for sublist in all_column_names for item in sublist]
+    print(f'\tall_column_names_flat: {all_column_names_flat}')
+    initial_dataframe = initial_dataframe[all_column_names_flat]
+
+    # Initialize the app
+    # app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+    # app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG])
+    app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
+    # Slate
+    
+    # # money = FormatTemplate.money(2)
+    # percentage = FormatTemplate.percentage(2)
+    # # percentage = FormatTemplate.deci
+    # column_designators = [
+    #     dict(id='a', name='delta_aligned_start_t', type='numeric', format=Format()),
+    #     dict(id='a', name='session_name', type='text', format=Format()),
+    #     dict(id='a', name='time_bin_size', type='numeric', format=Format(padding=Padding.yes).padding_width(9)),
+    #     dict(id='a', name='P_Long', type='numeric', format=dict(specifier='05')),
+    #     dict(id='a', name='P_LR', type='numeric', format=dict(specifier='05')),
+    # ]
+
+    # App layout
+    app.layout = dbc.Container([
+        dbc.Row([
+                html.Div(children='My Custom App with Data, Graph, and Controls'),
+                html.Hr()
+        ]),
+        dbc.Row([
+            dbc.Col(dcc.RadioItems(options=options_list, value=initial_option, id='controls-and-radio-item'), width=3),
+            dbc.Col(dcc.Checklist(options=time_bin_sizes, value=enabled_time_bin_sizes, id='time-bin-checkboxes', inline=True), width=3), # Add CheckboxGroup for time_bin_sizes
+        ]),
+        dbc.Row([
+            dbc.Col(DataTable(data=initial_dataframe.to_dict('records'), page_size=16, id='tbl-datatable',
+                        # columns=column_designators,
+                        columns=[{"name": i, "id": i} for i in initial_dataframe.columns],
+                        style_data_conditional=[
+                            {
+                                'if': {'row_index': 'odd'},
+                                'backgroundColor': 'rgb(50, 50, 50)',
+                                'color': 'white'
+                            },
+                            {
+                                'if': {'row_index': 'even'},
+                                'backgroundColor': 'rgb(70, 70, 70)',
+                                'color': 'white'
+                            },
+                            {
+                                'if': {'column_editable': True},
+                                'backgroundColor': 'rgb(100, 100, 100)',
+                                'color': 'white'
+                            }
+                        ],
+                        style_header={
+                            'backgroundColor': 'rgb(30, 30, 30)',
+                            'color': 'white'
+                        },
+                        row_selectable="multi",
+                ) # end DataTable
+            , align='stretch', width=3),
+            dbc.Col(dcc.Graph(figure={}, id='controls-and-graph', hoverData={'points': [{'customdata': []}]},
+                            ), align='end', width=9),
+        ]), # end Row
+        dbc.Row(dcc.Graph(figure={}, id='selected-yellow-blue-marginals-graph')),
+    ]) # end Container
+
+    # Add controls to build the interaction
+    @callback(
+        Output(component_id='controls-and-graph', component_property='figure'),
+        [Input(component_id='controls-and-radio-item', component_property='value'),
+        Input(component_id='time-bin-checkboxes', component_property='value'),
+        ]
+    )
+    def update_graph(col_chosen, chose_bin_sizes):
+        print(f'update_graph(col_chosen: {col_chosen}, chose_bin_sizes: {chose_bin_sizes})')
+        data_results_df: pd.DataFrame = final_dfs_dict[col_chosen].copy()
+        # Filter dataframe by chosen bin sizes
+        data_results_df = data_results_df[data_results_df.time_bin_size.isin(chose_bin_sizes)]
+        
+        unique_sessions: List[str] = data_results_df['session_name'].unique().tolist()
+        num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+
+        ## Extract the unique time bin sizes:
+        time_bin_sizes: List[float] = data_results_df['time_bin_size'].unique().tolist()
+        num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
+        print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
+        enabled_time_bin_sizes = chose_bin_sizes
+        fig = _helper_build_figure(data_results_df=data_results_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode='separate_row_per_session', title=f"{col_chosen}")        
+        # 'delta_aligned_start_t', 'session_name', 'time_bin_size'
+        tuples_data = data_results_df[['session_name', 'time_bin_size', 'epoch_idx', 'delta_aligned_start_t']].to_dict(orient='records')
+        print(f'tuples_data: {tuples_data}')
+        fig.update_traces(customdata=tuples_data)
+        fig.update_layout(hovermode='closest') # margin={'l': 40, 'b': 40, 't': 10, 'r': 0},
+        return fig
+
+
+    @callback(
+        Output(component_id='tbl-datatable', component_property='data'),
+        [Input(component_id='controls-and-radio-item', component_property='value'),
+            Input(component_id='time-bin-checkboxes', component_property='value'),
+        ]
+    )
+    def update_datatable(col_chosen, chose_bin_sizes):
+        """ captures: final_dfs_dict, all_column_names_flat
+        """
+        print(f'update_datatable(col_chosen: {col_chosen}, chose_bin_sizes: {chose_bin_sizes})')
+        a_df = final_dfs_dict[col_chosen].copy()
+        ## prune to relevent columns:
+        a_df = a_df[all_column_names_flat]
+        # Filter dataframe by chosen bin sizes
+        a_df = a_df[a_df.time_bin_size.isin(chose_bin_sizes)]
+        data = a_df.to_dict('records')
+        return data
+
+    @callback(
+        Output('selected-yellow-blue-marginals-graph', 'figure'),
+        [Input(component_id='controls-and-radio-item', component_property='value'),
+        Input(component_id='time-bin-checkboxes', component_property='value'),
+        Input(component_id='tbl-datatable', component_property='selected_rows'),
+        Input(component_id='controls-and-graph', component_property='hoverData'),
+        ]
+    )
+    def get_selected_rows(col_chosen, chose_bin_sizes, indices, hoverred_rows):
+        print(f'get_selected_rows(col_chosen: {col_chosen}, chose_bin_sizes: {chose_bin_sizes}, indices: {indices}, hoverred_rows: {hoverred_rows})')
+        data_results_df: pd.DataFrame = final_dfs_dict[col_chosen].copy()
+        data_results_df = data_results_df[data_results_df.time_bin_size.isin(chose_bin_sizes)] # Filter dataframe by chosen bin sizes
+        # ## prune to relevent columns:
+        data_results_df = data_results_df[all_column_names_flat]
+        
+        unique_sessions: List[str] = data_results_df['session_name'].unique().tolist()
+        num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+
+        ## Extract the unique time bin sizes:
+        time_bin_sizes: List[float] = data_results_df['time_bin_size'].unique().tolist()
+        num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
+        # print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
+        enabled_time_bin_sizes = chose_bin_sizes
+
+        print(f'hoverred_rows: {hoverred_rows}')
+        # get_selected_rows(col_chosen: AcrossSession_Laps_per-Epoch, chose_bin_sizes: [0.03, 0.1], indices: None, hoverred_rows: {'points': [{'curveNumber': 26, 'pointNumber': 8, 'pointIndex': 8, 'x': -713.908702568122, 'y': 0.6665361938589899, 'bbox': {'x0': 1506.896, 'x1': 1512.896, 'y0': 283.62, 'y1': 289.62}, 'customdata': {'delta_aligned_start_t': -713.908702568122, 'session_name': 'kdiba_vvp01_one_2006-4-10_12-25-50', 'time_bin_size': 0.03}}]})
+        # hoverred_rows: 
+        hoverred_row_points = hoverred_rows.get('points', [])
+        num_hoverred_points: int = len(hoverred_row_points)
+        extracted_custom_data = [p['customdata'] for p in hoverred_row_points if (p.get('customdata', None) is not None)] # {'delta_aligned_start_t': -713.908702568122, 'session_name': 'kdiba_vvp01_one_2006-4-10_12-25-50', 'time_bin_size': 0.03}
+        num_custom_data_hoverred_points: int = len(extracted_custom_data)
+
+        print(f'extracted_custom_data: {extracted_custom_data}')
+        # {'points': [{'curveNumber': 26, 'pointNumber': 8, 'pointIndex': 8, 'x': -713.908702568122, 'y': 0.6665361938589899, 'bbox': {'x0': 1506.896, 'x1': 1512.896, 'y0': 283.62, 'y1': 289.62}, 'customdata': {'delta_aligned_start_t': -713.908702568122, 'session_name': 'kdiba_vvp01_one_2006-4-10_12-25-50', 'time_bin_size': 0.03}}]}
+            # selection empty!
+
+        # a_df = final_dfs_dict[col_chosen].copy()
+        # ## prune to relevent columns:
+        # a_df = a_df[all_column_names_flat]
+        # # Filter dataframe by chosen bin sizes
+        # a_df = a_df[a_df.time_bin_size.isin(chose_bin_sizes)]
+        # data = a_df.to_dict('records')
+        if (indices is not None) and (len(indices) > 0):
+            selected_rows = data_results_df.iloc[indices, :]
+            print(f'\tselected_rows: {selected_rows}')
+        else:
+            print(f'\tselection empty!')
+            
+        if (extracted_custom_data is not None) and (num_custom_data_hoverred_points > 0):
+            # selected_rows = data_results_df.iloc[indices, :]
+            print(f'\tnum_custom_data_hoverred_points: {num_custom_data_hoverred_points}')
+            fig = plot_blue_yellow_points(a_df=data_results_df.copy(), specific_point_list=extracted_custom_data)
+        else:
+            print(f'\thoverred points empty!')
+            fig = go.Figure()
+
+        return fig
+
+    return app
+
 
 # ==================================================================================================================== #
 # 2024-01-29 - Across Session CSV Import and Plotting                                                                  #
