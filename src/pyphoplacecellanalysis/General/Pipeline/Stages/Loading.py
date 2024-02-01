@@ -400,7 +400,7 @@ class PipelineWithInputStage:
 
         if not active_basedir.exists():
             self.logger.info(f'active_basedir: "{active_basedir}" does not exist!')
-            raise FileExistsError
+            raise FileExistsError(f'active_basedir: "{active_basedir}" does not exist!')
 
         self.session_data_type = session_data_type
         
