@@ -18,11 +18,11 @@ from pyphocorehelpers.function_helpers import function_attributes
 # ==================================================================================================================== #
 
 from neuropy.analyses.placefields import PfND
-
+from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 
 def _perform_calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized_occupancy):
-	""" function to calculate Spatial Information (SI) score
-	
+    """ function to calculate Spatial Information (SI) score
+    
     # f_i is the trial-averaged activity per position bin i -- sounds like the average number of spikes in each position bin within the trial
 
     # f is the mean activity rate over the whole session, computed as the sum of f_i * p_i over all N (position) bins
@@ -38,39 +38,39 @@ def _perform_calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized
 
     Usage:    
     SI = calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized_occupancy)
-	"""
-	
-	# add a small value to prevent division by zero
-	# SMALL_VALUE: float = 1e12
+    """
+    
+    # add a small value to prevent division by zero
+    # SMALL_VALUE: float = 1e12
 
 
 
-	## SI Calculator: fi/<f>
+    ## SI Calculator: fi/<f>
 
 
-	p_i = probability_normalized_occupancy.copy()
+    p_i = probability_normalized_occupancy.copy()
 
-	# add a small value to prevent division by zero
-	# occupancy_spatial_distribution = p_i + SMALL_VALUE
+    # add a small value to prevent division by zero
+    # occupancy_spatial_distribution = p_i + SMALL_VALUE
 
-	# f_rate_over_all_session = global_all_spikes_counts['rate_Hz'].to_numpy()
-	# f_rate_over_all_session
-	check_f = np.nansum((p_i *  epoch_averaged_activity_per_pos_bin), axis=-1) # a check for f (rate over all session)
-	f_rate_over_all_session = check_f # temporarily use check_f instead of the real f_rate
+    # f_rate_over_all_session = global_all_spikes_counts['rate_Hz'].to_numpy()
+    # f_rate_over_all_session
+    check_f = np.nansum((p_i *  epoch_averaged_activity_per_pos_bin), axis=-1) # a check for f (rate over all session)
+    f_rate_over_all_session = check_f # temporarily use check_f instead of the real f_rate
 
-	fi_over_mean_f = epoch_averaged_activity_per_pos_bin / f_rate_over_all_session.reshape(-1, 1) # the `.reshape(-1, 1)` fixes the broadcasting
-	# fi_over_mean_f
+    fi_over_mean_f = epoch_averaged_activity_per_pos_bin / f_rate_over_all_session.reshape(-1, 1) # the `.reshape(-1, 1)` fixes the broadcasting
+    # fi_over_mean_f
 
-	log_base_2_of_fi_over_mean_f = np.log2(fi_over_mean_f) ## Here is where some entries become -np.inf
-	# log_base_2_of_fi_over_mean_f
+    log_base_2_of_fi_over_mean_f = np.log2(fi_over_mean_f) ## Here is where some entries become -np.inf
+    # log_base_2_of_fi_over_mean_f
 
-	_summand = (p_i * fi_over_mean_f * log_base_2_of_fi_over_mean_f)
-	# _summand.shape # (77, 56)
-	# _summand
+    _summand = (p_i * fi_over_mean_f * log_base_2_of_fi_over_mean_f)
+    # _summand.shape # (77, 56)
+    # _summand
 
-	SI = np.nansum(_summand, axis=1)
-	# SI.shape
-	return SI
+    SI = np.nansum(_summand, axis=1)
+    # SI.shape
+    return SI
 
 
 def compute_spatial_information(all_spikes_df: pd.DataFrame, an_active_pf: PfND, global_session_duration:float):
@@ -109,7 +109,6 @@ def compute_spatial_information(all_spikes_df: pd.DataFrame, an_active_pf: PfND,
     ## Next need epoch-averaged activity per position bin:
 
     # Build the full matrix:
-
     global_per_position_bin_spikes_counts = all_spikes_df.groupby(['aclu', 'binned_x', 'binned_y']).agg(t_count=('t', 'count')).reset_index()
     a_spikes_df_bin_grouped = global_per_position_bin_spikes_counts.groupby(['aclu', 'binned_x']).agg(t_count_sum=('t_count', 'sum')).reset_index() ## for 1D plotting mode, collapse over all y-bins
     # a_spikes_df_bin_grouped
@@ -252,7 +251,7 @@ def compute_activity_by_lap_by_position_bin_matrix(a_spikes_df: pd.DataFrame, la
     return a_spikes_bin_counts_mat
 
 
-def compute_spatially_binned_activity(an_active_pf, global_any_laps_epochs_obj):
+def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_epochs_obj
     """ 
     
     """
@@ -297,62 +296,132 @@ def compute_spatially_binned_activity(an_active_pf, global_any_laps_epochs_obj):
     # aclu: int = neuron_IDs[idx]
     # print(f'aclu: {aclu}')
     
-    active_out_matr_dict = {}
+    position_binned_activity_matr_dict = {}
 
     # for a_spikes_df in split_spikes_dfs:
     for aclu, a_spikes_df in split_spikes_df_dict.items():
         # split_spikes_df_dict[aclu], (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(a_spikes_df.drop(columns=['neuron_type'], inplace=False), bin_values=(an_active_pf.xbin, an_active_pf.ybin), active_computation_config=deepcopy(an_active_pf.config), force_recompute=True, debug_print=False)
-        active_out_matr = compute_activity_by_lap_by_position_bin_matrix(a_spikes_df=a_spikes_df, lap_id_to_matrix_IDX_map=lap_id_to_matrix_IDX_map, n_xbins=n_xbins)
-        active_out_matr_dict[aclu] = active_out_matr
+        a_position_binned_activity_matr = compute_activity_by_lap_by_position_bin_matrix(a_spikes_df=a_spikes_df, lap_id_to_matrix_IDX_map=lap_id_to_matrix_IDX_map, n_xbins=n_xbins)
+        position_binned_activity_matr_dict[aclu] = a_position_binned_activity_matr
         
     # output: split_spikes_df_dict
-    return active_out_matr_dict, split_spikes_df_dict
+    return position_binned_activity_matr_dict, split_spikes_df_dict, (neuron_id_to_new_IDX_map, lap_id_to_matrix_IDX_map)
+
+def compute_spatial_binned_activity_via_pfdt(active_pf_dt: PfND_TimeDependent, epochs_df: pd.DataFrame):
+    """ 2024-02-01 - Use pfND_dt to compute spatially binned activity during the epochs.
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_spatial_binned_activity_via_pfdt
+          
+        if 'pf1D_dt' not in curr_active_pipeline.computation_results[global_epoch_name].computed_data:
+            # if `KeyError: 'pf1D_dt'` recompute
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+
+        active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
+        active_pf_2D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt'])
+
+
+        laps_df = deepcopy(global_any_laps_epochs_obj.to_dataframe())
+        n_laps = len(laps_df)
+
+        active_pf_dt: PfND_TimeDependent = deepcopy(active_pf_1D_dt)
+        # active_pf_dt = deepcopy(active_pf_2D_dt) # 2D
+        historical_snapshots = compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=laps_df)
+
+    """
+    use_pf_dt_obj = False
+
+    if isinstance(epochs_df, pd.DataFrame):
+        # dataframes are treated weird by PfND_dt, convert to basic numpy array of shape (n_epochs, 2)
+        time_intervals = epochs_df[['start', 'stop']].to_numpy() # .shape # (n_epochs, 2)
+    else:
+        time_intervals = epochs_df # assume already a numpy array
+        
+    assert np.shape(time_intervals)[-1] == 2
+    n_epochs: int = np.shape(time_intervals)[0]
+        
+    ## Entirely independent computations for binned_times:
+    if use_pf_dt_obj:
+        active_pf_dt.reset()
+
+    if not use_pf_dt_obj:
+        historical_snapshots = {} # build a dict<float:PlacefieldSnapshot>
+
+    for start_t, end_t in time_intervals:
+        ## Inline version that reuses active_pf_1D_dt directly:
+        if use_pf_dt_obj:
+            # active_pf_1D_dt.update(end_t, should_snapshot=True) # use this because it correctly integrates over [0, end_t] instead of [start_t, end_t]
+            # active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=True, should_snapshot=True)
+            historical_snapshots[float(end_t)] = active_pf_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=False, should_snapshot=False) # Integrates each [start_t, end_t] independently
+        else:
+            # Static version that calls PfND_TimeDependent.perform_time_range_computation(...) itself using just the computed variables of `active_pf_1D_dt`:
+            historical_snapshots[float(end_t)] = PfND_TimeDependent.perform_time_range_computation(active_pf_dt.all_time_filtered_spikes_df, active_pf_dt.all_time_filtered_pos_df, position_srate=active_pf_dt.position_srate,
+                                                                        xbin=active_pf_dt.xbin, ybin=active_pf_dt.ybin,
+                                                                        start_time=start_t, end_time=end_t,
+                                                                        included_neuron_IDs=active_pf_dt.included_neuron_IDs, active_computation_config=active_pf_dt.config, override_smooth=active_pf_dt.smooth)
+
+    # {1.9991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x16c2b74fb20>, 2.4991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x168acfb3bb0>, ...}
+    if use_pf_dt_obj:
+        historical_snapshots = active_pf_dt.historical_snapshots
+
+    epoch_pf_results_dict = {'historical_snapshots': historical_snapshots}
+    epoch_pf_results_dict['num_position_samples_occupancy'] = np.stack([placefield_snapshot.num_position_samples_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+    epoch_pf_results_dict['seconds_occupancy'] = np.stack([placefield_snapshot.seconds_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+    epoch_pf_results_dict['normalized_occupancy'] = np.stack([placefield_snapshot.normalized_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+    epoch_pf_results_dict['spikes_maps_matrix'] = np.stack([placefield_snapshot.spikes_maps_matrix for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+    epoch_pf_results_dict['occupancy_weighted_tuning_maps'] = np.stack([placefield_snapshot.occupancy_weighted_tuning_maps_matrix for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+    # active_lap_pf_results_dict['snapshot_occupancy_weighted_tuning_maps'] = np.stack([placefield_snapshot.occupancy_weighted_tuning_maps_matrix for placefield_snapshot in active_lap_pf_results_dict['historical_snapshots'].values()])
+
+    # len(historical_snapshots)
+    return epoch_pf_results_dict
+
 
 
 # ==================================================================================================================== #
 # 2024-01-29 - Ideal Pho Plotting Interface - UNFINISHED                                                               #
 # ==================================================================================================================== #
 def map_dataframe_to_plot(df: pd.DataFrame, **kwargs):
-	""" 2024-01-29 - My ideal desired function that allows the user to map any column in a dataframe to a plot command, including rows/columns.
-	Not yet finished.
-	 maps any column in the dataframe to a property in a plot. 
-	 
-	 Usage:
-	 	fully_resolved_kwargs = map_dataframe_to_plot(df=all_sessions_laps_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size') # , title=f"Laps - {laps_title_string_suffix}"
-		fully_resolved_kwargs
+    """ 2024-01-29 - My ideal desired function that allows the user to map any column in a dataframe to a plot command, including rows/columns.
+    Not yet finished.
+     maps any column in the dataframe to a property in a plot. 
+     
+     Usage:
+         fully_resolved_kwargs = map_dataframe_to_plot(df=all_sessions_laps_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size') # , title=f"Laps - {laps_title_string_suffix}"
+        fully_resolved_kwargs
 
-	"""
-	all_column_names: List[str] = list(df.columns)
-	all_kwargs_keys: List[str] = list(kwargs.keys())
-	all_kwargs_values: List[Union[str, Any]] = list(kwargs.values()) # expected to be either a column name to map or a literal.
-	num_rows: int = len(df)
-	
-	should_fully_extract_dataframe_values: bool = True # if True, extracts the values from the dataframe as an array
-	fully_resolved_kwargs = {}
-	
-	# for a_key in all_kwargs_keys:
-	# 	assert a_key in df.columns, f'key "{a_key}" specified in kwargs is not a column in df! \n\tdf.columns: {list(df.columns)}'
-	known_keys = ['x', 'y', 'color', 'size', 'row', 'column', 'page', 'xlabel', 'ylabel', 'title']
-	for a_key, a_value in kwargs.items():
-		if a_key not in known_keys:
-			print(f'WARN: key "{a_key}" is not in the known keys list: known_keys: {known_keys}')
-		if not isinstance(a_value, str):
-			# not a string
-			raise ValueError(f"value {a_value} is not a string and its length is not equal to the length of the dataframe.")
-			#TODO 2024-01-29 23:45: - [ ] Allow passing literal list-like values with the correct length to be passed directly
-			assert (len(a_value) == num_rows), f"(len(a_value) == num_rows) but (len(a_value): {len(a_value)} == num_rows: {num_rows})"
-			fully_resolved_kwargs[a_key] = a_value # Set the passed value directly
-			
-		else:
-			# it is a string, assume that it's a column in the dataframe
-			assert a_value in all_column_names, f'key:value pair <"{a_key}":"{a_value}"> specified in kwargs has a value that is not a valid column in df! \n\tspecified_value: {a_value}\n\tdf.columns: {list(df.columns)}'
-			if should_fully_extract_dataframe_values:
-				fully_resolved_kwargs[a_key] = df[a_value].to_numpy()
-			else:
-				# leave as the validated column name
-				fully_resolved_kwargs[a_key] = a_value
-				
-	return fully_resolved_kwargs
+    """
+    all_column_names: List[str] = list(df.columns)
+    all_kwargs_keys: List[str] = list(kwargs.keys())
+    all_kwargs_values: List[Union[str, Any]] = list(kwargs.values()) # expected to be either a column name to map or a literal.
+    num_rows: int = len(df)
+    
+    should_fully_extract_dataframe_values: bool = True # if True, extracts the values from the dataframe as an array
+    fully_resolved_kwargs = {}
+    
+    # for a_key in all_kwargs_keys:
+    # 	assert a_key in df.columns, f'key "{a_key}" specified in kwargs is not a column in df! \n\tdf.columns: {list(df.columns)}'
+    known_keys = ['x', 'y', 'color', 'size', 'row', 'column', 'page', 'xlabel', 'ylabel', 'title']
+    for a_key, a_value in kwargs.items():
+        if a_key not in known_keys:
+            print(f'WARN: key "{a_key}" is not in the known keys list: known_keys: {known_keys}')
+        if not isinstance(a_value, str):
+            # not a string
+            raise ValueError(f"value {a_value} is not a string and its length is not equal to the length of the dataframe.")
+            #TODO 2024-01-29 23:45: - [ ] Allow passing literal list-like values with the correct length to be passed directly
+            assert (len(a_value) == num_rows), f"(len(a_value) == num_rows) but (len(a_value): {len(a_value)} == num_rows: {num_rows})"
+            fully_resolved_kwargs[a_key] = a_value # Set the passed value directly
+            
+        else:
+            # it is a string, assume that it's a column in the dataframe
+            assert a_value in all_column_names, f'key:value pair <"{a_key}":"{a_value}"> specified in kwargs has a value that is not a valid column in df! \n\tspecified_value: {a_value}\n\tdf.columns: {list(df.columns)}'
+            if should_fully_extract_dataframe_values:
+                fully_resolved_kwargs[a_key] = df[a_value].to_numpy()
+            else:
+                # leave as the validated column name
+                fully_resolved_kwargs[a_key] = a_value
+                
+    return fully_resolved_kwargs
 
 
 def _embed_in_subplots(scatter_fig):
@@ -477,36 +546,36 @@ def plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list, xb
 
 
 def plot_blue_yellow_points(a_df, specific_point_list):
-	""" Renders a figure containing one or more yellow-blue plots (marginals) for a given hoverred point. Used with Dash app.
+    """ Renders a figure containing one or more yellow-blue plots (marginals) for a given hoverred point. Used with Dash app.
     
-	specific_point_list: List[Dict] - specific_point_list = [{'session_name': 'kdiba_vvp01_one_2006-4-10_12-25-50', 'time_bin_size': 0.03, 'epoch_idx': 0, 'delta_aligned_start_t': -713.908702568122}]
-	"""
-	time_window_centers_list = []
-	posterior_list = []
+    specific_point_list: List[Dict] - specific_point_list = [{'session_name': 'kdiba_vvp01_one_2006-4-10_12-25-50', 'time_bin_size': 0.03, 'epoch_idx': 0, 'delta_aligned_start_t': -713.908702568122}]
+    """
+    time_window_centers_list = []
+    posterior_list = []
 
-	# for a_single_epoch_row_idx, a_single_epoch_idx in enumerate(selected_epoch_idxs):
-	for a_single_epoch_row_idx, a_single_custom_data_dict in enumerate(specific_point_list):
-		# a_single_epoch_idx = selected_epoch_idxs[a_single_epoch_row_idx]
-		a_single_epoch_idx: int = int(a_single_custom_data_dict['epoch_idx'])
-		a_single_session_name: str = str(a_single_custom_data_dict['session_name'])
-		a_single_time_bin_size: float = float(a_single_custom_data_dict['time_bin_size'])
-		## Get the dataframe entries:
-		a_single_epoch_df = a_df.copy()
-		a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.epoch_idx == a_single_epoch_idx] ## filter by epoch idx
-		a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.session_name == a_single_session_name] ## filter by session
-		a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.time_bin_size == a_single_time_bin_size] ## filter by time-bin-size	
+    # for a_single_epoch_row_idx, a_single_epoch_idx in enumerate(selected_epoch_idxs):
+    for a_single_epoch_row_idx, a_single_custom_data_dict in enumerate(specific_point_list):
+        # a_single_epoch_idx = selected_epoch_idxs[a_single_epoch_row_idx]
+        a_single_epoch_idx: int = int(a_single_custom_data_dict['epoch_idx'])
+        a_single_session_name: str = str(a_single_custom_data_dict['session_name'])
+        a_single_time_bin_size: float = float(a_single_custom_data_dict['time_bin_size'])
+        ## Get the dataframe entries:
+        a_single_epoch_df = a_df.copy()
+        a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.epoch_idx == a_single_epoch_idx] ## filter by epoch idx
+        a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.session_name == a_single_session_name] ## filter by session
+        a_single_epoch_df = a_single_epoch_df[a_single_epoch_df.time_bin_size == a_single_time_bin_size] ## filter by time-bin-size	
 
-		posterior = a_single_epoch_df[['P_Long', 'P_Short']].to_numpy().T
-		time_window_centers = a_single_epoch_df['delta_aligned_start_t'].to_numpy()
-		xbin = np.arange(2)
-		time_window_centers_list.append(time_window_centers)
-		posterior_list.append(posterior)
-		
-		# fig = plotly_plot_1D_most_likely_position_comparsions(time_window_centers=time_window_centers, xbin=xbin, posterior=posterior)
-		# fig.show()
-		
-	fig = plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list=time_window_centers_list, xbin=xbin, posterior_list=posterior_list)
-	return fig
+        posterior = a_single_epoch_df[['P_Long', 'P_Short']].to_numpy().T
+        time_window_centers = a_single_epoch_df['delta_aligned_start_t'].to_numpy()
+        xbin = np.arange(2)
+        time_window_centers_list.append(time_window_centers)
+        posterior_list.append(posterior)
+        
+        # fig = plotly_plot_1D_most_likely_position_comparsions(time_window_centers=time_window_centers, xbin=xbin, posterior=posterior)
+        # fig.show()
+        
+    fig = plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list=time_window_centers_list, xbin=xbin, posterior_list=posterior_list)
+    return fig
 
 def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, latest_delta_aligned_t_end: float):
     """ builds an interactive Across Sessions Dash app
