@@ -22,10 +22,10 @@ from nptyping import NDArray
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 
 def compute_trial_by_trial_correlation_matrix(active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray) -> NDArray:
-	""" 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
-	
-	Returns:
-		C_trial_by_trial_correlation_matrix: .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
+    """ 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
+    
+    Returns:
+        C_trial_by_trial_correlation_matrix: .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
         z_scored_tuning_map_matrix
 
     Usage:
@@ -33,33 +33,36 @@ def compute_trial_by_trial_correlation_matrix(active_pf_dt: PfND_TimeDependent, 
 
         C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix = compute_trial_by_trial_correlation_matrix(active_pf_dt, occupancy_weighted_tuning_maps_matrix=occupancy_weighted_tuning_maps_matrix)
 
-	"""
-	neuron_ids = deepcopy(np.array(active_pf_dt.ratemap.neuron_ids))
-	n_aclus = len(neuron_ids)
-	n_xbins = len(active_pf_dt.xbin_centers)
+    """
+    neuron_ids = deepcopy(np.array(active_pf_dt.ratemap.neuron_ids))
+    n_aclus = len(neuron_ids)
+    n_xbins = len(active_pf_dt.xbin_centers)
 
-	assert np.shape(occupancy_weighted_tuning_maps_matrix)[1] == n_aclus
-	assert np.shape(occupancy_weighted_tuning_maps_matrix)[2] == n_xbins
+    assert np.shape(occupancy_weighted_tuning_maps_matrix)[1] == n_aclus
+    assert np.shape(occupancy_weighted_tuning_maps_matrix)[2] == n_xbins
 
-	# Assuming 'occupancy_weighted_tuning_maps_matrix' is your dataset with shape (trials, positions)
-	# Z-score along the position axis (axis=1)
-	position_axis_idx: int = 2
-	z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)
+    # Assuming 'occupancy_weighted_tuning_maps_matrix' is your dataset with shape (trials, positions)
+    # Z-score along the position axis (axis=1)
+    position_axis_idx: int = 2
+    z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)
 
-	# trial-by-trial correlation matrix C
-	M = float(n_xbins)
-	C_list = []
-	for i, aclu in enumerate(neuron_ids):
-		A_i = np.squeeze(z_scored_tuning_map_matrix[:,i,:])
-		C_i = (1/(M-1)) * (A_i @ A_i.T) # Perform matrix multiplication using the @ operator
-		# C_i.shape # (n_epochs, n_epochs) - (84, 84) - gives the correlation between each epoch and the others
-		C_list.append(C_i)
-	# occupancy_weighted_tuning_maps_matrix
-	C_list
+    # trial-by-trial correlation matrix C
+    M = float(n_xbins)
+    C_list = []
+    for i, aclu in enumerate(neuron_ids):
+        A_i = np.squeeze(z_scored_tuning_map_matrix[:,i,:])
+        C_i = (1/(M-1)) * (A_i @ A_i.T) # Perform matrix multiplication using the @ operator
+        # C_i.shape # (n_epochs, n_epochs) - (84, 84) - gives the correlation between each epoch and the others
+        C_list.append(C_i)
+    # occupancy_weighted_tuning_maps_matrix
 
-	C_trial_by_trial_correlation_matrix = np.stack(C_list, axis=0) # .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
-	# outputs: C_trial_by_trial_correlation_matrix
-	return C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix
+    C_trial_by_trial_correlation_matrix = np.stack(C_list, axis=0) # .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
+    # outputs: C_trial_by_trial_correlation_matrix
+
+    # n_laps: int = len(laps_unique_ids)
+    aclu_to_matrix_IDX_map = dict(zip(neuron_ids, np.arange(n_aclus)))
+
+    return C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map
 
 
 # ==================================================================================================================== #
@@ -254,18 +257,9 @@ def compute_activity_by_lap_by_position_bin_matrix(a_spikes_df: pd.DataFrame, la
     a_spikes_df_bin_grouped = a_spikes_df_bin_grouped.groupby(['binned_x', 'lap']).agg(t_seconds_count_sum=('t_seconds_count', 'sum')).reset_index()
     # a_spikes_df_bin_grouped
     assert n_xbins is not None
-    
-    # if lap_id_to_matrix_IDX_map is None:
-        # assert n_laps is not None
-        
     assert lap_id_to_matrix_IDX_map is not None
     n_laps: int = len(lap_id_to_matrix_IDX_map)
     
-    # n_laps = a_spikes_df_bin_grouped.lap.nunique()    
-    # n_laps: int = position_df.lap.nunique()
-    # n_xbins = len(an_active_pf.xbin_centers)
-    # n_ybins = len(an_active_pf.ybin_centers)
-
     a_spikes_bin_counts_mat = np.zeros((n_laps, n_xbins)) # for this single cell
 
     ## Update the matrix:
