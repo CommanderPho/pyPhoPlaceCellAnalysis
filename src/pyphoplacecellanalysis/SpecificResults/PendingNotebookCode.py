@@ -5,11 +5,308 @@ from datetime import datetime
 from pathlib import Path
 import re
 from typing import  List, Optional, Dict, Tuple, Any, Union
+from neuropy.analyses.placefields import PfND
 import numpy as np
 import pandas as pd
 from attrs import define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
+
+
+# ==================================================================================================================== #
+# 2024-02-01 - Spatial Information                                                                                     #
+# ==================================================================================================================== #
+
+from neuropy.analyses.placefields import PfND
+
+
+def _perform_calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized_occupancy):
+	""" function to calculate Spatial Information (SI) score
+	
+    # f_i is the trial-averaged activity per position bin i -- sounds like the average number of spikes in each position bin within the trial
+
+    # f is the mean activity rate over the whole session, computed as the sum of f_i * p_i over all N (position) bins
+
+    ## What they call "p_i" - "occupancy probability per position bin per trial" ([Sosa et al., 2023, p. 23](zotero://select/library/items/I5FLMP5R)) ([pdf](zotero://open-pdf/library/items/C3Y8AKEB?page=23&annotation=GAHX9PYH))
+    occupancy_probability = a_spikes_bin_counts_mat.copy()
+    occupancy_probability = occupancy_probability / occupancy_probability.sum(axis=1, keepdims=True) # quotient is "total number of samples in each trial"
+    occupancy_probability
+
+    # We then summed the occupancy probabilities across trials and divided by the total per session to get an occupancy probability per position bin per session
+
+    # To get the spatial “tuning curve” over the session, we averaged the activity in each bin across trials
+
+    Usage:    
+    SI = calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized_occupancy)
+	"""
+	
+	# add a small value to prevent division by zero
+	# SMALL_VALUE: float = 1e12
+
+
+
+	## SI Calculator: fi/<f>
+
+
+	p_i = probability_normalized_occupancy.copy()
+
+	# add a small value to prevent division by zero
+	# occupancy_spatial_distribution = p_i + SMALL_VALUE
+
+	# f_rate_over_all_session = global_all_spikes_counts['rate_Hz'].to_numpy()
+	# f_rate_over_all_session
+	check_f = np.nansum((p_i *  epoch_averaged_activity_per_pos_bin), axis=-1) # a check for f (rate over all session)
+	f_rate_over_all_session = check_f # temporarily use check_f instead of the real f_rate
+
+	fi_over_mean_f = epoch_averaged_activity_per_pos_bin / f_rate_over_all_session.reshape(-1, 1) # the `.reshape(-1, 1)` fixes the broadcasting
+	# fi_over_mean_f
+
+	log_base_2_of_fi_over_mean_f = np.log2(fi_over_mean_f) ## Here is where some entries become -np.inf
+	# log_base_2_of_fi_over_mean_f
+
+	_summand = (p_i * fi_over_mean_f * log_base_2_of_fi_over_mean_f)
+	# _summand.shape # (77, 56)
+	# _summand
+
+	SI = np.nansum(_summand, axis=1)
+	# SI.shape
+	return SI
+
+
+def compute_spatial_information(all_spikes_df: pd.DataFrame, an_active_pf: PfND, global_session_duration:float):
+    """ Calculates the spatial information (SI) for each cell and returns all intermediates.
+
+    Usage: 
+        global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False)
+        an_active_pf = deepcopy(global_pf1D)
+        SI, all_spikes_df, epoch_averaged_activity_per_pos_bin, global_all_spikes_counts = compute_spatial_information(all_spikes_df=global_spikes_df, an_active_pf=an_active_pf, global_session_duration=global_session.duration)
+
+
+    """
+    from neuropy.core.flattened_spiketrains import SpikesAccessor
+    from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+
+    #  Inputs: global_spikes_df: pd.DataFrame, an_active_pf: PfND, 
+    # Build the aclu indicies:
+    # neuron_IDs = global_spikes_df.aclu.unique()
+    # n_aclus = global_spikes_df.aclu.nunique()
+    neuron_IDs = deepcopy(np.array(an_active_pf.ratemap.neuron_ids))
+    n_aclus = len(neuron_IDs)
+
+    all_spikes_df = deepcopy(all_spikes_df).spikes.sliced_by_neuron_id(neuron_IDs)
+    all_spikes_df, neuron_id_to_new_IDX_map = all_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()  # rebuild the fragile indicies afterwards
+    all_spikes_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(all_spikes_df, bin_values=(an_active_pf.xbin, an_active_pf.ybin), active_computation_config=deepcopy(an_active_pf.config), force_recompute=True, debug_print=False)
+    # global_spikes_df
+
+
+    # Get <f> for each sell, the rate over the entire session.
+    global_all_spikes_counts = all_spikes_df.groupby(['aclu']).agg(t_count=('t', 'count')).reset_index()
+    global_all_spikes_counts['rate_Hz'] = global_all_spikes_counts['t_count'] / global_session_duration
+    # global_all_spikes_counts
+
+    assert len(global_all_spikes_counts) == n_aclus
+    
+    ## Next need epoch-averaged activity per position bin:
+
+    # Build the full matrix:
+
+    global_per_position_bin_spikes_counts = all_spikes_df.groupby(['aclu', 'binned_x', 'binned_y']).agg(t_count=('t', 'count')).reset_index()
+    a_spikes_df_bin_grouped = global_per_position_bin_spikes_counts.groupby(['aclu', 'binned_x']).agg(t_count_sum=('t_count', 'sum')).reset_index() ## for 1D plotting mode, collapse over all y-bins
+    # a_spikes_df_bin_grouped
+
+    assert n_aclus is not None
+    n_xbins = len(an_active_pf.xbin_centers)
+    # n_ybins = len(an_active_pf.ybin_centers)
+
+    print(f'{n_aclus = }, {n_xbins = }')
+
+    # a_spikes_bin_counts_mat = np.zeros((n_laps, n_xbins)) # for this single cell
+    epoch_averaged_activity_per_pos_bin = np.zeros((n_aclus, n_xbins)) # for this single cell
+
+    ## Update the matrix:
+    for index, row in a_spikes_df_bin_grouped.iterrows():
+        # lap = int(row['lap'])
+        aclu = int(row['aclu'])
+        neuron_fragile_IDX: int = neuron_id_to_new_IDX_map[aclu]
+        binned_x = int(row['binned_x'])
+        count = row['t_count_sum']
+        # a_spikes_bin_counts_mat[lap - 1][binned_x - 1] = count
+        epoch_averaged_activity_per_pos_bin[neuron_fragile_IDX - 1][binned_x - 1] = count
+
+    # an_active_pf.occupancy.shape # (n_xbins,) - (56,)
+    # epoch_averaged_activity_per_pos_bin.shape # (n_aclus, n_xbins) - (77, 56)
+    assert np.shape(an_active_pf.occupancy)[0] == np.shape(epoch_averaged_activity_per_pos_bin)[1]
+        
+    ## Compute actual Spatial Information for each cell:
+    SI = _perform_calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized_occupancy=an_active_pf.ratemap.probability_normalized_occupancy)
+
+    return SI, all_spikes_df, epoch_averaged_activity_per_pos_bin, global_all_spikes_counts
+
+
+def permutation_test(position_data, rate_maps, occupancy_maps, n_permutations=100):
+    """ Not yet implemented. 2024-02-01
+    
+    Based off of the following quote:
+    To determine the significance of the SI scores, we created a null distribution by circularly permuting the position data relative to the timeseries of each cell, by a random amount of at least 1 sec and a maximum amount of the length of the trial, independently on each trial. SI was calculated from the trial-averaged activity of each shuffle, and this shuffle procedure was repeated 100 times per cell. A cell’s true SI was considered significant if it exceeded 95% of the SI scores from all shuffles within animal (i.e. shuffled scores were pooled across cells within animal to produce this threshold, which is more stringent than comparing to the shuffle of each individual cell
+    
+    Usage:
+        # True place field rate maps for all cells
+        rate_maps = np.array('your rate maps')
+        # True occupancy maps for all cells
+        occupancy_maps = np.array('your occupancy maps')
+        # Your position data
+        position_data = np.array('your position data')
+
+        # Call the permutation test function with the given number of permutations
+        sig_cells = permutation_test(position_data, rate_maps, occupancy_maps, n_permutations=100)
+
+        print(f'Indices of cells with significant SI: {sig_cells}')
+
+    
+    """
+    # function to calculate Spatial Information (SI) score
+    def calc_SI(rate_map, occupancy):
+        # Place your existing SI calculation logic here
+        pass
+
+    # function to calculate rate map for given position data
+    def calc_rate_map(position_data):
+        # logic to calculate rate map
+        pass
+
+    # function to calculate occupancy map for given position data
+    def calc_occupancy_map(position_data):
+        # logic to calculate occupancy map
+        pass
+
+    n_cells = rate_maps.shape[0]  # number of cells
+    si_scores = np.empty((n_cells, n_permutations))  # Initialize container for SI scores per cell per permutation
+    true_si_scores = np.empty(n_cells)  # Initialize container for true SI scores per cell
+   
+    for cell_idx in range(n_cells):
+        true_si_scores[cell_idx] = calc_SI(rate_maps[cell_idx], occupancy_maps[cell_idx])
+        
+        for perm_idx in range(n_permutations):
+            shift_val = np.random.randint(1, len(position_data))  # A random shift amount
+            shuffled_position_data = np.roll(position_data, shift_val)  # Shift the position data
+        
+            shuffled_rate_map = calc_rate_map(shuffled_position_data)
+            shuffled_occupancy_map = calc_occupancy_map(shuffled_position_data)
+
+            si_scores[cell_idx][perm_idx] = calc_SI(shuffled_rate_map, shuffled_occupancy_map)
+   
+    pooled_scores = si_scores.flatten() # Pool scores within animal
+    threshold = np.percentile(pooled_scores, 95)  # Get the 95th percentile of the pooled scores
+
+    return np.where(true_si_scores > threshold)  # Return indices where true SI scores exceed 95 percentile
+
+
+def compute_activity_by_lap_by_position_bin_matrix(a_spikes_df: pd.DataFrame, lap_id_to_matrix_IDX_map: Dict, n_xbins: int): # , an_active_pf: Optional[PfND] = None
+    """ 2024-01-31 - Note that this does not take in position tracking information, so it cannot compute real occupancy. 
+    
+    Plots for a single neuron.
+    
+    an_active_pf: is just so we have access to the placefield's properties later
+    
+    
+    Currently plots raw spikes counts (in number of spikes).
+    
+    """
+    # Filter rows based on column: 'binned_x'
+    a_spikes_df = a_spikes_df[a_spikes_df['binned_x'].astype("string").notna()]
+    # a_spikes_df_bin_grouped = a_spikes_df.groupby(['binned_x', 'binned_y']).agg(t_seconds_count=('t_seconds', 'count')).reset_index()
+    a_spikes_df_bin_grouped = a_spikes_df.groupby(['binned_x', 'binned_y', 'lap']).agg(t_seconds_count=('t_seconds', 'count')).reset_index()
+    # a_spikes_df_bin_grouped
+
+    ## for 1D plotting mode, collapse over all y-bins:
+    a_spikes_df_bin_grouped = a_spikes_df_bin_grouped.groupby(['binned_x', 'lap']).agg(t_seconds_count_sum=('t_seconds_count', 'sum')).reset_index()
+    # a_spikes_df_bin_grouped
+    assert n_xbins is not None
+    
+    # if lap_id_to_matrix_IDX_map is None:
+        # assert n_laps is not None
+        
+    assert lap_id_to_matrix_IDX_map is not None
+    n_laps: int = len(lap_id_to_matrix_IDX_map)
+    
+    # n_laps = a_spikes_df_bin_grouped.lap.nunique()    
+    # n_laps: int = position_df.lap.nunique()
+    # n_xbins = len(an_active_pf.xbin_centers)
+    # n_ybins = len(an_active_pf.ybin_centers)
+
+    a_spikes_bin_counts_mat = np.zeros((n_laps, n_xbins)) # for this single cell
+
+    ## Update the matrix:
+    for index, row in a_spikes_df_bin_grouped.iterrows():
+        lap_id = int(row['lap'])
+        lap_IDX = lap_id_to_matrix_IDX_map[lap_id]
+        
+        binned_x = int(row['binned_x'])
+        count = row['t_seconds_count_sum']
+        a_spikes_bin_counts_mat[lap_IDX][binned_x - 1] = count
+        
+    # active_out_matr = occupancy_probability
+    
+    # active_out_matr = a_spikes_bin_counts_mat
+    # “calculated the occupancy (number of imaging samples) in each bin on each trial, and divided this by the total number of samples in each trial to get an occupancy probability per position bin per trial” 
+    return a_spikes_bin_counts_mat
+
+
+def compute_spatially_binned_activity(an_active_pf, global_any_laps_epochs_obj):
+    """ 
+    
+    """
+    from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+    # from neuropy.utils.mixins.time_slicing import add_epochs_id_identity # needed to add laps column
+
+    ## need global laps positions now.
+
+    # # Position:
+    # position_df: pd.DataFrame = deepcopy(an_active_pf.filtered_pos_df) # .drop(columns=['neuron_type'], inplace=False)
+    # position_df, (xbin,), bin_infos = build_df_discretized_binned_position_columns(position_df, bin_values=(an_active_pf.xbin,), position_column_names=('lin_pos',), binned_column_names=('binned_x',), active_computation_config=deepcopy(an_active_pf.config), force_recompute=True, debug_print=False)
+    # if 'lap' not in position_df:
+    #     position_df = add_epochs_id_identity(position_df, epochs_df=deepcopy(global_any_laps_epochs_obj.to_dataframe()), epoch_id_key_name='lap', epoch_label_column_name='lap_id', no_interval_fill_value=-1, override_time_variable_name='t')
+    #     # drop the -1 indicies because they are below the speed:
+    #     position_df = position_df[position_df['lap'] != -1] # Drop all non-included spikes
+    # position_df
+
+    neuron_IDs = deepcopy(np.array(an_active_pf.ratemap.neuron_ids))
+    n_aclus = len(neuron_IDs)
+
+    # all_spikes_df: pd.DataFrame = deepcopy(all_spikes_df) # require passed-in value
+    # a_spikes_df: pd.DataFrame = deepcopy(an_active_pf.spikes_df)
+    # a_spikes_df: pd.DataFrame = deepcopy(an_active_pf.filtered_spikes_df)
+    all_spikes_df: pd.DataFrame = deepcopy(an_active_pf.spikes_df) # Use placefields all spikes 
+    all_spikes_df = all_spikes_df.spikes.sliced_by_neuron_id(neuron_IDs)
+    all_spikes_df = all_spikes_df[all_spikes_df['lap'] > -1] # get only the spikes within a lap
+    all_spikes_df, neuron_id_to_new_IDX_map = all_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()  # rebuild the fragile indicies afterwards
+    all_spikes_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(all_spikes_df, bin_values=(an_active_pf.xbin, an_active_pf.ybin), active_computation_config=deepcopy(an_active_pf.config), force_recompute=True, debug_print=False)
+
+    split_spikes_dfs_list = all_spikes_df.spikes.get_split_by_unit()
+    split_spikes_df_dict = dict(zip(neuron_IDs, split_spikes_dfs_list))
+    
+    laps_unique_ids = all_spikes_df.lap.unique()
+    n_laps: int = len(laps_unique_ids)
+    lap_id_to_matrix_IDX_map = dict(zip(laps_unique_ids, np.arange(n_laps)))
+
+    # n_laps: int = position_df.lap.nunique()
+    n_xbins = len(an_active_pf.xbin_centers)
+    # n_ybins = len(an_active_pf.ybin_centers)
+    
+    # idx: int = 9
+    # aclu: int = neuron_IDs[idx]
+    # print(f'aclu: {aclu}')
+    
+    active_out_matr_dict = {}
+
+    # for a_spikes_df in split_spikes_dfs:
+    for aclu, a_spikes_df in split_spikes_df_dict.items():
+        # split_spikes_df_dict[aclu], (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(a_spikes_df.drop(columns=['neuron_type'], inplace=False), bin_values=(an_active_pf.xbin, an_active_pf.ybin), active_computation_config=deepcopy(an_active_pf.config), force_recompute=True, debug_print=False)
+        active_out_matr = compute_activity_by_lap_by_position_bin_matrix(a_spikes_df=a_spikes_df, lap_id_to_matrix_IDX_map=lap_id_to_matrix_IDX_map, n_xbins=n_xbins)
+        active_out_matr_dict[aclu] = active_out_matr
+        
+    # output: split_spikes_df_dict
+    return active_out_matr_dict, split_spikes_df_dict
 
 
 # ==================================================================================================================== #
