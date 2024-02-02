@@ -5,12 +5,58 @@ from datetime import datetime
 from pathlib import Path
 import re
 from typing import  List, Optional, Dict, Tuple, Any, Union
+import napari
 from neuropy.analyses.placefields import PfND
 import numpy as np
 import pandas as pd
 from attrs import define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
+
+
+# ==================================================================================================================== #
+# 2024-02-02 - Napari Export Helpers - Batch export all images                                                         #
+# ==================================================================================================================== #
+from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_set_time_windw_index
+
+
+
+
+def napari_export_image_sequence(viewer: napari.viewer.Viewer, imageseries_output_directory='output/videos/imageseries/', slider_axis_IDX: int = 0, build_filename_from_viewer_callback_fn=None):
+    """ 
+    
+    Based off of `napari_export_video_frames`
+    
+    Usage:
+            
+        desired_save_parent_path = Path('/home/halechr/Desktop/test_napari_out').resolve()
+        imageseries_output_directory = napari_export_image_sequence(viewer=viewer, imageseries_output_directory=desired_save_parent_path, slider_axis_IDX=0, build_filename_from_viewer_callback_fn=build_filename_from_viewer)
+
+    
+    """
+    # Get the slide info:
+    slider_min, slider_max, slider_step = viewer.dims.range[slider_axis_IDX]
+    slider_range = np.arange(start=slider_min, step=slider_step, stop=slider_max)
+
+    # __MAX_SIMPLE_EXPORT_COUNT: int = 5
+    n_time_windows = np.shape(slider_range)[0]
+    # n_time_windows = min(__MAX_SIMPLE_EXPORT_COUNT, n_time_windows) ## Limit the export to 5 items for testing
+
+    if not isinstance(imageseries_output_directory, Path):
+        imageseries_output_directory: Path = Path(imageseries_output_directory).resolve()
+        
+    for window_idx in np.arange(n_time_windows):
+        # napari_set_time_windw_index(viewer, window_idx+1)
+        napari_set_time_windw_index(viewer, window_idx)
+        
+        if build_filename_from_viewer_callback_fn is not None:
+            image_out_path = build_filename_from_viewer_callback_fn(viewer, desired_save_parent_path=imageseries_output_directory, slider_axis_IDX=slider_axis_IDX)
+        else:
+            image_out_path = imageseries_output_directory.joinpath(f'screenshot_{window_idx}.png').resolve()
+                
+        screenshot = viewer.screenshot(path=image_out_path, canvas_only=True, flash=False)
+
+    return imageseries_output_directory
 
 
 
