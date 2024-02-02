@@ -39,19 +39,8 @@ def _perform_calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized
     Usage:    
     SI = calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized_occupancy)
     """
-    
-    # add a small value to prevent division by zero
-    # SMALL_VALUE: float = 1e12
-
-
-
     ## SI Calculator: fi/<f>
-
-
     p_i = probability_normalized_occupancy.copy()
-
-    # add a small value to prevent division by zero
-    # occupancy_spatial_distribution = p_i + SMALL_VALUE
 
     # f_rate_over_all_session = global_all_spikes_counts['rate_Hz'].to_numpy()
     # f_rate_over_all_session
@@ -59,17 +48,12 @@ def _perform_calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized
     f_rate_over_all_session = check_f # temporarily use check_f instead of the real f_rate
 
     fi_over_mean_f = epoch_averaged_activity_per_pos_bin / f_rate_over_all_session.reshape(-1, 1) # the `.reshape(-1, 1)` fixes the broadcasting
-    # fi_over_mean_f
 
     log_base_2_of_fi_over_mean_f = np.log2(fi_over_mean_f) ## Here is where some entries become -np.inf
-    # log_base_2_of_fi_over_mean_f
 
-    _summand = (p_i * fi_over_mean_f * log_base_2_of_fi_over_mean_f)
-    # _summand.shape # (77, 56)
-    # _summand
+    _summand = (p_i * fi_over_mean_f * log_base_2_of_fi_over_mean_f) # _summand.shape # (77, 56)
 
     SI = np.nansum(_summand, axis=1)
-    # SI.shape
     return SI
 
 
@@ -807,93 +791,93 @@ import plotly.express as px
 import plotly.graph_objs as go
 
 
-def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histogram_bins:int=25):
-    """ 
-    Usage:
+# def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histogram_bins:int=25):
+#     """ 
+#     Usage:
 
-        histogram_bins: int = 25
+#         histogram_bins: int = 25
 
-        new_laps_fig = complete_plotly_figure(data_results_df=deepcopy(all_sessions_laps_df), out_scatter_fig=fig_laps, histogram_bins=histogram_bins)
-        new_laps_fig
+#         new_laps_fig = complete_plotly_figure(data_results_df=deepcopy(all_sessions_laps_df), out_scatter_fig=fig_laps, histogram_bins=histogram_bins)
+#         new_laps_fig
 
-    """
-    import plotly.subplots as sp
-    import plotly.express as px
-    import plotly.graph_objs as go
+#     """
+#     import plotly.subplots as sp
+#     import plotly.express as px
+#     import plotly.graph_objs as go
 
-    unique_sessions = data_results_df['session_name'].unique()
-    num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+#     unique_sessions = data_results_df['session_name'].unique()
+#     num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
 
-    ## Extract the unique time bin sizes:
-    time_bin_sizes: int = data_results_df['time_bin_size'].unique()
-    num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
+#     ## Extract the unique time bin sizes:
+#     time_bin_sizes: int = data_results_df['time_bin_size'].unique()
+#     num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
 
-    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
-
-
-    # get the pre-delta epochs
-    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
-    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
-
-    # X_all = data_results_df['delta_aligned_start_t'].to_numpy()
-    # Y_all = data_results_df['P_Long'].to_numpy()
-
-    # X_pre_delta = pre_delta_df['delta_aligned_start_t'].to_numpy()
-    # X_post_delta = post_delta_df['delta_aligned_start_t'].to_numpy()
-
-    # Y_pre_delta = pre_delta_df['P_Long'].to_numpy()
-    # Y_post_delta = post_delta_df['P_Long'].to_numpy()
-
-    # creating subplots
-    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta",f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"])
-
-    # Pre-Delta Histogram ________________________________________________________________________________________________ #
-    # adding first histogram
-    pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
-    print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
-    # time_bin_sizes
-    for a_trace in pre_delta_fig.data:
-        fig.add_trace(a_trace, row=1, col=1)
-        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-
-    # Calculate the histogram data
-    # hist1, bins1 = np.histogram(X_pre_delta, bins=histogram_bins)
-
-    # # Adding the first histogram as a bar graph and making x negative
-    # fig.add_trace(
-    #     # go.Bar(x=bins1[:-1], y=hist1, marker_color='#EB89B5', name='first half', orientation='h', ),
-    # 	go.Histogram(y=Y_pre_delta, name='pre-delta', marker_color='#EB89B5'),
-    #     row=1, col=1
-    # )
-    # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-
-    # Scatter Plot _______________________________________________________________________________________________________ #
-    # adding scatter plot
-    for a_trace in out_scatter_fig.data:
-        fig.add_trace(a_trace, row=1, col=2)
-        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+#     print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
 
 
-    # Post-Delta Histogram _______________________________________________________________________________________________ #
-    # adding the second histogram
-    post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+#     # get the pre-delta epochs
+#     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+#     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
 
-    for a_trace in post_delta_fig.data:
-        fig.add_trace(a_trace, row=1, col=3)
-        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+#     # X_all = data_results_df['delta_aligned_start_t'].to_numpy()
+#     # Y_all = data_results_df['P_Long'].to_numpy()
+
+#     # X_pre_delta = pre_delta_df['delta_aligned_start_t'].to_numpy()
+#     # X_post_delta = post_delta_df['delta_aligned_start_t'].to_numpy()
+
+#     # Y_pre_delta = pre_delta_df['P_Long'].to_numpy()
+#     # Y_post_delta = post_delta_df['P_Long'].to_numpy()
+
+#     # creating subplots
+#     fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta",f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"])
+
+#     # Pre-Delta Histogram ________________________________________________________________________________________________ #
+#     # adding first histogram
+#     pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+#     print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
+#     # time_bin_sizes
+#     for a_trace in pre_delta_fig.data:
+#         fig.add_trace(a_trace, row=1, col=1)
+#         fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+
+#     # Calculate the histogram data
+#     # hist1, bins1 = np.histogram(X_pre_delta, bins=histogram_bins)
+
+#     # # Adding the first histogram as a bar graph and making x negative
+#     # fig.add_trace(
+#     #     # go.Bar(x=bins1[:-1], y=hist1, marker_color='#EB89B5', name='first half', orientation='h', ),
+#     # 	go.Histogram(y=Y_pre_delta, name='pre-delta', marker_color='#EB89B5'),
+#     #     row=1, col=1
+#     # )
+#     # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+
+#     # Scatter Plot _______________________________________________________________________________________________________ #
+#     # adding scatter plot
+#     for a_trace in out_scatter_fig.data:
+#         fig.add_trace(a_trace, row=1, col=2)
+#         fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+
+
+#     # Post-Delta Histogram _______________________________________________________________________________________________ #
+#     # adding the second histogram
+#     post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+
+#     for a_trace in post_delta_fig.data:
+#         fig.add_trace(a_trace, row=1, col=3)
+#         fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
         
-    # Calculate the histogram data for second half
-    # hist2, bins2 = np.histogram(X_post_delta, bins=histogram_bins)
-    # Adding the second histogram
-    # fig.add_trace(
-    # 	go.Histogram(y=Y_post_delta, name='post-delta', marker_color='#EB89B5',),
-    #     # go.Bar(x=bins2[:-1], y=hist2, marker_color='#330C73', name='second half', orientation='h', ),
-    #     row=1, col=3
-    # )
+#     # Calculate the histogram data for second half
+#     # hist2, bins2 = np.histogram(X_post_delta, bins=histogram_bins)
+#     # Adding the second histogram
+#     # fig.add_trace(
+#     # 	go.Histogram(y=Y_post_delta, name='post-delta', marker_color='#EB89B5',),
+#     #     # go.Bar(x=bins2[:-1], y=hist2, marker_color='#330C73', name='second half', orientation='h', ),
+#     #     row=1, col=3
+#     # )
 
-    # fig.update_layout(layout_yaxis_range=[0.0, 1.0])
-    fig.update_layout(yaxis=dict(range=[0.0, 1.0]), barmode='overlay')
-    return fig
+#     # fig.update_layout(layout_yaxis_range=[0.0, 1.0])
+#     fig.update_layout(yaxis=dict(range=[0.0, 1.0]), barmode='overlay')
+#     return fig
 
 
 def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
@@ -964,6 +948,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         
     elif (main_plot_mode == 'separate_facet_row_per_session'):
         # main_plot_mode: str = 'separate_facet_row_per_session'
+        raise NotImplementedError(f"DOES NOT WORK")
         sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
         px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
                             'facet_row': 'session_name', 'facet_row_spacing': 0.04, # 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
@@ -1063,7 +1048,6 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
             #  fig.update_xaxes(matches='x')
         
         else:
-            # scatter_fig = px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title, range_y=[0.0, 1.0], labels={"session_name": "Session", "time_bin_size": "tbin_size"})
             scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
 
             # for a_trace in scatter_traces:
@@ -1101,6 +1085,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     ## Add the delta indicator:
     if (enable_scatter_plot and enable_epoch_shading_shapes):
         t_split: float = 0.0
+        #TODO 2024-02-02 04:36: - [ ] Should get the specific session t_start/t_end instead of using the general `earliest_delta_aligned_t_start`
         _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
         for a_shape_name, a_shape in _extras_output_dict.items():
             if (main_plot_mode == 'separate_row_per_session'):
@@ -1141,7 +1126,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
 
 
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concatenated_ripple_df,
+def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenated_laps_df: pd.DataFrame, concatenated_ripple_df: pd.DataFrame,
                                           earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
                                           enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session',
                                           laps_title_prefix: str = f"Laps", ripple_title_prefix: str = f"Ripples",
@@ -1151,7 +1136,11 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
 
     Unknowingly captured: session_name
     
+    - [ ] Truncate each session to their start/end instead of the global x bounds.
+    
+    
     """
+    from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
     import plotly.subplots as sp
     import plotly.express as px
     import plotly.graph_objects as go
@@ -1175,7 +1164,7 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
         figures_folder = Path(directory, 'figures')
         figures_folder.mkdir(parents=False, exist_ok=True)
         assert figures_folder.exists()
-        print(f'\tfigures_folder: {figures_folder}')
+        print(f'\tfigures_folder: {file_uri_from_path(figures_folder)}')
     
     # Create an empty list to store the figures
     all_figures = []
@@ -1209,10 +1198,10 @@ def plot_across_sessions_scatter_results(directory, concatenated_laps_df, concat
                  a_save_fn = lambda a_fig, a_save_name: a_fig.write_image(a_save_name)
     
             fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_{laps_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
-            print(f'\tsaving "{fig_laps_name}"...')
+            print(f'\tsaving "{file_uri_from_path(fig_laps_name)}"...')
             a_save_fn(fig_laps, fig_laps_name)
             fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_{ripple_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
-            print(f'\tsaving "{fig_ripple_name}"...')
+            print(f'\tsaving "{file_uri_from_path(fig_ripple_name)}"...')
             a_save_fn(fig_ripples, fig_ripple_name)
             
 
