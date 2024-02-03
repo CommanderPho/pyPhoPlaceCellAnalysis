@@ -21,6 +21,71 @@ from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_set_time_win
 
 
 
+import napari
+
+def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix):
+    """ Visualizes position binned activity matrix beside the trial-by-trial correlation matrix.
+    
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import napari_trial_by_trial_activity_viz
+        viewer, image_layer_dict = napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix)
+
+        
+        image_layer_dict
+        # can find peak spatial shift distance by performing convolution and finding time of maximum value?
+        _layer_z_scored_tuning_maps = image_layer_dict['z_scored_tuning_maps']
+        # Extent(data=array([[0, 0, 0],
+        #        [80, 84, 56]]), world=array([[-0.5, -0.5, -0.5],
+        #        [79.5, 83.5, 55.5]]), step=array([1, 1, 1]))
+
+        _layer_C_trial_by_trial_correlation_matrix = image_layer_dict['C_trial_by_trial_correlation_matrix']
+        _layer_C_trial_by_trial_correlation_matrix.extent
+
+        # _layer_z_scored_tuning_maps.extent
+        # Extent(data=array([[0, 0, 0],
+        #        [80, 84, 84]]), world=array([[-0.5, -0.5, -0.5],
+        #        [79.5, 83.5, 83.5]]), step=array([1, 1, 1]))
+
+        # array([0, 0, 0])
+
+
+        
+    Viewer properties:
+        # viewer.grid # GridCanvas(stride=1, shape=(-1, -1), enabled=True)
+        viewer.grid.enabled = True
+        https://napari.org/0.4.15/guides/preferences.html
+        https://forum.image.sc/t/dividing-the-display-in-the-viewer-window/42034
+        https://napari.org/stable/howtos/connecting_events.html
+        https://napari.org/stable/howtos/headless.html
+        https://forum.image.sc/t/napari-how-add-a-text-label-time-always-in-the-same-spot-in-viewer/52932/3
+        https://napari.org/stable/tutorials/segmentation/annotate_segmentation.html
+        https://napari.org/stable/gallery/add_labels.html
+        
+    """
+    # inputs: z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix
+    image_layer_dict = {}
+    layers_dict = {
+        'z_scored_tuning_maps': dict(blending='translucent', colormap='viridis', name='z_scored_tuning_maps', img_data=z_scored_tuning_map_matrix.transpose(1, 0, 2)), # reshape to be compatibile with C_i's dimensions
+        'C_trial_by_trial_correlation_matrix': dict(blending='translucent', colormap='viridis', name='C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix),
+    }
+
+    viewer = None
+    for i, (a_name, layer_dict) in enumerate(layers_dict.items()):
+        img_data = layer_dict.pop('img_data').astype(float) # assumes integrated img_data in the layers dict
+        if viewer is None: #i == 0:
+            # viewer = napari.view_image(img_data) # rgb=True
+            viewer = napari.Viewer(title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin'))
+
+        image_layer_dict[a_name] = viewer.add_image(img_data, **(dict(name=a_name)|layer_dict))
+
+    viewer.dims.axis_labels = ('aclu', 'lap', 'xbin')
+    viewer.grid.enabled = True # enables the grid layout of the data so adjacent data is displayed next to each other
+
+    # outputs: viewer, image_layer_dict
+    return viewer, image_layer_dict
+
+
 
 def napari_export_image_sequence(viewer: napari.viewer.Viewer, imageseries_output_directory='output/videos/imageseries/', slider_axis_IDX: int = 0, build_filename_from_viewer_callback_fn=None):
     """ 
