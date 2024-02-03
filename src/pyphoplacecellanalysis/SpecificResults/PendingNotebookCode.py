@@ -23,7 +23,7 @@ from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_set_time_win
 
 import napari
 
-def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix):
+def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, layers_dict=None):
     """ Visualizes position binned activity matrix beside the trial-by-trial correlation matrix.
     
 
@@ -65,10 +65,12 @@ def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_tr
     """
     # inputs: z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix
     image_layer_dict = {}
-    layers_dict = {
-        'z_scored_tuning_maps': dict(blending='translucent', colormap='viridis', name='z_scored_tuning_maps', img_data=z_scored_tuning_map_matrix.transpose(1, 0, 2)), # reshape to be compatibile with C_i's dimensions
-        'C_trial_by_trial_correlation_matrix': dict(blending='translucent', colormap='viridis', name='C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix),
-    }
+    if layers_dict is None:
+        # build the default from the values:
+        layers_dict = {
+            'z_scored_tuning_maps': dict(blending='translucent', colormap='viridis', name='z_scored_tuning_maps', img_data=z_scored_tuning_map_matrix.transpose(1, 0, 2)), # reshape to be compatibile with C_i's dimensions
+            'C_trial_by_trial_correlation_matrix': dict(blending='translucent', colormap='viridis', name='C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix),
+        }
 
     viewer = None
     for i, (a_name, layer_dict) in enumerate(layers_dict.items()):
