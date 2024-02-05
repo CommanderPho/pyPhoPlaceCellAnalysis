@@ -4,7 +4,7 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 import re
-from typing import  List, Optional, Dict, Tuple, Any, Union
+from typing import List, Optional, Dict, Tuple, Any, Union
 import napari
 from neuropy.analyses.placefields import PfND
 import numpy as np
@@ -133,6 +133,16 @@ def napari_export_image_sequence(viewer: napari.viewer.Viewer, imageseries_outpu
 
 from nptyping import NDArray
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+@define(slots=False)
+class TrialByTrialActivity:
+    """ 
+    """
+    active_epochs_df: pd.DataFrame = field()
+    C_trial_by_trial_correlation_matrix: NDArray = field()
+    z_scored_tuning_map_matrix: NDArray = field()
+    aclu_to_matrix_IDX_map: Dict = field() # factory=Factory(dict)
+    neuron_ids: NDArray = field()
+    
 
 def compute_trial_by_trial_correlation_matrix(active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray) -> NDArray:
     """ 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
