@@ -923,17 +923,30 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
 # ==================================================================================================================== #
 
 def convert_QPoint_to_xy_tuple(a_point):
-	return np.array([a_point.x(), a_point.y()])
+    return np.array([a_point.x(), a_point.y()])
 
-
-
-def add_napari_track_shapes_layer(test_shapes_viewer):
-    # long_rect_items # list of QGraphicsRectItem 
+def convert_QGraphicsRectItem_list_to_napari_poly_verticies(a_rect_items):
+    """ 
     
-    # long_extracted_rect_verticies = []
-    long_extracted_poly_verticies = []
+    returns: 
+        [array([[44.7092, 161.421],
+                [44.7092, 124.579],
+                [81.5516, 124.579],
+                [81.5516, 161.421]]),
+        array([[78.4814, 149.294],
+                [78.4814, 136.706],
+                [342.519, 136.706],
+                [342.519, 149.294]]),
+        array([[339.448, 161.421],
+                [339.448, 124.579],
+                [376.291, 124.579],
+                [376.291, 161.421]])]
 
-    for a_graphics_rect_item in long_rect_items:
+    """
+    # long_rect_items # list of QGraphicsRectItem 
+    an_extracted_poly_verticies = []
+
+    for a_graphics_rect_item in a_rect_items:
         a_rect = a_graphics_rect_item.mapRectToScene(a_graphics_rect_item.boundingRect()) # QRectF
         # a_rect_coords = a_rect.getRect() # for QRect
         # a_rect_coords = np.array(a_rect.getRect())
@@ -941,66 +954,39 @@ def add_napari_track_shapes_layer(test_shapes_viewer):
         top_right = convert_QPoint_to_xy_tuple(a_rect.topRight())
         bottom_left = convert_QPoint_to_xy_tuple(a_rect.bottomLeft())
         bottom_right = convert_QPoint_to_xy_tuple(a_rect.bottomRight())
-        # Define coordinates for a rectangle
-        # top_left = np.array([top_left.x(), top_left.y()])
-        # bottom_right = np.array([bottom_right.x(), bottom_right.y()])
-        # print(f'top_left: {top_left}, bottom_right: {bottom_right}')
-        # a_rect_coords = np.array([top_left, bottom_right])	
-        # print(f'a_rect_coords: {a_rect_coords}')
-
-        # Can also do: 
-        # x = a_rect.x()
-        # y = a_rect.y()
-        # w = a_rect.width()
-        # h = a_rect.height()
-        # a_rect_coords = np.array([x, y, (x+w), (y+h)])		
-
-        # long_extracted_rect_verticies.append(a_rect_coords)
         
         a_poly_coords = np.array([bottom_left, top_left, top_right, bottom_right])
-        long_extracted_poly_verticies.append(a_poly_coords)
-
-    # polygons = [
-    #     np.array([[225, 146], [283, 146], [283, 211], [225, 211]]),
-    #     np.array([[67, 182], [167, 182], [167, 268], [67, 268]]),
-    #     np.array([[111, 336], [220, 336], [220, 240], [111, 240]]),
-    # ]
+        an_extracted_poly_verticies.append(a_poly_coords)
+        
+    # the order is LeftPlatform, MidTrack, RightPlatform, and we want MidTrack to be in the back, so we move it to the end of the list:
+    LeftPlatform, MidTrack, RightPlatform, = an_extracted_poly_verticies
+    return [MidTrack, RightPlatform, LeftPlatform]
 
 
-    # long_extracted_rect_verticies # [array([44.7092, 124.579, 36.8424, 36.8424]), array([78.4814, 136.706, 264.037, 12.5878]), array([339.448, 124.579, 36.8424, 36.8424])]
-    # long_extracted_rect_verticies = np.stack(long_extracted_rect_verticies).T # (N, D) array of the N vertices of a shape in D dimensions
 
-    # ## Convert to xmin, xmax
-    # x = long_extracted_rect_verticies[0,:] # x
-    # y = long_extracted_rect_verticies[1,:] # y
-    # width = long_extracted_rect_verticies[2,:] # width
-    # height = long_extracted_rect_verticies[3,:] # height
+def add_napari_track_shapes_layer(viewer, long_rect_items, short_rect_items):
+    """ 2024-02-05 - Plots the long and short track as Napari shape layers in the `viewer`
+    
+    """
+    # long_rect_items # list of QGraphicsRectItem 
+    
+    long_extracted_poly_verticies = convert_QGraphicsRectItem_list_to_napari_poly_verticies(long_rect_items)
+    short_extracted_poly_verticies = convert_QGraphicsRectItem_list_to_napari_poly_verticies(short_rect_items)
 
-    # long_extracted_rect_verticies[2,:] = long_extracted_rect_verticies[2,:] + long_extracted_rect_verticies[0,:] # x_max
-    # long_extracted_rect_verticies[3,:] = long_extracted_rect_verticies[3,:] + long_extracted_rect_verticies[1,:] # y_max
+    a_display_config_man = LongShortDisplayConfigManager()
+    
 
-    # long_extracted_rect_verticies
-    long_extracted_poly_verticies
-
-    # [array([[44.7092, 161.421],
-    #         [44.7092, 124.579],
-    #         [81.5516, 124.579],
-    #         [81.5516, 161.421]]),
-    #  array([[78.4814, 149.294],
-    #         [78.4814, 136.706],
-    #         [342.519, 136.706],
-    #         [342.519, 149.294]]),
-    #  array([[339.448, 161.421],
-    #         [339.448, 124.579],
-    #         [376.291, 124.579],
-    #         [376.291, 161.421]])]
-
-    # add polygons
-    long_rectangles_poly_shapes_layer = test_shapes_viewer.add_shapes(long_extracted_poly_verticies, shape_type='polygon', edge_width=3, edge_color='class', face_color='royalblue', text='Long Track', name='poly_track')
+    long_rectangles_poly_shapes_layer = viewer.add_shapes(long_extracted_poly_verticies, shape_type='polygon', edge_width=3, edge_color='class', face_color=a_display_config_man.long_epoch_config.mpl_color, text='Long Track', name='LongTrack')
     # change some attributes of the layer
     long_rectangles_poly_shapes_layer.opacity = 1
-
-
+    long_rectangles_poly_shapes_layer.editable = False
+    
+    short_rectangles_poly_shapes_layer = viewer.add_shapes(short_extracted_poly_verticies, shape_type='polygon', edge_width=3, edge_color='class', face_color=a_display_config_man.short_epoch_config.mpl_color, text='Short Track', name='ShortTrack')
+    # change some attributes of the layer
+    short_rectangles_poly_shapes_layer.opacity = 1
+    short_rectangles_poly_shapes_layer.editable = False
+    
+    return long_rectangles_poly_shapes_layer, short_rectangles_poly_shapes_layer
 
 
 if __name__ == '__main__':
