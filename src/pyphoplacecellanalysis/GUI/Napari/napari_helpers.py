@@ -161,3 +161,24 @@ def napari_export_video_frames(viewer: napari.viewer.Viewer, time_intervals, ima
 
     # animation.animate('demo2D.mov', canvas_only=False)
     return imageseries_output_directory
+
+
+
+def extract_layer_info(a_layer):
+	""" by default Napari layers print like: `<Shapes layer 'Shapes' at 0x1635a1e8460>`: without any properties that can be easily referenced.
+	This function extracts a dict of properties.
+	
+    from pyphoplacecellanalysis.GUI.Napari.napari_helpers import extract_layer_info
+     
+	"""
+	out_properties_dict = {}
+	positioning = ['scale', 'translate', 'rotate', 'shear', 'affine']
+	visual = ['opacity', 'blending', 'visible', 'z_index']
+	# positioning = ['scale', 'translate', 'rotate', 'shear', 'affine']
+	out_properties_dict['positioning'] = {}
+	
+	for a_property_name in positioning:
+		out_properties_dict['positioning'][a_property_name] = getattr(a_layer, a_property_name)
+	return out_properties_dict
+
+
