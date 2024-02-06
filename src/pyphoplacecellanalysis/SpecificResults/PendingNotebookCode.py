@@ -13,6 +13,53 @@ from attrs import define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
 
+# ==================================================================================================================== #
+# Usability/Conveninece Helpers                                                                                        #
+# ==================================================================================================================== #
+
+def pho_jointplot(*args, **kwargs):
+	""" wraps sns.jointplot to allow adding titles/axis labels/etc."""
+	import seaborn as sns
+	title = kwargs.pop('title', None)
+	_out = sns.jointplot(*args, **kwargs)
+	if title is not None:
+		plt.suptitle(title)
+	return _out
+
+
+def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
+    """ plots a stacked histogram of the many time-bin sizes """
+    # get the pre-delta epochs
+    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+
+    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
+    
+    # plot pre-delta histogram
+    time_bin_sizes = pre_delta_df['time_bin_size'].unique()
+    
+    figure_identifier: str = f"{descriptor_str}_preDelta"
+    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
+    for time_bin_size in time_bin_sizes:
+        df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+        df_tbs['P_Long'].hist(alpha=0.5, label=str(time_bin_size)) 
+    
+    plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
+    plt.legend()
+    plt.show()
+
+    # plot post-delta histogram
+    time_bin_sizes = post_delta_df['time_bin_size'].unique()
+    figure_identifier: str = f"{descriptor_str}_postDelta"
+    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
+    for time_bin_size in time_bin_sizes:
+        df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
+        df_tbs['P_Long'].hist(alpha=0.5, label=str(time_bin_size)) 
+    
+    plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
+    plt.legend()
+    plt.show()
+
 
 def pho_plothelper(data, **kwargs):
 	""" 2024-02-06 - Provides an interface like plotly's classes provide to extract keys fom DataFrame columns or dicts and generate kwargs to pass to a plotting function.
