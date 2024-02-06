@@ -49,7 +49,7 @@ def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_tr
 
         # array([0, 0, 0])
 
-
+	, title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin')
         
     Viewer properties:
         # viewer.grid # GridCanvas(stride=1, shape=(-1, -1), enabled=True)
@@ -63,6 +63,9 @@ def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_tr
         https://napari.org/stable/gallery/add_labels.html
         
     """
+    from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_from_layers_dict
+    
+
     # inputs: z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix
     image_layer_dict = {}
     if layers_dict is None:
@@ -186,6 +189,31 @@ def compute_trial_by_trial_correlation_matrix(active_pf_dt: PfND_TimeDependent, 
     aclu_to_matrix_IDX_map = dict(zip(neuron_ids, np.arange(n_aclus)))
 
     return C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map
+
+
+def directional_compute_trial_by_trial_correlation_matrix(active_pf_dt, directional_lap_epochs_dict) -> Dict[str,TrialByTrialActivity]:
+	""" 
+	
+	2024-02-02 - 10pm - Have global version working but want seperate directional versions. Seperately do `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`:
+	
+	"""
+	directional_active_lap_pf_results_dicts: Dict[str,TrialByTrialActivity] = {}
+
+	# Seperately do (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj):
+	for an_epoch_name, active_laps_epoch in directional_lap_epochs_dict.items():
+		active_laps_df = deepcopy(active_laps_epoch.to_dataframe())
+		active_lap_pf_results_dict = compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=active_laps_df)
+		# Unpack the variables:
+		historical_snapshots = active_lap_pf_results_dict['historical_snapshots']
+		occupancy_weighted_tuning_maps_matrix = active_lap_pf_results_dict['occupancy_weighted_tuning_maps'] # .shape: (n_epochs, n_aclus, n_xbins) - (84, 80, 56)
+		# 2024-02-02 - Trial-by-trial Correlation Matrix C
+		C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map = compute_trial_by_trial_correlation_matrix(active_pf_dt, occupancy_weighted_tuning_maps_matrix=occupancy_weighted_tuning_maps_matrix)
+		neuron_ids = np.array(list(aclu_to_matrix_IDX_map.keys()))
+		
+		# directional_active_lap_pf_results_dicts[an_epoch_name] = (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) # currently discards: occupancy_weighted_tuning_maps_matrix, historical_snapshots, active_lap_pf_results_dict, active_laps_df
+		directional_active_lap_pf_results_dicts[an_epoch_name] = TrialByTrialActivity(active_epochs_df=active_laps_df, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map=aclu_to_matrix_IDX_map, neuron_ids=neuron_ids)
+		
+	return directional_active_lap_pf_results_dicts
 
 
 # ==================================================================================================================== #
