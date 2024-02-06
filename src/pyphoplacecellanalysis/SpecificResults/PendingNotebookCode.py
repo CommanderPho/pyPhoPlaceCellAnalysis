@@ -22,6 +22,47 @@ from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_set_time_win
 
 
 import napari
+from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_from_layers_dict
+
+
+def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts):
+    """ Plots the directional trial-by-trial activity visualization:
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import napari_plot_directional_trial_by_trial_activity_viz
+        
+        directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict = napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts)
+    
+    """
+    from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_from_layers_dict
+
+    custom_direction_split_layers_dict = {}
+    layers_list_sort_order = ['maze1_odd_z_scored_tuning_maps', 'maze1_odd_C_trial_by_trial_correlation_matrix', 
+    'maze1_even_z_scored_tuning_maps', 'maze1_even_C_trial_by_trial_correlation_matrix',
+    'maze2_odd_z_scored_tuning_maps', 'maze2_odd_C_trial_by_trial_correlation_matrix', 
+    'maze2_even_z_scored_tuning_maps', 'maze2_even_C_trial_by_trial_correlation_matrix']
+
+    ## Build the image data layers for each
+    # for an_epoch_name, (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) in directional_active_lap_pf_results_dicts.items():
+    for an_epoch_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():
+        # (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids)
+        z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix
+        C_trial_by_trial_correlation_matrix = active_trial_by_trial_activity_obj.C_trial_by_trial_correlation_matrix
+        custom_direction_split_layers_dict[f'{an_epoch_name}_z_scored_tuning_maps'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_z_scored_tuning_maps', img_data=z_scored_tuning_map_matrix.transpose(1, 0, 2)) # reshape to be compatibile with C_i's dimensions
+        custom_direction_split_layers_dict[f'{an_epoch_name}_C_trial_by_trial_correlation_matrix'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix)
+
+    # custom_direction_split_layers_dict
+
+    # directional_viewer, directional_image_layer_dict = napari_trial_by_trial_activity_viz(None, None, layers_dict=custom_direction_split_layers_dict)
+
+    ## sort the layers dict:
+    custom_direction_split_layers_dict = {k:custom_direction_split_layers_dict[k] for k in reversed(layers_list_sort_order)}
+
+    directional_viewer, directional_image_layer_dict = napari_from_layers_dict(layers_dict=custom_direction_split_layers_dict, title='Directioanl Trial-by-Trial Activity', axis_labels=('aclu', 'lap', 'xbin'))
+    directional_viewer.grid.shape = (-1, 4)
+
+
+    return directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict
+
 
 def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, layers_dict=None):
     """ Visualizes position binned activity matrix beside the trial-by-trial correlation matrix.
@@ -49,7 +90,7 @@ def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_tr
 
         # array([0, 0, 0])
 
-	, title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin')
+    , title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin')
         
     Viewer properties:
         # viewer.grid # GridCanvas(stride=1, shape=(-1, -1), enabled=True)
@@ -192,28 +233,28 @@ def compute_trial_by_trial_correlation_matrix(active_pf_dt: PfND_TimeDependent, 
 
 
 def directional_compute_trial_by_trial_correlation_matrix(active_pf_dt, directional_lap_epochs_dict) -> Dict[str,TrialByTrialActivity]:
-	""" 
-	
-	2024-02-02 - 10pm - Have global version working but want seperate directional versions. Seperately do `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`:
-	
-	"""
-	directional_active_lap_pf_results_dicts: Dict[str,TrialByTrialActivity] = {}
+    """ 
+    
+    2024-02-02 - 10pm - Have global version working but want seperate directional versions. Seperately do `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`:
+    
+    """
+    directional_active_lap_pf_results_dicts: Dict[str,TrialByTrialActivity] = {}
 
-	# Seperately do (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj):
-	for an_epoch_name, active_laps_epoch in directional_lap_epochs_dict.items():
-		active_laps_df = deepcopy(active_laps_epoch.to_dataframe())
-		active_lap_pf_results_dict = compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=active_laps_df)
-		# Unpack the variables:
-		historical_snapshots = active_lap_pf_results_dict['historical_snapshots']
-		occupancy_weighted_tuning_maps_matrix = active_lap_pf_results_dict['occupancy_weighted_tuning_maps'] # .shape: (n_epochs, n_aclus, n_xbins) - (84, 80, 56)
-		# 2024-02-02 - Trial-by-trial Correlation Matrix C
-		C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map = compute_trial_by_trial_correlation_matrix(active_pf_dt, occupancy_weighted_tuning_maps_matrix=occupancy_weighted_tuning_maps_matrix)
-		neuron_ids = np.array(list(aclu_to_matrix_IDX_map.keys()))
-		
-		# directional_active_lap_pf_results_dicts[an_epoch_name] = (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) # currently discards: occupancy_weighted_tuning_maps_matrix, historical_snapshots, active_lap_pf_results_dict, active_laps_df
-		directional_active_lap_pf_results_dicts[an_epoch_name] = TrialByTrialActivity(active_epochs_df=active_laps_df, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map=aclu_to_matrix_IDX_map, neuron_ids=neuron_ids)
-		
-	return directional_active_lap_pf_results_dicts
+    # Seperately do (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj):
+    for an_epoch_name, active_laps_epoch in directional_lap_epochs_dict.items():
+        active_laps_df = deepcopy(active_laps_epoch.to_dataframe())
+        active_lap_pf_results_dict = compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=active_laps_df)
+        # Unpack the variables:
+        historical_snapshots = active_lap_pf_results_dict['historical_snapshots']
+        occupancy_weighted_tuning_maps_matrix = active_lap_pf_results_dict['occupancy_weighted_tuning_maps'] # .shape: (n_epochs, n_aclus, n_xbins) - (84, 80, 56)
+        # 2024-02-02 - Trial-by-trial Correlation Matrix C
+        C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map = compute_trial_by_trial_correlation_matrix(active_pf_dt, occupancy_weighted_tuning_maps_matrix=occupancy_weighted_tuning_maps_matrix)
+        neuron_ids = np.array(list(aclu_to_matrix_IDX_map.keys()))
+        
+        # directional_active_lap_pf_results_dicts[an_epoch_name] = (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) # currently discards: occupancy_weighted_tuning_maps_matrix, historical_snapshots, active_lap_pf_results_dict, active_laps_df
+        directional_active_lap_pf_results_dicts[an_epoch_name] = TrialByTrialActivity(active_epochs_df=active_laps_df, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map=aclu_to_matrix_IDX_map, neuron_ids=neuron_ids)
+        
+    return directional_active_lap_pf_results_dicts
 
 
 # ==================================================================================================================== #
@@ -431,7 +472,19 @@ def compute_activity_by_lap_by_position_bin_matrix(a_spikes_df: pd.DataFrame, la
 
 def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_epochs_obj
     """ 
-    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_spatially_binned_activity
+        
+        # a_spikes_df = None
+        # a_spikes_df: pd.DataFrame = deepcopy(long_one_step_decoder_1D.spikes_df) #.drop(columns=['neuron_type'], inplace=False)
+
+        # an_active_pf = deepcopy(global_pf2D)
+        # an_active_pf = deepcopy(global_pf1D)
+        # an_active_pf.linear_pos_obj
+
+        # an_active_pf = active_pf_2D_dt
+        an_active_pf = active_pf_1D_dt
+        position_binned_activity_matr_dict, split_spikes_df_dict, (neuron_id_to_new_IDX_map, lap_id_to_matrix_IDX_map) = compute_spatially_binned_activity(an_active_pf)
+        # 14.8s
     """
     from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
     # from neuropy.utils.mixins.time_slicing import add_epochs_id_identity # needed to add laps column
