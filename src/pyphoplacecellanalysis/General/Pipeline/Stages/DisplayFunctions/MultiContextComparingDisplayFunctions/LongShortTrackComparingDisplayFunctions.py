@@ -84,6 +84,8 @@ def build_extra_cell_info_label_string(row) -> str:
 
 
 
+
+
 # noinspection PyMethodParameters
 class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ LongShortTrackComparingDisplayFunctions

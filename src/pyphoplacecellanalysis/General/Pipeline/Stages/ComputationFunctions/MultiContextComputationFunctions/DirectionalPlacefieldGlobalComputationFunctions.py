@@ -37,6 +37,35 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability
 
+
+# Assume a1 and a2 are your numpy arrays
+# def find_shift(a1, a2):
+#     """ 
+#     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import find_shift
+#     shift = find_shift(a1, a2)
+    
+#     """
+#     correlation = np.correlate(a1, a2, "full")
+#     max_index = np.argmax(correlation)
+#     shift = max_index - len(a2) + 1
+#     return shift
+
+
+
+def find_shift(a1, a2):
+    """ 
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import find_shift
+    shift = find_shift(a1, a2)
+    
+    """
+    from scipy import signal
+    # correlation = np.correlate(a1, a2, "full")
+    correlation = signal.correlate(a1, a2, mode="full")
+    lags = signal.correlation_lags(a1.size, a2.size, mode="full")
+    lag = lags[np.argmax(correlation)]
+    return lag
+
+
 # Define the namedtuple
 DirectionalDecodersTuple = namedtuple('DirectionalDecodersTuple', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
 
@@ -95,7 +124,48 @@ class TrackTemplates(HDFMixin):
         """ a Dict (one for each decoder) of aclu-to-rank maps for each decoder (independently) """
         return {a_decoder_name:dict(zip(a_decoder.pf.ratemap.neuron_ids, scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=self.rank_method))) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
     
-    
+
+    @property    
+    def merged_decoders_aclu_peak_location_df(self) -> pd.DataFrame:
+        """ returns a single dataframe with all of the continuous peaks for each of the four decoders in it.
+        
+        """
+        from functools import reduce
+        
+        decoder_aclu_peak_location_df_list = [pd.DataFrame({'aclu':neuron_IDs, f'{a_decoder_name}_peak':peak_locations}) for a_decoder_name, neuron_IDs, peak_locations in zip(self.get_decoder_names(), self.decoder_neuron_IDs_list, self.decoder_peak_location_list)]
+        decoder_aclu_peak_location_df_merged: pd.DataFrame = reduce(lambda  left,right: pd.merge(left,right,on=['aclu'], how='outer'), decoder_aclu_peak_location_df_list).sort_values(['aclu']) .reset_index(drop=True)
+        # Add differences:
+        decoder_aclu_peak_location_df_merged['LR_peak_diff'] = decoder_aclu_peak_location_df_merged['long_LR_peak'] - decoder_aclu_peak_location_df_merged['short_LR_peak']
+        decoder_aclu_peak_location_df_merged['RL_peak_diff'] = decoder_aclu_peak_location_df_merged['long_RL_peak'] - decoder_aclu_peak_location_df_merged['short_RL_peak']
+        return decoder_aclu_peak_location_df_merged
+        
+
+
+    def get_long_short_decoder_shifts(self):
+        """ uses `find_shift` """
+
+        def _subfn_long_short_decoder_shift(long_dir_decoder, short_dir_decoder):
+            """ finds the offsets
+            """
+            long_dir_pf1D = deepcopy(long_dir_decoder.pf.ratemap.pdf_normalized_tuning_curves)
+            short_dir_pf1D = deepcopy(short_dir_decoder.pf.ratemap.pdf_normalized_tuning_curves)
+
+            assert np.shape(long_dir_pf1D) == np.shape(short_dir_pf1D)
+            assert short_dir_decoder.num_neurons == long_dir_decoder.num_neurons
+            neuron_ids = deepcopy(short_dir_decoder.pf.ratemap.neuron_ids)
+            # xbin_centers = deepcopy(short_dir_decoder.xbin_centers)
+
+            # shift = find_shift(long_dir_pf1D[:,i], short_dir_pf1D[:,i])
+            shift = np.array([find_shift(long_dir_pf1D[:,i], short_dir_pf1D[:,i]) for i in np.arange(long_dir_decoder.num_neurons)])
+            shift_x = shift.astype(float) * float(long_dir_decoder.pf.bin_info['xstep']) # In position coordinates
+            
+            return shift_x, shift, neuron_ids
+
+
+        LR_shift_x, LR_shift, LR_neuron_ids = _subfn_long_short_decoder_shift(long_dir_decoder=self.long_LR_decoder, short_dir_decoder=self.short_LR_decoder)
+        RL_shift_x, RL_shift, RL_neuron_ids = _subfn_long_short_decoder_shift(long_dir_decoder=self.long_RL_decoder, short_dir_decoder=self.short_RL_decoder)
+
+        return (LR_shift_x, LR_shift, LR_neuron_ids), (RL_shift_x, RL_shift, RL_neuron_ids)
     
 
     def get_decoder_aclu_peak_maps(self) -> DirectionalDecodersTuple:
