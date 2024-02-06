@@ -14,6 +14,21 @@ from attrs import define, field, Factory
 from pyphocorehelpers.function_helpers import function_attributes
 
 
+def pho_plothelper(data, **kwargs):
+	""" 2024-02-06 - Provides an interface like plotly's classes provide to extract keys fom DataFrame columns or dicts and generate kwargs to pass to a plotting function.
+		
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import pho_plothelper
+            extracted_value_kwargs = pho_plothelper(data=an_aclu_conv_overlap_output['valid_subset'], x='x', y='normalized_convolved_result')
+            extracted_value_kwargs
+
+	"""
+	# data is a pd.DataFrame or Dict-like
+	extracted_value_kwargs = {}
+	for k,v in kwargs.items():
+		extracted_value_kwargs[k] = data[v]
+	# end up with `extracted_value_kwargs` containing the real values to plot.
+	return extracted_value_kwargs
 # ==================================================================================================================== #
 # 2024-02-02 - Napari Export Helpers - Batch export all images                                                         #
 # ==================================================================================================================== #
@@ -25,7 +40,41 @@ import napari
 from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_from_layers_dict
 
 
-def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts):
+def napari_add_aclu_slider(viewer, neuron_ids):
+    """ adds a neuron aclu index overlay
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import napari_add_aclu_slider
+
+
+    """
+    def on_update_slider(event):
+        """ captures: viewer, neuron_ids
+        
+        Adds a little text label to the bottom right corner
+        
+        """
+        # only trigger if update comes from first axis (optional)
+        # print('inside')
+        #ind_lambda = viewer.dims.indices[0]
+
+        time = viewer.dims.current_step[0]
+        matrix_aclu_IDX = int(time)
+        # find the aclu value for this index:
+        aclu: int = neuron_ids[matrix_aclu_IDX]
+        viewer.text_overlay.text = f"aclu: {aclu}, IDX: {matrix_aclu_IDX}"
+        
+        # viewer.text_overlay.text = f"{time:1.1f} time"
+
+
+    # viewer = napari.Viewer()
+    # viewer.add_image(np.random.random((5, 5, 5)), colormap='red', opacity=0.8)
+    viewer.text_overlay.visible = True
+    _connected_on_update_slider_event = viewer.dims.events.current_step.connect(on_update_slider)
+    # viewer.dims.events.current_step.disconnect(on_update_slider)
+    return _connected_on_update_slider_event
+
+
+def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts, include_trial_by_trial_correlation_matrix:bool = True):
     """ Plots the directional trial-by-trial activity visualization:
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import napari_plot_directional_trial_by_trial_activity_viz
@@ -46,20 +95,23 @@ def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_p
     for an_epoch_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():
         # (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids)
         z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix
-        C_trial_by_trial_correlation_matrix = active_trial_by_trial_activity_obj.C_trial_by_trial_correlation_matrix
         custom_direction_split_layers_dict[f'{an_epoch_name}_z_scored_tuning_maps'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_z_scored_tuning_maps', img_data=z_scored_tuning_map_matrix.transpose(1, 0, 2)) # reshape to be compatibile with C_i's dimensions
-        custom_direction_split_layers_dict[f'{an_epoch_name}_C_trial_by_trial_correlation_matrix'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix)
+        if include_trial_by_trial_correlation_matrix:
+            C_trial_by_trial_correlation_matrix = active_trial_by_trial_activity_obj.C_trial_by_trial_correlation_matrix
+            custom_direction_split_layers_dict[f'{an_epoch_name}_C_trial_by_trial_correlation_matrix'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix)
 
     # custom_direction_split_layers_dict
 
     # directional_viewer, directional_image_layer_dict = napari_trial_by_trial_activity_viz(None, None, layers_dict=custom_direction_split_layers_dict)
 
     ## sort the layers dict:
-    custom_direction_split_layers_dict = {k:custom_direction_split_layers_dict[k] for k in reversed(layers_list_sort_order)}
+    custom_direction_split_layers_dict = {k:custom_direction_split_layers_dict[k] for k in reversed(layers_list_sort_order) if k in custom_direction_split_layers_dict}
 
-    directional_viewer, directional_image_layer_dict = napari_from_layers_dict(layers_dict=custom_direction_split_layers_dict, title='Directioanl Trial-by-Trial Activity', axis_labels=('aclu', 'lap', 'xbin'))
-    directional_viewer.grid.shape = (-1, 4)
-
+    directional_viewer, directional_image_layer_dict = napari_from_layers_dict(layers_dict=custom_direction_split_layers_dict, title='Directional Trial-by-Trial Activity', axis_labels=('aclu', 'lap', 'xbin'))
+    if include_trial_by_trial_correlation_matrix:
+        directional_viewer.grid.shape = (-1, 4)
+    else:
+        directional_viewer.grid.shape = (2, -1)
 
     return directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict
 
@@ -208,10 +260,11 @@ def compute_trial_by_trial_correlation_matrix(active_pf_dt: PfND_TimeDependent, 
     assert np.shape(occupancy_weighted_tuning_maps_matrix)[1] == n_aclus
     assert np.shape(occupancy_weighted_tuning_maps_matrix)[2] == n_xbins
 
+    epsilon_value: float = 1e-12
     # Assuming 'occupancy_weighted_tuning_maps_matrix' is your dataset with shape (trials, positions)
     # Z-score along the position axis (axis=1)
     position_axis_idx: int = 2
-    z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)
+    z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / ((np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True))+epsilon_value)
 
     # trial-by-trial correlation matrix C
     M = float(n_xbins)
@@ -468,7 +521,6 @@ def compute_activity_by_lap_by_position_bin_matrix(a_spikes_df: pd.DataFrame, la
     # active_out_matr = a_spikes_bin_counts_mat
     # “calculated the occupancy (number of imaging samples) in each bin on each trial, and divided this by the total number of samples in each trial to get an occupancy probability per position bin per trial” 
     return a_spikes_bin_counts_mat
-
 
 def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_epochs_obj
     """ 
@@ -740,6 +792,7 @@ def _embed_in_subplots(scatter_fig):
 
 #     return fig
 
+@function_attributes(short_name=None, tags=['plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
 def plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list, xbin, posterior_list): # , ax=None
     """ 
     Analagous to `plot_1D_most_likely_position_comparsions`
@@ -776,6 +829,7 @@ def plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list, xb
     return fig
 
 
+@function_attributes(short_name=None, tags=['plotly', 'blue_yellow'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
 def plot_blue_yellow_points(a_df, specific_point_list):
     """ Renders a figure containing one or more yellow-blue plots (marginals) for a given hoverred point. Used with Dash app.
     
@@ -808,6 +862,7 @@ def plot_blue_yellow_points(a_df, specific_point_list):
     fig = plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list=time_window_centers_list, xbin=xbin, posterior_list=posterior_list)
     return fig
 
+@function_attributes(short_name=None, tags=['Dash', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
 def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, latest_delta_aligned_t_end: float):
     """ builds an interactive Across Sessions Dash app
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _build_dash_app
@@ -1555,134 +1610,6 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
 
 
 
-
-
-# Plot the time_bin marginals:
-
-# def plot_across_sessions_results_with_histogram_gpt3(directory, concatenated_laps_df, concatenated_ripple_df, save_figures=False, figure_save_extension='.png'):
-#     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
-#     Produces and then saves figures out the the f'{directory}/figures/' subfolder
-
-#     """
-#     if not isinstance(directory, Path):
-#         directory = Path(directory).resolve()
-#     assert directory.exists()
-#     print(f'plot_across_sessions_results(directory: {directory})')
-#     if save_figures:
-#         # Create a 'figures' subfolder if it doesn't exist
-#         figures_folder = Path(directory, 'figures')
-#         figures_folder.mkdir(parents=False, exist_ok=True)
-#         assert figures_folder.exists()
-#         print(f'\tfigures_folder: {figures_folder}')
-    
-#     # Create an empty list to store the figures
-#     all_figures = []
-
-#     ## delta_t aligned:
-#     # Create a bubble chart for laps
-#     fig_laps = px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', title=f"Laps - Session: {session_name}", color='session_name')
-#     # Create a bubble chart for ripples
-#     fig_ripples = px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - Session: {session_name}", color='session_name')
-
-#     # Create a histogram for laps
-#     fig_hist_laps = px.histogram(concatenated_laps_df, x='delta_aligned_start_t', nbins=50, title=f"Laps - Session: {session_name}")
-    
-#     # Assign numerical values to session_name for color
-#     session_name_to_color = {name: i for i, name in enumerate(concatenated_laps_df['session_name'].unique())}
-
-#     # Create subplots with shared y-axis
-#     fig = make_subplots(rows=1, cols=2, subplot_titles=[f"Laps - Session: {session_name}", f"Ripples - Session: {session_name}"])
-    
-#     # Add histogram to the left subplot
-#     fig.add_trace(go.Histogram(x=concatenated_laps_df['delta_aligned_start_t'], nbinsx=50, name='Histogram'), row=1, col=1)
-#     fig.update_yaxes(title_text='Count', row=1, col=1)
-    
-#     # Add bubble chart to the right subplot
-#     fig.add_trace(go.Scatter(x=concatenated_laps_df['delta_aligned_start_t'], y=concatenated_laps_df['P_Long'], mode='markers', marker=dict(color=concatenated_laps_df['session_name'].map(session_name_to_color))), row=1, col=2)
-#     fig.update_xaxes(title_text='delta_aligned_start_t', row=1, col=2)
-#     fig.update_yaxes(title_text='P_Long', row=1, col=2)
-
-#     if save_figures:
-#         # Save the figure to the 'figures' subfolder
-#         print(f'\tsaving figures...')
-#         fig_name = Path(figures_folder, f"{session_name}_combined_plot{figure_save_extension}").resolve()
-#         print(f'\tsaving "{fig_name}"...')
-#         fig.write_image(fig_name)
-    
-#     # Append the figure to the list
-#     all_figures.append(fig)
-    
-#     return all_figures
-
-
-# def plot_across_sessions_results_with_histogram_new(directory, concatenated_laps_df, concatenated_ripple_df, save_figures=False, figure_save_extension='.png'):
-    # """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
-    # Produces and then saves figures out the the f'{directory}/figures/' subfolder
-
-    # """
-
-    # # Your existing code (not modified)
-
-    # ## delta_t aligned:
-    # # Create subplot with 2 rows and 1 column
-    # fig_laps = make_subplots(rows=2, cols=1)
-    # # Add scatter plot to first row, first column
-    # fig_laps.add_trace(
-    #     go.Scatter(x=concatenated_laps_df['delta_aligned_start_t'], y=concatenated_laps_df['P_Long'], mode='markers', name='Scatter'), 
-    #     row=1, col=1
-    # )
-    # # add histogram to second row, first column
-    # fig_laps.add_trace(
-    #     go.Histogram(x=concatenated_laps_df['delta_aligned_start_t'], name='Histogram'), 
-    #     row=2, col=1
-    # )
-    # # Same for ripples
-    # fig_ripples = make_subplots(rows=2, cols=1)
-    # fig_ripples.add_trace(
-    #     go.Scatter(x=concatenated_ripple_df['delta_aligned_start_t'], y=concatenated_ripple_df['P_Long'], mode='markers', name='Scatter'), 
-    #     row=1, col=1
-    # )
-    # fig_ripples.add_trace(
-    #     go.Histogram(x=concatenated_ripple_df['delta_aligned_start_t'], name='Histogram'), 
-    #     row=2, col=1
-    # )
-    # # Your existing code continues from here (not modified)
-    # if not isinstance(directory, Path):
-    #     directory = Path(directory).resolve()
-    # assert directory.exists()
-    # print(f'plot_across_sessions_results(directory: {directory})')
-    # if save_figures:
-    #     # Create a 'figures' subfolder if it doesn't exist
-    #     figures_folder = Path(directory, 'figures')
-    #     figures_folder.mkdir(parents=False, exist_ok=True)
-    #     assert figures_folder.exists()
-    #     print(f'\tfigures_folder: {figures_folder}')
-    
-    # # Create an empty list to store the figures
-    # all_figures = []
-
-    # ## delta_t aligned:
-    # # Create a bubble chart for laps
-    # fig_laps = px.scatter(concatenated_laps_df, x='delta_aligned_start_t', y='P_Long', title=f"Laps - Session: {session_name}", color='session_name')
-    # # Create a bubble chart for ripples
-    # fig_ripples = px.scatter(concatenated_ripple_df, x='delta_aligned_start_t', y='P_Long', title=f"Ripples - Session: {session_name}", color='session_name')
-
-    # if save_figures:
-    #     # Save the figures to the 'figures' subfolder
-    #     print(f'\tsaving figures...')
-    #     fig_laps_name = Path(figures_folder, f"{session_name}_laps_marginal{figure_save_extension}").resolve()
-    #     print(f'\tsaving "{fig_laps_name}"...')
-    #     fig_laps.write_image(fig_laps_name)
-    #     fig_ripple_name = Path(figures_folder, f"{session_name}_ripples_marginal{figure_save_extension}").resolve()
-    #     print(f'\tsaving "{fig_ripple_name}"...')
-    #     fig_ripples.write_image(fig_ripple_name)
-    
-    # # Append both figures to the list
-    # all_figures.append((fig_laps, fig_ripples))
-    
-    # return all_figures
-    
-
 # ==================================================================================================================== #
 # 2024-01-27 - Across Session CSV Import and Processing                                                                #
 # ==================================================================================================================== #
@@ -1830,3 +1757,54 @@ class AcrossSessionCSVOutputFormat:
         return export_date, date_name, epochs, granularity
     
 
+
+# ==================================================================================================================== #
+# 2024-01-23 - Writes the posteriors out to file                                                                       #
+# ==================================================================================================================== #
+
+def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, laps_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9):
+    """ 2024-01-23 - Writes the posteriors out to file 
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import save_posterior
+
+        collapsed_per_lap_epoch_marginal_track_identity_point = laps_marginals_df[['P_Long', 'P_Short']].to_numpy().astype(float)
+        collapsed_per_lap_epoch_marginal_dir_point = laps_marginals_df[['P_LR', 'P_RL']].to_numpy().astype(float)
+
+        for epoch_id in np.arange(laps_filter_epochs_decoder_result.num_filter_epochs):
+            raw_tuple, marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple = save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, laps_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point,
+                                                                                        parent_array_as_image_output_folder=parent_array_as_image_output_folder, epoch_id_identifier_str='lap', epoch_id=epoch_id)
+
+    """
+    from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image
+
+    assert parent_array_as_image_output_folder.exists()
+    
+    epoch_id_str = f"{epoch_id_identifier_str}[{epoch_id}]"
+    _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_raw_marginal.png').resolve()
+    img_data = raw_posterior_laps_marginals[epoch_id]['p_x_given_n'].astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+    raw_tuple = save_array_as_image(img_data, desired_height=100, desired_width=None, skip_img_normalization=True, out_path=_img_path)
+    # image_raw, path_raw = raw_tuple
+
+    _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir.png').resolve()
+    img_data = laps_directional_marginals[epoch_id]['p_x_given_n'].astype(float)
+    marginal_dir_tuple = save_array_as_image(img_data, desired_height=50, desired_width=None, skip_img_normalization=True, out_path=_img_path)
+    # image_marginal_dir, path_marginal_dir = marginal_dir_tuple
+
+    _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_track_identity.png').resolve()
+    img_data = laps_track_identity_marginals[epoch_id]['p_x_given_n'].astype(float)
+    marginal_track_identity_tuple = save_array_as_image(img_data, desired_height=50, desired_width=None, skip_img_normalization=True, out_path=_img_path)
+    # image_marginal_track_identity, path_marginal_track_identity = marginal_track_identity_tuple
+
+
+    _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_track_identity_point.png').resolve()
+    img_data = np.atleast_2d(collapsed_per_lap_epoch_marginal_track_identity_point[epoch_id,:]).T
+    marginal_dir_point_tuple = save_array_as_image(img_data, desired_height=50, desired_width=None, skip_img_normalization=True, out_path=_img_path)
+
+    _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir_point.png').resolve()
+    img_data = np.atleast_2d(collapsed_per_lap_epoch_marginal_dir_point[epoch_id,:]).T
+    marginal_track_identity_point_tuple = save_array_as_image(img_data, desired_height=50, desired_width=None, skip_img_normalization=True, out_path=_img_path)
+
+
+    return raw_tuple, marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple
+    
