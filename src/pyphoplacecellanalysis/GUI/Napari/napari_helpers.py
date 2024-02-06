@@ -1,3 +1,4 @@
+from typing import Any, Dict
 import napari
 import numpy as np
 import pandas as pd
@@ -165,20 +166,107 @@ def napari_export_video_frames(viewer: napari.viewer.Viewer, time_intervals, ima
 
 
 def extract_layer_info(a_layer):
-	""" by default Napari layers print like: `<Shapes layer 'Shapes' at 0x1635a1e8460>`: without any properties that can be easily referenced.
-	This function extracts a dict of properties.
-	
+    """ Extracts info as a dict from a single Napari layer. 
+    by default Napari layers print like: `<Shapes layer 'Shapes' at 0x1635a1e8460>`: without any properties that can be easily referenced.
+    This function extracts a dict of properties.
+    
     from pyphoplacecellanalysis.GUI.Napari.napari_helpers import extract_layer_info
      
+    """
+    out_properties_dict = {}
+    positioning = ['scale', 'translate', 'rotate', 'shear', 'affine', 'corner_pixels']
+    visual = ['opacity', 'blending', 'visible', 'z_index']
+    # positioning = ['scale', 'translate', 'rotate', 'shear', 'affine']
+    out_properties_dict['positioning'] = {}
+    
+    for a_property_name in positioning:
+        out_properties_dict['positioning'][a_property_name] = getattr(a_layer, a_property_name)
+    return out_properties_dict
+
+def napari_extract_layers_info(layers):
+	"""extracts info dict from each layer as well.
+	Usage:
+        from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_extract_layers_info
+		layers = directional_viewer.layers # [<Shapes layer 'Shapes' at 0x1635a1e8460>, <Shapes layer 'Shapes [1]' at 0x164d5402e50>]
+		out_layers_info_dict = debug_print_layers_info(layers)
+
 	"""
-	out_properties_dict = {}
-	positioning = ['scale', 'translate', 'rotate', 'shear', 'affine']
-	visual = ['opacity', 'blending', 'visible', 'z_index']
-	# positioning = ['scale', 'translate', 'rotate', 'shear', 'affine']
-	out_properties_dict['positioning'] = {}
-	
-	for a_property_name in positioning:
-		out_properties_dict['positioning'][a_property_name] = getattr(a_layer, a_property_name)
-	return out_properties_dict
+	out_layers_info_dict = {}
+	for a_layer in layers:
+		a_name: str = str(a_layer.name)
+		out_properties_dict = extract_layer_info(a_layer)
+		out_layers_info_dict[a_name] = out_properties_dict
+		# if isinstance(a_layer, Shapes):
+		# 	print(f'shapes layer: {a_layer}')
+		# 	a_shapes_layer: Shapes = a_layer
+		# 	# print(f'a_shapes_layer.properties: {a_shapes_layer.properties}')
+		# 	out_properties_dict = extract_layer_info(a_layer)
+		# 	print(f'\tout_properties_dict: {out_properties_dict}')
+		# 	out_layers_info_dict[a_name] = out_properties_dict
+		# else:
+		# 	print(f'unknown layer: {a_layer}')	
+	return out_layers_info_dict
 
 
+
+def napari_from_layers_dict(layers_dict: Dict, viewer=None, title: str = 'napari', ndisplay: int = 2, order: Any = (), axis_labels: Any = (), show: bool = True, **kwargs):
+    """ Visualizes position binned activity matrix beside the trial-by-trial correlation matrix.
+    
+    
+    
+    Usage:
+        from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_from_layers_dict
+        viewer, image_layer_dict = napari_from_layers_dict(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix)
+
+        
+        image_layer_dict
+        # can find peak spatial shift distance by performing convolution and finding time of maximum value?
+        _layer_z_scored_tuning_maps = image_layer_dict['z_scored_tuning_maps']
+        # Extent(data=array([[0, 0, 0],
+        #        [80, 84, 56]]), world=array([[-0.5, -0.5, -0.5],
+        #        [79.5, 83.5, 55.5]]), step=array([1, 1, 1]))
+
+        _layer_C_trial_by_trial_correlation_matrix = image_layer_dict['C_trial_by_trial_correlation_matrix']
+        _layer_C_trial_by_trial_correlation_matrix.extent
+
+        # _layer_z_scored_tuning_maps.extent
+        # Extent(data=array([[0, 0, 0],
+        #        [80, 84, 84]]), world=array([[-0.5, -0.5, -0.5],
+        #        [79.5, 83.5, 83.5]]), step=array([1, 1, 1]))
+
+        # array([0, 0, 0])
+
+
+        
+    Viewer properties:
+        # viewer.grid # GridCanvas(stride=1, shape=(-1, -1), enabled=True)
+        viewer.grid.enabled = True
+        https://napari.org/0.4.15/guides/preferences.html
+        https://forum.image.sc/t/dividing-the-display-in-the-viewer-window/42034
+        https://napari.org/stable/howtos/connecting_events.html
+        https://napari.org/stable/howtos/headless.html
+        https://forum.image.sc/t/napari-how-add-a-text-label-time-always-in-the-same-spot-in-viewer/52932/3
+        https://napari.org/stable/tutorials/segmentation/annotate_segmentation.html
+        https://napari.org/stable/gallery/add_labels.html
+        
+    """
+    # inputs: z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix
+    image_layer_dict: Dict = {}
+    assert layers_dict is not None
+
+    
+    for i, (a_name, layer_dict) in enumerate(layers_dict.items()):
+        img_data = layer_dict.pop('img_data').astype(float) # assumes integrated img_data in the layers dict
+        if viewer is None: #i == 0:
+            # viewer = napari.view_image(img_data) # rgb=True
+            viewer = napari.Viewer(title=title, axis_labels=axis_labels, **kwargs)
+
+        image_layer_dict[a_name] = viewer.add_image(img_data, **(dict(name=a_name)|layer_dict))
+
+    if axis_labels is not None:
+        viewer.dims.axis_labels = axis_labels # ('aclu', 'lap', 'xbin')
+    
+    viewer.grid.enabled = True # enables the grid layout of the data so adjacent data is displayed next to each other
+
+    # outputs: viewer, image_layer_dict
+    return viewer, image_layer_dict
