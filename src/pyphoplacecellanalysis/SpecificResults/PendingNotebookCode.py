@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 from typing import List, Optional, Dict, Tuple, Any, Union
+import matplotlib as mpl
 import napari
 from neuropy.analyses.placefields import PfND
 import numpy as np
@@ -16,6 +17,84 @@ from pyphocorehelpers.function_helpers import function_attributes
 # ==================================================================================================================== #
 # Usability/Conveninece Helpers                                                                                        #
 # ==================================================================================================================== #
+
+
+
+
+
+def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None):
+	""" 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
+
+	"""
+	from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
+	
+	# fig = plt.figure(layout="constrained", figsize=[9, 7], dpi=220, clear=True) # figsize=[Width, height] in inches.
+	fig = plt.figure(layout="tight", figsize=[9, 7], dpi=220, clear=True)
+	long_width_ratio = 1
+	ax_dict = fig.subplot_mosaic(
+		[
+			["ax_long_LR", "ax_long_RL"],
+			["ax_short_LR", "ax_short_RL"],
+		],
+		# set the height ratios between the rows
+		# set the width ratios between the columns
+		width_ratios=[long_width_ratio, long_width_ratio],
+		sharex=True, sharey=False,
+		gridspec_kw=dict(wspace=0.027, hspace=0.112) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+	)
+
+	# Get the colormap to use and set the bad color
+	cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
+	cmap.set_bad(color='black')
+
+	# Compute extents for imshow:
+	imshow_kwargs = {
+		'origin': 'lower',
+		# 'vmin': 0,
+		# 'vmax': 1,
+		'cmap': cmap,
+		'interpolation':'nearest',
+		'aspect':'auto',
+		'animated':True,
+	}
+
+	data_to_ax_mapping = dict(zip(['maze1_odd', 'maze1_even', 'maze2_odd', 'maze2_even'], ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"]))
+	for k, v in curr_aclu_z_scored_tuning_map_matrix_dict.items():
+		curr_ax = ax_dict[data_to_ax_mapping[k]]
+
+		# hist_data = np.random.randn(1_500)
+		# xbin_centers = np.arange(len(hist_data))+0.5
+		# ax_dict["ax_LONG_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, (-1.0 * curr_cell_normalized_tuning_curve), ax_dict["ax_LONG_pf_tuning_curve"], is_horizontal=True)
+
+		n_epochs:int = np.shape(v)[1]
+		epoch_indicies = np.arange(n_epochs)
+
+		# Posterior distribution heatmaps at each point.
+		xmin, xmax, ymin, ymax = (xbin[0], xbin[-1], epoch_indicies[0], epoch_indicies[-1])           
+		imshow_kwargs['extent'] = (xmin, xmax, ymin, ymax)
+
+		# plot heatmap:
+		curr_ax.set_xticklabels([])
+		curr_ax.set_yticklabels([])
+		fig, ax, im = visualize_heatmap(v.copy(), ax=curr_ax, title=f'{k}', defer_show=True, **imshow_kwargs) # defer_show so it doesn't produce a separate figure for each!
+		ax.set_xlim((xmin, xmax))
+		ax.set_ylim((ymin, ymax))
+
+		if point_dict is not None:
+			if k in point_dict:
+				# have points to plot
+				ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label='peak')
+
+	fig.tight_layout()
+
+	# ax_dict["ax_SHORT_activity_v_time"].plot([1, 2, 3, 3, 3, 2, 1, 0, 0, 0, 1, 2, 3, 3, 1, 2, 0, 0])
+	# ax_dict["ax_SHORT_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, curr_cell_normalized_tuning_curve, ax_dict["ax_SHORT_pf_tuning_curve"], is_horizontal=True)
+	# ax_dict["ax_SHORT_pf_tuning_curve"].set_xticklabels([])
+	# ax_dict["ax_SHORT_pf_tuning_curve"].set_yticklabels([])
+	# ax_dict["ax_SHORT_pf_tuning_curve"].set_box
+
+	return fig, ax_dict
+
 
 def pho_jointplot(*args, **kwargs):
 	""" wraps sns.jointplot to allow adding titles/axis labels/etc."""
@@ -163,7 +242,7 @@ def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_p
     return directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict
 
 
-def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, layers_dict=None):
+def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, layers_dict=None, **viewer_kwargs):
     """ Visualizes position binned activity matrix beside the trial-by-trial correlation matrix.
     
 
@@ -220,7 +299,7 @@ def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_tr
         img_data = layer_dict.pop('img_data').astype(float) # assumes integrated img_data in the layers dict
         if viewer is None: #i == 0:
             # viewer = napari.view_image(img_data) # rgb=True
-            viewer = napari.Viewer(title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin'))
+            viewer = napari.Viewer(**viewer_kwargs)
 
         image_layer_dict[a_name] = viewer.add_image(img_data, **(dict(name=a_name)|layer_dict))
 
@@ -286,6 +365,10 @@ class TrialByTrialActivity:
     aclu_to_matrix_IDX_map: Dict = field() # factory=Factory(dict)
     neuron_ids: NDArray = field()
     
+    @property 
+    def stability_score(self) -> NDArray:
+        return np.nanmedian(self.C_trial_by_trial_correlation_matrix, axis=(1,2))
+
 
 def compute_trial_by_trial_correlation_matrix(active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray) -> NDArray:
     """ 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
@@ -1719,11 +1802,15 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, s
             # Try H5 pattern:
             # matches '2024-01-04-kdiba_gor01_one_2006-6-08_14-26'
             day_date_with_variant_suffix_pattern = r"(?P<export_datetime_str>\d{4}-\d{2}-\d{2})_?(?P<variant_suffix>[^-_]*)-(?P<session_str>.+?)_(?P<export_file_type>[A-Za-z_]+)"
-            day_date_with_variant_suffix_match = re.match(day_date_with_variant_suffix_pattern, filename) # '2024-01-04-kdiba_gor01_one_2006-6-08_14-26'
+            day_date_with_variant_suffix_match = re.match(day_date_with_variant_suffix_pattern, filename) # '2024-01-04-kdiba_gor01_one_2006-6-08_14-26', 
             if day_date_with_variant_suffix_match is not None:
                 export_datetime_str, session_str, export_file_type = day_date_with_variant_suffix_match.group('export_datetime_str'), day_date_with_variant_suffix_match.group('session_str'), day_date_with_variant_suffix_match.group('export_file_type')
                 # parse the datetime from the export_datetime_str and convert it to datetime object
-                export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
+                try:
+                    export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
+                except ValueError as e:
+                    print(f'ERR: Could not parse date "{export_datetime_str}" of filename: "{filename}"') # 2024-01-18_GL_t_split_df
+                    return None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
         
             else:
                 print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
