@@ -738,6 +738,20 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             global_computation_results.computed_data['short_long_pf_overlap_analyses']
                 ['short_long_pf_overlap_analyses']['short_long_neurons_diff']
                 ['short_long_pf_overlap_analyses']['poly_overlap_df']
+                
+        Usage:
+        
+            ## Unwrapping `short_long_pf_overlap_analyses`:
+            short_long_pf_overlap_analyses: DynamicParameters = curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']
+            short_long_neurons_diff = short_long_pf_overlap_analyses['short_long_neurons_diff']
+            poly_overlap_df = short_long_pf_overlap_analyses['poly_overlap_df']
+            conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
+            conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
+            product_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
+            product_overlap_scalars_df = short_long_pf_overlap_analyses['product_overlap_scalars_df']
+            relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
+            relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+
         
         """
         if include_includelist is None:
