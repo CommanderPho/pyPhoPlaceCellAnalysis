@@ -23,87 +23,91 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 
 def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None):
-	""" 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
+    """ 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
 
-	"""
-	from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
-	
-	# fig = plt.figure(layout="constrained", figsize=[9, 7], dpi=220, clear=True) # figsize=[Width, height] in inches.
-	fig = plt.figure(layout="tight", figsize=[9, 7], dpi=220, clear=True)
-	long_width_ratio = 1
-	ax_dict = fig.subplot_mosaic(
-		[
-			["ax_long_LR", "ax_long_RL"],
-			["ax_short_LR", "ax_short_RL"],
-		],
-		# set the height ratios between the rows
-		# set the width ratios between the columns
-		width_ratios=[long_width_ratio, long_width_ratio],
-		sharex=True, sharey=False,
-		gridspec_kw=dict(wspace=0.027, hspace=0.112) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-	)
+    """
+    from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
+    
+    # fig = plt.figure(layout="constrained", figsize=[9, 7], dpi=220, clear=True) # figsize=[Width, height] in inches.
+    fig = plt.figure(layout="tight", figsize=[9, 7], dpi=220, clear=True)
+    long_width_ratio = 1
+    ax_dict = fig.subplot_mosaic(
+        [
+            ["ax_long_LR", "ax_long_RL"],
+            ["ax_short_LR", "ax_short_RL"],
+        ],
+        # set the height ratios between the rows
+        # set the width ratios between the columns
+        width_ratios=[long_width_ratio, long_width_ratio],
+        sharex=True, sharey=False,
+        gridspec_kw=dict(wspace=0.027, hspace=0.112) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+    )
 
-	# Get the colormap to use and set the bad color
-	cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
-	cmap.set_bad(color='black')
+    # Get the colormap to use and set the bad color
+    cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
+    cmap.set_bad(color='black')
 
-	# Compute extents for imshow:
-	imshow_kwargs = {
-		'origin': 'lower',
-		# 'vmin': 0,
-		# 'vmax': 1,
-		'cmap': cmap,
-		'interpolation':'nearest',
-		'aspect':'auto',
-		'animated':True,
-	}
+    # Compute extents for imshow:
+    imshow_kwargs = {
+        'origin': 'lower',
+        # 'vmin': 0,
+        # 'vmax': 1,
+        'cmap': cmap,
+        'interpolation':'nearest',
+        'aspect':'auto',
+        'animated':True,
+    }
 
-	data_to_ax_mapping = dict(zip(['maze1_odd', 'maze1_even', 'maze2_odd', 'maze2_even'], ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"]))
-	for k, v in curr_aclu_z_scored_tuning_map_matrix_dict.items():
-		curr_ax = ax_dict[data_to_ax_mapping[k]]
+    _old_data_to_ax_mapping = dict(zip(['maze1_odd', 'maze1_even', 'maze2_odd', 'maze2_even'], ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"]))
+    data_to_ax_mapping = dict(zip(['long_LR', 'long_RL', 'short_LR', 'short_RL'], ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"]))
 
-		# hist_data = np.random.randn(1_500)
-		# xbin_centers = np.arange(len(hist_data))+0.5
-		# ax_dict["ax_LONG_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, (-1.0 * curr_cell_normalized_tuning_curve), ax_dict["ax_LONG_pf_tuning_curve"], is_horizontal=True)
+    # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
 
-		n_epochs:int = np.shape(v)[1]
-		epoch_indicies = np.arange(n_epochs)
+    for k, v in curr_aclu_z_scored_tuning_map_matrix_dict.items():
+        curr_ax = ax_dict[data_to_ax_mapping[k]]
 
-		# Posterior distribution heatmaps at each point.
-		xmin, xmax, ymin, ymax = (xbin[0], xbin[-1], epoch_indicies[0], epoch_indicies[-1])           
-		imshow_kwargs['extent'] = (xmin, xmax, ymin, ymax)
+        # hist_data = np.random.randn(1_500)
+        # xbin_centers = np.arange(len(hist_data))+0.5
+        # ax_dict["ax_LONG_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, (-1.0 * curr_cell_normalized_tuning_curve), ax_dict["ax_LONG_pf_tuning_curve"], is_horizontal=True)
 
-		# plot heatmap:
-		curr_ax.set_xticklabels([])
-		curr_ax.set_yticklabels([])
-		fig, ax, im = visualize_heatmap(v.copy(), ax=curr_ax, title=f'{k}', defer_show=True, **imshow_kwargs) # defer_show so it doesn't produce a separate figure for each!
-		ax.set_xlim((xmin, xmax))
-		ax.set_ylim((ymin, ymax))
+        n_epochs:int = np.shape(v)[1]
+        epoch_indicies = np.arange(n_epochs)
 
-		if point_dict is not None:
-			if k in point_dict:
-				# have points to plot
-				ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label='peak')
+        # Posterior distribution heatmaps at each point.
+        xmin, xmax, ymin, ymax = (xbin[0], xbin[-1], epoch_indicies[0], epoch_indicies[-1])           
+        imshow_kwargs['extent'] = (xmin, xmax, ymin, ymax)
 
-	fig.tight_layout()
+        # plot heatmap:
+        curr_ax.set_xticklabels([])
+        curr_ax.set_yticklabels([])
+        fig, ax, im = visualize_heatmap(v.copy(), ax=curr_ax, title=f'{k}', defer_show=True, **imshow_kwargs) # defer_show so it doesn't produce a separate figure for each!
+        ax.set_xlim((xmin, xmax))
+        ax.set_ylim((ymin, ymax))
 
-	# ax_dict["ax_SHORT_activity_v_time"].plot([1, 2, 3, 3, 3, 2, 1, 0, 0, 0, 1, 2, 3, 3, 1, 2, 0, 0])
-	# ax_dict["ax_SHORT_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, curr_cell_normalized_tuning_curve, ax_dict["ax_SHORT_pf_tuning_curve"], is_horizontal=True)
-	# ax_dict["ax_SHORT_pf_tuning_curve"].set_xticklabels([])
-	# ax_dict["ax_SHORT_pf_tuning_curve"].set_yticklabels([])
-	# ax_dict["ax_SHORT_pf_tuning_curve"].set_box
+        if point_dict is not None:
+            if k in point_dict:
+                # have points to plot
+                ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label='peak')
 
-	return fig, ax_dict
+    fig.tight_layout()
+
+    # ax_dict["ax_SHORT_activity_v_time"].plot([1, 2, 3, 3, 3, 2, 1, 0, 0, 0, 1, 2, 3, 3, 1, 2, 0, 0])
+    # ax_dict["ax_SHORT_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, curr_cell_normalized_tuning_curve, ax_dict["ax_SHORT_pf_tuning_curve"], is_horizontal=True)
+    # ax_dict["ax_SHORT_pf_tuning_curve"].set_xticklabels([])
+    # ax_dict["ax_SHORT_pf_tuning_curve"].set_yticklabels([])
+    # ax_dict["ax_SHORT_pf_tuning_curve"].set_box
+
+    return fig, ax_dict
 
 
 def pho_jointplot(*args, **kwargs):
-	""" wraps sns.jointplot to allow adding titles/axis labels/etc."""
-	import seaborn as sns
-	title = kwargs.pop('title', None)
-	_out = sns.jointplot(*args, **kwargs)
-	if title is not None:
-		plt.suptitle(title)
-	return _out
+    """ wraps sns.jointplot to allow adding titles/axis labels/etc."""
+    import seaborn as sns
+    title = kwargs.pop('title', None)
+    _out = sns.jointplot(*args, **kwargs)
+    if title is not None:
+        plt.suptitle(title)
+    return _out
 
 
 def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
@@ -141,20 +145,20 @@ def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataF
 
 
 def pho_plothelper(data, **kwargs):
-	""" 2024-02-06 - Provides an interface like plotly's classes provide to extract keys fom DataFrame columns or dicts and generate kwargs to pass to a plotting function.
-		
+    """ 2024-02-06 - Provides an interface like plotly's classes provide to extract keys fom DataFrame columns or dicts and generate kwargs to pass to a plotting function.
+        
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import pho_plothelper
             extracted_value_kwargs = pho_plothelper(data=an_aclu_conv_overlap_output['valid_subset'], x='x', y='normalized_convolved_result')
             extracted_value_kwargs
 
-	"""
-	# data is a pd.DataFrame or Dict-like
-	extracted_value_kwargs = {}
-	for k,v in kwargs.items():
-		extracted_value_kwargs[k] = data[v]
-	# end up with `extracted_value_kwargs` containing the real values to plot.
-	return extracted_value_kwargs
+    """
+    # data is a pd.DataFrame or Dict-like
+    extracted_value_kwargs = {}
+    for k,v in kwargs.items():
+        extracted_value_kwargs[k] = data[v]
+    # end up with `extracted_value_kwargs` containing the real values to plot.
+    return extracted_value_kwargs
 # ==================================================================================================================== #
 # 2024-02-02 - Napari Export Helpers - Batch export all images                                                         #
 # ==================================================================================================================== #
