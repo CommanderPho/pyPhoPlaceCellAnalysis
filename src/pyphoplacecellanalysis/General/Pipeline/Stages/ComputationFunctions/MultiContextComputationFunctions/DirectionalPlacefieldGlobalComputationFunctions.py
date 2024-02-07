@@ -184,7 +184,7 @@ class TrackTemplates(HDFMixin):
             # xbin_centers = deepcopy(short_dir_decoder.xbin_centers)
 
             # shift = find_shift(long_dir_pf1D[:,i], short_dir_pf1D[:,i])
-            shift = np.array([find_shift(long_dir_pf1D[:,i], short_dir_pf1D[:,i]) for i in np.arange(long_dir_decoder.num_neurons)])
+            shift = np.array([find_shift(long_dir_pf1D[i,:], short_dir_pf1D[i,:]) for i in np.arange(long_dir_decoder.num_neurons)])
             shift_x = shift.astype(float) * float(long_dir_decoder.pf.bin_info['xstep']) # In position coordinates
             
             return shift_x, shift, neuron_ids
