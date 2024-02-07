@@ -4,10 +4,13 @@ from attrs import define, field, Factory, asdict, astuple
 from functools import wraps
 from copy import deepcopy
 from collections import namedtuple
-from typing import Iterable, List, Dict, Optional, Tuple
 from pathlib import Path
 from datetime import datetime, date, timedelta
 
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.function_helpers import function_attributes
@@ -31,7 +34,6 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResu
 
 import scipy.stats
 from scipy import ndimage
-from nptyping import NDArray
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
@@ -120,10 +122,17 @@ class TrackTemplates(HDFMixin):
         return {a_decoder_name:scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=self.rank_method) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
     
     @property
-    def decoder_aclu_peak_rank_dict_dict(self) -> Dict[str, Dict[int, float]]:
+    def decoder_aclu_peak_rank_dict_dict(self) -> Dict[str, Dict[types.aclu_index, float]]:
         """ a Dict (one for each decoder) of aclu-to-rank maps for each decoder (independently) """
         return {a_decoder_name:dict(zip(a_decoder.pf.ratemap.neuron_ids, scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=self.rank_method))) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
     
+    @property
+    def decoder_normalized_tuning_curves_dict_dict(self) -> Dict[str, Dict[types.aclu_index, NDArray]]:
+        """ a Dict (one for each decoder) of aclu-to-1D normalized placefields for each decoder (independently) """
+        return {a_name:a_decoder.pf.normalized_tuning_curves_dict for a_name, a_decoder in self.get_decoders_dict().items()}
+            
+
+
 
     @property    
     def merged_decoders_aclu_peak_location_df(self) -> pd.DataFrame:
