@@ -22,27 +22,33 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 
 
-def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None):
+def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None, ax_dict=None):
     """ 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
 
     """
     from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
     
-    # fig = plt.figure(layout="constrained", figsize=[9, 7], dpi=220, clear=True) # figsize=[Width, height] in inches.
-    fig = plt.figure(layout="tight", figsize=[9, 7], dpi=220, clear=True)
-    long_width_ratio = 1
-    ax_dict = fig.subplot_mosaic(
-        [
-            ["ax_long_LR", "ax_long_RL"],
-            ["ax_short_LR", "ax_short_RL"],
-        ],
-        # set the height ratios between the rows
-        # set the width ratios between the columns
-        width_ratios=[long_width_ratio, long_width_ratio],
-        sharex=True, sharey=False,
-        gridspec_kw=dict(wspace=0.027, hspace=0.112) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-    )
-
+    if ax_dict is None:
+        # fig = plt.figure(layout="constrained", figsize=[9, 7], dpi=220, clear=True) # figsize=[Width, height] in inches.
+        fig = plt.figure(layout="tight", figsize=[9, 7], dpi=220, clear=True)
+        long_width_ratio = 1
+        ax_dict = fig.subplot_mosaic(
+            [
+                ["ax_long_LR", "ax_long_RL"],
+                ["ax_short_LR", "ax_short_RL"],
+            ],
+            # set the height ratios between the rows
+            # set the width ratios between the columns
+            width_ratios=[long_width_ratio, long_width_ratio],
+            sharex=True, sharey=False,
+            gridspec_kw=dict(wspace=0.027, hspace=0.112) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        )
+    else:
+        # figure already exists, reuse the axes
+        assert len(ax_dict) == 4
+        assert list(ax_dict.keys()) == ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"]
+        
+        
     # Get the colormap to use and set the bad color
     cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
     cmap.set_bad(color='black')
@@ -56,6 +62,7 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
         'interpolation':'nearest',
         'aspect':'auto',
         'animated':True,
+        'show_xticks':False,
     }
 
     _old_data_to_ax_mapping = dict(zip(['maze1_odd', 'maze1_even', 'maze2_odd', 'maze2_even'], ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"]))
@@ -65,7 +72,8 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
 
     for k, v in curr_aclu_z_scored_tuning_map_matrix_dict.items():
         curr_ax = ax_dict[data_to_ax_mapping[k]]
-
+        curr_ax.clear()
+        
         # hist_data = np.random.randn(1_500)
         # xbin_centers = np.arange(len(hist_data))+0.5
         # ax_dict["ax_LONG_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, (-1.0 * curr_cell_normalized_tuning_curve), ax_dict["ax_LONG_pf_tuning_curve"], is_horizontal=True)
@@ -87,7 +95,7 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
         if point_dict is not None:
             if k in point_dict:
                 # have points to plot
-                ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label='peak')
+                ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label=f'{k}_peak')
 
     fig.tight_layout()
 
