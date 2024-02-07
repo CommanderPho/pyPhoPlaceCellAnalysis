@@ -133,23 +133,42 @@ class TrackTemplates(HDFMixin):
             
 
 
+    @function_attributes(short_name=None, tags=['peak', 'multi-peak'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-07 17:45', related_items=[])
+    def get_decoders_aclu_peak_location_df(self, peak_mode='peaks', **find_peaks_kwargs) -> pd.DataFrame:
+        """ 2024-02-07 - returns a single dataframe with all of the continuous peaks for each of the four decoders in it.
 
-    @property    
-    def merged_decoders_aclu_peak_location_df(self) -> pd.DataFrame:
-        """ returns a single dataframe with all of the continuous peaks for each of the four decoders in it.
-        
+        I have four dataframes, each containing the common columns ['aclu', 'series_idx', 'subpeak_idx'] and I'd like to the 'pos' column from each and rename it by prefixing it with one of four strings (provided in a list). The resultant dataframe should have every unique entry of ['aclu', 'series_idx', 'subpeak_idx'] from any of the dataframes and have four columns with their values taken from each of the dataframes. If an entry doesn't exist in one of the dataframes, pd.NA should be used.
+
         """
-        from functools import reduce
-        
-        decoder_aclu_peak_location_df_list = [pd.DataFrame({'aclu':neuron_IDs, f'{a_decoder_name}_peak':peak_locations}) for a_decoder_name, neuron_IDs, peak_locations in zip(self.get_decoder_names(), self.decoder_neuron_IDs_list, self.decoder_peak_location_list)]
-        decoder_aclu_peak_location_df_merged: pd.DataFrame = reduce(lambda  left,right: pd.merge(left,right,on=['aclu'], how='outer'), decoder_aclu_peak_location_df_list).sort_values(['aclu']).reset_index(drop=True)
+        from pyphocorehelpers.indexing_helpers import reorder_columns_relative
+
+        assert peak_mode == 'peaks', f"2024-02-07 - this function was added to get real peaks, not the center-of-mass values which are useless for remapping info. Only 'peaks' mode is supported."
+        index_column_names = ['aclu', 'series_idx', 'subpeak_idx'] # the columns present in every df to merge on
+        included_columns = ['pos', 'peak_heights'] # the columns of interest that you want in the final dataframe.
+        included_columns_renamed = dict(zip(included_columns, ['peak', 'peak_height'])) # change the initial column names. Like change 'pos' column to 'peak' in the final name
+        decoder_peaks_results_dfs = [a_decoder.pf.ratemap.get_tuning_curve_peak_df(peak_mode=peak_mode, **find_peaks_kwargs) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
+        prefix_names = [f'{a_decoder_name}_' for a_decoder_name in self.get_decoder_names()]
+        all_included_columns = index_column_names + included_columns # Used to filter out the unwanted columns from the output
+        rename_list_fn = lambda a_prefix: {a_col_name:f"{a_prefix}{included_columns_renamed[a_col_name]}" for a_col_name in included_columns}
+
+        # rename 'pos' column in each dataframe and then reduce to perform cumulative outer merge
+        decoder_aclu_peak_location_df_merged: pd.DataFrame = decoder_peaks_results_dfs[0][all_included_columns].rename(columns=rename_list_fn(prefix_names[0]))
+        for df, a_prefix in zip(decoder_peaks_results_dfs[1:], prefix_names[1:]):
+            decoder_aclu_peak_location_df_merged = pd.merge(decoder_aclu_peak_location_df_merged, df[all_included_columns].rename(columns=rename_list_fn(a_prefix)), on=index_column_names, how='outer')
+
+        ## Move the "height" columns to the end
+        decoder_aclu_peak_location_df_merged = reorder_columns_relative(decoder_aclu_peak_location_df_merged, column_names=list(filter(lambda column: column.endswith('_peak_height'), decoder_aclu_peak_location_df_merged.columns)), relative_mode='end')
+        decoder_aclu_peak_location_df_merged = decoder_aclu_peak_location_df_merged.sort_values(['aclu', 'series_idx', 'subpeak_idx']).reset_index(drop=True)
+
         # Add differences:
         decoder_aclu_peak_location_df_merged['LR_peak_diff'] = decoder_aclu_peak_location_df_merged['long_LR_peak'] - decoder_aclu_peak_location_df_merged['short_LR_peak']
         decoder_aclu_peak_location_df_merged['RL_peak_diff'] = decoder_aclu_peak_location_df_merged['long_RL_peak'] - decoder_aclu_peak_location_df_merged['short_RL_peak']
         return decoder_aclu_peak_location_df_merged
         
 
+    ## WARNING 2024-02-07 - The following all use .peak_tuning_curve_center_of_masses: .get_decoder_aclu_peak_maps, get_decoder_aclu_peak_map_dict, get_decoder_aclu_peak_map_dict
 
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
     def get_long_short_decoder_shifts(self):
         """ uses `find_shift` """
 
@@ -176,7 +195,7 @@ class TrackTemplates(HDFMixin):
 
         return (LR_shift_x, LR_shift, LR_neuron_ids), (RL_shift_x, RL_shift, RL_neuron_ids)
     
-
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
     def get_decoder_aclu_peak_maps(self) -> DirectionalDecodersTuple:
         """ returns a tuple of dicts, each containing a mapping between aclu:peak_pf_x for a given decoder. 
          
@@ -190,6 +209,7 @@ class TrackTemplates(HDFMixin):
         # return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_locations))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
         return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_tuning_curve_center_of_masses))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
 
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
     def get_decoder_aclu_peak_map_dict(self) -> Dict[str, Dict]:
         return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps()))
 
