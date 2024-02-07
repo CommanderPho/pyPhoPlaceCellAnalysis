@@ -133,7 +133,7 @@ class TrackTemplates(HDFMixin):
         from functools import reduce
         
         decoder_aclu_peak_location_df_list = [pd.DataFrame({'aclu':neuron_IDs, f'{a_decoder_name}_peak':peak_locations}) for a_decoder_name, neuron_IDs, peak_locations in zip(self.get_decoder_names(), self.decoder_neuron_IDs_list, self.decoder_peak_location_list)]
-        decoder_aclu_peak_location_df_merged: pd.DataFrame = reduce(lambda  left,right: pd.merge(left,right,on=['aclu'], how='outer'), decoder_aclu_peak_location_df_list).sort_values(['aclu']) .reset_index(drop=True)
+        decoder_aclu_peak_location_df_merged: pd.DataFrame = reduce(lambda  left,right: pd.merge(left,right,on=['aclu'], how='outer'), decoder_aclu_peak_location_df_list).sort_values(['aclu']).reset_index(drop=True)
         # Add differences:
         decoder_aclu_peak_location_df_merged['LR_peak_diff'] = decoder_aclu_peak_location_df_merged['long_LR_peak'] - decoder_aclu_peak_location_df_merged['short_LR_peak']
         decoder_aclu_peak_location_df_merged['RL_peak_diff'] = decoder_aclu_peak_location_df_merged['long_RL_peak'] - decoder_aclu_peak_location_df_merged['short_RL_peak']
