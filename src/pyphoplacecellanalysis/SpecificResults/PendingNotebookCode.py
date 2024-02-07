@@ -22,7 +22,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 
 
-def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None, ax_dict=None, tuning_curves_dict=None, include_tuning_curves=False):
+def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None, ax_dict=None, extra_decoder_values_dict=None, tuning_curves_dict=None, include_tuning_curves=False):
     """ 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
 
     """
@@ -121,11 +121,6 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
         ax.set_xlim((xmin, xmax))
         ax.set_ylim((ymin, ymax))
 
-        if point_dict is not None:
-            if k in point_dict:
-                # have points to plot
-                ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label=f'{k}_peak')
-
 
         if include_tuning_curves:
             tuning_curve = tuning_curves_dict[k]
@@ -136,11 +131,22 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
                 # plot curve heatmap:
                 curr_curve_ax.set_xticklabels([])
                 curr_curve_ax.set_yticklabels([])
+                ymin, ymax = 0, 1
                 imshow_kwargs['extent'] = (xmin, xmax, 0, 1)
                 fig, curr_curve_ax, im = visualize_heatmap(tuning_curve.copy(), ax=curr_curve_ax, title=f'{k}', defer_show=True, **imshow_kwargs) # defer_show so it doesn't produce a separate figure for each!
                 curr_curve_ax.set_xlim((xmin, xmax))
                 curr_curve_ax.set_ylim((0, 1))
-        
+                
+            point_ax = curr_curve_ax # draw the lines on the tuning curve axis
+            
+        else:
+            point_ax = ax
+
+        if point_dict is not None:
+            if k in point_dict:
+                # have points to plot
+                point_ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label=f'{k}_peak')
+                
 
     fig.tight_layout()
 
