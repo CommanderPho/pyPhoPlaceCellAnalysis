@@ -22,33 +22,62 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 
 
-def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None, ax_dict=None):
+def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None, ax_dict=None, tuning_curves_dict=None, include_tuning_curves=False):
     """ 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
 
     """
     from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
+    if tuning_curves_dict is None:
+        assert include_tuning_curves == False
     
     if ax_dict is None:
-        # fig = plt.figure(layout="constrained", figsize=[9, 7], dpi=220, clear=True) # figsize=[Width, height] in inches.
-        fig = plt.figure(layout="tight", figsize=[9, 7], dpi=220, clear=True)
-        long_width_ratio = 1
-        ax_dict = fig.subplot_mosaic(
-            [
-                ["ax_long_LR", "ax_long_RL"],
-                ["ax_short_LR", "ax_short_RL"],
-            ],
-            # set the height ratios between the rows
-            # set the width ratios between the columns
-            width_ratios=[long_width_ratio, long_width_ratio],
-            sharex=True, sharey=False,
-            gridspec_kw=dict(wspace=0.027, hspace=0.112) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-        )
+        if not include_tuning_curves:
+            # fig = plt.figure(layout="constrained", figsize=[9, 7], dpi=220, clear=True) # figsize=[Width, height] in inches.
+            fig = plt.figure(layout="tight", figsize=[8, 7], dpi=220, clear=True)
+            long_width_ratio = 1
+            ax_dict = fig.subplot_mosaic(
+                [
+                    ["ax_long_LR", "ax_long_RL"],
+                    ["ax_short_LR", "ax_short_RL"],
+                ],
+                # set the height ratios between the rows
+                # set the width ratios between the columns
+                width_ratios=[long_width_ratio, long_width_ratio],
+                sharex=True, sharey=False,
+                gridspec_kw=dict(wspace=0.027, hspace=0.112) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+            )
+        else:
+            # tuning curves mode:
+            fig = plt.figure(layout="tight", figsize=[9, 7], dpi=220, clear=True)
+            long_width_ratio = 1
+            ax_dict = fig.subplot_mosaic(
+                [
+                    ["ax_long_LR_curve", "ax_long_RL_curve"],
+                    ["ax_long_LR", "ax_long_RL"],
+                    ["ax_short_LR", "ax_short_RL"],
+                    ["ax_short_LR_curve", "ax_short_RL_curve"],
+                ],
+                # set the height ratios between the rows
+                # set the width ratios between the columns
+                width_ratios=[long_width_ratio, long_width_ratio],
+                height_ratios=[1, 7, 7, 1], # tuning curves are smaller than laps
+                sharex=True, sharey=False,
+                gridspec_kw=dict(wspace=0.027, hspace=0.112) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+            )
+            curve_ax_names = ["ax_long_LR_curve", "ax_long_RL_curve", "ax_short_LR_curve", "ax_short_RL_curve"]
+
     else:
-        # figure already exists, reuse the axes
-        assert len(ax_dict) == 4
-        assert list(ax_dict.keys()) == ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"]
+        if not include_tuning_curves:
+            # figure already exists, reuse the axes
+            assert len(ax_dict) == 4
+            assert list(ax_dict.keys()) == ["ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL"]
+        else:
+            # tuning curves mode:
+            assert len(ax_dict) == 8
+            assert list(ax_dict.keys()) == ["ax_long_LR_curve", "ax_long_RL_curve", "ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL", "ax_short_LR_curve", "ax_short_RL_curve"]
         
-        
+
+    
     # Get the colormap to use and set the bad color
     cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
     cmap.set_bad(color='black')
@@ -96,6 +125,22 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
             if k in point_dict:
                 # have points to plot
                 ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label=f'{k}_peak')
+
+
+        if include_tuning_curves:
+            tuning_curve = tuning_curves_dict[k]
+            if tuning_curve is not None:
+                curr_curve_ax = ax_dict[f"{data_to_ax_mapping[k]}_curve"]
+                curr_curve_ax.clear()
+                
+                # plot curve heatmap:
+                curr_curve_ax.set_xticklabels([])
+                curr_curve_ax.set_yticklabels([])
+                imshow_kwargs['extent'] = (xmin, xmax, 0, 1)
+                fig, curr_curve_ax, im = visualize_heatmap(tuning_curve.copy(), ax=curr_curve_ax, title=f'{k}', defer_show=True, **imshow_kwargs) # defer_show so it doesn't produce a separate figure for each!
+                curr_curve_ax.set_xlim((xmin, xmax))
+                curr_curve_ax.set_ylim((0, 1))
+        
 
     fig.tight_layout()
 
