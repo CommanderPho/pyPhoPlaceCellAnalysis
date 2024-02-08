@@ -102,7 +102,11 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
 
     # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
 
+    
     for k, v in curr_aclu_z_scored_tuning_map_matrix_dict.items():
+        # is_first_item = (k == list(curr_aclu_z_scored_tuning_map_matrix_dict.keys())[0])
+        is_last_item = (k == list(curr_aclu_z_scored_tuning_map_matrix_dict.keys())[-1])
+        
         curr_ax = ax_dict[data_to_ax_mapping[k]]
         curr_ax.clear()
         
@@ -132,7 +136,10 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
 
             if tuning_curve is not None:
                 # plot curve heatmap:
-                curr_curve_ax.set_xticklabels([])
+                if not is_last_item:
+                    curr_curve_ax.set_xticklabels([])
+                    # Leave the position x-ticks on for the last item
+
                 curr_curve_ax.set_yticklabels([])
                 ymin, ymax = 0, 1
                 imshow_kwargs['extent'] = (xmin, xmax, 0, 1)
@@ -438,76 +445,154 @@ class TrialByTrialActivity:
     @property 
     def stability_score(self) -> NDArray:
         return np.nanmedian(self.C_trial_by_trial_correlation_matrix, axis=(1,2))
-
-
-def compute_trial_by_trial_correlation_matrix(active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray) -> NDArray:
-    """ 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
     
-    Returns:
-        C_trial_by_trial_correlation_matrix: .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
-        z_scored_tuning_map_matrix
-
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_trial_by_trial_correlation_matrix
-
-        C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix = compute_trial_by_trial_correlation_matrix(active_pf_dt, occupancy_weighted_tuning_maps_matrix=occupancy_weighted_tuning_maps_matrix)
-
-    """
-    neuron_ids = deepcopy(np.array(active_pf_dt.ratemap.neuron_ids))
-    n_aclus = len(neuron_ids)
-    n_xbins = len(active_pf_dt.xbin_centers)
-
-    assert np.shape(occupancy_weighted_tuning_maps_matrix)[1] == n_aclus
-    assert np.shape(occupancy_weighted_tuning_maps_matrix)[2] == n_xbins
-
-    epsilon_value: float = 1e-12
-    # Assuming 'occupancy_weighted_tuning_maps_matrix' is your dataset with shape (trials, positions)
-    # Z-score along the position axis (axis=1)
-    position_axis_idx: int = 2
-    z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / ((np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True))+epsilon_value)
-
-    # trial-by-trial correlation matrix C
-    M = float(n_xbins)
-    C_list = []
-    for i, aclu in enumerate(neuron_ids):
-        A_i = np.squeeze(z_scored_tuning_map_matrix[:,i,:])
-        C_i = (1/(M-1)) * (A_i @ A_i.T) # Perform matrix multiplication using the @ operator
-        # C_i.shape # (n_epochs, n_epochs) - (84, 84) - gives the correlation between each epoch and the others
-        C_list.append(C_i)
-    # occupancy_weighted_tuning_maps_matrix
-
-    C_trial_by_trial_correlation_matrix = np.stack(C_list, axis=0) # .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
-    # outputs: C_trial_by_trial_correlation_matrix
-
-    # n_laps: int = len(laps_unique_ids)
-    aclu_to_matrix_IDX_map = dict(zip(neuron_ids, np.arange(n_aclus)))
-
-    return C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map
-
-
-def directional_compute_trial_by_trial_correlation_matrix(active_pf_dt, directional_lap_epochs_dict) -> Dict[str,TrialByTrialActivity]:
-    """ 
+    @property 
+    def aclu_to_stability_score_dict(self) -> Dict[int, NDArray]:
+        return dict(zip(self.neuron_ids, self.stability_score))
     
-    2024-02-02 - 10pm - Have global version working but want seperate directional versions. Seperately do `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`:
-    
-    """
-    directional_active_lap_pf_results_dicts: Dict[str,TrialByTrialActivity] = {}
 
-    # Seperately do (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj):
-    for an_epoch_name, active_laps_epoch in directional_lap_epochs_dict.items():
-        active_laps_df = deepcopy(active_laps_epoch.to_dataframe())
-        active_lap_pf_results_dict = compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=active_laps_df)
-        # Unpack the variables:
-        historical_snapshots = active_lap_pf_results_dict['historical_snapshots']
-        occupancy_weighted_tuning_maps_matrix = active_lap_pf_results_dict['occupancy_weighted_tuning_maps'] # .shape: (n_epochs, n_aclus, n_xbins) - (84, 80, 56)
-        # 2024-02-02 - Trial-by-trial Correlation Matrix C
-        C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map = compute_trial_by_trial_correlation_matrix(active_pf_dt, occupancy_weighted_tuning_maps_matrix=occupancy_weighted_tuning_maps_matrix)
-        neuron_ids = np.array(list(aclu_to_matrix_IDX_map.keys()))
+
+    @classmethod
+    def compute_spatial_binned_activity_via_pfdt(cls, active_pf_dt: PfND_TimeDependent, epochs_df: pd.DataFrame):
+        """ 2024-02-01 - Use pfND_dt to compute spatially binned activity during the epochs.
         
-        # directional_active_lap_pf_results_dicts[an_epoch_name] = (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) # currently discards: occupancy_weighted_tuning_maps_matrix, historical_snapshots, active_lap_pf_results_dict, active_laps_df
-        directional_active_lap_pf_results_dicts[an_epoch_name] = TrialByTrialActivity(active_epochs_df=active_laps_df, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map=aclu_to_matrix_IDX_map, neuron_ids=neuron_ids)
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_spatial_binned_activity_via_pfdt
+            
+            if 'pf1D_dt' not in curr_active_pipeline.computation_results[global_epoch_name].computed_data:
+                # if `KeyError: 'pf1D_dt'` recompute
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+
+            active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
+            active_pf_2D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt'])
+
+
+            laps_df = deepcopy(global_any_laps_epochs_obj.to_dataframe())
+            n_laps = len(laps_df)
+
+            active_pf_dt: PfND_TimeDependent = deepcopy(active_pf_1D_dt)
+            # active_pf_dt = deepcopy(active_pf_2D_dt) # 2D
+            historical_snapshots = compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=laps_df)
+
+        """
+        use_pf_dt_obj = False
+
+        if isinstance(epochs_df, pd.DataFrame):
+            # dataframes are treated weird by PfND_dt, convert to basic numpy array of shape (n_epochs, 2)
+            time_intervals = epochs_df[['start', 'stop']].to_numpy() # .shape # (n_epochs, 2)
+        else:
+            time_intervals = epochs_df # assume already a numpy array
+            
+        assert np.shape(time_intervals)[-1] == 2
+        n_epochs: int = np.shape(time_intervals)[0]
+            
+        ## Entirely independent computations for binned_times:
+        if use_pf_dt_obj:
+            active_pf_dt.reset()
+
+        if not use_pf_dt_obj:
+            historical_snapshots = {} # build a dict<float:PlacefieldSnapshot>
+
+        for start_t, end_t in time_intervals:
+            ## Inline version that reuses active_pf_1D_dt directly:
+            if use_pf_dt_obj:
+                # active_pf_1D_dt.update(end_t, should_snapshot=True) # use this because it correctly integrates over [0, end_t] instead of [start_t, end_t]
+                # active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=True, should_snapshot=True)
+                historical_snapshots[float(end_t)] = active_pf_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=False, should_snapshot=False) # Integrates each [start_t, end_t] independently
+            else:
+                # Static version that calls PfND_TimeDependent.perform_time_range_computation(...) itself using just the computed variables of `active_pf_1D_dt`:
+                historical_snapshots[float(end_t)] = PfND_TimeDependent.perform_time_range_computation(active_pf_dt.all_time_filtered_spikes_df, active_pf_dt.all_time_filtered_pos_df, position_srate=active_pf_dt.position_srate,
+                                                                            xbin=active_pf_dt.xbin, ybin=active_pf_dt.ybin,
+                                                                            start_time=start_t, end_time=end_t,
+                                                                            included_neuron_IDs=active_pf_dt.included_neuron_IDs, active_computation_config=active_pf_dt.config, override_smooth=active_pf_dt.smooth)
+
+        # {1.9991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x16c2b74fb20>, 2.4991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x168acfb3bb0>, ...}
+        if use_pf_dt_obj:
+            historical_snapshots = active_pf_dt.historical_snapshots
+
+        epoch_pf_results_dict = {'historical_snapshots': historical_snapshots}
+        epoch_pf_results_dict['num_position_samples_occupancy'] = np.stack([placefield_snapshot.num_position_samples_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+        epoch_pf_results_dict['seconds_occupancy'] = np.stack([placefield_snapshot.seconds_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+        epoch_pf_results_dict['normalized_occupancy'] = np.stack([placefield_snapshot.normalized_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+        epoch_pf_results_dict['spikes_maps_matrix'] = np.stack([placefield_snapshot.spikes_maps_matrix for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+        epoch_pf_results_dict['occupancy_weighted_tuning_maps'] = np.stack([placefield_snapshot.occupancy_weighted_tuning_maps_matrix for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
+        # active_lap_pf_results_dict['snapshot_occupancy_weighted_tuning_maps'] = np.stack([placefield_snapshot.occupancy_weighted_tuning_maps_matrix for placefield_snapshot in active_lap_pf_results_dict['historical_snapshots'].values()])
+
+        # len(historical_snapshots)
+        return epoch_pf_results_dict
+
+
+    @classmethod
+    def compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray):
+        """ 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
         
-    return directional_active_lap_pf_results_dicts
+        Returns:
+            C_trial_by_trial_correlation_matrix: .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
+            z_scored_tuning_map_matrix
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_trial_by_trial_correlation_matrix
+
+            C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix = compute_trial_by_trial_correlation_matrix(active_pf_dt, occupancy_weighted_tuning_maps_matrix=occupancy_weighted_tuning_maps_matrix)
+
+        """
+        neuron_ids = deepcopy(np.array(active_pf_dt.ratemap.neuron_ids))
+        n_aclus = len(neuron_ids)
+        n_xbins = len(active_pf_dt.xbin_centers)
+
+        assert np.shape(occupancy_weighted_tuning_maps_matrix)[1] == n_aclus
+        assert np.shape(occupancy_weighted_tuning_maps_matrix)[2] == n_xbins
+
+        epsilon_value: float = 1e-12
+        # Assuming 'occupancy_weighted_tuning_maps_matrix' is your dataset with shape (trials, positions)
+        # Z-score along the position axis (axis=1)
+        position_axis_idx: int = 2
+        z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / ((np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True))+epsilon_value)
+
+        # trial-by-trial correlation matrix C
+        M = float(n_xbins)
+        C_list = []
+        for i, aclu in enumerate(neuron_ids):
+            A_i = np.squeeze(z_scored_tuning_map_matrix[:,i,:])
+            C_i = (1/(M-1)) * (A_i @ A_i.T) # Perform matrix multiplication using the @ operator
+            # C_i.shape # (n_epochs, n_epochs) - (84, 84) - gives the correlation between each epoch and the others
+            C_list.append(C_i)
+        # occupancy_weighted_tuning_maps_matrix
+
+        C_trial_by_trial_correlation_matrix = np.stack(C_list, axis=0) # .shape (n_aclus, n_epochs, n_epochs) - (80, 84, 84)
+        # outputs: C_trial_by_trial_correlation_matrix
+
+        # n_laps: int = len(laps_unique_ids)
+        aclu_to_matrix_IDX_map = dict(zip(neuron_ids, np.arange(n_aclus)))
+
+        return C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map
+
+    ## MAIN CALL:
+    @classmethod
+    def directional_compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, directional_lap_epochs_dict) -> Dict[str, "TrialByTrialActivity"]:
+        """ 
+        
+        2024-02-02 - 10pm - Have global version working but want seperate directional versions. Seperately do `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`:
+        
+        """
+        directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = {}
+
+        # Seperately do (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj):
+        for an_epoch_name, active_laps_epoch in directional_lap_epochs_dict.items():
+            active_laps_df = deepcopy(active_laps_epoch.to_dataframe())
+            active_lap_pf_results_dict = cls.compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=active_laps_df)
+            # Unpack the variables:
+            historical_snapshots = active_lap_pf_results_dict['historical_snapshots']
+            occupancy_weighted_tuning_maps_matrix = active_lap_pf_results_dict['occupancy_weighted_tuning_maps'] # .shape: (n_epochs, n_aclus, n_xbins) - (84, 80, 56)
+            # 2024-02-02 - Trial-by-trial Correlation Matrix C
+            C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map = cls.compute_trial_by_trial_correlation_matrix(active_pf_dt, occupancy_weighted_tuning_maps_matrix=occupancy_weighted_tuning_maps_matrix)
+            neuron_ids = np.array(list(aclu_to_matrix_IDX_map.keys()))
+            
+            # directional_active_lap_pf_results_dicts[an_epoch_name] = (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) # currently discards: occupancy_weighted_tuning_maps_matrix, historical_snapshots, active_lap_pf_results_dict, active_laps_df
+            directional_active_lap_pf_results_dicts[an_epoch_name] = TrialByTrialActivity(active_epochs_df=active_laps_df, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map=aclu_to_matrix_IDX_map, neuron_ids=neuron_ids)
+            
+        return directional_active_lap_pf_results_dicts
 
 
 # ==================================================================================================================== #
@@ -790,74 +875,7 @@ def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_e
     # output: split_spikes_df_dict
     return position_binned_activity_matr_dict, split_spikes_df_dict, (neuron_id_to_new_IDX_map, lap_id_to_matrix_IDX_map)
 
-def compute_spatial_binned_activity_via_pfdt(active_pf_dt: PfND_TimeDependent, epochs_df: pd.DataFrame):
-    """ 2024-02-01 - Use pfND_dt to compute spatially binned activity during the epochs.
-    
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_spatial_binned_activity_via_pfdt
-          
-        if 'pf1D_dt' not in curr_active_pipeline.computation_results[global_epoch_name].computed_data:
-            # if `KeyError: 'pf1D_dt'` recompute
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
-
-        active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
-        active_pf_2D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt'])
-
-
-        laps_df = deepcopy(global_any_laps_epochs_obj.to_dataframe())
-        n_laps = len(laps_df)
-
-        active_pf_dt: PfND_TimeDependent = deepcopy(active_pf_1D_dt)
-        # active_pf_dt = deepcopy(active_pf_2D_dt) # 2D
-        historical_snapshots = compute_spatial_binned_activity_via_pfdt(active_pf_dt=active_pf_dt, epochs_df=laps_df)
-
-    """
-    use_pf_dt_obj = False
-
-    if isinstance(epochs_df, pd.DataFrame):
-        # dataframes are treated weird by PfND_dt, convert to basic numpy array of shape (n_epochs, 2)
-        time_intervals = epochs_df[['start', 'stop']].to_numpy() # .shape # (n_epochs, 2)
-    else:
-        time_intervals = epochs_df # assume already a numpy array
-        
-    assert np.shape(time_intervals)[-1] == 2
-    n_epochs: int = np.shape(time_intervals)[0]
-        
-    ## Entirely independent computations for binned_times:
-    if use_pf_dt_obj:
-        active_pf_dt.reset()
-
-    if not use_pf_dt_obj:
-        historical_snapshots = {} # build a dict<float:PlacefieldSnapshot>
-
-    for start_t, end_t in time_intervals:
-        ## Inline version that reuses active_pf_1D_dt directly:
-        if use_pf_dt_obj:
-            # active_pf_1D_dt.update(end_t, should_snapshot=True) # use this because it correctly integrates over [0, end_t] instead of [start_t, end_t]
-            # active_pf_1D_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=True, should_snapshot=True)
-            historical_snapshots[float(end_t)] = active_pf_dt.complete_time_range_computation(start_t, end_t, assign_results_to_member_variables=False, should_snapshot=False) # Integrates each [start_t, end_t] independently
-        else:
-            # Static version that calls PfND_TimeDependent.perform_time_range_computation(...) itself using just the computed variables of `active_pf_1D_dt`:
-            historical_snapshots[float(end_t)] = PfND_TimeDependent.perform_time_range_computation(active_pf_dt.all_time_filtered_spikes_df, active_pf_dt.all_time_filtered_pos_df, position_srate=active_pf_dt.position_srate,
-                                                                        xbin=active_pf_dt.xbin, ybin=active_pf_dt.ybin,
-                                                                        start_time=start_t, end_time=end_t,
-                                                                        included_neuron_IDs=active_pf_dt.included_neuron_IDs, active_computation_config=active_pf_dt.config, override_smooth=active_pf_dt.smooth)
-
-    # {1.9991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x16c2b74fb20>, 2.4991045125061646: <neuropy.analyses.time_dependent_placefields.PlacefieldSnapshot at 0x168acfb3bb0>, ...}
-    if use_pf_dt_obj:
-        historical_snapshots = active_pf_dt.historical_snapshots
-
-    epoch_pf_results_dict = {'historical_snapshots': historical_snapshots}
-    epoch_pf_results_dict['num_position_samples_occupancy'] = np.stack([placefield_snapshot.num_position_samples_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
-    epoch_pf_results_dict['seconds_occupancy'] = np.stack([placefield_snapshot.seconds_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
-    epoch_pf_results_dict['normalized_occupancy'] = np.stack([placefield_snapshot.normalized_occupancy for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
-    epoch_pf_results_dict['spikes_maps_matrix'] = np.stack([placefield_snapshot.spikes_maps_matrix for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
-    epoch_pf_results_dict['occupancy_weighted_tuning_maps'] = np.stack([placefield_snapshot.occupancy_weighted_tuning_maps_matrix for placefield_snapshot in epoch_pf_results_dict['historical_snapshots'].values()])
-    # active_lap_pf_results_dict['snapshot_occupancy_weighted_tuning_maps'] = np.stack([placefield_snapshot.occupancy_weighted_tuning_maps_matrix for placefield_snapshot in active_lap_pf_results_dict['historical_snapshots'].values()])
-
-    # len(historical_snapshots)
-    return epoch_pf_results_dict
 
 
 
