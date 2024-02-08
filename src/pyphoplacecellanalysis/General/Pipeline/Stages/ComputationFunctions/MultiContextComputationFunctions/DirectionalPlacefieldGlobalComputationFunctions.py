@@ -40,6 +40,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability
 
 
+
+decoder_name_str: TypeAlias = str # an string name of a particular decoder, such as 'Long_LR' or 'Short_RL'
+
+
 # Assume a1 and a2 are your numpy arrays
 # def find_shift(a1, a2):
 #     """ 
@@ -133,6 +137,30 @@ class TrackTemplates(HDFMixin):
             
 
 
+    def get_decoders_tuning_curve_modes(self, peak_mode='peaks', **find_peaks_kwargs) -> Tuple[Dict[decoder_name_str, Dict[types.aclu_index, NDArray]], Dict[decoder_name_str, Dict[types.aclu_index, int]], Dict[decoder_name_str, pd.DataFrame]]:
+        """ 2023-12-19 - Uses `scipy.signal.find_peaks to find the number of peaks or ("modes") for each of the cells in the ratemap. 
+        Can detect bimodal (or multi-modal) placefields.
+        
+        Depends on:
+            self.tuning_curves
+        
+        Returns:
+            aclu_n_peaks_dict: Dict[int, int] - A mapping between aclu:n_tuning_curve_modes
+        Usage:    
+            decoder_peaks_dict_dict, decoder_aclu_n_peaks_dict_dict, decoder_peaks_results_df_dict = track_templates.get_decoders_tuning_curve_modes()
+
+        """
+        decoder_peaks_results_tuples_dict = {a_decoder_name:a_decoder.pf.ratemap.compute_tuning_curve_modes(peak_mode=peak_mode, **find_peaks_kwargs) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
+        # each tuple contains: peaks_dict, aclu_n_peaks_dict, peaks_results_df, so unwrap below
+        
+        decoder_peaks_dict_dict = {k:v[0] for k,v in decoder_peaks_results_tuples_dict.items()}
+        decoder_aclu_n_peaks_dict_dict = {k:v[1] for k,v in decoder_peaks_results_tuples_dict.items()}
+        decoder_peaks_results_df_dict = {k:v[2] for k,v in decoder_peaks_results_tuples_dict.items()}
+
+        # return peaks_dict, aclu_n_peaks_dict, unimodal_peaks_dict, peaks_results_dict
+        return decoder_peaks_dict_dict, decoder_aclu_n_peaks_dict_dict, decoder_peaks_results_df_dict
+    
+
     @function_attributes(short_name=None, tags=['peak', 'multi-peak'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-07 17:45', related_items=[])
     def get_decoders_aclu_peak_location_df(self, peak_mode='peaks', **find_peaks_kwargs) -> pd.DataFrame:
         """ 2024-02-07 - returns a single dataframe with all of the continuous peaks for each of the four decoders in it.
@@ -164,7 +192,45 @@ class TrackTemplates(HDFMixin):
         decoder_aclu_peak_location_df_merged['LR_peak_diff'] = decoder_aclu_peak_location_df_merged['long_LR_peak'] - decoder_aclu_peak_location_df_merged['short_LR_peak']
         decoder_aclu_peak_location_df_merged['RL_peak_diff'] = decoder_aclu_peak_location_df_merged['long_RL_peak'] - decoder_aclu_peak_location_df_merged['short_RL_peak']
         return decoder_aclu_peak_location_df_merged
-        
+
+
+    def get_decoders_aclu_num_peaks_df(self, peak_mode='peaks', **find_peaks_kwargs) -> pd.DataFrame:
+            """ returns a dataframe containing the number of peaks for each aclu across all four decoders.
+            
+            Usage:
+            
+                decoder_aclu_num_peaks_df = track_templates.get_decoders_aclu_num_peaks_df(height=0.2, width=None)
+                decoder_aclu_num_peaks_df
+
+            """
+            from pyphocorehelpers.indexing_helpers import reorder_columns, reorder_columns_relative, dict_to_full_array
+
+            replace_value = 0
+
+            # This one tries to recover from the combined dataframe. The line below this is easier.
+            # decoder_aclu_num_peaks_df: Dict = self.get_decoders_aclu_peak_location_df(peak_mode=peak_mode, **find_peaks_kwargs).groupby(['aclu']).agg(subpeak_idx_count=('subpeak_idx', 'count')).reset_index().set_index('aclu').to_dict()['subpeak_idx_count'] # number of peaks ("models" for each aclu)
+
+            _, decoder_num_modes_dict, _ = self.get_decoders_tuning_curve_modes(peak_mode=peak_mode, **find_peaks_kwargs)
+
+            all_aclus = self.any_decoder_neuron_IDs.copy()
+            
+            # Inputs: decoder_num_modes_dict, decoder_aclu_peak_location_df_merged for aclus
+            aclu_num_peaks_df: pd.DataFrame = pd.DataFrame({'aclu': all_aclus})
+            # target_df: pd.DataFrame = decoder_aclu_peak_location_df_merged
+            variable_name: str = 'num_peaks'
+            for k, v in decoder_num_modes_dict.items():
+                column_name: str = f'{k}_{variable_name}'
+                if column_name not in aclu_num_peaks_df:
+                    aclu_num_peaks_df[column_name] = 0 # Initialize column
+                aclu_num_peaks_df[column_name] = dict_to_full_array(v, full_indicies=aclu_num_peaks_df.aclu.to_numpy())
+                # # Replace all instances of -1 with 0 in columns: 'long_LR_num_peaks', 'long_RL_num_peaks' and 2 other columns
+                aclu_num_peaks_df.loc[aclu_num_peaks_df[column_name] == -1, column_name] = replace_value
+
+            return aclu_num_peaks_df
+
+
+
+
 
     ## WARNING 2024-02-07 - The following all use .peak_tuning_curve_center_of_masses: .get_decoder_aclu_peak_maps, get_decoder_aclu_peak_map_dict, get_decoder_aclu_peak_map_dict
 
@@ -210,7 +276,7 @@ class TrackTemplates(HDFMixin):
         return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_tuning_curve_center_of_masses))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
-    def get_decoder_aclu_peak_map_dict(self) -> Dict[str, Dict]:
+    def get_decoder_aclu_peak_map_dict(self) -> Dict[decoder_name_str, Dict]:
         return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps()))
 
 
