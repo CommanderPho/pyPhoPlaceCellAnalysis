@@ -136,6 +136,11 @@ class TrackTemplates(HDFMixin):
         return {a_name:a_decoder.pf.normalized_tuning_curves_dict for a_name, a_decoder in self.get_decoders_dict().items()}
             
 
+    @property
+    def decoder_stability_dict_dict(self): # -> Dict[str, Dict[types.aclu_index, NDArray]]:
+        # """ a Dict (one for each decoder) of aclu-to-1D normalized placefields for each decoder (independently) """
+        return {a_name:a_decoder.pf.ratemap.spatial_sparcity for a_name, a_decoder in self.get_decoders_dict().items()}
+    
 
     def get_decoders_tuning_curve_modes(self, peak_mode='peaks', **find_peaks_kwargs) -> Tuple[Dict[decoder_name_str, Dict[types.aclu_index, NDArray]], Dict[decoder_name_str, Dict[types.aclu_index, int]], Dict[decoder_name_str, pd.DataFrame]]:
         """ 2023-12-19 - Uses `scipy.signal.find_peaks to find the number of peaks or ("modes") for each of the cells in the ratemap. 
@@ -167,6 +172,10 @@ class TrackTemplates(HDFMixin):
 
         I have four dataframes, each containing the common columns ['aclu', 'series_idx', 'subpeak_idx'] and I'd like to the 'pos' column from each and rename it by prefixing it with one of four strings (provided in a list). The resultant dataframe should have every unique entry of ['aclu', 'series_idx', 'subpeak_idx'] from any of the dataframes and have four columns with their values taken from each of the dataframes. If an entry doesn't exist in one of the dataframes, pd.NA should be used.
 
+        
+        #TODO 2024-02-08 10:52: - [ ] Issue with the dataframe build. The plotted posisions don't always seem to be the primary ones.
+
+        
         """
         from pyphocorehelpers.indexing_helpers import reorder_columns_relative
 
@@ -193,9 +202,9 @@ class TrackTemplates(HDFMixin):
         decoder_aclu_peak_location_df_merged['RL_peak_diff'] = decoder_aclu_peak_location_df_merged['long_RL_peak'] - decoder_aclu_peak_location_df_merged['short_RL_peak']
         return decoder_aclu_peak_location_df_merged
 
-
+    @function_attributes(short_name=None, tags=['peak', 'multi-peak', 'decoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-08 10:06', related_items=[])
     def get_decoders_aclu_num_peaks_df(self, peak_mode='peaks', **find_peaks_kwargs) -> pd.DataFrame:
-            """ returns a dataframe containing the number of peaks for each aclu across all four decoders.
+            """ returns a single dataframe containing the number of peaks for each aclu across all four decoders.
             
             Usage:
             
