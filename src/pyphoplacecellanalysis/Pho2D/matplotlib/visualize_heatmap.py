@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from pyphocorehelpers.function_helpers import function_attributes
 
 @function_attributes(short_name='visualize_heatmap', tags=['display','matplotlib','heatmap'], input_requires=[], output_provides=[], uses=[], used_by=['build_callout_subgraphic'], creation_date='2023-03-22 15:11')
-def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False, **imshow_kwargs):
+def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False, layout=None, **imshow_kwargs):
     """
     A MATPLOTLIB-based simple heatmap plot of the given 2D numpy array data.
 
@@ -67,7 +67,9 @@ def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heat
                 text = ax.text(j, i, data[i, j], ha="center", va="center", color="w")
 
     ax.set_title(title)
-    fig.tight_layout()
+    if (layout is not None) and (layout == 'tight'):
+        fig.tight_layout()
+    
     if not defer_show:
         plt.show()
     

@@ -30,10 +30,13 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
     if tuning_curves_dict is None:
         assert include_tuning_curves == False
     
+    # figure_kwargs = dict(layout="tight")
+    figure_kwargs = dict(layout="none")
+
     if ax_dict is None:
         if not include_tuning_curves:
             # fig = plt.figure(layout="constrained", figsize=[9, 7], dpi=220, clear=True) # figsize=[Width, height] in inches.
-            fig = plt.figure(layout="tight", figsize=[8, 7], dpi=220, clear=True)
+            fig = plt.figure(figsize=[8, 7], dpi=220, clear=True, **figure_kwargs)
             long_width_ratio = 1
             ax_dict = fig.subplot_mosaic(
                 [
@@ -48,7 +51,7 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
             )
         else:
             # tuning curves mode:
-            fig = plt.figure(layout="tight", figsize=[9, 7], dpi=220, clear=True)
+            fig = plt.figure(figsize=[9, 7], dpi=220, clear=True, **figure_kwargs)
             long_width_ratio = 1
             ax_dict = fig.subplot_mosaic(
                 [
@@ -117,17 +120,17 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
         # plot heatmap:
         curr_ax.set_xticklabels([])
         curr_ax.set_yticklabels([])
-        fig, ax, im = visualize_heatmap(v.copy(), ax=curr_ax, title=f'{k}', defer_show=True, **imshow_kwargs) # defer_show so it doesn't produce a separate figure for each!
+        fig, ax, im = visualize_heatmap(v.copy(), ax=curr_ax, title=f'{k}', layout='none', defer_show=True, **imshow_kwargs) # defer_show so it doesn't produce a separate figure for each!
         ax.set_xlim((xmin, xmax))
         ax.set_ylim((ymin, ymax))
 
 
         if include_tuning_curves:
             tuning_curve = tuning_curves_dict[k]
+            curr_curve_ax = ax_dict[f"{data_to_ax_mapping[k]}_curve"]
+            curr_curve_ax.clear()
+
             if tuning_curve is not None:
-                curr_curve_ax = ax_dict[f"{data_to_ax_mapping[k]}_curve"]
-                curr_curve_ax.clear()
-                
                 # plot curve heatmap:
                 curr_curve_ax.set_xticklabels([])
                 curr_curve_ax.set_yticklabels([])
@@ -148,7 +151,11 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
                 point_ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label=f'{k}_peak')
                 
 
-    fig.tight_layout()
+    # fig.tight_layout()
+    # NOTE: these layout changes don't seem to take effect until the window containing the figure is resized.
+    # fig.set_layout_engine('compressed') # TAKEWAY: Use 'compressed' instead of 'constrained'
+    fig.set_layout_engine('none') # disabling layout engine. Strangely still allows window to resize and the plots scale, so I'm not sure what the layout engine is doing.
+
 
     # ax_dict["ax_SHORT_activity_v_time"].plot([1, 2, 3, 3, 3, 2, 1, 0, 0, 0, 1, 2, 3, 3, 1, 2, 0, 0])
     # ax_dict["ax_SHORT_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, curr_cell_normalized_tuning_curve, ax_dict["ax_SHORT_pf_tuning_curve"], is_horizontal=True)
