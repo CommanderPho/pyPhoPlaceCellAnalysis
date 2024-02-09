@@ -1431,8 +1431,8 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     import plotly.express as px
     import plotly.graph_objects as go
     
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-    
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers, LongShortDisplayConfigManager
+
     barmode='overlay'
     # barmode='stack'
     histogram_kwargs = dict(barmode=barmode)
@@ -1624,17 +1624,61 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         
     ## Add the delta indicator:
     if (enable_scatter_plot and enable_epoch_shading_shapes):
+        
         t_split: float = 0.0
         #TODO 2024-02-02 04:36: - [ ] Should get the specific session t_start/t_end instead of using the general `earliest_delta_aligned_t_start`
-        _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
-        for a_shape_name, a_shape in _extras_output_dict.items():
-            if (main_plot_mode == 'separate_row_per_session'):
-                for a_session_i, a_session_name in enumerate(unique_sessions):    
-                    row_index: int = a_session_i + 1 # 1-indexed
-                    fig.add_shape(a_shape, name=a_shape_name, row=row_index, col=scatter_column)
-            else:
-                fig.add_shape(a_shape, name=a_shape_name, row=1, col=scatter_column)
+        # _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
+        # for a_shape_name, a_shape in _extras_output_dict.items():
+        #     if (main_plot_mode == 'separate_row_per_session'):
+        #         for a_session_i, a_session_name in enumerate(unique_sessions):    
+        #             row_index: int = a_session_i + 1 # 1-indexed
+        #             fig.add_shape(a_shape, name=a_shape_name, row=row_index, col=scatter_column)
+        #     else:
+        #         fig.add_shape(a_shape, name=a_shape_name, row=1, col=scatter_column)
     
+
+        # 2024-02-08 Rewrite of shape plotting using simpler functions _______________________________________________________ #
+        t_start: float = earliest_delta_aligned_t_start
+        t_end: float = latest_delta_aligned_t_end
+
+        yrange = [0.0, 1.0]
+        assert (yrange is not None) and (len(yrange) == 2)
+        ymin, ymax = yrange # unpack y-range
+        assert (ymin < ymax)
+
+        _extras_output_dict = {}
+        ## Get the track configs for the colors:
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        # long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+        # short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+
+        # long_epoch_kwargs = dict(fillcolor="blue")
+        # short_epoch_kwargs = dict(fillcolor="red")
+        long_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.long_epoch_config.mpl_color)
+        short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config.mpl_color)
+        
+        # blue_shape = dict(type="rect", xref="x", yref="paper", x0=t_start, y0=ymin, x1=t_split, y1=ymax, opacity=0.5, layer="below", line_width=1, **long_epoch_kwargs) 
+        # red_shape = dict(type="rect", xref="x", yref="paper", x0=t_split, y0=ymin, x1=t_end, y1=ymax, opacity=0.5, layer="below", line_width=1, **short_epoch_kwargs)
+        # vertical_divider_line = dict(type="line", x0=t_split, y0=ymin, x1=t_split, y1=ymax, line=dict(color="rgba(0,0,0,.25)", width=3, ), )
+            
+        row_column_kwargs = dict(row='all', col=scatter_column)
+
+        ## new methods
+        _extras_output_dict["y_zero_line"] = fig.add_hline(y=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
+        vertical_divider_line = fig.add_vline(x=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
+
+        # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
+
+        blue_shape = fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs) # , fillcolor="green", opacity=0.25
+        red_shape = fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs)
+
+        _extras_output_dict["long_region"] = blue_shape
+        _extras_output_dict["short_region"] = red_shape
+        _extras_output_dict["divider_line"] = vertical_divider_line
+        
+
+
+
     # Update title and height
     
     
