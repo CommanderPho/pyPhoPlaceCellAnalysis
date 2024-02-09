@@ -414,6 +414,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
 
+    @property
+    def active_filter_epochs(self):
+        """ for compatibility """
+        return deepcopy(self.filter_epochs)
+
+
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes
             DecodedFilterEpochsResult(decoding_time_bin_size: float,
