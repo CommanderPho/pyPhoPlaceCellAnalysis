@@ -444,8 +444,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
 
-    
-
 
     def flatten(self):
         """ flattens the result over all epochs to produce one per time bin """
