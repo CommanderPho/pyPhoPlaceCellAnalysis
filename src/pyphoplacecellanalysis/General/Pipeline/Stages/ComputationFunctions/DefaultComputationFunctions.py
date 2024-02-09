@@ -618,7 +618,11 @@ def compute_radon_transforms(decoder, decoder_result, nlines=5000, margin=16, ju
     active_posterior = decoder_result.p_x_given_n_list # one for each epoch
 
     # the size of the x_bin in [cm]
-    pos_bin_size = float(decoder.pf.bin_info['xstep'])
+    if decoder.pf.bin_info is not None:
+        pos_bin_size = float(decoder.pf.bin_info['xstep'])
+    else:
+        ## if the bin_info is for some reason not accessible, just average the distance between the bin centers.
+        pos_bin_size = np.diff(decoder.pf.xbin_centers).mean()
 
     ## compute the Radon transform to get the lines of best fit
     score, velocity, intercept = get_radon_transform(active_posterior, decoding_time_bin_duration=decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=1)
