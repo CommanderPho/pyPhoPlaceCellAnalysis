@@ -856,6 +856,11 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
         
         
+    NOTES: curr_results_obj - seems to contain the epochs decoding result and the associated decoder/metadata.
+    
+    _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(curr_results_obj.active_filter_epochs, curr_results_obj.all_included_filter_epochs_decoder_result, 
+        xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name=controller_name, active_context=display_context,  max_subplots_per_page=max_subplots_per_page, included_epoch_indicies=included_epoch_indicies) # 10
+        
     
     """
     #TODO 2023-06-21 14:58: - [ ] Need to be able to filter down to just a few epochs with a list
