@@ -299,6 +299,9 @@ class PlottingHelpers:
         red_shape = dict(type="rect", xref="x", yref="paper", x0=t_split, y0=ymin, x1=t_end, y1=ymax, opacity=0.5, layer="below", line_width=1, **short_epoch_kwargs)
         vertical_divider_line = dict(type="line", x0=t_split, y0=ymin, x1=t_split, y1=ymax, line=dict(color="rgba(0,0,0,.25)", width=3, ), )
             
+        ## new methods
+        output_dict["y_zero_line"] = fig.add_hline(y=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ))
+
         output_dict["long_region"] = blue_shape
         output_dict["short_region"] = red_shape
         output_dict["divider_line"] = vertical_divider_line
