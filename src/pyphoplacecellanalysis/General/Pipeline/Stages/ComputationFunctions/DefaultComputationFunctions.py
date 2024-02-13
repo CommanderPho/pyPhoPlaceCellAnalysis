@@ -603,7 +603,7 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
 @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=['_perform_decoded_replay_fit_best_line_computation'], creation_date='2023-05-31 19:55', related_items=[])
-def compute_radon_transforms(decoder, decoder_result, nlines=5000, margin=16, jump_stat=None, n_jobs=1):
+def compute_radon_transforms(decoder, decoder_result, nlines=5000, margin=16, jump_stat=None, n_jobs=1) -> pd.DataFrame:
     """ 2023-05-25 - Computes the line of best fit (which gives the velocity) for the 1D Posteriors for each replay epoch using the Radon Transform approch.
     
     Usage:

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import List, Dict, Tuple, Optional, Any, Callable, Union
 from copy import deepcopy
 from attrs import define, field, Factory
 import matplotlib as mpl
@@ -12,6 +13,8 @@ from neuropy.core import Epoch
 from neuropy.utils.dynamic_container import overriding_dict_with, get_dict_subset # required for safely_accepts_kwargs
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
 from neuropy.utils.result_context import IdentifyingContext
+from neuropy.utils.mixins.binning_helpers import BinningContainer # for _build_radon_transform_plotting_data typehinting
+
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -31,6 +34,7 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCo
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions import DefaultComputationFunctions # TODO: I think it's bad to include computation functions here technically
+
 
 
 class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -844,6 +848,100 @@ class RadonTransformPlotData:
     line_y: np.ndarray
     score_text: str
     speed_text: str
+    
+
+def _callback_update_decoded_single_epoch_slice_plot(curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+    """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+
+    Needs only: curr_time_bins, plots_data, i
+    Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+    """
+    from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
+
+    line_alpha = 0.2  # Faint line
+    marker_alpha = 0.8  # More opaque markers
+
+    debug_print = kwargs.pop('debug_print', False)
+    if debug_print:
+        print(f'_callback_update_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
+    extant_plots = plots['radon_transform'].get(i, {})
+    extant_line = extant_plots.get('line', None)
+    extant_score_text = extant_plots.get('score_text', None)
+    # plot the radon transform line on the epoch:    
+    if (extant_line is not None) or (extant_score_text is not None):
+        # already exists, clear the existing ones. 
+        # Let's assume we want to remove the 'Quadratic' line (line2)
+        if extant_line is not None:
+            extant_line.remove()
+        if extant_score_text is not None:
+            extant_score_text.remove()
+            
+        # Is .clear() needed? Why doesn't it remove the heatmap as well?
+        curr_ax.clear()
+
+    # the trailing comma is important, as it unpacks the single line, returning a Plot2D object instead of a single-element tuple.
+    radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[i].line_y, label=f'computed radon transform', linestyle='dashed', linewidth=1, color='#e5ff00', alpha=line_alpha, marker='+', markersize=10) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+    # Update marker alpha separately using setp
+    # plt.setp(radon_transform_plot[0], markerfacealpha=marker_alpha, markeredgealpha=marker_alpha)
+    # radon_transform_plot[0].set_markerfacealpha(marker_alpha)
+    # radon_transform_plot[0].set_markeredgealpha(marker_edge_alpha)
+
+
+    # Add replay score text to top-right corner:
+    final_text = f"{plots_data.radon_transform_data[i].score_text}\n{plots_data.radon_transform_data[i].speed_text}"
+    anchored_text = add_inner_title(curr_ax, final_text, loc='upper right', strokewidth=5, stroke_foreground='k', text_foreground='#e5ff00') # loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
+    anchored_text.patch.set_ec("none")
+    anchored_text.set_alpha(0.4)
+
+    # Store the plot objects for future updates:
+    plots['radon_transform'][i] = {'line':radon_transform_plot, 'score_text':anchored_text}
+    
+    if debug_print:
+        print(f'\t success!')
+    return params, plots_data, plots, ui
+
+
+
+def _build_radon_transform_plotting_data(active_filter_epochs_df: pd.DataFrame, num_filter_epochs: int, time_bin_containers: List["BinningContainer"], radon_transform_column_names: Optional[List[str]]=None):
+    """ 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
+    
+    
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _build_radon_transform_plotting_data
+        
+        radon_transform_data = _build_radon_transform_plotting_data(active_filter_epochs_df = curr_results_obj.active_filter_epochs.to_dataframe().copy(),
+            num_filter_epochs = ,
+            time_bin_containers = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers)
+    
+    """
+    if radon_transform_column_names is None:
+        radon_transform_column_names = ['score', 'velocity', 'intercept', 'speed'] # use default
+        
+    # `active_filter_epochs_df` native columns approach
+    assert np.isin(radon_transform_column_names, active_filter_epochs_df.columns).all()
+    epochs_linear_fit_df = active_filter_epochs_df[radon_transform_column_names].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
+    score_col_name, velocity_col_name, intercept_col_name, speed_col_name = radon_transform_column_names # extract the column names from the provided list
+
+
+    # epochs_linear_fit_df approach
+    assert num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
+
+    radon_transform_data = {}
+
+    for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(num_filter_epochs), epochs_linear_fit_df[velocity_col_name].values, epochs_linear_fit_df[intercept_col_name].values, epochs_linear_fit_df[score_col_name].values, epochs_linear_fit_df[speed_col_name].values):
+        # build the discrete line over the centered time bins:
+        epoch_time_bins = time_bin_containers[epoch_idx].centers
+        epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
+        epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
+        with np.printoptions(precision=3, suppress=True, threshold=5):
+            score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+            speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
+        radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, score_text=score_text, speed_text=speed_text)
+
+    return radon_transform_data
+
+
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController', 'add_inner_title', 'RadonTransformPlotData'], used_by=[], creation_date='2023-06-02 13:36')
@@ -867,7 +965,9 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         #TODO 2023-06-23 02:00: - [ ] Added `included_epoch_indicies` filtering of the epochs, but need to use this value to also filter the `epochs_linear_fit_df`, the `curr_results_obj.all_included_filter_epochs_decoder_result` which is used to get `.num_filter_epochs` and `.time_bin_containers[epoch_idx].centers` 
 
     from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController # `plot_decoded_epoch_slices_paginated`
-    from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
+    from neuropy.utils.mixins.binning_helpers import BinningContainer
+
+    # from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
 
     if display_context is None:
         display_context = IdentifyingContext(display_fn_name='DecodedEpochSlices')
@@ -898,47 +998,26 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         _out_pagination_controller.plots_data.radon_transform_data = {}
         _out_pagination_controller.plots['radon_transform'] = {}
 
-        for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs), epochs_linear_fit_df['velocity'].values, epochs_linear_fit_df['intercept'].values, epochs_linear_fit_df['score'].values, epochs_linear_fit_df['speed'].values):
-            # build the discrete line over the centered time bins:
-            epoch_time_bins = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx].centers
-            epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
-            epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
-            with np.printoptions(precision=3, suppress=True, threshold=5):
-                score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
-                speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
-            _out_pagination_controller.plots_data.radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, score_text=score_text, speed_text=speed_text)
 
-        def _callback_update_decoded_single_epoch_slice_plot(curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
-            """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+        num_filter_epochs:int = curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs # curr_results_obj.num_filter_epochs
+        time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
+        # time_bin_containers
+        radon_transform_data = _build_radon_transform_plotting_data(active_filter_epochs_df = curr_results_obj.active_filter_epochs.copy(),
+                num_filter_epochs = num_filter_epochs, time_bin_containers = time_bin_containers, radon_transform_column_names=['score', 'velocity', 'intercept', 'speed'])
 
-            Needs only: curr_time_bins, plots_data, i
-            Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
-            """
-            debug_print = kwargs.pop('debug_print', False)
-            if debug_print:
-                print(f'_callback_update_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
-            extant_plots = plots['radon_transform'].get(i, {})
-            extant_line = extant_plots.get('line', None)
-            extant_score_text = extant_plots.get('score_text', None)
-            # plot the radon transform line on the epoch:    
-            if (extant_line is not None) or (extant_score_text is not None):
-                # already exists, clear the existing ones. 
-                curr_ax.clear()
 
-            radon_transform_plot = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[i].line_y, label=f'computed radon transform', linestyle='dashed', linewidth=1, color='#e5ff00', alpha=0.8, marker='+', markersize=10) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data
+        
+        # for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs), epochs_linear_fit_df['velocity'].values, epochs_linear_fit_df['intercept'].values, epochs_linear_fit_df['score'].values, epochs_linear_fit_df['speed'].values):
+        #     # build the discrete line over the centered time bins:
+        #     epoch_time_bins = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx].centers
+        #     epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
+        #     epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
+        #     with np.printoptions(precision=3, suppress=True, threshold=5):
+        #         score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+        #         speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
+        #     _out_pagination_controller.plots_data.radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, score_text=score_text, speed_text=speed_text)
 
-            # Add replay score text to top-right corner:
-            final_text = f"{plots_data.radon_transform_data[i].score_text}\n{plots_data.radon_transform_data[i].speed_text}"
-            anchored_text = add_inner_title(curr_ax, final_text, loc='upper right', strokewidth=5, stroke_foreground='k', text_foreground='#e5ff00') # loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
-            anchored_text.patch.set_ec("none")
-            anchored_text.set_alpha(0.4)
-
-            # Store the plot objects for future updates:
-            plots['radon_transform'][i] = {'line':radon_transform_plot, 'score_text':anchored_text}
-            
-            if debug_print:
-                print(f'\t success!')
-            return params, plots_data, plots, ui
 
     else:
         # radon transform info disabled:

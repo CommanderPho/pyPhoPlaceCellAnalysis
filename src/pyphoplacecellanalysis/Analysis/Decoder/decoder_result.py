@@ -1036,7 +1036,7 @@ def old_score_posterior(posterior, n_jobs:int=8):
     slope = [res[1] for res in results]
     return np.asarray(score), np.asarray(slope)
 
-def get_radon_transform(posterior, decoding_time_bin_duration:float, pos_bin_size:float, nlines=5000, margin=16, jump_stat=None, posteriors=None, n_jobs:int=8):
+def get_radon_transform(posterior, decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:int=16, jump_stat=None, posteriors=None, n_jobs:int=8):
         """ 2023-05-25 - Radon Transform to fit line to decoded replay epoch posteriors. Gives score, velocity, and intercept. 
 
         Usage:
