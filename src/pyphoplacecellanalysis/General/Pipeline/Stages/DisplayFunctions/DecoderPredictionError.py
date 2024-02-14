@@ -863,10 +863,14 @@ def _callback_update_decoded_single_epoch_slice_plot(curr_ax, params: "Visualiza
     """
     from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
 
-    line_alpha = 0.2  # Faint line
+    # line_alpha = 0.2  # Faint line
+    # marker_alpha = 0.8  # More opaque markers
+
+    line_alpha = 0.8  # Faint line
     marker_alpha = 0.8  # More opaque markers
 
-    debug_print = kwargs.pop('debug_print', False)
+
+    debug_print = kwargs.pop('debug_print', True)
     if debug_print:
         print(f'_callback_update_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
     extant_plots = plots['radon_transform'].get(i, {})
@@ -885,7 +889,13 @@ def _callback_update_decoded_single_epoch_slice_plot(curr_ax, params: "Visualiza
         curr_ax.clear()
 
     # the trailing comma is important, as it unpacks the single line, returning a Plot2D object instead of a single-element tuple.
-    radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[i].line_y, label=f'computed radon transform', linestyle='dashed', linewidth=1, color='#e5ff00', alpha=line_alpha, marker='+', markersize=10) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+    # radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[i].line_y, label=f'computed radon transform', linestyle='dashed', linewidth=1, color='#e5ff00', alpha=line_alpha, marker='+', markersize=10) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        
+    # active_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='dashed', linewidth=1, color='#e5ff00', alpha=line_alpha, marker='+', markersize=10)
+    active_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha, marker='+', markersize=2, markerfacecolor='#e5ff00', markeredgecolor='#e5ff00') # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
+
+    radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[i].line_y, **active_kwargs)
+
     # Update marker alpha separately using setp
     # plt.setp(radon_transform_plot[0], markerfacealpha=marker_alpha, markeredgealpha=marker_alpha)
     # radon_transform_plot[0].set_markerfacealpha(marker_alpha)
@@ -894,7 +904,7 @@ def _callback_update_decoded_single_epoch_slice_plot(curr_ax, params: "Visualiza
 
     # Add replay score text to top-right corner:
     final_text = f"{plots_data.radon_transform_data[i].score_text}\n{plots_data.radon_transform_data[i].speed_text}"
-    anchored_text = add_inner_title(curr_ax, final_text, loc='upper right', strokewidth=5, stroke_foreground='k', text_foreground='#e5ff00') # loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
+    anchored_text = add_inner_title(curr_ax, final_text, loc='upper left', strokewidth=5, stroke_foreground='k', text_foreground='#e5ff00') # loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
     anchored_text.patch.set_ec("none")
     anchored_text.set_alpha(0.4)
 
