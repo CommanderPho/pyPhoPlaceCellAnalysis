@@ -592,7 +592,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """ new version (replacing `plot_paginated_decoded_epoch_slices`) calls `plot_decoded_epoch_slices` which produces the state variables (params, plots_data, plots, ui), a new instance of this object type is then initialized with those variables and then updated with any specific properties. """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
         
-        
+        # single_plot_fixed_height=100.0, debug_test_max_num_slices=20, size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True
+        if isinstance(active_filter_epochs, pd.DataFrame):
+            # convert to native epoch object.
+            active_filter_epochs = Epoch(epochs=deepcopy(active_filter_epochs)) # convert to native Epoch object
+
         params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page)
         # new_obj = cls(params=params, plots_data=plots_data, plots=plots, ui=ui)
@@ -733,12 +737,14 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 on_render_page_callbacks = self.params.get('on_render_page_callbacks', {})
                 for a_callback_name, a_callback in on_render_page_callbacks.items():
                     if self.params.debug_print:
-                        print(f'performing callback with name: {a_callback_name}')
+                        print(f'performing callback with name: "{a_callback_name}"')
                     try:
                         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
                     except Exception as e:
-                        print(f'\t encountered exception in callback: {e}')
-                        raise e
+                        print(f'\t encountered exception in callback with name {a_callback_name}: exception: {e}')
+                        # raise e
+                        raise UserWarning(e)
+                        ## Continue...
                     
                 curr_ax.set_xlim(*curr_epoch_slice)
                 curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
@@ -797,6 +803,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             ax.patch.set_facecolor('gray')
         else:
             ax.patch.set_facecolor('white')
+        if self.params.debug_print:
+            print(f'\tdone.')
+
 
     def perform_update_selections(self, defer_render:bool=True):
         """ called to update the selection when the page is changed or something else happens. """
