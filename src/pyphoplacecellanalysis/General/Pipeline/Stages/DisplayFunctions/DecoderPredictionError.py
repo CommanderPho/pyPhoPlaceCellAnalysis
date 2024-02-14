@@ -855,6 +855,11 @@ def _callback_update_decoded_single_epoch_slice_plot(curr_ax, params: "Visualiza
 
     Needs only: curr_time_bins, plots_data, i
     Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+
+    Called with:
+
+    self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
+
     """
     from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
 
@@ -922,8 +927,6 @@ def _build_radon_transform_plotting_data(active_filter_epochs_df: pd.DataFrame, 
     assert np.isin(radon_transform_column_names, active_filter_epochs_df.columns).all()
     epochs_linear_fit_df = active_filter_epochs_df[radon_transform_column_names].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
     score_col_name, velocity_col_name, intercept_col_name, speed_col_name = radon_transform_column_names # extract the column names from the provided list
-
-
     # epochs_linear_fit_df approach
     assert num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
 
@@ -1004,20 +1007,7 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         # time_bin_containers
         radon_transform_data = _build_radon_transform_plotting_data(active_filter_epochs_df = curr_results_obj.active_filter_epochs.copy(),
                 num_filter_epochs = num_filter_epochs, time_bin_containers = time_bin_containers, radon_transform_column_names=['score', 'velocity', 'intercept', 'speed'])
-
-
-        _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data
-        
-        # for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs), epochs_linear_fit_df['velocity'].values, epochs_linear_fit_df['intercept'].values, epochs_linear_fit_df['score'].values, epochs_linear_fit_df['speed'].values):
-        #     # build the discrete line over the centered time bins:
-        #     epoch_time_bins = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers[epoch_idx].centers
-        #     epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
-        #     epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
-        #     with np.printoptions(precision=3, suppress=True, threshold=5):
-        #         score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
-        #         speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
-        #     _out_pagination_controller.plots_data.radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, score_text=score_text, speed_text=speed_text)
-
+        _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data        
 
     else:
         # radon transform info disabled:
