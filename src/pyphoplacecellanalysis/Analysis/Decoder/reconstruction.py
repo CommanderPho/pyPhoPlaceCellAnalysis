@@ -420,6 +420,41 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return deepcopy(self.filter_epochs)
 
 
+    @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=[], creation_date='2024-02-13 17:25', related_items=[])
+    def compute_radon_transforms(self, pos_bin_size:float, nlines:int=8192, margin:int=16, jump_stat=None, n_jobs:int=1) -> pd.DataFrame:
+        """ 2023-05-25 - Computes the line of best fit (which gives the velocity) for the 1D Posteriors for each replay epoch using the Radon Transform approch.
+        
+        # pos_bin_size: the size of the x_bin in [cm]
+        if decoder.pf.bin_info is not None:
+            pos_bin_size = float(decoder.pf.bin_info['xstep'])
+        else:
+            ## if the bin_info is for some reason not accessible, just average the distance between the bin centers.
+            pos_bin_size = np.diff(decoder.pf.xbin_centers).mean()
+
+
+        Usage:
+        
+            epochs_linear_fit_df = compute_radon_transforms(pos_bin_size=pos_bin_size, nlines=8192, margin=16, n_jobs=1)
+            
+            a_directional_laps_filter_epochs_decoder_result = a_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+            laps_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result)
+
+            Columns:         ['score', 'velocity', 'intercept', 'speed']
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
+        # active_time_bins = active_epoch_decoder_result.time_bin_edges[0]
+        # active_posterior_container = active_epoch_decoder_result.marginal_x_list[0]
+        active_posterior = self.p_x_given_n_list # one for each epoch
+
+        ## compute the Radon transform to get the lines of best fit
+        score, velocity, intercept = get_radon_transform(active_posterior, decoding_time_bin_duration=self.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs)
+
+        epochs_linear_fit_df = pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept, 'speed': np.abs(velocity)})
+        return epochs_linear_fit_df
+
+
+
+
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes
             DecodedFilterEpochsResult(decoding_time_bin_size: float,
