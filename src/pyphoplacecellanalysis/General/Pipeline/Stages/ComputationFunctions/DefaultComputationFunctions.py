@@ -603,13 +603,16 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
 @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=['_perform_decoded_replay_fit_best_line_computation'], creation_date='2023-05-31 19:55', related_items=[])
-def compute_radon_transforms(decoder, decoder_result, nlines=5000, margin=16, jump_stat=None, n_jobs=1) -> pd.DataFrame:
+def compute_radon_transforms(decoder, decoder_result, nlines=8192, margin=16, jump_stat=None, n_jobs=1) -> pd.DataFrame:
     """ 2023-05-25 - Computes the line of best fit (which gives the velocity) for the 1D Posteriors for each replay epoch using the Radon Transform approch.
     
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import compute_radon_transforms
         epochs_linear_fit_df = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
         
+        a_directional_laps_filter_epochs_decoder_result = a_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+        laps_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result)
+
         Columns:         ['score', 'velocity', 'intercept', 'speed']
     """
     from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
