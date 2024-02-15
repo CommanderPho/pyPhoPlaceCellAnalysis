@@ -588,7 +588,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """
 
     @classmethod
-    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False):
+    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False, **kwargs):
         """ new version (replacing `plot_paginated_decoded_epoch_slices`) calls `plot_decoded_epoch_slices` which produces the state variables (params, plots_data, plots, ui), a new instance of this object type is then initialized with those variables and then updated with any specific properties. """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
         
@@ -598,7 +598,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             active_filter_epochs = Epoch(epochs=deepcopy(active_filter_epochs)) # convert to native Epoch object
 
         params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
-                                                                name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page)
+                                                                name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, **kwargs)
         # new_obj = cls(params=params, plots_data=plots_data, plots=plots, ui=ui)
 
         new_obj = cls(params, plots_data, plots, ui)
@@ -607,8 +607,14 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         new_obj.plots_data.paginator = new_obj._subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, new_obj.params.debug_print)  # assign the paginator
         new_obj.params.active_identifying_figure_ctx = active_context # set context before calling `plot_paginated_decoded_epoch_slices` which will set the rest of the properties
 
+        ## Resize the widget to meet the minimum height requirements:
+        a_widget = new_obj.ui.mw # MatplotlibTimeSynchronizedWidget
+        a_widget.setMinimumHeight(new_obj.params.all_plots_height)
+        # new_obj.params.scrollability_mode
+
+
         ## Add the PaginationControlWidget
-        new_obj._subfn_helper_add_pagination_control_widget(new_obj.plots_data.paginator, new_obj.ui.mw, defer_render=False)
+        new_obj._subfn_helper_add_pagination_control_widget(new_obj.plots_data.paginator, new_obj.ui.mw, defer_render=False) # minimum height is 21
 
         ## Setup Selectability
         new_obj._subfn_helper_setup_selectability()
@@ -618,6 +624,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         new_obj.on_paginator_control_widget_jump_to_page(page_idx=0)
         _a_connection = new_obj.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(new_obj.on_paginator_control_widget_jump_to_page) # bind connection
         new_obj.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
+
 
         return new_obj
     
@@ -721,13 +728,21 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 if self.params.debug_print:
                     print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
 
+                ## Clear the axis here:
+                curr_ax.clear()
+
                 # Update the axes appropriately:
                 _pagination_helper_plot_single_epoch_slice(curr_ax, self.params, self.plots_data, self.plots, self.ui, a_slice_idx=curr_slice_idxs, is_first_setup=False, debug_print=self.params.debug_print) # calling with is_first_setup=False doesn't set the right-hand Epoch end time labels right
 
+                skip_plotting_measured_positions: bool = self.params.get('skip_plotting_measured_positions', False)
+                skip_plotting_most_likely_positions: bool = self.params.get('skip_plotting_most_likely_positions', False)
+                
+                ## NOTE: the actual heatmp is plotted using: 
                 _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin,
                                                                 posterior=curr_posterior,
                                                                 active_most_likely_positions_1D=curr_most_likely_positions,
-                                                                enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print)
+                                                                enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print,
+                                                                skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions)
                 
                 
                 if _temp_fig is not None:
@@ -737,11 +752,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 on_render_page_callbacks = self.params.get('on_render_page_callbacks', {})
                 for a_callback_name, a_callback in on_render_page_callbacks.items():
                     if self.params.debug_print:
-                        print(f'performing callback with name: "{a_callback_name}"')
+                        print(f'performing callback with name: "{a_callback_name}" for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax}')
                     try:
                         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
                     except Exception as e:
-                        print(f'\t encountered exception in callback with name {a_callback_name}: exception: {e}')
+                        print(f'\t encountered exception in callback with name {a_callback_name} for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax}: exception: {e}')
                         # raise e
                         raise UserWarning(e)
                         ## Continue...
@@ -755,7 +770,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             except IndexError as e:
                 # Occurs when there are more plots on the page than there are data to plot for that page (happens on the last page)
                 if self.params.debug_print:
-                    print(f'WARNING: exceeded data indicies (probably on last page).')
+                    print(f'WARNING: exceeded data indicies (probably on last page). (for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax})')
                 curr_ax.set_visible(False)
 
             except Exception as e:

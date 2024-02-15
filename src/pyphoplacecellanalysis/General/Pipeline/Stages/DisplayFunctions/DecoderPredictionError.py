@@ -233,7 +233,8 @@ def _cached_epoch_computation_if_needed(computation_result, active_config, activ
 # Private Implementations                                                                                              #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=[])
-def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
+def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
+                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -272,7 +273,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             fig = None # Calling plt.gcf() creates an empty figure and returns the wrong value 
             # fig = plt.gcf()
         
-        if measured_position_df is not None:
+        if ((not skip_plotting_measured_positions) and (measured_position_df is not None)):
             # Actual Position Plots (red line):
             ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
 
@@ -305,7 +306,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             ax.set_ylim((ymin, ymax))
 
         # Most-likely Estimated Position Plots (grey line):
-        if active_most_likely_positions_1D is not None:
+        if ((not skip_plotting_most_likely_positions) and (active_most_likely_positions_1D is not None)):
             # Most likely position plots:
 
             if enable_flat_line_drawing:
@@ -664,12 +665,15 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     if skip_plotting_measured_positions:
         measured_position_df = None
     else:
-        measured_position_df = plots_data.global_pos_df        
+        measured_position_df = plots_data.global_pos_df
+
+    skip_plotting_most_likely_positions: bool = params.get('skip_plotting_most_likely_positions', False)
 
     _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(measured_position_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=params.variable_name, xbin=params.xbin,
                                                         posterior=curr_posterior,
                                                         active_most_likely_positions_1D=curr_most_likely_positions,
-                                                        enable_flat_line_drawing=params.enable_flat_line_drawing, debug_print=debug_print)
+                                                        enable_flat_line_drawing=params.enable_flat_line_drawing, debug_print=debug_print,
+                                                        skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions)
     if _temp_fig is not None:
         plots.fig = _temp_fig
     
