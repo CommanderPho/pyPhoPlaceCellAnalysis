@@ -1,10 +1,11 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Dict, Union
+from typing import Dict, List, Optional, Union
 from attrs import define, field, Factory
 import attrs # used for several things
 import matplotlib.pyplot as plt
-from matplotlib import cm # used for plot_kourosh_activity_style_figure version too to get a good colormap 
+from matplotlib import cm
+from nptyping import NDArray # used for plot_kourosh_activity_style_figure version too to get a good colormap 
 import numpy as np
 import numpy.ma as ma # for masked array
 import pandas as pd
@@ -1006,7 +1007,7 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 import numpy as np
 from neuropy.analyses.decoders import radon_transform, old_radon_transform
 
-_allow_parallel_run_general:bool = False
+_allow_parallel_run_general:bool = True
 
 def old_score_posterior(posterior, n_jobs:int=8):
     """Old version scoring of epochs that uses `old_radon_transform`
@@ -1036,7 +1037,8 @@ def old_score_posterior(posterior, n_jobs:int=8):
     slope = [res[1] for res in results]
     return np.asarray(score), np.asarray(slope)
 
-def get_radon_transform(posterior, decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:int=16, jump_stat=None, posteriors=None, n_jobs:int=8):
+
+def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[int]=16, neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True):
         """ 2023-05-25 - Radon Transform to fit line to decoded replay epoch posteriors. Gives score, velocity, and intercept. 
 
         Usage:
@@ -1052,25 +1054,67 @@ def get_radon_transform(posterior, decoding_time_bin_duration:float, pos_bin_siz
             pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept})
             
         """
+        
+
         if posteriors is None:
             assert posterior is not None, "No posteriors found"
             posteriors = posterior
 
-        x_binsize = pos_bin_size
-        neighbours = int(margin / x_binsize)
+        if neighbours is None:
+            # Set neighbors from margin, pos_bin_size
+            assert margin is not None, f"both neighbours and margin are None!"
+            neighbours: int = int(margin / pos_bin_size)
+            if debug_print:
+                print(f'neighbours will be calculated from margin and pos_bin_size. neighbours: {neighbours} = int(margin: {margin} / pos_bin_size: {pos_bin_size})')
+        else:
+            # use existing neighbors
+            neighbors = int(neighbors)
+            if margin is not None:
+                print(f'WARN: margin is not None but its value will not be used because neighbours is provided directly (neighbors: {neighbors}, margin: {margin})')
 
         run_parallel = _allow_parallel_run_general and (n_jobs > 1)
+        if (n_jobs > 1) and (not _allow_parallel_run_general):
+            print(f'WARNING: n_jobs > 1 (n_jobs: {n_jobs}) but _allow_parallel_run_general == False, so parallel computation will not be performed.')
         if run_parallel:
             from joblib import Parallel, delayed
-            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours) for epoch in posteriors)
+            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr) for epoch in posteriors)
         else:
-            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours) for epoch in posteriors]
-        score, velocity, intercept = np.asarray(results).T
+            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr) for epoch in posteriors]
+
+        if enable_return_neighbors_arr:
+            # score_velocity_intercept_tuple, (num_neighbours, neighbors_arr) = results # unpack
+
+            score = []
+            velocity = []
+            intercept = []
+            num_neighbours = []
+            neighbors_arr = []
+
+            for a_result_tuple in results:
+                a_score, a_velocity, a_intercept, (a_num_neighbours, a_neighbors_arr) = a_result_tuple
+                score.append(a_score)
+                velocity.append(a_velocity)
+                intercept.append(a_intercept)
+                num_neighbours.append(a_num_neighbours)
+                neighbors_arr.append(a_neighbors_arr)
+               
+            score = np.array(score)
+            velocity = np.array(velocity)
+            intercept = np.array(intercept)
+            num_neighbours = np.array(num_neighbours)
+            # neighbors_arr = np.array(neighbors_arr)
+            # score, velocity, intercept = np.asarray(score_velocity_intercept_tuple).T
+        else:
+            score, velocity, intercept = np.asarray(results).T
 
         # if jump_stat is not None:
         #     return score, velocity, intercept, self._get_jd(posteriors, jump_stat)
         # else:
-        return score, velocity, intercept
+
+        if enable_return_neighbors_arr:
+            return score, velocity, intercept, (num_neighbours, neighbors_arr)
+        else:
+            return score, velocity, intercept
 
 
 

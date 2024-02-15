@@ -700,7 +700,7 @@ class RankOrderRastersDebugger:
 
 
     def save_figure(self, export_path: Path):
-        """ Exports all four rasters to a specified file path        
+        """ Exports all four rasters to a specified file path
         
         _out_rank_order_event_raster_debugger.save_figure(export_path=export_path)
         
