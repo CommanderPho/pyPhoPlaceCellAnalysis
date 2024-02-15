@@ -617,11 +617,11 @@ def compute_radon_transforms(decoder, decoder_result, nlines=8192, margin=16, ju
         ## if the bin_info is for some reason not accessible, just average the distance between the bin centers.
         pos_bin_size = np.diff(decoder.pf.xbin_centers).mean()
 
-    return perform_compute_radon_transforms(active_posterior=active_posterior, decoding_time_bin_duration=decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs)
+    return perform_compute_radon_transforms(active_posterior=active_posterior, decoding_time_bin_duration=decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs)
 
 
 @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=['_perform_decoded_replay_fit_best_line_computation'], creation_date='2023-05-31 19:55', related_items=[])
-def perform_compute_radon_transforms(active_posterior, decoding_time_bin_duration: float, pos_bin_size:float, nlines=8192, margin=16, jump_stat=None, n_jobs=1) -> pd.DataFrame:
+def perform_compute_radon_transforms(active_posterior, decoding_time_bin_duration: float, pos_bin_size:float, nlines=8192, margin=16, jump_stat=None, n_jobs=4, enable_return_neighbors_arr=False) -> pd.DataFrame:
     """ 2023-05-25 - Computes the line of best fit (which gives the velocity) for the 1D Posteriors for each replay epoch using the Radon Transform approch.
     
     Usage:
@@ -637,9 +637,9 @@ def perform_compute_radon_transforms(active_posterior, decoding_time_bin_duratio
     from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
     ## compute the Radon transform to get the lines of best fit
     extra_outputs = []
-    score, velocity, intercept = get_radon_transform(active_posterior, decoding_time_bin_duration=decoding_time_bin_duration, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs)
+    score, velocity, intercept, *extra_outputs = get_radon_transform(active_posterior, decoding_time_bin_duration=decoding_time_bin_duration, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs, enable_return_neighbors_arr=enable_return_neighbors_arr)
     epochs_linear_fit_df = pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept, 'speed': np.abs(velocity)})
-    return epochs_linear_fit_df
+    return epochs_linear_fit_df, *extra_outputs
 
 
 
