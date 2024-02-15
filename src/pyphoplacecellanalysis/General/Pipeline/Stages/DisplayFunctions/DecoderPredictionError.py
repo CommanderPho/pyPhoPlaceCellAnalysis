@@ -1,3 +1,4 @@
+from matplotlib.offsetbox import AnchoredText
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple, Optional, Any, Callable, Union
@@ -849,13 +850,12 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
 @define
 class RadonTransformPlotData:
-    line_y: np.ndarray
-    score_text: str
-    speed_text: str
-
-
-
-
+    line_y: np.ndarray = field()
+    line_fn: Callable = field()
+    score_text: str = field(default='')
+    speed_text: str = field(default='')
+    intercept_text: str = field(default='')
+    extra_text: Optional[str] = field(default=None)
 
 
 # @define(slots=False, repr=False)
@@ -934,13 +934,27 @@ class RadonTransformPlotDataProvider:
 
         for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(num_filter_epochs), epochs_linear_fit_df[velocity_col_name].values, epochs_linear_fit_df[intercept_col_name].values, epochs_linear_fit_df[score_col_name].values, epochs_linear_fit_df[speed_col_name].values):
             # build the discrete line over the centered time bins:
+            nt: int = time_bin_containers[epoch_idx].num_bins # .step, .variable_extents
+            dt: float = time_bin_containers[epoch_idx].edge_info.step
+            # t_start, t_end = time_bin_containers[epoch_idx].variable_extents
+            # duration: float = t_end - t_start
+            # time_bin_containers[epoch_idx].edge_info
+            # time_mid: float = nt * dt / 2
             epoch_time_bins = time_bin_containers[epoch_idx].centers
             epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
+            #TODO 2024-02-15 12:19: - [ ] MAYBE THE CENTER of the epoch, not the start!!
+            # epoch_time_bins = epoch_time_bins - time_mid
+            # Try subtracting another half o a time bin width just for fun:
+            epoch_time_bins = epoch_time_bins - (0.5 * dt)
+            
+            epoch_line_fn = lambda t: (epoch_vel * (t - epoch_time_bins[0])) + epoch_intercept
             epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
             with np.printoptions(precision=3, suppress=True, threshold=5):
                 score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
                 speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
-            radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, score_text=score_text, speed_text=speed_text)
+                intercept_text = f"intcpt: " + str(np.array([epoch_intercept])).lstrip("[").rstrip("]")
+
+            radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, score_text=score_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None)
 
         return radon_transform_data
 
@@ -1018,10 +1032,18 @@ class RadonTransformPlotDataProvider:
 
         line_alpha = 0.8  # Faint line
         marker_alpha = 0.8  # More opaque markers
+        extra_text_kwargs = dict(stroke_alpha=0.35, text_alpha=0.8)
         
         debug_print = kwargs.pop('debug_print', True)
         if debug_print:
             print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
+            
+        # Add replay score text to top-right corner:
+        final_text = f"{plots_data.radon_transform_data[i].score_text}\n{plots_data.radon_transform_data[i].speed_text}\n{plots_data.radon_transform_data[i].intercept_text}"
+        if plots_data.radon_transform_data[i].extra_text is not None:
+            final_text = f"{final_text}\n{plots_data.radon_transform_data[i].extra_text}"
+            
+
         extant_plots = plots[cls.plots_group_identifier_key].get(i, {})
         extant_line = extant_plots.get('line', None)
         extant_score_text = extant_plots.get('score_text', None)
@@ -1031,29 +1053,36 @@ class RadonTransformPlotDataProvider:
             # Let's assume we want to remove the 'Quadratic' line (line2)
             if extant_line is not None:
                 extant_line.remove()
-            if extant_score_text is not None:
-                extant_score_text.remove()
-                
+            # if extant_score_text is not None:
+            #     extant_score_text.remove()
+
             # Is .clear() needed? Why doesn't it remove the heatmap as well?
             # curr_ax.clear()
 
 
-        active_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha, marker='+', markersize=2, markerfacecolor='#e5ff00', markeredgecolor='#e5ff00') # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
-
+        ## Plot the line plot. Could update this like I did for the text?
+        active_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha,
+                             marker='+', markersize=2, markerfacecolor='#e5ff00', markeredgecolor='#e5ff00') # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
         radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[i].line_y, **active_kwargs)
 
-        # Add replay score text to top-right corner:
-        final_text = f"{plots_data.radon_transform_data[i].score_text}\n{plots_data.radon_transform_data[i].speed_text}"
-        anchored_text = add_inner_title(curr_ax, final_text, loc='upper left', strokewidth=5, stroke_foreground='k', text_foreground='#e5ff00') # loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
-        anchored_text.patch.set_ec("none")
-        anchored_text.set_alpha(0.4)
+
+        if (extant_score_text is not None):
+            # already exists, update the existing one:
+            assert isinstance(extant_score_text, AnchoredText), f"extant_score_text is of type {type(extant_score_text)} but is expected to be of type AnchoredText."
+            anchored_text: AnchoredText = extant_score_text
+            anchored_text.txt.set_text(final_text)
+        else:
+            ## Create a new one:
+            anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, loc='upper left', strokewidth=5, stroke_foreground='k', text_foreground='#e5ff00', **extra_text_kwargs)
+            anchored_text.patch.set_ec("none")
+            anchored_text.set_alpha(0.4)
+
 
         # Store the plot objects for future updates:
         plots[cls.plots_group_identifier_key][i] = {'line':radon_transform_plot, 'score_text':anchored_text}
         
         if debug_print:
             print(f'\t success!')
-
 
         # If you are in an interactive environment, you might need to refresh the figure.
         # curr_ax.figure.canvas.draw()
@@ -1134,6 +1163,9 @@ class WeightedCorrelationPlotter:
         if debug_print:
             print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
         
+
+        extra_text_kwargs = dict(stroke_alpha=0.35, text_alpha=0.8)
+            
         # Add replay score text to top-right corner:
         final_text: str = f"{plots_data.weighted_corr_data[i].wcorr_text}" # \n{plots_data.radon_transform_data[i].speed_text}
         if len(plots_data.weighted_corr_data[i].P_decoder_text) > 0:
@@ -1151,34 +1183,14 @@ class WeightedCorrelationPlotter:
             # extant_wcorr_text.remove()
             assert isinstance(extant_wcorr_text, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text)} but is expected to be of type AnchoredText."
             anchored_text: AnchoredText = extant_wcorr_text
-            anchored_text.txt.set_text(final_text) 
-            # fontprops = dict(size=14)
-            # anchored_text.prop.update(fontprops)
-
-            # To update the font size, get the current font properties and create a new FontProperties object
-            # current_fontprops = anchored_text.txt.get_fontproperties().copy()
-            # new_font_size = 14
-            # current_fontprops.set_size(new_font_size)
-            # anchored_text.txt.set_fontproperties(current_fontprops)
-
-            # anchored_text.txt.set_fontsize(12) # font-size in points or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
+            anchored_text.txt.set_text(final_text)
             # Is .clear() needed? Why doesn't it remove the heatmap as well?
             # curr_ax.clear()
         else:
             ## Create a new one:
-            anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, loc='upper center', strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
-            # anchored_text.txt.set_fontsize(12) # font-size in points or {'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
-            # Update font size -- you must create a new properties dictionary
-            # fontprops = dict(size=14)
-            # anchored_text.prop.update(fontprops)
+            anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, loc='upper center', strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, **extra_text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
             anchored_text.patch.set_ec("none")
             anchored_text.set_alpha(0.4)
-            # To update the font size, get the current font properties and create a new FontProperties object
-            # current_fontprops = anchored_text.txt.get_fontproperties().copy()
-            # new_font_size = 14
-            # current_fontprops.set_size(new_font_size)
-            # anchored_text.txt.set_fontproperties(current_fontprops)
-
 
 
         # Store the plot objects for future updates:
