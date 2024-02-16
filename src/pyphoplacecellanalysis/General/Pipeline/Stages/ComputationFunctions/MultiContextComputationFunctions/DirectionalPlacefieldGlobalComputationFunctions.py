@@ -1438,9 +1438,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
         epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column)
         return epoch_time_bin_marginals_df
     
-
-
-
     def compute_and_export_marginals_df_csvs(self, parent_output_path: Path, active_context):
         """ Builds the four dataframes from the marginal distributions and exports them to .csv files.
         
@@ -1519,6 +1516,114 @@ class DirectionalMergedDecodersResult(ComputedResult):
         ripple_out_path = export_marginals_df_csv(ripple_marginals_df, data_identifier_str=f'(ripple_marginals_df)_tbin-{ripple_decoding_time_bin_size_str}')
 
         return (laps_marginals_df, laps_out_path, laps_time_bin_marginals_df, laps_time_bin_marginals_out_path), (ripple_marginals_df, ripple_out_path, ripple_time_bin_marginals_df, ripple_time_bin_marginals_out_path)
+
+    @function_attributes(short_name=None, tags=['correlation', 'simple_corr', 'spike-times-v-pf-peak-x'], input_requires=[], output_provides=[], uses=['_perform_compute_simple_spike_time_v_pf_peak_x_by_epoch'], used_by=[], creation_date='2024-02-15 18:29', related_items=[])
+    def compute_simple_spike_time_v_pf_peak_x_by_epoch(self, track_templates: TrackTemplates, spikes_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """ 
+        Updates the .filter_epochs property on both the laps and the ripples objects
+        """
+
+        corr_only_result_dfs = []
+        all_directional_laps_filter_epochs_decoder_result_value = self.all_directional_laps_filter_epochs_decoder_result
+        all_directional_ripple_filter_epochs_decoder_result_value = self.all_directional_ripple_filter_epochs_decoder_result
+
+        for an_epochs_result in (all_directional_laps_filter_epochs_decoder_result_value, all_directional_ripple_filter_epochs_decoder_result_value):
+            # spikes_df = deepcopy(curr_active_pipeline.global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
+            active_epochs_df: pd.DataFrame = deepcopy(an_epochs_result.filter_epochs)
+            corr_df = self._perform_compute_simple_spike_time_v_pf_peak_x_by_epoch(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=active_epochs_df, epoch_label_column_name='label')
+            ## Join the correlations result into the active_epochs_df:
+            active_epochs_df = Epoch(active_epochs_df).to_dataframe().join(corr_df)
+            if isinstance(an_epochs_result.filter_epochs, pd.DataFrame):
+                an_epochs_result.filter_epochs = active_epochs_df
+            else:
+                an_epochs_result.filter_epochs = Epoch(active_epochs_df)
+
+        return (Epoch(all_directional_laps_filter_epochs_decoder_result_value.filter_epochs).to_dataframe(), Epoch(all_directional_ripple_filter_epochs_decoder_result_value.filter_epochs).to_dataframe())
+
+
+
+    @classmethod
+    def _perform_compute_simple_spike_time_v_pf_peak_x_by_epoch(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, epoch_label_column_name = 'label') -> pd.DataFrame:
+        """ 
+        epoch_label_column_name = 'label'
+
+        """
+        from pyphocorehelpers.indexing_helpers import partition_df # used by _compute_simple_spike_time_v_pf_peak_x_by_epoch
+        from scipy.stats import pearsonr # used by _compute_simple_spike_time_v_pf_peak_x_by_epoch
+
+        _NaN_Type = pd.NA
+        _label_column_type: str = 'int64'
+        
+
+        ## Add the epochs identity column ('Probe_Epoch_id') to spikes_df so that they can be split by epoch:
+        ## INPUTS: track_templates, spikes_df, active_epochs_df
+        
+        if not isinstance(active_epochs_df, pd.DataFrame):
+            active_epochs_df = active_epochs_df.to_dataframe()
+
+        decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+        neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in decoders_dict.values()] # [A, B, C, D, ...]
+        included_neuron_ids = np.array(track_templates.any_decoder_neuron_IDs) # one list for all decoders
+        n_neurons = len(included_neuron_ids)
+        # print(f'included_neuron_ids: {included_neuron_ids}, n_neurons: {n_neurons}')
+
+        # Get only the spikes for the shared_aclus:
+        spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(included_neuron_ids)
+        if epoch_label_column_name is not None:
+            assert epoch_label_column_name in active_epochs_df
+            active_epochs_df[epoch_label_column_name] = pd.to_numeric(active_epochs_df[epoch_label_column_name]).astype(int) # 'Int64'
+
+        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=epoch_label_column_name, should_replace_existing_column=True) # , override_time_variable_name='t_seconds'
+        spikes_df = spikes_df[(spikes_df['Probe_Epoch_id'] != -1)] # ['lap', 'maze_relative_lap', 'maze_id']
+        spikes_df, neuron_id_to_new_IDX_map = spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+        # spikes_df
+
+        ## Add pf peak locations to each spike: _pf_peak_x_column_names # ['long_LR_pf_peak_x', 'long_RL_pf_peak_x', 'short_LR_pf_peak_x', 'short_RL_pf_peak_x']
+
+        # Inputs: spikes_df
+        decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict()
+        ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
+        spikes_df: pd.DataFrame = deepcopy(spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': _label_column_type}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+
+        # _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
+        _pf_peak_x_column_names = [f'{a_decoder_name}_pf_peak_x' for a_decoder_name in track_templates.get_decoder_names()]
+        spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[_NaN_Type, _NaN_Type, _NaN_Type, _NaN_Type]], index=spikes_df.index)
+        for a_decoder_name, an_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+            spikes_df[f'{a_decoder_name}_pf_peak_x'] = spikes_df.aclu.map(an_aclu_peak_map)
+
+        # # NOTE: to shuffle aclus, a more complicated approach (as follows) must be used:
+        # unique_Probe_Epoch_IDs = active_selected_spikes_df['Probe_Epoch_id'].unique()
+        # for a_probe_epoch_ID in unique_Probe_Epoch_IDs:
+        # 	mask = (a_probe_epoch_ID == active_selected_spikes_df['Probe_Epoch_id'])
+        # 	for a_decoder_name, an_aclu_peak_map in decoder_aclu_peak_map_dict.items():
+        # 		active_selected_spikes_df.loc[mask, 'aclu'] = active_selected_spikes_df.loc[mask, 'aclu'].sample(frac=1).values # Shuffle aclus here
+        # 		active_selected_spikes_df.loc[mask, f'{a_decoder_name}_pf_peak_x'] = active_selected_spikes_df.loc[mask, 'aclu'].map(an_aclu_peak_map)
+
+        # spikes_df
+
+        partitioned_dfs: Dict[int, pd.DataFrame] = dict(zip(*partition_df(spikes_df, partitionColumn='Probe_Epoch_id')))
+
+        ## Compute the spike-t v. pf_peak_x correlation for each of the decoders
+
+        _simple_corr_results_dict = {}
+
+        for an_epoch_idx, an_epoch_spikes_df in partitioned_dfs.items():
+            # for each epoch
+            # print(f'an_epoch_idx: {an_epoch_idx}, np.shape(epoch_spikes_df): {np.shape(an_epoch_spikes_df)}')
+            _temp_dfs = [an_epoch_spikes_df[['t_rel_seconds', a_peak_x_col_name]].dropna(subset=['t_rel_seconds', a_peak_x_col_name], inplace=False).to_numpy().T for a_peak_x_col_name in _pf_peak_x_column_names]
+            _simple_corr_results_dict[an_epoch_idx] = [pearsonr(_an_arr[0], _an_arr[1]).statistic for _an_arr in _temp_dfs]
+
+        # simple_corr_results_dict
+            
+        # an_epoch_spikes_df
+        corr_df: pd.DataFrame = pd.DataFrame(_simple_corr_results_dict).T
+        corr_column_names = [f'{n}_pearsonr' for n in _pf_peak_x_column_names]
+        corr_df = corr_df.rename(columns=dict(zip(corr_df.columns, corr_column_names)))
+        corr_df.index.name = 'epoch_id'
+        return corr_df
+
+
+
 
 
 @define(slots=False, repr=False)
