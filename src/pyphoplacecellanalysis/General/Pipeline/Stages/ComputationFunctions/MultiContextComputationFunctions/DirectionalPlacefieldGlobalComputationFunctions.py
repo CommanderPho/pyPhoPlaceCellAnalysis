@@ -1716,6 +1716,32 @@ class DirectionalDecodersDecodedResult(ComputedResult):
 
 
 
+def _workaround_validate_has_directional_decoded_continuous_epochs(curr_active_pipeline, computation_filter_name='maze') -> bool:
+    """ Validates that the decoding is complete
+    """
+    directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+    all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+    pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+    if pseudo2D_decoder is None:
+        return False
+    continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+    if len(continuously_decoded_result_cache_dict) < 1:
+        return False
+
+    time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+    if time_bin_size is None:
+        return False
+
+    continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+    if continuously_decoded_dict is None:
+        return False
+    pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo2D', None)
+    if pseudo2D_decoder_continuously_decoded_result is None:
+        return False
+
+    return True
+
+
 
 @define(slots=False, repr=False)
 class DecoderDecodedEpochsResult(ComputedResult):
@@ -1810,6 +1836,39 @@ class DecoderDecodedEpochsResult(ComputedResult):
     # 	# Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
     # 	super(DecoderDecodedEpochsResult, self).__init__() # from
 
+
+def _workaround_validate_has_directional_decoded_epochs_evaluations(curr_active_pipeline, computation_filter_name='maze') -> bool:
+    """ Validates that the decoding is complete, workaround to maybe prevent  #TODO 2024-02-16 14:25: - [ ] PicklingError: Can't pickle <function make_set_closure_cell.<locals>.set_closure_cell at 0x7fd35e66b700>: it's not found as attr._compat.make_set_closure_cell.<locals>.set_closure_cell
+
+    
+    """
+    directional_decoders_decode_epochs_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+    if directional_decoders_decode_epochs_result is None:
+        return False
+    pos_bin_size: float = directional_decoders_decode_epochs_result.pos_bin_size
+    if pos_bin_size is None:
+        return False
+    ripple_decoding_time_bin_size: float = directional_decoders_decode_epochs_result.ripple_decoding_time_bin_size
+    if ripple_decoding_time_bin_size is None:
+        return False
+    laps_decoding_time_bin_size: float = directional_decoders_decode_epochs_result.laps_decoding_time_bin_size
+    if laps_decoding_time_bin_size is None:
+        return False
+
+    decoder_laps_filter_epochs_decoder_result_dict = directional_decoders_decode_epochs_result.decoder_laps_filter_epochs_decoder_result_dict
+    if decoder_laps_filter_epochs_decoder_result_dict is None:
+        return False
+
+    decoder_ripple_filter_epochs_decoder_result_dict = directional_decoders_decode_epochs_result.decoder_ripple_filter_epochs_decoder_result_dict
+    if decoder_ripple_filter_epochs_decoder_result_dict is None:
+        return False
+
+    laps_simple_pf_pearson_merged_df = directional_decoders_decode_epochs_result.laps_simple_pf_pearson_merged_df
+    if laps_simple_pf_pearson_merged_df is None:
+        return False
+
+    #TODO 2024-02-16 13:52: - [ ] Rest of properties
+    return True
 
 
 
@@ -2301,7 +2360,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
     @function_attributes(short_name='directional_decoders_decode_continuous', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-17 09:05', related_items=[],
         requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersDecoded'],
-        validate_computation_test=DirectionalDecodersDecodedResult.validate_has_directional_decoded_continuous_epochs, is_global=True)
+        # validate_computation_test=DirectionalDecodersDecodedResult.validate_has_directional_decoded_continuous_epochs,
+        validate_computation_test=_workaround_validate_has_directional_decoded_continuous_epochs,
+        is_global=True)
     def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None):
         """ Using the four 1D decoders, decodes continously streams of positions from the neural activity for each.
         
@@ -2474,7 +2535,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
     @function_attributes(short_name='directional_decoders_evaluate_epochs', tags=['directional-decoders', 'epochs', 'decode', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-16 12:49', related_items=['DecoderDecodedEpochsResult'],
                          requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
-                         validate_computation_test=DecoderDecodedEpochsResult.validate_has_directional_decoded_epochs_evaluations, is_global=True)
+                        #  validate_computation_test=DecoderDecodedEpochsResult.validate_has_directional_decoded_epochs_evaluations,
+                         validate_computation_test=_workaround_validate_has_directional_decoded_epochs_evaluations,
+                         is_global=True)
     def _decode_and_evaluate_epochs_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Using the four 1D decoders, decodes continously streams of positions from the neural activity for each.
         

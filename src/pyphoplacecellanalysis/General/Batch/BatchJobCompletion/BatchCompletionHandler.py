@@ -172,6 +172,7 @@ class BatchSessionCompletionHandler:
                                         'split_to_directional_laps',
                                         'merged_directional_placefields',
                                         # 'rank_order_shuffle_analysis',
+                                        'directional_decoders_evaluate_epochs',
                                     ]) # do only specified
 
     force_global_recompute: bool = field(default=False)
