@@ -175,7 +175,8 @@ class TrackTemplates(HDFMixin):
         
         #TODO 2024-02-08 10:52: - [ ] Issue with the dataframe build. The plotted posisions don't always seem to be the primary ones.
 
-        
+        #TODO 2024-02-16 06:50: - [ ] ERROR discovered in `decoder_aclu_peak_location_df_merged` - the columns 'LR_peak_diff', 'RL_peak_diff' are incorrect as they aren't comparing the maximum peak (supposed to be at `subpeak_idx == 0`, but better given by `height == 1.0`) of long decoder to maximum peak of short. The comparison logic is wrong.
+
         """
         from pyphocorehelpers.indexing_helpers import reorder_columns_relative
 
@@ -196,6 +197,11 @@ class TrackTemplates(HDFMixin):
         ## Move the "height" columns to the end
         decoder_aclu_peak_location_df_merged = reorder_columns_relative(decoder_aclu_peak_location_df_merged, column_names=list(filter(lambda column: column.endswith('_peak_height'), decoder_aclu_peak_location_df_merged.columns)), relative_mode='end')
         decoder_aclu_peak_location_df_merged = decoder_aclu_peak_location_df_merged.sort_values(['aclu', 'series_idx', 'subpeak_idx']).reset_index(drop=True)
+
+        ## LR/RL are treated as entirely independent here, so only need to focus on one at a time (LR)
+        ## #TODO 2024-02-16 06:50: - [ ] ERROR discovered in `decoder_aclu_peak_location_df_merged` - the columns 'LR_peak_diff', 'RL_peak_diff' are incorrect as they aren't comparing the maximum peak (supposed to be at `subpeak_idx == 0`, but better given by `height == 1.0`) of long decoder to maximum peak of short. The comparison logic is wrong.
+        
+
 
         # Add differences:
         decoder_aclu_peak_location_df_merged['LR_peak_diff'] = decoder_aclu_peak_location_df_merged['long_LR_peak'] - decoder_aclu_peak_location_df_merged['short_LR_peak']
