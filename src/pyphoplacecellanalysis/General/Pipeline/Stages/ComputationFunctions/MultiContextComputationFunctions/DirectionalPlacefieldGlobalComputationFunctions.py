@@ -2168,8 +2168,6 @@ def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame
 
 
 
-
-
 class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """ functions related to directional placefield computations. """
     _computationGroupName = 'directional_pfs'
