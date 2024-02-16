@@ -271,7 +271,7 @@ class TrackTemplates(HDFMixin):
         return (LR_shift_x, LR_shift, LR_neuron_ids), (RL_shift_x, RL_shift, RL_neuron_ids)
     
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
-    def get_decoder_aclu_peak_maps(self) -> DirectionalDecodersTuple:
+    def get_decoder_aclu_peak_maps(self, peak_mode='CoM') -> DirectionalDecodersTuple:
         """ returns a tuple of dicts, each containing a mapping between aclu:peak_pf_x for a given decoder. 
          
         # Naievely:
@@ -281,12 +281,19 @@ class TrackTemplates(HDFMixin):
         short_RL_aclu_peak_map = deepcopy(dict(zip(self.short_RL_decoder.neuron_IDs, self.short_RL_decoder.peak_locations)))
         
         """
-        # return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_locations))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
-        return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_tuning_curve_center_of_masses))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
+        assert peak_mode in ['peaks', 'CoM']
+        if peak_mode == 'peaks':
+            # return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.get_tuning_curve_peak_positions(peak_mode=peak_mode)))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
+            return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_locations))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]) ## #TODO 2024-02-16 04:27: - [ ] This uses .peak_locations which are the positions corresponding to the peak position bin (but not continuously the peak from the curve).
+        elif peak_mode == 'CoM':
+            return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_tuning_curve_center_of_masses))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
+        else:
+            raise NotImplementedError(f"peak_mode: '{peak_mode}' is not supported.")
+    
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
-    def get_decoder_aclu_peak_map_dict(self) -> Dict[decoder_name_str, Dict]:
-        return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps()))
+    def get_decoder_aclu_peak_map_dict(self, peak_mode='CoM') -> Dict[decoder_name_str, Dict]:
+        return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps(peak_mode=peak_mode)))
 
 
     def __repr__(self):
@@ -1557,7 +1564,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
         
         ## Add the epochs identity column ('Probe_Epoch_id') to spikes_df so that they can be split by epoch:
         ## INPUTS: track_templates, spikes_df, active_epochs_df
-        
         if not isinstance(active_epochs_df, pd.DataFrame):
             active_epochs_df = active_epochs_df.to_dataframe()
 
@@ -1581,12 +1587,17 @@ class DirectionalMergedDecodersResult(ComputedResult):
         ## Add pf peak locations to each spike: _pf_peak_x_column_names # ['long_LR_pf_peak_x', 'long_RL_pf_peak_x', 'short_LR_pf_peak_x', 'short_RL_pf_peak_x']
 
         # Inputs: spikes_df
-        decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict()
+        decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict(peak_mode='CoM') # original implementation
+        # decoder_aclu_peak_map_dict = track_templates.get_decoder_aclu_peak_map_dict(peak_mode='peaks') # new attempt to improve ripple decoding scores by using the non-CoM positions. 2024-02-16 - actually worse performance
+        
         ## Restrict to only the relevant columns, and Initialize the dataframe columns to np.nan:
         spikes_df: pd.DataFrame = deepcopy(spikes_df[['t_rel_seconds', 'aclu', 'Probe_Epoch_id']]).sort_values(['Probe_Epoch_id', 't_rel_seconds', 'aclu']).astype({'Probe_Epoch_id': _label_column_type}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
 
         # _pf_peak_x_column_names = ['LR_Long_pf_peak_x', 'RL_Long_pf_peak_x', 'LR_Short_pf_peak_x', 'RL_Short_pf_peak_x']
         _pf_peak_x_column_names = [f'{a_decoder_name}_pf_peak_x' for a_decoder_name in track_templates.get_decoder_names()]
+        corr_column_names = [f'{n}_pearsonr' for n in _pf_peak_x_column_names]
+
+        ## Initialize the output dataframe:
         spikes_df[_pf_peak_x_column_names] = pd.DataFrame([[_NaN_Type, _NaN_Type, _NaN_Type, _NaN_Type]], index=spikes_df.index)
         for a_decoder_name, an_aclu_peak_map in decoder_aclu_peak_map_dict.items():
             spikes_df[f'{a_decoder_name}_pf_peak_x'] = spikes_df.aclu.map(an_aclu_peak_map)
@@ -1601,23 +1612,19 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         # spikes_df
 
-        partitioned_dfs: Dict[int, pd.DataFrame] = dict(zip(*partition_df(spikes_df, partitionColumn='Probe_Epoch_id')))
-
         ## Compute the spike-t v. pf_peak_x correlation for each of the decoders
 
         _simple_corr_results_dict = {}
-
+        partitioned_dfs: Dict[int, pd.DataFrame] = dict(zip(*partition_df(spikes_df, partitionColumn='Probe_Epoch_id')))
         for an_epoch_idx, an_epoch_spikes_df in partitioned_dfs.items():
             # for each epoch
             # print(f'an_epoch_idx: {an_epoch_idx}, np.shape(epoch_spikes_df): {np.shape(an_epoch_spikes_df)}')
             _temp_dfs = [an_epoch_spikes_df[['t_rel_seconds', a_peak_x_col_name]].dropna(subset=['t_rel_seconds', a_peak_x_col_name], inplace=False).to_numpy().T for a_peak_x_col_name in _pf_peak_x_column_names]
             _simple_corr_results_dict[an_epoch_idx] = [pearsonr(_an_arr[0], _an_arr[1]).statistic for _an_arr in _temp_dfs]
 
-        # simple_corr_results_dict
-            
-        # an_epoch_spikes_df
+        ## Convert results dict into a pd.DataFrame            
         corr_df: pd.DataFrame = pd.DataFrame(_simple_corr_results_dict).T
-        corr_column_names = [f'{n}_pearsonr' for n in _pf_peak_x_column_names]
+        
         corr_df = corr_df.rename(columns=dict(zip(corr_df.columns, corr_column_names)))
         corr_df.index.name = 'epoch_id'
         return corr_df, corr_column_names
