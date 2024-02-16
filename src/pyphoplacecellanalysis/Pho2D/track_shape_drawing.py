@@ -674,17 +674,17 @@ def test_LinearTrackDimensions_2D_pyqtgraph(long_track_dims=None, short_track_di
     w.setCentralWidget(cw)
     w.setWindowTitle('LinearTrackDimensions pyqtgraph example: _test_LinearTrackDimensions_2D')
 
-    p = cw.addPlot(row=0, col=0, name="LongTrack")
-    p2 = cw.addPlot(row=1, col=0, name="ShortTrack")
+    ax0 = cw.addPlot(row=0, col=0, name="LongTrack")
+    ax1 = cw.addPlot(row=1, col=0, name="ShortTrack")
 
-    p2.setXLink(p)
-    p2.setYLink(p)
+    ax1.setXLink(ax0)
+    ax1.setYLink(ax0)
     # p.setRange(QtCore.QRectF(-20, -10, 60, 20))
 
-    long_track_combined_collection, long_rect_items, long_rects = long_track_dims.plot_rects(p)
-    short_track_combined_collection, short_rect_items, short_rects = short_track_dims.plot_rects(p2)
+    long_track_combined_collection, long_rect_items, long_rects = long_track_dims.plot_rects(ax0)
+    short_track_combined_collection, short_rect_items, short_rects = short_track_dims.plot_rects(ax1)
     
-    return app, w, cw, (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects)
+    return app, w, cw, (ax0, ax1), (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects)
 
 
 def test_LinearTrackDimensions_2D_Matplotlib(long_track_dims=None, short_track_dims=None, long_offset=None, short_offset=None):
