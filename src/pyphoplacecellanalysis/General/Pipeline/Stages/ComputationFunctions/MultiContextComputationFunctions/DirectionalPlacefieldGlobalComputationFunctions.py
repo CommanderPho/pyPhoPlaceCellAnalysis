@@ -1540,8 +1540,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         return (Epoch(all_directional_laps_filter_epochs_decoder_result_value.filter_epochs).to_dataframe(), Epoch(all_directional_ripple_filter_epochs_decoder_result_value.filter_epochs).to_dataframe())
 
-
-
     @classmethod
     def _perform_compute_simple_spike_time_v_pf_peak_x_by_epoch(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, epoch_label_column_name = 'label') -> pd.DataFrame:
         """ 
@@ -1621,6 +1619,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         corr_df = corr_df.rename(columns=dict(zip(corr_df.columns, corr_column_names)))
         corr_df.index.name = 'epoch_id'
         return corr_df
+
 
 
 
