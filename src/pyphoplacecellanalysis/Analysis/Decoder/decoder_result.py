@@ -1143,7 +1143,7 @@ class DiagnosticDistanceMetricFigure:
 
     Usage: (for use in Jupyter Notebook)
         ```python
-        from PendingNotebookCode import DiagnosticDistanceMetricFigure
+        from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import DiagnosticDistanceMetricFigure
         import ipywidgets as widgets
         from IPython.display import display
 
