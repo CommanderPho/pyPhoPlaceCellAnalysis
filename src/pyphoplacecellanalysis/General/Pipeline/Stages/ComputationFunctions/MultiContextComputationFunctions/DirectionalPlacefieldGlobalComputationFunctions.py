@@ -1518,27 +1518,30 @@ class DirectionalMergedDecodersResult(ComputedResult):
         return (laps_marginals_df, laps_out_path, laps_time_bin_marginals_df, laps_time_bin_marginals_out_path), (ripple_marginals_df, ripple_out_path, ripple_time_bin_marginals_df, ripple_time_bin_marginals_out_path)
 
     @function_attributes(short_name=None, tags=['correlation', 'simple_corr', 'spike-times-v-pf-peak-x'], input_requires=[], output_provides=[], uses=['_perform_compute_simple_spike_time_v_pf_peak_x_by_epoch'], used_by=[], creation_date='2024-02-15 18:29', related_items=[])
-    def compute_simple_spike_time_v_pf_peak_x_by_epoch(self, track_templates: TrackTemplates, spikes_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def compute_simple_spike_time_v_pf_peak_x_by_epoch(self, track_templates: TrackTemplates, spikes_df: pd.DataFrame) -> Tuple[Tuple[pd.DataFrame, pd.DataFrame], List[str]]:
         """ 
         Updates the .filter_epochs property on both the laps and the ripples objects
+        adds columns: ['long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr', 'best_decoder_index']
         """
-
-        corr_only_result_dfs = []
+        best_decoder_index_col_name: str = 'best_decoder_index' # _pearsonr
         all_directional_laps_filter_epochs_decoder_result_value = self.all_directional_laps_filter_epochs_decoder_result
         all_directional_ripple_filter_epochs_decoder_result_value = self.all_directional_ripple_filter_epochs_decoder_result
 
         for an_epochs_result in (all_directional_laps_filter_epochs_decoder_result_value, all_directional_ripple_filter_epochs_decoder_result_value):
             # spikes_df = deepcopy(curr_active_pipeline.global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
             active_epochs_df: pd.DataFrame = deepcopy(an_epochs_result.filter_epochs)
-            corr_df = self._perform_compute_simple_spike_time_v_pf_peak_x_by_epoch(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=active_epochs_df, epoch_label_column_name='label')
+            corr_df, corr_column_names = self._perform_compute_simple_spike_time_v_pf_peak_x_by_epoch(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=active_epochs_df, epoch_label_column_name='label') # corr_column_names: ['long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']
             ## Join the correlations result into the active_epochs_df:
-            active_epochs_df = Epoch(active_epochs_df).to_dataframe().join(corr_df)
+            active_epochs_df = Epoch(active_epochs_df).to_dataframe()
+            active_epochs_df = active_epochs_df.drop(columns=corr_column_names, errors='ignore', inplace=False) # drop existing columns so they can be replaced
+            active_epochs_df = active_epochs_df.join(corr_df)
+            active_epochs_df[best_decoder_index_col_name] = active_epochs_df[corr_column_names].abs().apply(lambda row: np.argmax(row.values), axis=1) # Computes the highest-valued decoder for this score. Note `.abs()` is important here to consider both directions.
             if isinstance(an_epochs_result.filter_epochs, pd.DataFrame):
                 an_epochs_result.filter_epochs = active_epochs_df
             else:
                 an_epochs_result.filter_epochs = Epoch(active_epochs_df)
 
-        return (Epoch(all_directional_laps_filter_epochs_decoder_result_value.filter_epochs).to_dataframe(), Epoch(all_directional_ripple_filter_epochs_decoder_result_value.filter_epochs).to_dataframe())
+        return (Epoch(all_directional_laps_filter_epochs_decoder_result_value.filter_epochs).to_dataframe(), Epoch(all_directional_ripple_filter_epochs_decoder_result_value.filter_epochs).to_dataframe()), corr_column_names
 
     @classmethod
     def _perform_compute_simple_spike_time_v_pf_peak_x_by_epoch(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, epoch_label_column_name = 'label') -> pd.DataFrame:
@@ -1552,7 +1555,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
         _NaN_Type = pd.NA
         _label_column_type: str = 'int64'
         
-
         ## Add the epochs identity column ('Probe_Epoch_id') to spikes_df so that they can be split by epoch:
         ## INPUTS: track_templates, spikes_df, active_epochs_df
         
@@ -1618,7 +1620,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         corr_column_names = [f'{n}_pearsonr' for n in _pf_peak_x_column_names]
         corr_df = corr_df.rename(columns=dict(zip(corr_df.columns, corr_column_names)))
         corr_df.index.name = 'epoch_id'
-        return corr_df
+        return corr_df, corr_column_names
 
 
 
