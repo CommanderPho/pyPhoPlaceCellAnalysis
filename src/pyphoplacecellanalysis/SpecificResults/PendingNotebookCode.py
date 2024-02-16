@@ -144,7 +144,6 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict, columns=[
             score_metric_merged_df = score_metric_merged_df.add_suffix(f"_{a_name}") # suffix the columns so they're unique
         else:
             ## append to the initial_df
-            # initial_df = initial_df.join(deepcopy(a_df), lsuffix=None, rsuffix=f'_{a_name}')
             score_metric_merged_df = score_metric_merged_df.join(filter_columns_fn(deepcopy(a_df)).add_suffix(f"_{a_name}"), lsuffix=None, rsuffix=None)
 
     # Get the column name with the maximum value for each row
@@ -155,9 +154,8 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict, columns=[
     return score_metric_merged_df
 
 ## INPUTS: laps_all_epoch_bins_marginals_df, radon_transform_merged_df
-def _build_merged_marginals_df(an_all_epoch_bins_marginals_df: pd.DataFrame, radon_transform_merged_df: pd.DataFrame) ->  pd.DataFrame:
-    """ ## Compare the radon-transform ['score'] column for each decoder
-    
+def _compute_nonmarginalized_decoder_prob(an_all_epoch_bins_marginals_df: pd.DataFrame) ->  pd.DataFrame:
+    """ Convert from the marginalized Long/Short probabilities back to the individual 1D decoder probability.
     """
     ## Get the probability of each decoder:
     a_marginals_df = deepcopy(an_all_epoch_bins_marginals_df)
@@ -169,14 +167,7 @@ def _build_merged_marginals_df(an_all_epoch_bins_marginals_df: pd.DataFrame, rad
     # Get the column name with the maximum value for each row
     # a_marginals_df['most_likely_decoder_index'] = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].idxmax(axis=1)
     a_marginals_df['most_likely_decoder_index'] = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].apply(lambda row: np.argmax(row.values), axis=1)
-
-    ## Merge in the RadonTransform df:
-    a_marginals_df: pd.DataFrame = a_marginals_df.join(radon_transform_merged_df)
-
-    # ## count up the number that the RadonTransform and the most-likely direction agree
-    # agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs) = _compute_matching_best_indicies(a_marginals_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
     return a_marginals_df
-
 
 
 def _recover_position_bin_size(a_directional_pf1D_Decoder) -> float:
@@ -190,7 +181,6 @@ def _recover_position_bin_size(a_directional_pf1D_Decoder) -> float:
     
     print(f'pos_bin_size: {pos_bin_size}')
     return pos_bin_size
-
 
 def _compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result, a_directional_ripple_filter_epochs_decoder_result, nlines=4192, margin=16, n_jobs=4):
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder.
@@ -262,24 +252,26 @@ def _compute_complete_df_metrics(directional_merged_decoders_result: "Directiona
         decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_score_result_df=decoder_laps_df_dict[a_name], columns=active_df_columns)
         decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=decoder_ripple_df_dict[a_name], columns=active_df_columns)
 
+    ## Convert from a Dict (decoder_laps_df_dict) to a merged dataframe with columns suffixed with the decoder name:
     laps_metric_merged_df = _build_merged_score_metric_df(decoder_laps_df_dict, columns=active_df_columns)
     ripple_metric_merged_df = _build_merged_score_metric_df(decoder_ripple_df_dict, columns=active_df_columns)
-    ## OUTPUTS: laps_radon_transform_merged_df, ripple_radon_transform_merged_df
+    ## OUTPUTS: laps_metric_merged_df, ripple_metric_merged_df
 
-    ## Compare the radon-transform ['score'] column for each decoder
-    laps_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)
-    ripple_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)
-    laps_metric_merged_df = _build_merged_marginals_df(laps_all_epoch_bins_marginals_df, laps_metric_merged_df)
-    ripple_metric_merged_df = _build_merged_marginals_df(ripple_all_epoch_bins_marginals_df, ripple_metric_merged_df)
+    ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs:
+    _laps_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df))
+    _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df))
+    
+    ## Merge in the RadonTransform df:
+    laps_metric_merged_df: pd.DataFrame = _laps_all_epoch_bins_marginals_df.join(laps_metric_merged_df)
+    ripple_metric_merged_df: pd.DataFrame = _ripple_all_epoch_bins_marginals_df.join(ripple_metric_merged_df)
 
     ## Extract the individual decoder probability into the .active_epochs
+    per_decoder_df_columns = ['P_decoder']
     decoder_name_to_decoder_probability_column_map = dict(zip(track_templates.get_decoder_names(), ['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']))
-    for a_name, a_decoder in track_templates.get_decoders_dict().items():
-        # decoder_laps_filter_epochs_decoder_result_dict[a_name]
-        # decoder_ripple_filter_epochs_decoder_result_dict[a_name].filter_epochs
-        ## Get a dataframe containing only the appropriate column for this decoder
+    # for a_name, a_decoder in track_templates.get_decoders_dict().items():
+    for a_name in track_templates.get_decoder_names():
+        ## Build a single-column dataframe containing only the appropriate column for this decoder
         a_prob_column_name:str = decoder_name_to_decoder_probability_column_map[a_name]
-        per_decoder_df_columns = ['P_decoder']
         a_laps_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': laps_metric_merged_df[a_prob_column_name].to_numpy()})
         a_ripple_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': ripple_metric_merged_df[a_prob_column_name].to_numpy()})
         
@@ -767,7 +759,8 @@ from nptyping import NDArray
 from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 @define(slots=False)
 class TrialByTrialActivity:
-    """ 
+    """ 2024-02-12 - Computes lap-by-lap placefields and helps display correlation matricies and such.
+    
     """
     active_epochs_df: pd.DataFrame = field()
     C_trial_by_trial_correlation_matrix: NDArray = field()
