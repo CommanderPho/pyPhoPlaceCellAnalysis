@@ -1337,93 +1337,95 @@ import plotly.express as px
 import plotly.graph_objs as go
 
 
-# def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histogram_bins:int=25):
-#     """ 
-#     Usage:
+def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histogram_bins:int=25):
+    """ 
+    Usage:
 
-#         histogram_bins: int = 25
+        histogram_bins: int = 25
 
-#         new_laps_fig = complete_plotly_figure(data_results_df=deepcopy(all_sessions_laps_df), out_scatter_fig=fig_laps, histogram_bins=histogram_bins)
-#         new_laps_fig
+        new_laps_fig = complete_plotly_figure(data_results_df=deepcopy(all_sessions_laps_df), out_scatter_fig=fig_laps, histogram_bins=histogram_bins)
+        new_laps_fig
 
-#     """
-#     import plotly.subplots as sp
-#     import plotly.express as px
-#     import plotly.graph_objs as go
+    """
+    import plotly.subplots as sp
+    import plotly.express as px
+    import plotly.graph_objs as go
 
-#     unique_sessions = data_results_df['session_name'].unique()
-#     num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+    unique_sessions = data_results_df['session_name'].unique()
+    num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
 
-#     ## Extract the unique time bin sizes:
-#     time_bin_sizes: int = data_results_df['time_bin_size'].unique()
-#     num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
+    ## Extract the unique time bin sizes:
+    time_bin_sizes: int = data_results_df['time_bin_size'].unique()
+    num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
 
-#     print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
-
-
-#     # get the pre-delta epochs
-#     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
-#     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
-
-#     # X_all = data_results_df['delta_aligned_start_t'].to_numpy()
-#     # Y_all = data_results_df['P_Long'].to_numpy()
-
-#     # X_pre_delta = pre_delta_df['delta_aligned_start_t'].to_numpy()
-#     # X_post_delta = post_delta_df['delta_aligned_start_t'].to_numpy()
-
-#     # Y_pre_delta = pre_delta_df['P_Long'].to_numpy()
-#     # Y_post_delta = post_delta_df['P_Long'].to_numpy()
-
-#     # creating subplots
-#     fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta",f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"])
-
-#     # Pre-Delta Histogram ________________________________________________________________________________________________ #
-#     # adding first histogram
-#     pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
-#     print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
-#     # time_bin_sizes
-#     for a_trace in pre_delta_fig.data:
-#         fig.add_trace(a_trace, row=1, col=1)
-#         fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-
-#     # Calculate the histogram data
-#     # hist1, bins1 = np.histogram(X_pre_delta, bins=histogram_bins)
-
-#     # # Adding the first histogram as a bar graph and making x negative
-#     # fig.add_trace(
-#     #     # go.Bar(x=bins1[:-1], y=hist1, marker_color='#EB89B5', name='first half', orientation='h', ),
-#     # 	go.Histogram(y=Y_pre_delta, name='pre-delta', marker_color='#EB89B5'),
-#     #     row=1, col=1
-#     # )
-#     # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
-
-#     # Scatter Plot _______________________________________________________________________________________________________ #
-#     # adding scatter plot
-#     for a_trace in out_scatter_fig.data:
-#         fig.add_trace(a_trace, row=1, col=2)
-#         fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
 
 
-#     # Post-Delta Histogram _______________________________________________________________________________________________ #
-#     # adding the second histogram
-#     post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+    # get the pre-delta epochs
+    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
 
-#     for a_trace in post_delta_fig.data:
-#         fig.add_trace(a_trace, row=1, col=3)
-#         fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+    # X_all = data_results_df['delta_aligned_start_t'].to_numpy()
+    # Y_all = data_results_df['P_Long'].to_numpy()
+
+    # X_pre_delta = pre_delta_df['delta_aligned_start_t'].to_numpy()
+    # X_post_delta = post_delta_df['delta_aligned_start_t'].to_numpy()
+
+    # Y_pre_delta = pre_delta_df['P_Long'].to_numpy()
+    # Y_post_delta = post_delta_df['P_Long'].to_numpy()
+
+    # creating subplots
+    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta",f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"])
+
+    # Pre-Delta Histogram ________________________________________________________________________________________________ #
+    # adding first histogram
+    pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+    print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
+    # time_bin_sizes
+    for a_trace in pre_delta_fig.data:
+        fig.add_trace(a_trace, row=1, col=1)
+        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+
+    # Calculate the histogram data
+    # hist1, bins1 = np.histogram(X_pre_delta, bins=histogram_bins)
+
+    # # Adding the first histogram as a bar graph and making x negative
+    # fig.add_trace(
+    #     # go.Bar(x=bins1[:-1], y=hist1, marker_color='#EB89B5', name='first half', orientation='h', ),
+    # 	go.Histogram(y=Y_pre_delta, name='pre-delta', marker_color='#EB89B5'),
+    #     row=1, col=1
+    # )
+    # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+
+    # Scatter Plot _______________________________________________________________________________________________________ #
+    # adding scatter plot
+    for a_trace in out_scatter_fig.data:
+        fig.add_trace(a_trace, row=1, col=2)
+        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+
+
+    # Post-Delta Histogram _______________________________________________________________________________________________ #
+    # adding the second histogram
+    post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+
+    for a_trace in post_delta_fig.data:
+        fig.add_trace(a_trace, row=1, col=3)
+        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
         
-#     # Calculate the histogram data for second half
-#     # hist2, bins2 = np.histogram(X_post_delta, bins=histogram_bins)
-#     # Adding the second histogram
-#     # fig.add_trace(
-#     # 	go.Histogram(y=Y_post_delta, name='post-delta', marker_color='#EB89B5',),
-#     #     # go.Bar(x=bins2[:-1], y=hist2, marker_color='#330C73', name='second half', orientation='h', ),
-#     #     row=1, col=3
-#     # )
+    # Calculate the histogram data for second half
+    # hist2, bins2 = np.histogram(X_post_delta, bins=histogram_bins)
+    # Adding the second histogram
+    # fig.add_trace(
+    # 	go.Histogram(y=Y_post_delta, name='post-delta', marker_color='#EB89B5',),
+    #     # go.Bar(x=bins2[:-1], y=hist2, marker_color='#330C73', name='second half', orientation='h', ),
+    #     row=1, col=3
+    # )
 
-#     # fig.update_layout(layout_yaxis_range=[0.0, 1.0])
-#     fig.update_layout(yaxis=dict(range=[0.0, 1.0]), barmode='overlay')
-#     return fig
+    # fig.update_layout(layout_yaxis_range=[0.0, 1.0])
+    fig.update_layout(yaxis=dict(range=[0.0, 1.0]), barmode='overlay')
+    return fig
+
+
 
 
 def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
