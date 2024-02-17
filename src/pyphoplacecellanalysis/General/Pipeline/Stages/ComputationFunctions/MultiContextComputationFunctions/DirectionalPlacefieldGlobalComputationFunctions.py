@@ -1769,6 +1769,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
     ripple_weighted_corr_merged_df: pd.DataFrame = serialized_field(default=None)
     decoder_laps_weighted_corr_df_dict: Dict = serialized_field(default=Factory(dict))
     decoder_ripple_weighted_corr_df_dict: Dict = serialized_field(default=Factory(dict))
+    
     laps_simple_pf_pearson_merged_df: pd.DataFrame = serialized_field(default=None)
     ripple_simple_pf_pearson_merged_df: pd.DataFrame = serialized_field(default=None)
     
@@ -1822,6 +1823,74 @@ class DecoderDecodedEpochsResult(ComputedResult):
     #         raise KeyError(f"'{key}' is not a valid attribute of '{self.__class__.__name__}'")
 
 
+
+    def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float]):
+        """ export as separate .csv files. 
+        active_context = curr_active_pipeline.get_session_context()
+        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+        active_context = curr_active_pipeline.get_session_context()
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+
+            
+        """
+        assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
+        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+
+
+        def add_session_df_columns(df: pd.DataFrame, session_name: str, time_bin_size: float, curr_session_t_delta: Optional[float], time_col: str) -> pd.DataFrame:
+            """ adds session-specific information to the marginal dataframes """
+            df['session_name'] = session_name
+            if time_bin_size is not None:
+                df['time_bin_size'] = np.full((len(df), ), time_bin_size)
+            if curr_session_t_delta is not None:
+                df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
+            return df
+
+        # Export CSVs:
+        def export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)'):
+            """ captures `active_context`, `parent_output_path`. 'output_date_str'
+            """
+            # parent_output_path: Path = Path('output').resolve()
+            # active_context = curr_active_pipeline.get_session_context()
+            session_identifier_str: str = active_context.get_description()
+            assert output_date_str is not None
+            out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04|kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+            out_filename = f"{out_basename}.csv"
+            out_path = parent_output_path.joinpath(out_filename).resolve()
+            export_df.to_csv(out_path)
+            return out_path 
+        
+
+        _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
+        
+        tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
+        time_col_name_dict = {'laps': 'lap_start_t', 'ripple': 'ripple_start_t'} ## default should be 't_bin_center'
+        
+        # a_df_name.startswith(
+        # an_epochs_source_names
+
+        export_files_dict = {}
+        extracted_dfs_dict = {a_df_name:getattr(self, a_df_name) for a_df_name in _df_variables_names}
+        for a_df_name, a_df in extracted_dfs_dict.items():
+            an_epochs_source_name: str = a_df_name.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
+            a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
+            a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
+            ## Add t_bin column method
+            a_df = add_session_df_columns(a_df, session_name=session_name, time_bin_size=a_tbin_size, curr_session_t_delta=curr_session_t_delta, time_col=a_time_col_name)            
+            a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
+            a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier 
+            
+            # TODO: add in custom columns
+            # ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+            # ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
+        
+            export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str)
+            
+        return export_files_dict
+    
 
 
     # ## For serialization/pickling:
