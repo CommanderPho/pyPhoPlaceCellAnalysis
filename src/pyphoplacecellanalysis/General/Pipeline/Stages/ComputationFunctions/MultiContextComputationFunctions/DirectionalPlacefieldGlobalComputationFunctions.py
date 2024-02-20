@@ -2642,8 +2642,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 laps_simple_pf_pearson_merged_df = directional_decoders_epochs_decode_result.laps_simple_pf_pearson_merged_df
                 ripple_simple_pf_pearson_merged_df = directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df
 
-
-
+                
         Should call:
         
         _perform_compute_custom_epoch_decoding
@@ -3036,7 +3035,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         laps_radon_transform_merged_df, ripple_radon_transform_merged_df, laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df, laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df = merged_df_outputs_tuple
         decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_extras_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict = raw_dict_outputs_tuple
 
-
         #TODO 2024-02-16 13:46: - [ ] Currently always replace
         ## Create or update the global directional_merged_decoders_result:
         # directional_decoders_epochs_decode_result: DirectionalMergedDecodersResult = global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
@@ -3054,26 +3052,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             'laps_simple_pf_pearson_merged_df': laps_simple_pf_pearson_merged_df, 'ripple_simple_pf_pearson_merged_df': ripple_simple_pf_pearson_merged_df,
             })
 
-        # loaded_dict = global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
-        # ## UNPACK HERE:
-        # pos_bin_size: float = loaded_dict['pos_bin_size']
-        # ripple_decoding_time_bin_size = loaded_dict['ripple_decoding_time_bin_size']
-        # laps_decoding_time_bin_size = loaded_dict['laps_decoding_time_bin_size']
-        # decoder_laps_filter_epochs_decoder_result_dict = loaded_dict['decoder_laps_filter_epochs_decoder_result_dict']
-        # decoder_ripple_filter_epochs_decoder_result_dict = loaded_dict['decoder_ripple_filter_epochs_decoder_result_dict']
-        # decoder_laps_radon_transform_df_dict = loaded_dict['decoder_laps_radon_transform_df_dict']
-        # decoder_ripple_radon_transform_df_dict = loaded_dict['decoder_ripple_radon_transform_df_dict']
-        # ## New 2024-02-14 - Noon:
-        # decoder_laps_radon_transform_extras_dict = loaded_dict['decoder_laps_radon_transform_extras_dict']
-        # decoder_ripple_radon_transform_extras_dict = loaded_dict['decoder_ripple_radon_transform_extras_dict']
-        # ## New 2024-02-16 _ Weighted Corr
-        # laps_weighted_corr_merged_df = loaded_dict['laps_weighted_corr_merged_df']
-        # ripple_weighted_corr_merged_df = loaded_dict['ripple_weighted_corr_merged_df']
-        # decoder_laps_weighted_corr_df_dict = loaded_dict['decoder_laps_weighted_corr_df_dict']
-        # decoder_ripple_weighted_corr_df_dict = loaded_dict['decoder_ripple_weighted_corr_df_dict']
-
-        # laps_simple_pf_pearson_merged_df = loaded_dict['laps_simple_pf_pearson_merged_df']
-        # ripple_simple_pf_pearson_merged_df = loaded_dict['ripple_simple_pf_pearson_merged_df']
 
         # Set the global result:
         global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations'] = directional_decoders_epochs_decode_result
