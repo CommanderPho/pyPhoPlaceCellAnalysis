@@ -1804,7 +1804,7 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
 
 
 @function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, **kwargs) -> None:
+def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column='P_Long', **kwargs) -> None:
     """ plots a set of two histograms in subplots, split at the delta for each session.
     from PendingNotebookCode import plot_histograms
     
@@ -1835,11 +1835,11 @@ def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec:
     descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
     
     # plot pre-delta histogram
-    pre_delta_df.hist(ax=ax_dict['epochs_pre_delta'], column='P_Long', **histogram_kwargs)
+    pre_delta_df.hist(ax=ax_dict['epochs_pre_delta'], column=column, **histogram_kwargs)
     ax_dict['epochs_pre_delta'].set_title(f'{descriptor_str} - pre-$\Delta$ time bins')
 
     # plot post-delta histogram
-    post_delta_df.hist(ax=ax_dict['epochs_post_delta'], column='P_Long', **histogram_kwargs)
+    post_delta_df.hist(ax=ax_dict['epochs_post_delta'], column=column, **histogram_kwargs)
     ax_dict['epochs_post_delta'].set_title(f'{descriptor_str} - post-$\Delta$ time bins')
     if not defer_show:
         fig.show()

@@ -2606,7 +2606,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                          validate_computation_test=_workaround_validate_has_directional_decoded_epochs_evaluations,
                          is_global=True)
     def _decode_and_evaluate_epochs_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
-        """ Using the four 1D decoders, decodes continously streams of positions from the neural activity for each.
+        """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
             ['sess']
@@ -2722,7 +2722,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             decoder_ripple_filter_epochs_decoder_result_dict = {}
 
             for a_name, a_decoder in track_templates.get_decoders_dict().items():
-                # decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name], (decoder_laps_radon_transform_df_dict[a_name], decoder_ripple_radon_transform_df_dict[a_name]) =
                 decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_epoch_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
 
             # decoder_laps_radon_transform_df_dict ## ~4m
@@ -2937,6 +2936,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             decoder_laps_radon_transform_df_dict = {}
             decoder_ripple_radon_transform_df_dict = {}
 
+            # These 'extra' dicts were intended to be used in debugging the Radon Transform calculations, but were never needed.
             decoder_laps_radon_transform_extras_dict = {}
             decoder_ripple_radon_transform_extras_dict = {}
 
