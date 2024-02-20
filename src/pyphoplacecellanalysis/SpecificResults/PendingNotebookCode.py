@@ -1803,7 +1803,6 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     return all_figures
 
 
-
 @function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, **kwargs) -> None:
     """ plots a set of two histograms in subplots, split at the delta for each session.
@@ -1942,10 +1941,8 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, s
     if match is not None:
         # export_datetime_str, session_str, export_file_type = match.groups()
         export_datetime_str, session_str, export_file_type, decoding_time_bin_size_str = match.group('export_datetime_str'), match.group('session_str'), match.group('export_file_type'), match.group('decoding_time_bin_size_str')
-    
         # parse the datetime from the export_datetime_str and convert it to datetime object
         export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d_%I%M%p")
-
     else:
         if debug_print:
             print(f'did not match pattern with time.')
@@ -1957,7 +1954,6 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, s
             # print(export_datetime_str, session_str, export_file_type)
             # parse the datetime from the export_datetime_str and convert it to datetime object
             export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
-        
         else:
             # Try H5 pattern:
             # matches '2024-01-04-kdiba_gor01_one_2006-6-08_14-26'
@@ -1971,7 +1967,6 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, s
                 except ValueError as e:
                     print(f'ERR: Could not parse date "{export_datetime_str}" of filename: "{filename}"') # 2024-01-18_GL_t_split_df
                     return None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
-        
             else:
                 print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
                 return None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
