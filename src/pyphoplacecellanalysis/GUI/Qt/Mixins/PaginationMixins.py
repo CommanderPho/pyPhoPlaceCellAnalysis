@@ -191,11 +191,22 @@ class PaginatedFigureBaseController:
         else:
             ax.patch.set_facecolor('white')
 
+        # Update the selection rectangles for this ax if we have them:
+        selection_rectangles_dict = self.plots.get('selection_rectangles_dict', {})
+        a_selection_rect = selection_rectangles_dict.get(ax, None)
+        if a_selection_rect is not None:
+            a_selection_rect.set_visible(is_selected)
+
+
+
     def perform_update_selections(self, defer_render:bool = False):
         """ called to update the selection when the page is changed or something else happens. """        
         current_page_idx = self.current_page_idx
         curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
         assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
+        ## This seems uneeeded, but we'll see:
+        self._subfn_build_selectibility_rects_if_needed(self.plots.axs, list(curr_page_data_indicies))
+        
         for ax, found_data_idx in zip(self.plots.axs, list(curr_page_data_indicies)): # TODO: might fail for the last page?
             # print(f'found_data_idx: {found_data_idx}')
             # found_data_index = curr_page_data_indicies[found_index]
@@ -206,6 +217,39 @@ class PaginatedFigureBaseController:
         # Redraw the figure to show the updated selection
         if not defer_render:
             self.plots.fig.canvas.draw_idle()
+            ax.get_figure().canvas.draw()
+
+
+
+    def _subfn_build_selectibility_rects_if_needed(self, axs, curr_page_data_indicies):
+        """ adds the selectibility rectangles (patches), one for each axis, to the matplotlib axes provided
+        
+        Updates: self.plots.selection_rectangles_dict
+        Uses: self.params.is_selected
+        """
+        from matplotlib.patches import Rectangle
+        from neuropy.utils.matplotlib_helpers import add_selection_patch
+
+        if not self.plots.has_attr('selection_rectangles_dict'):
+            ## Create the dict if needed and it doesn't exist:
+            print(f'building new self.plots.selection_rectangles_dict as one does not exist')
+            self.plots.selection_rectangles_dict = {} # empty dict to start
+
+        ## INPUTS: curr_page_data_indicies, axs
+        assert len(axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
+        for ax, found_data_idx in zip(axs, list(curr_page_data_indicies)): # TODO: might fail for the last page?
+            ## First get the ax
+            a_selection_rect = self.plots.selection_rectangles_dict.get(ax, None)
+            if a_selection_rect is None:
+                # create a new one
+                print(f'needed a new selection rect.')
+                a_selection_rect = add_selection_patch(ax, selection_color='green', alpha=0.6, zorder=-1, defer_draw=True)
+                self.plots.selection_rectangles_dict[ax] = a_selection_rect ## add to dict
+
+            is_selected = self.params.is_selected.get(found_data_idx, False)
+            a_selection_rect.set_visible(is_selected)
+
+
 
     def _subfn_helper_setup_selectability(self):
         """ sets up selectability of items. 
