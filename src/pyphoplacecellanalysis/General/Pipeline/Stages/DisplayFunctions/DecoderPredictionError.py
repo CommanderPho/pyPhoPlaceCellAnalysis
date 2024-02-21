@@ -924,37 +924,40 @@ class RadonTransformPlotDataProvider:
             radon_transform_column_names = ['score', 'velocity', 'intercept', 'speed'] # use default
             
         # `active_filter_epochs_df` native columns approach
-        assert np.isin(radon_transform_column_names, active_filter_epochs_df.columns).all()
-        epochs_linear_fit_df = active_filter_epochs_df[radon_transform_column_names].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
-        score_col_name, velocity_col_name, intercept_col_name, speed_col_name = radon_transform_column_names # extract the column names from the provided list
-        # epochs_linear_fit_df approach
-        assert num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
+        if not np.isin(radon_transform_column_names, active_filter_epochs_df.columns).all():
+            print(f'no radon transform columns present in the the active_filter_epochs_df. Skipping.')
+            radon_transform_data = None
+        else:
+            epochs_linear_fit_df = active_filter_epochs_df[radon_transform_column_names].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
+            score_col_name, velocity_col_name, intercept_col_name, speed_col_name = radon_transform_column_names # extract the column names from the provided list
+            # epochs_linear_fit_df approach
+            assert num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
 
-        radon_transform_data = {}
+            radon_transform_data = {}
 
-        for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(num_filter_epochs), epochs_linear_fit_df[velocity_col_name].values, epochs_linear_fit_df[intercept_col_name].values, epochs_linear_fit_df[score_col_name].values, epochs_linear_fit_df[speed_col_name].values):
-            # build the discrete line over the centered time bins:
-            nt: int = time_bin_containers[epoch_idx].num_bins # .step, .variable_extents
-            dt: float = time_bin_containers[epoch_idx].edge_info.step
-            # t_start, t_end = time_bin_containers[epoch_idx].variable_extents
-            # duration: float = t_end - t_start
-            # time_bin_containers[epoch_idx].edge_info
-            # time_mid: float = nt * dt / 2
-            epoch_time_bins = time_bin_containers[epoch_idx].centers
-            epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
-            #TODO 2024-02-15 12:19: - [ ] MAYBE THE CENTER of the epoch, not the start!!
-            # epoch_time_bins = epoch_time_bins - time_mid
-            # Try subtracting another half o a time bin width just for fun:
-            epoch_time_bins = epoch_time_bins - (0.5 * dt)
-            
-            epoch_line_fn = lambda t: (epoch_vel * (t - epoch_time_bins[0])) + epoch_intercept
-            epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
-            with np.printoptions(precision=3, suppress=True, threshold=5):
-                score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
-                speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
-                intercept_text = f"intcpt: " + str(np.array([epoch_intercept])).lstrip("[").rstrip("]")
+            for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(num_filter_epochs), epochs_linear_fit_df[velocity_col_name].values, epochs_linear_fit_df[intercept_col_name].values, epochs_linear_fit_df[score_col_name].values, epochs_linear_fit_df[speed_col_name].values):
+                # build the discrete line over the centered time bins:
+                nt: int = time_bin_containers[epoch_idx].num_bins # .step, .variable_extents
+                dt: float = time_bin_containers[epoch_idx].edge_info.step
+                # t_start, t_end = time_bin_containers[epoch_idx].variable_extents
+                # duration: float = t_end - t_start
+                # time_bin_containers[epoch_idx].edge_info
+                # time_mid: float = nt * dt / 2
+                epoch_time_bins = time_bin_containers[epoch_idx].centers
+                epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
+                #TODO 2024-02-15 12:19: - [ ] MAYBE THE CENTER of the epoch, not the start!!
+                # epoch_time_bins = epoch_time_bins - time_mid
+                # Try subtracting another half o a time bin width just for fun:
+                epoch_time_bins = epoch_time_bins - (0.5 * dt)
+                
+                epoch_line_fn = lambda t: (epoch_vel * (t - epoch_time_bins[0])) + epoch_intercept
+                epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
+                with np.printoptions(precision=3, suppress=True, threshold=5):
+                    score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+                    speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
+                    intercept_text = f"intcpt: " + str(np.array([epoch_intercept])).lstrip("[").rstrip("]")
 
-            radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, score_text=score_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None)
+                radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, score_text=score_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None)
 
         return radon_transform_data
 
