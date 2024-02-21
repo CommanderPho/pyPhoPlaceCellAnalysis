@@ -848,6 +848,39 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
 
 
+# ==================================================================================================================== #
+# Pagination Data Providers                                                                                            #
+# ==================================================================================================================== #
+
+
+class PaginatedPlotDataProvider:
+    """ Provides auxillary and optional data to paginated plots, currently of decoded posteriors. 
+    
+    """
+    # callback_identifier_string: str = 'plot_radon_transform_line_data'
+    # plots_group_identifier_key: str = 'radon_transform' # _out_pagination_controller.plots['weighted_corr']
+
+    @classmethod
+    def add_data_to_pagination_controller(cls, _out_pagination_controller, radon_transform_data, update_controller_on_apply:bool=False):
+        """ should be general I think.
+        """
+        enable_radon_transform_info = True
+
+        _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data
+        _out_pagination_controller.plots[cls.plots_group_identifier_key] = {}
+
+        # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
+        on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
+        if on_render_page_callbacks is None:
+            _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
+        ## add or update this callback:
+        if enable_radon_transform_info:
+            _out_pagination_controller.params.on_render_page_callbacks[cls.callback_identifier_string] = cls._callback_update_curr_single_epoch_slice_plot
+        # Trigger the update
+        if update_controller_on_apply:
+            _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
+
+
 @define
 class RadonTransformPlotData:
     line_y: np.ndarray = field()
@@ -859,8 +892,11 @@ class RadonTransformPlotData:
 
 
 # @define(slots=False, repr=False)
-class RadonTransformPlotDataProvider:
-    """ 
+class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
+    """ Adds the yellow Radon Transform result to the posterior heatmap.
+
+    `.add_data_to_pagination_controller(...)` adds the result to the pagination controller
+
     Data:
         plots_data.radon_transform_data
     Plots:
@@ -879,7 +915,6 @@ class RadonTransformPlotDataProvider:
     callback_identifier_string: str = 'plot_radon_transform_line_data'
     plots_group_identifier_key: str = 'radon_transform' # _out_pagination_controller.plots['weighted_corr']
 
-
     @classmethod
     def add_data_to_pagination_controller(cls, _out_pagination_controller, radon_transform_data, update_controller_on_apply:bool=False):
         """ should be general I think.
@@ -895,11 +930,11 @@ class RadonTransformPlotDataProvider:
             _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
         ## add or update this callback:
         if enable_radon_transform_info:
-            _out_pagination_controller.params.on_render_page_callbacks[cls.callback_identifier_string] = cls._callback_update_curr_single_epoch_slice_plot            
+            _out_pagination_controller.params.on_render_page_callbacks[cls.callback_identifier_string] = cls._callback_update_curr_single_epoch_slice_plot
         # Trigger the update
         if update_controller_on_apply:
             _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
-        
+
 
     @classmethod
     def _subfn_build_radon_transform_plotting_data(cls, active_filter_epochs_df: pd.DataFrame, num_filter_epochs: int, time_bin_containers: List["BinningContainer"], radon_transform_column_names: Optional[List[str]]=None):
@@ -1099,11 +1134,25 @@ class RadonTransformPlotDataProvider:
 class WeightedCorrelationPlotData:
     wcorr_text: str = field()
     P_decoder_text: str = field(default='')
+    pearson_r_text: str = field(default='')
+
+    @classmethod
+    def init_from_df_columns(cls, epoch_wcorr, epoch_P_decoder, pearson_r) -> "WeightedCorrelationPlotData":
+        """ TODO: make general """
+        with np.printoptions(precision=3, suppress=True, threshold=5):
+            wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+            P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
+            if pearson_r is not None:
+                pearson_r_text = f"pearsonr: " + str(np.array([pearson_r])).lstrip("[").rstrip("]")
+            return cls(wcorr_text=wcorr_text, P_decoder_text=P_decoder_text, pearson_r_text=pearson_r_text)
+
 
 
 # @define(slots=False, repr=False)
-class WeightedCorrelationPlotter:
-    """ 
+class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
+    """ NOTE: This class currently provides more than just weighted correlation data, in fact it is suitable for rendering any subplot-dependent computed quantity.
+    Currently displays: WCorr, P_decoder (1D decoder probability of the four different decoders), simple correlation pearson r value
+
     Data:
         plots_data.weighted_corr_data
     Plots:
@@ -1116,9 +1165,8 @@ class WeightedCorrelationPlotter:
     callback_identifier_string: str = 'plot_wcorr_data'
     plots_group_identifier_key: str = 'weighted_corr' # _out_pagination_controller.plots['weighted_corr']
 
-    text_color: str = '#ff001a'
+    text_color: str = '#ff886a'
     
-
     @classmethod
     def add_data_to_pagination_controller(cls, _out_pagination_controller, weighted_corr_data, update_controller_on_apply:bool=False):
         """ should be general I think.
@@ -1167,31 +1215,29 @@ class WeightedCorrelationPlotter:
             print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
         
 
-        extra_text_kwargs = dict(stroke_alpha=0.35, text_alpha=0.8)
+        extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
             
         # Add replay score text to top-right corner:
         final_text: str = f"{plots_data.weighted_corr_data[i].wcorr_text}" # \n{plots_data.radon_transform_data[i].speed_text}
         if len(plots_data.weighted_corr_data[i].P_decoder_text) > 0:
             ## Add the P_decoder line:
             final_text = f"{final_text}\n{plots_data.weighted_corr_data[i].P_decoder_text}"
-
+        if len(plots_data.weighted_corr_data[i].pearson_r_text) > 0:
+            ## Add the P_decoder line:
+            final_text = f"{final_text}\n{plots_data.weighted_corr_data[i].pearson_r_text}"
 
         ## Build or Update:
         extant_plots = plots[cls.plots_group_identifier_key].get(i, {})
         extant_wcorr_text = extant_plots.get('wcorr_text', None)
         # plot the radon transform line on the epoch:    
         if (extant_wcorr_text is not None):
-            # already exists, clear the existing ones. 
-            # Let's assume we want to remove the 'Quadratic' line (line2)
-            # extant_wcorr_text.remove()
+            # already exists, update the existing ones. 
             assert isinstance(extant_wcorr_text, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text)} but is expected to be of type AnchoredText."
             anchored_text: AnchoredText = extant_wcorr_text
             anchored_text.txt.set_text(final_text)
-            # Is .clear() needed? Why doesn't it remove the heatmap as well?
-            # curr_ax.clear()
         else:
             ## Create a new one:
-            anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, loc='upper center', strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, **extra_text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
+            anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, **extra_text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
             anchored_text.patch.set_ec("none")
             anchored_text.set_alpha(0.4)
 
@@ -1219,12 +1265,15 @@ class WeightedCorrelationPlotter:
             num_filter_epochs = np.shape(active_filter_epochs_df)[0]
             wcorr_col_name: str = 'wcorr'
             P_decoder_col_name: str = 'P_decoder'
+            pearson_r_col_name: str = 'pearsonr'
             wcorr_data = {}
-            for epoch_idx, epoch_wcorr, epoch_P_decoder in zip(np.arange(num_filter_epochs), active_filter_epochs_df[wcorr_col_name].values, active_filter_epochs_df[P_decoder_col_name].values):
-                with np.printoptions(precision=3, suppress=True, threshold=5):
-                    wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
-                    P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
-                wcorr_data[epoch_idx] = WeightedCorrelationPlotData(wcorr_text=wcorr_text, P_decoder_text=P_decoder_text)
+            for epoch_idx, epoch_wcorr, epoch_P_decoder, epoch_pearsonr in zip(np.arange(num_filter_epochs), active_filter_epochs_df[wcorr_col_name].values, active_filter_epochs_df[P_decoder_col_name].values, active_filter_epochs_df[pearson_r_col_name].values):
+                # with np.printoptions(precision=3, suppress=True, threshold=5):
+                #     wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+                #     P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
+                # wcorr_data[epoch_idx] = WeightedCorrelationPlotData(wcorr_text=wcorr_text, P_decoder_text=P_decoder_text)
+                wcorr_data[epoch_idx] = WeightedCorrelationPlotData.init_from_df_columns(epoch_wcorr, epoch_P_decoder, epoch_pearsonr)
+                
             return wcorr_data
 
         from pyphocorehelpers.indexing_helpers import NumpyHelpers
