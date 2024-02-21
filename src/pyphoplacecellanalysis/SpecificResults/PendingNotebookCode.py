@@ -31,7 +31,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController
 from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPlotter
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
 
 
 def align_decoder_pagination_controller_windows(pagination_controller_dict):
@@ -216,7 +216,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             included_columns = []
 
         epoch_type_names_list: List[str] = [a_pagination_controller.params.active_identifying_figure_ctx.epochs for a_pagination_controller in self.pagination_controllers.values()]
-        # TODO: All epoch_type_names should be the same, either 'laps' or 'ripple':
+        # All epoch_type_names should be the same, either 'laps' or 'ripple':
+        assert (len(set(epoch_type_names_list)) == 1), f"All epoch_type_names should be the same, either 'laps' or 'ripple', but they are not: epoch_type_names_list: {epoch_type_names_list}"
         epoch_type_name: str = epoch_type_names_list[0]
         assert epoch_type_name in ['laps', 'ripple']
 
@@ -235,21 +236,23 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                     RadonTransformPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, radon_transform_epochs_data_dict[a_name], update_controller_on_apply=False)
             
 
-        # Build Radon Transforms and add them:
-        # wcorr_laps_data_dict = WeightedCorrelationPlotter.decoder_build_weighted_correlation_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_laps_weighted_corr_df_dict)
-        # wcorr_ripple_data_dict = WeightedCorrelationPlotter.decoder_build_weighted_correlation_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_weighted_corr_df_dict)
-        wcorr_laps_data_dict = WeightedCorrelationPlotter.decoder_build_weighted_correlation_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict)
-        wcorr_ripple_data_dict = WeightedCorrelationPlotter.decoder_build_weighted_correlation_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
+        # Build Weighted Correlation Data Info and add them:
+        if epoch_type_name == 'laps':
+            wcorr_epochs_data_dict = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_weighted_correlation_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict)
 
+        elif epoch_type_name == 'ripple':
+            wcorr_epochs_data_dict = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_weighted_correlation_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
+        else:
+            raise NotImplementedError(f"epoch_type_name: {epoch_type_name}")
+    
         ## Add the radon_transform_lines to each of the four figures:
-        for a_name, a_pagination_controller in self.pagination_controllers.items():
-            if a_pagination_controller.params.active_identifying_figure_ctx.epochs == 'laps':
-                WeightedCorrelationPlotter.add_data_to_pagination_controller(a_pagination_controller, wcorr_laps_data_dict[a_name], update_controller_on_apply=False)
-            elif a_pagination_controller.params.active_identifying_figure_ctx.epochs == 'ripple':
-                WeightedCorrelationPlotter.add_data_to_pagination_controller(a_pagination_controller, wcorr_ripple_data_dict[a_name], update_controller_on_apply=False)
-            else:
-                raise NotImplementedError(a_pagination_controller.params.active_identifying_figure_ctx)
-            
+        if wcorr_epochs_data_dict is not None:
+            for a_name, a_pagination_controller in self.pagination_controllers.items():
+                if wcorr_epochs_data_dict[a_name] is not None:
+                    WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, wcorr_epochs_data_dict[a_name], update_controller_on_apply=False)
+
+
+
 
     @classmethod
     def _subfn_prepare_plot_multi_decoders_stacked_epoch_slices(cls, curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict, epochs_name:str ='laps', included_epoch_indicies=None, defer_render=True, save_figure=True, **kwargs):

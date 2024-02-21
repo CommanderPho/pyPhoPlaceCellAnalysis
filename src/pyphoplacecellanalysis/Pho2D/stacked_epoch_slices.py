@@ -794,15 +794,19 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         ax = event.inaxes
         # Find the axes
         found_index = safe_find_index_in_list(self.plots.axs, ax) # find the index on the page of the ax that was clicked
-        # print(f'{found_index = }')
-        current_page_idx = self.current_page_idx
-        curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
-        found_data_index = curr_page_data_indicies[found_index]
-        print(f'{current_page_idx = }, {found_data_index =}')
-        # Toggle the selection status of the clicked Axes
-        self.params.is_selected[found_data_index] = not self.params.is_selected.get(found_data_index, False) # if never set before, assume that it's not selected
-        ## Update visual apperance of axis:
-        self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
+        if found_index is not None:
+            # print(f'{found_index = }')
+            current_page_idx = self.current_page_idx
+            curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
+            found_data_index = curr_page_data_indicies[found_index]
+            print(f'{current_page_idx = }, {found_data_index =}') # array([[0, 1, 2, 3, 4, 5, 6, 7]])
+            # Toggle the selection status of the clicked Axes
+            self.params.is_selected[found_data_index] = not self.params.is_selected.get(found_data_index, False) # if never set before, assume that it's not selected
+            ## Update visual apperance of axis:
+            self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
+
+        else:
+            print(f'could not find the clicked ax: {ax} in the list of axes: {self.plots.axs}')
 
         # Redraw the figure to show the updated selection
         # event.canvas.draw()
@@ -818,6 +822,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             ax.patch.set_facecolor('gray')
         else:
             ax.patch.set_facecolor('white')
+        # Update the selection rectangles for this ax if we have them:
+        selection_rectangles_dict = self.plots.get('selection_rectangles_dict', {})
+        a_selection_rect = selection_rectangles_dict.get(ax, None)
+        if a_selection_rect is not None:
+            a_selection_rect.set_visible(is_selected)
+
         if self.params.debug_print:
             print(f'\tdone.')
 
@@ -829,10 +839,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         current_page_idx = self.current_page_idx
         curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
         assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
+        ## This seems uneeeded, but we'll see:
+        self._subfn_build_selectibility_rects_if_needed(self.plots.axs, list(curr_page_data_indicies))
+
         for ax, found_data_idx in zip(self.plots.axs, list(curr_page_data_indicies)): # TODO: might fail for the last page?
-            # print(f'found_data_idx: {found_data_idx}')
-            # found_data_index = curr_page_data_indicies[found_index]
-            # print(f'{current_page_idx = }, {found_data_index =}')
             is_selected = self.params.is_selected.get(found_data_idx, False)
             self.perform_update_ax_selected_state(ax=ax, is_selected=is_selected)
                 
@@ -840,7 +850,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         assert defer_render
         if not defer_render:
             self.plots.fig.canvas.draw_idle()
-            
+            ax.get_figure().canvas.draw()
 
 
 def interactive_good_epoch_selections(annotations_man: UserAnnotationsManager, curr_active_pipeline) -> dict:
