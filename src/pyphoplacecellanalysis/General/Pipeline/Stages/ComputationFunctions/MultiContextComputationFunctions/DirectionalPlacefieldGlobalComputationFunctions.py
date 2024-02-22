@@ -1085,7 +1085,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         return True
 
-
     @classmethod
     def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result, debug_print=False):
         """ only works for the all-directional coder with the four items
@@ -1138,7 +1137,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
                     print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
         return custom_curr_unit_marginal_list
-
 
     @classmethod
     def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result, debug_print=False):
@@ -1202,8 +1200,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
                     print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
         return custom_curr_unit_marginal_list
-
-
 
     @classmethod
     def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result, debug_print=False):
@@ -1303,9 +1299,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
                     print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
         return custom_curr_unit_marginal_list
-    
-
-    
+        
     @classmethod
     def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result):
         """ 
@@ -1432,7 +1426,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
         
 
         return epoch_time_bin_marginals_df
-
 
     @classmethod
     def _build_per_time_bin_marginals(cls, a_decoder_result: DecodedFilterEpochsResult, active_marginals: List, columns=['P_Long', 'P_Short']) -> pd.DataFrame:
@@ -1938,32 +1931,6 @@ def _workaround_validate_has_directional_decoded_epochs_evaluations(curr_active_
 
     #TODO 2024-02-16 13:52: - [ ] Rest of properties
     return True
-
-
-
-
-# loaded_dict = global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
-        # ## UNPACK HERE:
-        # pos_bin_size: float = loaded_dict['pos_bin_size']
-        # ripple_decoding_time_bin_size = loaded_dict['ripple_decoding_time_bin_size']
-        # laps_decoding_time_bin_size = loaded_dict['laps_decoding_time_bin_size']
-        # decoder_laps_filter_epochs_decoder_result_dict = loaded_dict['decoder_laps_filter_epochs_decoder_result_dict']
-        # decoder_ripple_filter_epochs_decoder_result_dict = loaded_dict['decoder_ripple_filter_epochs_decoder_result_dict']
-        # decoder_laps_radon_transform_df_dict = loaded_dict['decoder_laps_radon_transform_df_dict']
-        # decoder_ripple_radon_transform_df_dict = loaded_dict['decoder_ripple_radon_transform_df_dict']
-        # ## New 2024-02-14 - Noon:
-        # decoder_laps_radon_transform_extras_dict = loaded_dict['decoder_laps_radon_transform_extras_dict']
-        # decoder_ripple_radon_transform_extras_dict = loaded_dict['decoder_ripple_radon_transform_extras_dict']
-        # ## New 2024-02-16 _ Weighted Corr
-        # laps_weighted_corr_merged_df = loaded_dict['laps_weighted_corr_merged_df']
-        # ripple_weighted_corr_merged_df = loaded_dict['ripple_weighted_corr_merged_df']
-        # decoder_laps_weighted_corr_df_dict = loaded_dict['decoder_laps_weighted_corr_df_dict']
-        # decoder_ripple_weighted_corr_df_dict = loaded_dict['decoder_ripple_weighted_corr_df_dict']
-
-        # laps_simple_pf_pearson_merged_df = loaded_dict['laps_simple_pf_pearson_merged_df']
-        # ripple_simple_pf_pearson_merged_df = loaded_dict['ripple_simple_pf_pearson_merged_df']
-
-
 
 
 
