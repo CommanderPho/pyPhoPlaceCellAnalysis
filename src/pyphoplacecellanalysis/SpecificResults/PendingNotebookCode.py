@@ -16,6 +16,127 @@ from attrs import define, field, Factory
 from pyphocorehelpers.function_helpers import function_attributes
 
 
+# ==================================================================================================================== #
+# 2024-02-20 - Track Remapping Figures                                                                                 #
+# ==================================================================================================================== #
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.path import Path
+import matplotlib.colors as mcolors
+import matplotlib.cm as cm
+
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _build_track_1D_verticies
+
+@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-22 11:12', related_items=[])
+def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds, long_column_name:str='long_LR', short_column_name:str='short_LR'):
+    """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
+
+    🔝🖼️🎨
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_track_remapping_diagram
+    # grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(global_pf2D.config.grid_bin_bounds)
+    fix, ax, _outputs_tuple = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff, grid_bin_bounds=long_pf2D.config.grid_bin_bounds)
+
+    """
+    # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
+    from pyphocorehelpers.geometry_helpers import BoundsRect
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+
+
+    ## Extract the quantities needed from the DF passed
+    active_aclus = LR_only_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
+    long_peak_x = LR_only_decoder_aclu_MAX_peak_maps_df[long_column_name].to_numpy()
+    short_peak_x = LR_only_decoder_aclu_MAX_peak_maps_df[short_column_name].to_numpy()
+    # peak_x_diff = LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'].to_numpy()
+
+    grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
+    # display(grid_bin_bounds)
+
+    # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+    # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+
+    long_track_dims = LinearTrackDimensions(track_length=170.0)
+    short_track_dims = LinearTrackDimensions(track_length=100.0)
+
+    common_1D_platform_height = 0.25
+    common_1D_track_height = 0.1
+    long_track_dims.minor_axis_platform_side_width = common_1D_platform_height
+    long_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
+
+    short_track_dims.minor_axis_platform_side_width = common_1D_platform_height
+    short_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
+
+    # instances:
+    long_track = LinearTrackInstance(long_track_dims, grid_bin_bounds=grid_bin_bounds)
+    short_track = LinearTrackInstance(short_track_dims, grid_bin_bounds=grid_bin_bounds)
+
+    print(long_track_dims)
+    print(short_track_dims)
+
+    # BEGIN PLOTTING _____________________________________________________________________________________________________ #
+    long_path = _build_track_1D_verticies(platform_length=22.0, track_length=170.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
+    short_path = _build_track_1D_verticies(platform_length=22.0, track_length=100.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=True)
+
+    ## Create the remapping figure:
+    fig, ax = plt.subplots()
+    long_patch = patches.PathPatch(long_path, facecolor='orange', alpha=0.5, lw=2)
+    ax.add_patch(long_patch)
+
+    short_patch = patches.PathPatch(short_path, facecolor='green', alpha=0.5, lw=2)
+    ax.add_patch(short_patch)
+    ax.autoscale()
+
+    ## INPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff
+
+    
+    # Define a colormap to map your unique integer indices to colors
+    colormap = plt.cm.viridis  # or any other colormap
+    normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
+    scalar_map = cm.ScalarMappable(norm=normalize, cmap=colormap)
+
+    random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
+    # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
+
+    long_y = (np.full_like(long_peak_x, 0.1)+random_y_jitter)
+    short_y = (np.full_like(short_peak_x, 0.75)+random_y_jitter)
+
+    _out = ax.scatter(long_peak_x, y=long_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='LR long_peak_x')
+    _out2 = ax.scatter(short_peak_x, y=short_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='LR short_peak_x')
+
+    # Add text labels to scatter points
+    for i, aclu_val in enumerate(active_aclus):
+        ax.text(long_peak_x[i], long_y[i], str(aclu_val), color='black', fontsize=8)
+        ax.text(short_peak_x[i], short_y[i], str(aclu_val), color='black', fontsize=8)
+
+    # Draw arrows from the first set of points to the second set
+    arrows_output = {}
+    for idx in range(len(long_peak_x)):
+        # Starting point coordinates
+        start_x = long_peak_x[idx]
+        # start_y = 0.1 + random_y_jitter[idx]
+        start_y = long_y[idx]
+        # End point coordinates
+        end_x = short_peak_x[idx]
+        # end_y = 0.75 + random_y_jitter[idx]
+        end_y = short_y[idx]
+        # Calculate the change in x and y for the arrow
+        # dx = end_x - start_x
+        # dy = end_y - start_y
+
+        # Get the corresponding color for the current index using the colormap
+        arrow_color = scalar_map.to_rgba(active_aclus[idx])
+        
+        # Annotate the plot with arrows; adjust the properties according to your needs
+        arrows_output[idx] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(arrowstyle="->", color=arrow_color, alpha=0.6))
+
+    # Show the plot
+    # plt.legend()
+    plt.show()
+    return fig, ax, (arrows_output)
+
+
+
+
 
 # ==================================================================================================================== #
 # 2024-02-15 - Radon Transform / Weighted Correlation, etc helpers                                                     #
@@ -59,9 +180,6 @@ def align_decoder_pagination_controller_windows(pagination_controller_dict):
         WidgetPositioningHelpers.align_window_edges(target_window, a_controlled_widget.window(), relative_position = 'right_of', resize_to_main=(1.0, ratio_content_height)) # use ratio_content_height to compensate for the lack of a pagination scroll bar
         target_window = a_controlled_widget.window() # update to reference the newly moved window
         ratio_content_height = 1.0 # after the first window, 1.0 should be used since they're all the same height
-
-
-
 
 class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     """ a custom PhoMainAppWindowBase (QMainWindow) subclass that contains a DockArea as its central view.
@@ -314,12 +432,49 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return new_connections_dict
 
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from flexitext import flexitext ## flexitext for formatted matplotlib text
 
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
+def export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline):
+    """ exports each pages single-decoder figures separately
+
+    Captures: curr_active_pipeline
+    
+    """
+    for a_name, a_pagination_controller in pagination_controller_dict.items():
+        display_context = a_pagination_controller.params.get('active_identifying_figure_ctx', IdentifyingContext())
+
+        # Get context for current page of items:
+        current_page_idx: int = int(a_pagination_controller.current_page_idx)
+        a_paginator = a_pagination_controller.paginator
+        total_num_pages = int(a_paginator.num_pages)
+        page_context = display_context.overwriting_context(page=current_page_idx, num_pages=total_num_pages)
+        print(page_context)
+
+        ## Get the figure/axes:
+        a_plots = a_pagination_controller.plots # RenderPlots
+        a_params = a_pagination_controller.params
+        
+        # with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+        with mpl.rc_context({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+            figs = a_plots.fig
+            axs = a_plots.axs
+            curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
+
+
+# export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
 
 
 # ==================================================================================================================== #
-# Usability/Conveninece Helpers                                                                                        #
+# 2024-02-08 - Plot Single ACLU Heatmaps for Each Decoder                                                              #
 # ==================================================================================================================== #
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+
 
 def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None, ax_dict=None, extra_decoder_values_dict=None, tuning_curves_dict=None, include_tuning_curves=False):
     """ 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
@@ -470,6 +625,92 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
     # ax_dict["ax_SHORT_pf_tuning_curve"].set_box
 
     return fig, ax_dict
+
+# INPUTS: directional_active_lap_pf_results_dicts, test_aclu: int = 26, xbin_centers, decoder_aclu_peak_location_df_merged
+
+def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts, xbin_centers, xbin, decoder_aclu_peak_location_df_merged: pd.DataFrame, aclu: int = 26, **kwargs):
+    """ 2024-02-06 - Plot all four decoders for a single aclu, with overlayed red lines for the detected peaks. 
+    
+    plot_single_heatmap_set_with_points
+
+    plot_cell_position_binned_activity_over_time
+
+    Usage:
+
+        decoders_tuning_curves_dict = track_templates.decoder_normalized_tuning_curves_dict_dict.copy()
+
+        extra_decoder_values_dict = {'tuning_curves': decoders_tuning_curves_dict, 'points': decoder_aclu_peak_location_df_merged}
+
+        # decoders_tuning_curves_dict
+        xbin_centers = deepcopy(active_pf_dt.xbin_centers)
+        xbin = deepcopy(active_pf_dt.xbin)
+        fig, ax_dict = plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts, xbin_centers, xbin, extra_decoder_values_dict=extra_decoder_values_dict, aclu=4, 
+                                                        decoders_tuning_curves_dict=decoders_tuning_curves_dict, decoder_aclu_peak_location_df_merged=decoder_aclu_peak_location_df_merged,
+                                                            active_context=curr_active_pipeline.build_display_context_for_session('single_heatmap_set_with_points'))
+                                                            
+    """
+    from neuropy.utils.result_context import IdentifyingContext
+
+    ## TEst: Look at a single aclu value
+    # test_aclu: int = 26
+    # test_aclu: int = 28
+    
+    active_context: IdentifyingContext = kwargs.get('active_context', IdentifyingContext())
+    active_context = active_context.overwriting_context(aclu=aclu)
+
+    decoders_tuning_curves_dict = kwargs.get('decoders_tuning_curves_dict', None)
+    
+    matching_aclu_df = decoder_aclu_peak_location_df_merged[decoder_aclu_peak_location_df_merged.aclu == aclu].copy()
+    assert len(matching_aclu_df) > 0, f"matching_aclu_df: {matching_aclu_df} for aclu == {aclu}"
+    new_peaks_dict: Dict = list(matching_aclu_df.itertuples(index=False))[0]._asdict() # {'aclu': 28, 'long_LR_peak': 185.29063638457257, 'long_RL_peak': nan, 'short_LR_peak': 176.75276643746625, 'short_RL_peak': nan, 'LR_peak_diff': 8.537869947106316, 'RL_peak_diff': nan}
+        
+    # long_LR_name, long_RL_name, short_LR_name, short_RL_name
+    curr_aclu_z_scored_tuning_map_matrix_dict = {}
+    curr_aclu_mean_epoch_peak_location_dict = {}
+    curr_aclu_median_peak_location_dict = {}
+    curr_aclu_extracted_decoder_peak_locations_dict = {}
+
+    ## Find the peak location for each epoch:
+    for a_name, a_decoder_directional_active_lap_pf_result in directional_active_lap_pf_results_dicts.items():
+        # print(f'a_name: {a_name}')
+        matrix_idx = a_decoder_directional_active_lap_pf_result.aclu_to_matrix_IDX_map[aclu]
+        curr_aclu_z_scored_tuning_map_matrix = a_decoder_directional_active_lap_pf_result.z_scored_tuning_map_matrix[:,matrix_idx,:] # .shape (22, 80, 56)
+        curr_aclu_z_scored_tuning_map_matrix_dict[a_name] = curr_aclu_z_scored_tuning_map_matrix
+
+        # curr_aclu_mean_epoch_peak_location_dict[a_name] = np.nanmax(curr_aclu_z_scored_tuning_map_matrix, axis=-1)
+        assert np.shape(curr_aclu_z_scored_tuning_map_matrix)[-1] == len(xbin_centers), f"np.shape(curr_aclu_z_scored_tuning_map_matrix)[-1]: {np.shape(curr_aclu_z_scored_tuning_map_matrix)} != len(xbin_centers): {len(xbin_centers)}"
+        curr_peak_value = new_peaks_dict[f'{a_name}_peak']
+        # print(f'curr_peak_value: {curr_peak_value}')
+        curr_aclu_extracted_decoder_peak_locations_dict[a_name] = curr_peak_value
+
+        curr_aclu_mean_epoch_peak_location_dict[a_name] = np.nanargmax(curr_aclu_z_scored_tuning_map_matrix, axis=-1)
+        curr_aclu_mean_epoch_peak_location_dict[a_name] = xbin_centers[curr_aclu_mean_epoch_peak_location_dict[a_name]] # convert to actual positions instead of indicies
+        curr_aclu_median_peak_location_dict[a_name] = np.nanmedian(curr_aclu_mean_epoch_peak_location_dict[a_name])
+
+    # curr_aclu_mean_epoch_peak_location_dict # {'maze1_odd': array([ 0, 55, 54, 55, 55, 53, 50, 55, 52, 52, 55, 53, 53, 52, 51, 52, 55, 55, 53, 55, 55, 54], dtype=int64), 'maze2_odd': array([46, 45, 43, 46, 45, 46, 46, 46, 45, 45, 44, 46, 44, 45, 46, 45, 44, 44, 45, 45], dtype=int64)}
+
+
+    if decoders_tuning_curves_dict is not None:
+        curr_aclu_tuning_curves_dict = {name:v.get(aclu, None) for name, v in decoders_tuning_curves_dict.items()}
+    else:
+        curr_aclu_tuning_curves_dict = None
+                
+    # point_value = curr_aclu_median_peak_location_dict
+    point_value = curr_aclu_extracted_decoder_peak_locations_dict
+    fig, ax_dict = plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin=xbin, point_dict=point_value, tuning_curves_dict=curr_aclu_tuning_curves_dict, include_tuning_curves=True)
+    # Set window title and plot title
+    perform_update_title_subtitle(fig=fig, ax=None, title_string=f"Position-Binned Activity per Lap - aclu {aclu}", subtitle_string=None, active_context=active_context, use_flexitext_titles=True)
+
+    # fig, ax_dict = plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin=xbin, point_dict=curr_aclu_extracted_decoder_peak_locations_dict) # , defer_show=True
+    
+    # fig.show()
+    return fig, ax_dict
+
+
+
+# ==================================================================================================================== #
+# Usability/Conveninece Helpers                                                                                        #
+# ==================================================================================================================== #
 
 
 def pho_jointplot(*args, **kwargs):

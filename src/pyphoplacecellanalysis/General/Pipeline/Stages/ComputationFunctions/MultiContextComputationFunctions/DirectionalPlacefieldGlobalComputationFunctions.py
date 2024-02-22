@@ -1533,15 +1533,30 @@ class DirectionalMergedDecodersResult(ComputedResult):
         all_directional_laps_filter_epochs_decoder_result_value = self.all_directional_laps_filter_epochs_decoder_result
         all_directional_ripple_filter_epochs_decoder_result_value = self.all_directional_ripple_filter_epochs_decoder_result
 
+        ## Drop endcap aclus:
+        # excluded_endcap_aclus: NDArray = np.array([ 6,  14,  15,  19,  28,  33,  40,  43,  51,  52,  53,  59,  60,  67,  71,  83,  84,  85,  87,  95, 101, 102]) # #TODO 2024-02-22 13:25: - [ ] Hardcoded values for IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-09_1-22-43')
+        spikes_df: pd.DataFrame = deepcopy(spikes_df)
+        # unique_aclus = spikes_df.aclu.unique()
+        # included_aclus = np.array([aclu for aclu in unique_aclus if (aclu not in excluded_endcap_aclus)]) 
+        # spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(included_aclus)
+        # spikes_df, neuron_id_to_new_IDX_map = spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+
+        ## TODO: Now filter included epochs by num_unique_aclus
+
         for an_epochs_result in (all_directional_laps_filter_epochs_decoder_result_value, all_directional_ripple_filter_epochs_decoder_result_value):
             # spikes_df = deepcopy(curr_active_pipeline.global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
             active_epochs_df: pd.DataFrame = deepcopy(an_epochs_result.filter_epochs)
             corr_df, corr_column_names = self._perform_compute_simple_spike_time_v_pf_peak_x_by_epoch(track_templates=track_templates, spikes_df=spikes_df, active_epochs_df=active_epochs_df, epoch_label_column_name='label') # corr_column_names: ['long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']
+            # corr_df.dropna(subset=corr_column_names)
+            # corr_df['n_participating_aclus'] = 
+
+            # Replace None with NaN
+            corr_df = corr_df.where(pd.notnull(corr_df), np.nan)
             ## Join the correlations result into the active_epochs_df:
             active_epochs_df = Epoch(active_epochs_df).to_dataframe()
             active_epochs_df = active_epochs_df.drop(columns=corr_column_names, errors='ignore', inplace=False) # drop existing columns so they can be replaced
             active_epochs_df = active_epochs_df.join(corr_df)
-            active_epochs_df[best_decoder_index_col_name] = active_epochs_df[corr_column_names].abs().apply(lambda row: np.argmax(row.values), axis=1) # Computes the highest-valued decoder for this score. Note `.abs()` is important here to consider both directions.
+            active_epochs_df[best_decoder_index_col_name] = active_epochs_df[corr_column_names].fillna(0.0).abs().apply(lambda row: np.argmax(row.values), axis=1) # Computes the highest-valued decoder for this score. Note `.abs()` is important here to consider both directions.
             if isinstance(an_epochs_result.filter_epochs, pd.DataFrame):
                 an_epochs_result.filter_epochs = active_epochs_df
             else:
@@ -1551,7 +1566,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
     @classmethod
     def _perform_compute_simple_spike_time_v_pf_peak_x_by_epoch(cls, track_templates: TrackTemplates, spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, epoch_label_column_name = 'label') -> pd.DataFrame:
-        """ 
+        """ Computes one type of epoch (laps, ripple) for all four decoders
         epoch_label_column_name = 'label'
 
         """
@@ -1618,8 +1633,26 @@ class DirectionalMergedDecodersResult(ComputedResult):
         for an_epoch_idx, an_epoch_spikes_df in partitioned_dfs.items():
             # for each epoch
             # print(f'an_epoch_idx: {an_epoch_idx}, np.shape(epoch_spikes_df): {np.shape(an_epoch_spikes_df)}')
-            _temp_dfs = [an_epoch_spikes_df[['t_rel_seconds', a_peak_x_col_name]].dropna(subset=['t_rel_seconds', a_peak_x_col_name], inplace=False).to_numpy().T for a_peak_x_col_name in _pf_peak_x_column_names]
-            _simple_corr_results_dict[an_epoch_idx] = [pearsonr(_an_arr[0], _an_arr[1]).statistic for _an_arr in _temp_dfs]
+            # _temp_dfs = [an_epoch_spikes_df[['t_rel_seconds', a_peak_x_col_name]].dropna(subset=['t_rel_seconds', a_peak_x_col_name], inplace=False).to_numpy().T for a_peak_x_col_name in _pf_peak_x_column_names] # splits into four temporary dfs', one for each decoder
+            # _simple_corr_results_dict[an_epoch_idx] = [pearsonr(_an_arr[0], _an_arr[1]).statistic for _an_arr in _temp_dfs] # take the pearson of the first two columns of the resultant numpy array
+
+            # _temp_dfs = []
+            _simple_corr_results_dict[an_epoch_idx] = []
+            for a_peak_x_col_name, a_decoder_neuron_IDs in zip(_pf_peak_x_column_names, neuron_IDs_lists):
+                ## For each decoder, so we can slice by that decoder's included neuron ids:
+
+                # a_decoder_specific_spikes_df = deepcopy(an_epoch_spikes_df).spikes.sliced_by_neuron_id(a_decoder_neuron_IDs)
+                a_decoder_specific_spikes_df = deepcopy(an_epoch_spikes_df)
+                a_decoder_specific_spikes_df = a_decoder_specific_spikes_df[a_decoder_specific_spikes_df['aclu'].isin(a_decoder_neuron_IDs)]
+                active_epoch_decoder_active_aclus = a_decoder_specific_spikes_df.aclu.unique()
+
+                min_num_required_unique_aclus = max(5, int(float(len(a_decoder_neuron_IDs)) * 0.333))
+                if len(active_epoch_decoder_active_aclus) < min_num_required_unique_aclus:
+                    _simple_corr_results_dict[an_epoch_idx].append(np.nan)
+                else:
+                    _an_arr = a_decoder_specific_spikes_df[['t_rel_seconds', a_peak_x_col_name]].dropna(subset=['t_rel_seconds', a_peak_x_col_name], inplace=False).to_numpy().T
+                    _simple_corr_results_dict[an_epoch_idx].append(pearsonr(_an_arr[0], _an_arr[1]).statistic)
+
 
         ## Convert results dict into a pd.DataFrame            
         corr_df: pd.DataFrame = pd.DataFrame(_simple_corr_results_dict).T
@@ -1798,6 +1831,21 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         #TODO 2024-02-16 13:52: - [ ] Rest of properties
         return True
+
+    @classmethod
+    def compute_matching_best_indicies(cls, a_marginals_df: pd.DataFrame, index_column_name: str = 'most_likely_decoder_index', second_index_column_name: str = 'best_decoder_index', enable_print=True):
+        """ count up the number of rows that the RadonTransform and the most-likely direction agree 
+        
+        DecoderDecodedEpochsResult.compute_matching_best_indicies
+
+        """
+        num_total_epochs: int = len(a_marginals_df)
+        agreeing_rows_count: int = (a_marginals_df[index_column_name] == a_marginals_df[second_index_column_name]).sum()
+        agreeing_rows_ratio = float(agreeing_rows_count)/float(num_total_epochs)
+        if enable_print:
+            print(f'agreeing_rows_count/num_total_epochs: {agreeing_rows_count}/{num_total_epochs}\n\tagreeing_rows_ratio: {agreeing_rows_ratio}')
+        return agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs)
+
 
     # def __getitem__(self, key):
     #     """
@@ -2696,14 +2744,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
         # Radon Transform / Weighted Correlation _____________________________________________________________________________ #
-        def _compute_matching_best_indicies(a_marginals_df: pd.DataFrame, index_column_name: str = 'most_likely_decoder_index', second_index_column_name: str = 'best_decoder_index', enable_print=True):
-            """ count up the number that the RadonTransform and the most-likely direction agree """
-            num_total_epochs: int = len(a_marginals_df)
-            agreeing_rows_count: int = (a_marginals_df[index_column_name] == a_marginals_df[second_index_column_name]).sum()
-            agreeing_rows_ratio = float(agreeing_rows_count)/float(num_total_epochs)
-            if enable_print:
-                print(f'agreeing_rows_count/num_total_epochs: {agreeing_rows_count}/{num_total_epochs}\n\tagreeing_rows_ratio: {agreeing_rows_ratio}')
-            return agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs)
 
         def _update_decoder_result_active_filter_epoch_columns(a_result_obj, a_score_result_df, columns=['score', 'velocity', 'intercept', 'speed']):
             """ Joins the radon-transform result into the `a_result_obj.filter_epochs` dataframe.
@@ -2923,10 +2963,10 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                                                                                                                                                                                                                             decoder_laps_df_dict=deepcopy(decoder_laps_radon_transform_df_dict), decoder_ripple_df_dict=deepcopy(decoder_ripple_radon_transform_df_dict), active_df_columns = ['score', 'velocity', 'intercept', 'speed'])
                 print(f'Performance: Radon Transform:\n\tLaps:')
                 ## count up the number that the RadonTransform and the most-likely direction agree
-                laps_radon_stats = _compute_matching_best_indicies(laps_radon_transform_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+                laps_radon_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_radon_transform_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
                 # agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs) = laps_radon_stats
                 print(f'\tPerformance: Ripple: Radon Transform:')
-                ripple_radon_stats = _compute_matching_best_indicies(ripple_radon_transform_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+                ripple_radon_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_radon_transform_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
             else:
                 laps_radon_transform_merged_df, ripple_radon_transform_merged_df = None, None
 
@@ -2965,16 +3005,16 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
             ## count up the number that the RadonTransform and the most-likely direction agree
             print(f'Performance: WCorr:\n\tLaps:')
-            laps_wcorr_stats = _compute_matching_best_indicies(laps_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+            laps_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
             # agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs) = laps_radon_stats
-            print(f'\tPerformance: Ripple: WCorr')
-            ripple_wcorr_stats = _compute_matching_best_indicies(ripple_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+            print(f'Performance: Ripple: WCorr')
+            ripple_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
 
             # Test agreement:
             print(f'Performance: Simple PF PearsonR:\n\tLaps:')
-            laps_simple_pf_pearson_stats = _compute_matching_best_indicies(laps_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
-            print(f'\tPerformance: Ripple: Simple PF PearsonR')
-            ripple_simple_pf_pearsonr_stats = _compute_matching_best_indicies(ripple_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+            laps_simple_pf_pearson_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+            print(f'Performance: Ripple: Simple PF PearsonR')
+            ripple_simple_pf_pearsonr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
 
             ## OUTPUTS: laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df
 
