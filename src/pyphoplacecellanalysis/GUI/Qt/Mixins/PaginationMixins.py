@@ -1,4 +1,5 @@
 import numpy as np
+from nptyping import NDArray
 import pandas as pd
 from attrs import define, field, Factory
 from benedict import benedict # https://github.com/fabiocaccamo/python-benedict#usage
@@ -24,14 +25,17 @@ TypeError: super(type, obj): obj must be an instance or subtype of type
 
 @define(slots=False, eq=False)
 class SelectionsObject(SubsettableDictRepresentable):
+    """ represents a selection of epochs in an interactive paginated viewer.
+    """
     global_epoch_start_t: float
     global_epoch_end_t: float
     variable_name: str
     figure_ctx: "IdentifyingContext" = field(alias='active_identifying_figure_ctx')
 
-    flat_all_data_indicies: np.ndarray
-    is_selected: np.ndarray
-    epoch_labels: np.ndarray
+    flat_all_data_indicies: NDArray
+    is_selected: NDArray
+    epoch_labels: NDArray
+
 
     @property
     def selected_indicies(self):
@@ -115,12 +119,12 @@ class PaginatedFigureBaseController:
         return self.plots_data.paginator
 
     @property
-    def current_page_idx(self):
+    def current_page_idx(self) -> int:
         """The curr_page_index property."""
         return self.ui.mw.ui.paginator_controller_widget.current_page_idx
 
     @property
-    def total_number_of_items_to_show(self):
+    def total_number_of_items_to_show(self) -> int:
         """The total number of items (subplots usually) to be shown across all pages)."""
         return self.paginator.nItemsToShow
 
@@ -129,7 +133,7 @@ class PaginatedFigureBaseController:
 
     # Selectability/Interactivity Helpers ________________________________________________________________________________ #
     @property
-    def is_selected(self):
+    def is_selected(self) -> NDArray:
         """The selected_indicies property."""
         return np.array(list(self.params.is_selected.values()))
     
