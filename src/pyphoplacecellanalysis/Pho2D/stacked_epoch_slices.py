@@ -1,13 +1,16 @@
 from copy import deepcopy
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from neuropy.utils.result_context import IdentifyingContext
 import numpy as np
 import pandas as pd
 from nptyping import NDArray
 from attrs import define, field, Factory
+from benedict import benedict # https://github.com/fabiocaccamo/python-benedict#usage
 
 import matplotlib.pyplot as plt # for stacked_epoch_slices_matplotlib_view(...)
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # for stacked_epoch_slices_matplotlib_view(...)
+
+from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 
 from neuropy.core.epoch import Epoch
 
@@ -24,6 +27,14 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow # for PhoPaginatedMultiDecoderDecodedEpochsWindow
+from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
+from neuropy.core.user_annotations import UserAnnotationsManager # used in `interactive_good_epoch_selections`
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # used in `interactive_good_epoch_selections`, `PhoPaginatedMultiDecoderDecodedEpochsWindow`
+
+
 
 """ 
 These functions help render a vertically stacked column of subplots that represent (potentially non-contiguous) slices of a time range. 
@@ -562,12 +573,6 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
 # Paginated Versions                                                                                                   #
 # ==================================================================================================================== #
 
-from benedict import benedict # https://github.com/fabiocaccamo/python-benedict#usage
-from pyphoplacecellanalysis.External.pyqtgraph import QtCore
-from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
-
-from neuropy.core.user_annotations import UserAnnotationsManager # used in `interactive_good_epoch_selections`
-from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # used in `interactive_good_epoch_selections`
 
 
 @define(slots=False, eq=False)
@@ -632,13 +637,15 @@ class EpochSelectionsObject(SelectionsObject):
 
 
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
-    """2023-05-09 - Aims to refactor `plot_paginated_decoded_epoch_slices`, a series of nested functions, into a stateful class
+    """2023-05-09 - A stateful class containing decoded epoch posteriors.
+
         Builds a matplotlib Figure in a CustomMatplotlibWidget that displays paginated axes using a Paginator by creating a `PaginationControlWidget`
         Specifically uses `plot_rr_aclu`, not general
         
         Ultimately plots the epochs via calls to `plot_1D_most_likely_position_comparsions`
         
-    2023-05-09 - Refactored from  `build_figure_and_control_widget_from_paginator`
+    History:
+        2023-05-09 - Refactored from  `build_figure_and_control_widget_from_paginator` - Aims to refactor `plot_paginated_decoded_epoch_slices`, a series of nested functions, into a stateful class
     
     ## [X]: would have to add reuse of figure and ax to `plot_rr_aclu` as a minimum - 5 minutes
     ## [X] 2023-05-02 - would have to add the concept of the current page index, the next/previous/jump operations (that could be triggered by arrows in the GUI for example) - 30 minutes
@@ -748,10 +755,13 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # selected_epoch_times = self.selected_epoch_times # returns an S x 2 array of epoch start/end times that are currently selected.
         print(f'\tselection_indicies: {self.selected_indicies}')
         print(f'\tselected_epoch_times: {self.selected_epoch_times}')
+        
+
 
     # Lifecycle Methods __________________________________________________________________________________________________ #
     def configure(self, **kwargs):
         """ assigns and computes needed variables for rendering. """
+        self._subfn_helper_setup_selectability()
         pass
         
 
@@ -767,6 +777,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def on_close(self):
         """ called when the figure is closed. """
         pass
+    
+
+    # Other Methods ______________________________________________________________________________________________________ #
 
     @staticmethod
     def _subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, debug_print) -> Paginator:
@@ -805,6 +818,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if not self.params.has_attr('callback_id') or self.params.get('callback_id', None) is None:
             # _out_pagination_controller.params.callback_id = _out_pagination_controller.plots.fig.canvas.mpl_connect('button_press_event', _out_pagination_controller.on_click) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
             self.params.callback_id = self.plots.fig.canvas.mpl_connect('button_press_event', self.on_selected_epochs_changed) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
+
+
     def disconnect_on_click_callback(self):
         """ disconnects the button_press_event callback for the figure."""
         self.plots.fig.canvas.mpl_disconnect(self.params.callback_id)
@@ -1009,11 +1024,6 @@ def interactive_good_epoch_selections(annotations_man: UserAnnotationsManager, c
     return user_annotations
 
 
-from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
-from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController
-from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
-from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # for PhoPaginatedMultiDecoderDecodedEpochsWindow
 
 def align_decoder_pagination_controller_windows(pagination_controller_dict):
     """ resizes and aligns all windows. Not needed with PhoPaginatedMultiDecoderDecodedEpochsWindow (only used when plotting in separate windows) 
@@ -1053,10 +1063,18 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         Inherited Properties: .area
 
     Usage:
-
     from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import PhoPaginatedMultiDecoderDecodedEpochsWindow
 
-        
+    ## Ripples:
+    pagination_controller_dict =  PhoPaginatedMultiDecoderDecodedEpochsWindow._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, epochs_name='ripple', included_epoch_indicies=None, defer_render=False, save_figure=False)
+    app, root_dockAreaWindow = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_pagination_controller_dict(pagination_controller_dict) # Combine to a single figure
+    root_dockAreaWindow.add_data_overlays(track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
+            
+    ## Laps:
+    laps_pagination_controller_dict =  PhoPaginatedMultiDecoderDecodedEpochsWindow._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', included_epoch_indicies=None, defer_render=False, save_figure=False)
+    laps_app, laps_root_dockAreaWindow = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_pagination_controller_dict(laps_pagination_controller_dict) # Combine to a single figure
+    laps_root_dockAreaWindow.add_data_overlays(track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
+
     """
     @property
     def contents(self):
@@ -1068,9 +1086,17 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
     @property
     def paginator_controller_widget(self) -> PaginationControlWidget:
+        """ the widget that goes left and right by pages in the bottom of the left plot. """
         a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
         paginator_controller_widget = a_controlling_pagination_controller.ui.mw.ui.paginator_controller_widget
         return paginator_controller_widget
+    
+
+    @property
+    def paginated_widgets(self) -> Dict[str, MatplotlibTimeSynchronizedWidget]:
+        """ the list of plotting child widgets. """
+        return {a_decoder_name:a_pagination_controller.ui.mw for a_decoder_name, a_pagination_controller in self.contents.pagination_controllers.items()}
+
 
     def __init__(self, title='PhoPaginatedMultiDecoderDecodedEpochsWindow', *args, **kwargs):
         super(PhoPaginatedMultiDecoderDecodedEpochsWindow, self).__init__(*args, **kwargs)
@@ -1187,8 +1213,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     ## Add a jump to page function
     def jump_to_page(self, page_idx: int):
         self.paginator_controller_widget.programmatically_update_page_idx(page_idx, block_signals=False) # don't block signals and then we don't have to call updates.        
-        # for a_name, a_pagination_controller in self.contents.pagination_controllers.items():
-        #     a_pagination_controller.on_paginator_control_widget_jump_to_page(page_idx=page_idx)
         
 
     def add_data_overlays(self, track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, included_columns=None):
@@ -1376,4 +1400,21 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
 
 
+    # ==================================================================================================================== #
+    # MatplotlibTimeSynchronizedWidget Wrappers                                                                            #
+    # ==================================================================================================================== #
+                
+    # def getFigure(self):
+    #     return self.plots.fig
+        
+    def draw(self):
+        """ Calls .draw() on all children MatplotlibTimeSynchronizedWidget items. 
+        Successfully redraws items.
 
+        """
+        #TODO 2023-07-06 15:05: - [ ] PERFORMANCE - REDRAW
+        for a_name, a_child_paginated_widget in self.paginated_widgets.items():
+            # a_child_paginated_widget.ui.canvas.draw()
+            a_child_paginated_widget.draw()
+        
+    
