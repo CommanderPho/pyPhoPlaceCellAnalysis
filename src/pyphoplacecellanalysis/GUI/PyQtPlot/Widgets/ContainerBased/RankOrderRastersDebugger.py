@@ -150,6 +150,17 @@ class RankOrderRastersDebugger:
         assert str(curr_redundant_label_lookup_label) == str(curr_epoch_label), f"curr_epoch_label: {str(curr_epoch_label)} != str(curr_redundant_label_lookup_label): {str(curr_redundant_label_lookup_label)}"
         return curr_epoch_label
 
+
+    def find_nearest_time_index(self, target_time: float) -> Optional[int]:
+        """ finds the index of the nearest time from the active epochs
+        """
+        from neuropy.utils.indexing_helpers import find_nearest_time
+        df = self.active_epochs_df
+        df, closest_index, closest_time, matched_time_difference = find_nearest_time(df=df, target_time=target_time, time_column_name='start', max_allowed_deviation=0.01, debug_print=False)
+        # df.iloc[closest_index]
+        return closest_index
+    
+
     @property
     def active_epoch_label(self):
         """ returns the epoch 'label' value corresponding to the currently selected `self.active_epoch_IDX`. """
@@ -509,6 +520,29 @@ class RankOrderRastersDebugger:
         pass
 
 
+    # ==================================================================================================================== #
+    # Programmatically Update Active Epoch Functions                                                                       #
+    # ==================================================================================================================== #
+    def programmatically_update_epoch_IDX(self, an_epoch_idx: int):
+        """ programmatically performs an update to the epoch_IDX 
+        """
+        assert an_epoch_idx is not None
+        assert an_epoch_idx >= 0 # minimum valid epoch
+        assert (an_epoch_idx < self.n_epochs) # maximum valid epoch
+        _a_ScrollBarWithSpinBox = self.ui.ctrls_widget # ScrollBarWithSpinBox 
+        _a_ScrollBarWithSpinBox.setValue(an_epoch_idx)
+
+    
+    def programmatically_update_epoch_IDX_from_epoch_start_time(self, target_time: float):
+        """ finds and selects the epoch starting nearest to the target_time
+        """
+        found_IDX = self.find_nearest_time_index(target_time)
+        if found_IDX is not None:
+            print(f'found_IDX: {found_IDX}')
+            self.programmatically_update_epoch_IDX(found_IDX)
+        else:
+            raise ValueError(f'could not find epoch near target_time: {target_time}.')
+
 
     # ==================================================================================================================== #
     # Update Active Epoch Functions                                                                                        #
@@ -527,7 +561,6 @@ class RankOrderRastersDebugger:
             a_win.setWindowTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
 
         self.update_cell_y_labels()
-
 
     def on_update_epoch_IDX(self, an_epoch_idx: int):
         """ Calls self.on_update_epoch_IDX(...)
