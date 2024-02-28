@@ -750,12 +750,18 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def on_selected_epochs_changed(self, event):
         ## Forward the click event to the `_out_pagination_controller.on_click` callback. This will update the `_out_pagination_controller.params.is_selected`
         print(f'DecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed(...)')
+        pre_selected_times = deepcopy(self.selected_epoch_times)
         self.on_click(event=event)
         ## Determine the Epochs that have actually been selected so they can be saved/stored somehow:
         # selected_epoch_times = self.selected_epoch_times # returns an S x 2 array of epoch start/end times that are currently selected.
         print(f'\tselection_indicies: {self.selected_indicies}')
         print(f'\tselected_epoch_times: {self.selected_epoch_times}')
-        
+        post_selected_times = deepcopy(self.selected_epoch_times)
+        # did_selection_change: bool = (pre_selected_times != post_selected_times)
+        did_selection_change: bool = np.logical_not(np.all(pre_selected_times == post_selected_times))
+        if did_selection_change:
+            print(f'\tDecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed: selection changed!')
+            self.draw() # Redraw
 
 
     # Lifecycle Methods __________________________________________________________________________________________________ #
@@ -926,7 +932,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
 
         else:
-            print(f'could not find the clicked ax: {ax} in the list of axes: {self.plots.axs}')
+            print(f'\tcould not find the clicked ax: {ax} in the list of axes: {self.plots.axs}')
 
         # Redraw the figure to show the updated selection
         # event.canvas.draw()
@@ -969,8 +975,23 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # Redraw the figure to show the updated selection
         assert defer_render
         if not defer_render:
-            self.plots.fig.canvas.draw_idle()
-            ax.get_figure().canvas.draw()
+            self.draw()
+
+    def draw(self):
+        """ Calls .draw() on child MatplotlibTimeSynchronizedWidget.
+        """
+        a_widget = self.ui.mw # MatplotlibTimeSynchronizedWidget
+        assert a_widget is not None
+        a_widget.draw() # Call Draw on the contained widget
+        # If that doesn't work, used to do:
+        # self.plots.fig.canvas.draw_idle()
+        # or with ax being the clicked axis:
+        # ax.get_figure().canvas.draw()
+
+
+
+    
+
 
 
 def interactive_good_epoch_selections(annotations_man: UserAnnotationsManager, curr_active_pipeline) -> dict:
@@ -1081,7 +1102,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return self.ui._contents
     
     @property
-    def pagination_controllers(self) -> Dict:
+    def pagination_controllers(self) -> Dict[str, DecodedEpochSlicesPaginatedFigureController]:
         return self.contents.pagination_controllers
 
     @property
@@ -1366,7 +1387,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             a_context = saved_selections_context_dict[a_name]
             # print(f"user_annotations[{a_context.get_initialization_code_string()}] = np.array({list(a_saved_selection.flat_all_data_indicies[a_saved_selection.is_selected])})")
             print(f"user_annotations[{a_context.get_initialization_code_string()}] = np.array({list(a_saved_selection.epoch_times)})")
-
+    
+        return user_annotations
+    
 
     # Export/Output ______________________________________________________________________________________________________ #
     def export_decoder_pagination_controller_figure_page(self, curr_active_pipeline):
