@@ -98,7 +98,7 @@ def create_tabbed_table_widget(dataframes_dict):
 
 
 
-@metadata_attributes(short_name=None, tags=['gui'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
+@metadata_attributes(short_name=None, tags=['gui', 'window', 'figure'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
 @define(slots=False)
 class RankOrderRastersDebugger:
     """ RankOrderRastersDebugger displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
