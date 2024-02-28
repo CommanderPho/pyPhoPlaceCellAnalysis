@@ -433,7 +433,12 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
 
 @function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=[])
 def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
-    """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots """
+    """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
+     
+    Great plotting for laps.
+    Plots in a paginated manner.
+
+    """
     def _subfn_chunks(iterable, size=10):
         iterator = iter(iterable)
         for first in iterator:    # stops when iterator is depleted

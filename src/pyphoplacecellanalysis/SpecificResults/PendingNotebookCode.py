@@ -16,6 +16,25 @@ from attrs import define, field, Factory
 from pyphocorehelpers.function_helpers import function_attributes
 
 
+from functools import wraps, partial
+
+def register_type_display(func_to_register, type_to_register):
+    """ adds the display function (`func_to_register`) it decorates to the class (`type_to_register) as a method
+
+
+    """
+    @wraps(func_to_register)
+    def wrapper(*args, **kwargs):
+        return func_to_register(*args, **kwargs)
+
+    function_name: str = func_to_register.__name__ # get the name of the function to be added as the property
+    setattr(type_to_register, function_name, wrapper) # set the function as a method with the same name as the decorated function on objects of the class.	
+    return wrapper
+
+
+
+
+
 # ==================================================================================================================== #
 # 2024-02-20 - Track Remapping Figures                                                                                 #
 # ==================================================================================================================== #
