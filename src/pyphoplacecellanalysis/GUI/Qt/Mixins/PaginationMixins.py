@@ -139,7 +139,10 @@ class PaginatedFigureBaseController:
     
     @property
     def selected_indicies(self):
-        """The selected_indicies property."""
+        """The selected_indicies property. 
+        `self.params.flat_all_data_indicies` is built using `._subfn_helper_setup_selectability(...)`
+
+        """
         return self.params.flat_all_data_indicies[self.is_selected]
 
 
@@ -168,27 +171,36 @@ class PaginatedFigureBaseController:
 
     def on_click(self, event):
         """ called when an axis is clicked to toggle the selection. """
+        if self.params.debug_print:
+            print(f'PaginatedFigureBaseController.on_click(...):')
+
         # Get the clicked Axes object
         ax = event.inaxes
         # Find the axes
         found_index = safe_find_index_in_list(self.plots.axs, ax) # find the index on the page of the ax that was clicked
-        # print(f'{found_index = }')
-        current_page_idx = self.current_page_idx
-        curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
-        found_data_index = curr_page_data_indicies[found_index]
-        print(f'{current_page_idx = }, {found_data_index =}')
-        # Toggle the selection status of the clicked Axes
-        self.params.is_selected[found_data_index] = not self.params.is_selected.get(found_data_index, False) # if never set before, assume that it's not selected
-        ## Update visual apperance of axis:
-        self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
+        if found_index is not None:
+            # print(f'{found_index = }')
+            current_page_idx = self.current_page_idx
+            curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
+            found_data_index = curr_page_data_indicies[found_index]
+            print(f'{current_page_idx = }, {found_data_index =}')
+            # Toggle the selection status of the clicked Axes
+            self.params.is_selected[found_data_index] = (not self.params.is_selected.get(found_data_index, False)) # if never set before, assume that it's not selected
+            ## Update visual apperance of axis:
+            self.perform_update_ax_selected_state(ax=ax, is_selected=self.params.is_selected[found_data_index])
 
-        # Redraw the figure to show the updated selection
-        # event.canvas.draw()
-        event.canvas.draw_idle()
+            # Redraw the figure to show the updated selection
+            # event.canvas.draw()
+            event.canvas.draw_idle()
+        else:
+            print(f'\tcould not find the clicked ax: {ax} in the list of axes: {self.plots.axs}')
 
 
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
         """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
+        if self.params.debug_print:
+            print(f'PaginatedFigureBaseController.perform_update_ax_selected_state(...):')
+
         # Set the face color of the clicked Axes based on its selection status
         if is_selected:
             ax.patch.set_facecolor('gray')
@@ -204,7 +216,10 @@ class PaginatedFigureBaseController:
 
 
     def perform_update_selections(self, defer_render:bool = False):
-        """ called to update the selection when the page is changed or something else happens. """        
+        """ called to update the selection when the page is changed or something else happens. """
+        if self.params.debug_print:
+            print(f'PaginatedFigureBaseController.perform_update_selections(...):')
+        
         current_page_idx = self.current_page_idx
         curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
         assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
