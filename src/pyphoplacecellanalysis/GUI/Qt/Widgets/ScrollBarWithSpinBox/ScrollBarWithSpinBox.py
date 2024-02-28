@@ -24,6 +24,10 @@ class ScrollBarWithSpinBox(QWidget):
     """ 
     from pyphoplacecellanalysis.GUI.Qt.Widgets.ScrollBarWithSpinBox.ScrollBarWithSpinBox import ScrollBarWithSpinBox
     
+    Can be safely updated programmatically by calling .setValue
+    
+    _a_ScrollBarWithSpinBox.setValue(45)
+
     """
     sigValueChanged = pg.QtCore.Signal(object)  # (self)
 
@@ -71,6 +75,8 @@ class ScrollBarWithSpinBox(QWidget):
         
     @pyqtExceptionPrintingSlot(int, bool)
     def setValue(self, value, emit_changed:bool=True):
+        """ can be safely called programmatically. 
+        """
         self.disable_emit_changed = True
         self.updateSpinBox(value)
         self.updateSlider(value)
