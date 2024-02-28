@@ -1013,8 +1013,6 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
 from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController
 from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # for PhoPaginatedMultiDecoderDecodedEpochsWindow
 
 def align_decoder_pagination_controller_windows(pagination_controller_dict):
@@ -1198,6 +1196,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
         """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
+
         ## Choose which columns from the filter_epochs dataframe to include on the plot.
         if included_columns is None:
             included_columns = []
