@@ -1214,9 +1214,9 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         if debug_print:
             print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
         
+        # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
+        extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
 
-        extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
-            
         # Add replay score text to top-right corner:
         final_text: str = f"{plots_data.weighted_corr_data[i].wcorr_text}" # \n{plots_data.radon_transform_data[i].speed_text}
         if len(plots_data.weighted_corr_data[i].P_decoder_text) > 0:
