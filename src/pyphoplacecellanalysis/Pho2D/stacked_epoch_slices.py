@@ -1595,6 +1595,33 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return new_selections_dict
     
 
+    @property
+    def any_good_selected_epoch_times(self) -> NDArray:
+        """ returns the selected epoch times for any of the self.pagination_controllers 
+        """
+        concatenated_selected_epoch_times = np.concatenate([a_ctrlr.selected_epoch_times for a_name, a_ctrlr in self.pagination_controllers.items()], axis=0)
+        any_good_selected_epoch_times: NDArray = np.unique(concatenated_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+        return any_good_selected_epoch_times
+
+
+    def find_data_indicies_from_epoch_times(self, epoch_times: NDArray) -> NDArray:
+        """ returns the matching data indicies corresponding to the epoch [start, stop] times 
+        epoch_times: S x 2 array of epoch start/end times
+        Returns: (S, ) array of data indicies corresponding to the times.
+
+        All the self.pagination_controllers should be displaying the same epochs, so searching each controller for the times should result in the same returned indicies.
+
+        Uses:
+            self.pagination_controllers
+        """
+        from pyphocorehelpers.indexing_helpers import NumpyHelpers
+        any_good_epoch_idxs_list = [a_ctrlr.find_data_indicies_from_epoch_times(epoch_times) for a_name, a_ctrlr in self.pagination_controllers.items()]
+        assert NumpyHelpers.all_array_equal(any_good_epoch_idxs_list), f"all indicies should be identical, but they are not! any_good_epoch_idxs_list: {any_good_epoch_idxs_list}"
+        any_good_epoch_idxs: NDArray = any_good_epoch_idxs_list[0]
+        return any_good_epoch_idxs
+
+
+
     # Export/Output ______________________________________________________________________________________________________ #
     def export_decoder_pagination_controller_figure_page(self, curr_active_pipeline):
         """ exports each pages single-decoder figures separately
