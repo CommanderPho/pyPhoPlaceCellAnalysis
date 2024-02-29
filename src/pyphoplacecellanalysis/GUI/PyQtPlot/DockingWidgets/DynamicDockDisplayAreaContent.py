@@ -410,7 +410,28 @@ class DynamicDockDisplayAreaContentMixin:
                     # del extant_group_items[unique_identifier]
                 
                 # once done with all children, remove the extant_group_items group:
-                del self.dynamic_display_dict[identifier]
+                try:
+                    del self.dynamic_display_dict[identifier]
+                except KeyError as e:
+                    """ 
+                    on_dock_closed(closing_dock: <Dock long_LR (430, 700)>)
+                        closing_dock_identifier: long_LR
+                        found by simple title identifier and removed!
+                    Uncaught Exception in slot
+                    Traceback (most recent call last):
+                    line 260, in DynamicDockDisplayAreaContentMixin_on_destroy
+                        self.clear_all_display_docks()
+                    line 429, in clear_all_display_docks
+                        self.remove_display_dock(group_identifier)
+                    line 413, in remove_display_dock
+                        del self.dynamic_display_dict[identifier]
+                    KeyError: 'long_LR'
+                    """
+                    # seems to always happen, not sure why
+                    print(f'WARNING: identifier: {identifier} not found in dynamic_display_dict.keys(): {list(self.dynamic_display_dict.keys())}')
+                except Exception as e:
+                    # Unhandled exception
+                    raise e
                 
             else:
                 # group was found and valid but already empty prior to remove:
