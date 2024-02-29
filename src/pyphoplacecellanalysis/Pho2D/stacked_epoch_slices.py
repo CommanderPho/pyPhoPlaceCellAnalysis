@@ -754,11 +754,14 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         self.on_click(event=event)
         ## Determine the Epochs that have actually been selected so they can be saved/stored somehow:
         # selected_epoch_times = self.selected_epoch_times # returns an S x 2 array of epoch start/end times that are currently selected.
-        print(f'\tselection_indicies: {self.selected_indicies}')
+        if self.params.debug_print:
+            print(f'\tselection_indicies: {self.selected_indicies}')
+
         print(f'\tselected_epoch_times: {self.selected_epoch_times}')
         post_selected_times = deepcopy(self.selected_epoch_times)
         # did_selection_change: bool = (pre_selected_times != post_selected_times)
-        did_selection_change: bool = np.logical_not(np.all(pre_selected_times == post_selected_times))
+        # did_selection_change: bool = np.logical_not(np.all(pre_selected_times == post_selected_times))
+        did_selection_change: bool = not np.array_equal(pre_selected_times, post_selected_times)
         if did_selection_change:
             print(f'\tDecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed: selection changed!')
             self.draw() # Redraw
