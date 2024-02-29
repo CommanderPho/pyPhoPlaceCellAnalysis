@@ -906,7 +906,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`
         if self.params.debug_print:
-            self.ui.print(f'on_jump_to_page(page_idx: {page_idx})') # for page_idx == max_index this is called but doesn't continue
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.on_jump_to_page(page_idx: {page_idx})') # for page_idx == max_index this is called but doesn't continue
         included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=page_idx)
         if self.params.debug_print:
             self.ui.print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
@@ -946,15 +946,19 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
                 ## Perform callback here:
                 on_render_page_callbacks = self.params.get('on_render_page_callbacks', {})
+                if self.params.debug_print:
+                    self.ui.print(f'performing on_render_page_callbacks ({len(on_render_page_callbacks)} callbacks):')
                 for a_callback_name, a_callback in on_render_page_callbacks.items():
                     if self.params.debug_print:
-                        self.ui.print(f'performing callback with name: "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}')
+                        self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}')
                     try:
                         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idx, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print, epoch_slice=curr_epoch_slice, curr_time_bin_container=curr_time_bin_container)
+                        if self.params.debug_print:
+                            self.ui.print(f'\t\tcallback with name: "{a_callback_name}" complete.')
                     except Exception as e:
-                        self.ui.print(f'\t encountered exception in callback with name {a_callback_name} for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}: exception: {e}')
+                        self.ui.print(f'\t\t WARNING: encountered exception in callback with name {a_callback_name} for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}: exception: {e}')
                         # raise e
-                        raise UserWarning(e)
+                        # raise UserWarning(e)
                         ## Continue...
                     
                 curr_ax.set_xlim(*curr_epoch_slice)
@@ -992,6 +996,15 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """ Called when the pagination control widget jumps to a particular page """
         return self.on_jump_to_page(page_idx=page_idx)
 
+
+
+    def refresh_current_page(self):
+        """ called to refresh the currently selected page to redraw the data widgets or axes.
+        
+        """
+        if self.params.debug_print:
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.refresh_current_page():') # for page_idx == max_index this is called but doesn't continue
+        self.on_jump_to_page(page_idx=self.current_page_idx)
 
 
     # ==================================================================================================================== #
@@ -1416,8 +1429,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             laps_app, laps_paginated_multi_decoder_decoded_epochs_window, laps_pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', included_epoch_indicies=None)
 
         """
-        pagination_controller_dict =  cls._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_decoded_epochs_result_dict, epochs_name=epochs_name, included_epoch_indicies=included_epoch_indicies, defer_render=True, save_figure=False)
-        app, paginated_multi_decoder_decoded_epochs_window = cls.init_from_pagination_controller_dict(pagination_controller_dict, name = name, title=title, defer_show=defer_show, **kwargs) # Combine to a single figure
+        pagination_controller_dict =  cls._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_decoded_epochs_result_dict, epochs_name=epochs_name, included_epoch_indicies=included_epoch_indicies, defer_render=True, save_figure=False, **kwargs)
+        app, paginated_multi_decoder_decoded_epochs_window = cls.init_from_pagination_controller_dict(pagination_controller_dict, name=name, title=title, defer_show=defer_show) # Combine to a single figure
         return app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict
     
 
@@ -1436,7 +1449,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         self.draw()
         
 
-    def add_data_overlays(self, track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, included_columns=None):
+    def add_data_overlays(self, track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data and adds them to the plot.
         
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
@@ -1477,7 +1490,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 if wcorr_epochs_data_dict[a_name] is not None:
                     WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, wcorr_epochs_data_dict[a_name], update_controller_on_apply=False)
 
-
+        if not defer_refresh:
+            self.refresh_current_page()
 
 
     @classmethod
@@ -1489,7 +1503,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         Usage:
             (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S) = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, defer_render=False)
         """
-
+        debug_print = kwargs.get('debug_print', False)
         params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True)
         pagination_controller_dict = {}
         for a_name, a_decoder in track_templates.get_decoders_dict().items():
@@ -1497,7 +1511,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                                 decoder_decoded_epochs_result_dict[a_name],
                                                                                                 xbin=a_decoder.xbin, global_pos_df=curr_active_pipeline.sess.position.df,
                                                                                                 a_name='DecodedEpochSlices', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
-                                                                                                max_subplots_per_page=8, debug_print=False, included_epoch_indicies=included_epoch_indicies, **params_kwargs) # , save_figure=save_figure
+                                                                                                max_subplots_per_page=8, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, **params_kwargs) # , save_figure=save_figure
 
             # pagination_controller_dict[a_name], active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict[a_name], curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
             # fig_L = pagination_controller_L.plots.fig
@@ -1698,3 +1712,11 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             a_child_paginated_widget.draw()
         
     
+
+    def refresh_current_page(self):
+        """ called to refresh the currently selected page for all controllers (to redraw the data widgets or axes).
+        """
+        # if self.debug_print:
+        #     self.ui.print(f'PhoPaginatedMultiDecoderDecodedEpochsWindow.refresh_current_page():') # for page_idx == max_index this is called but doesn't continue
+        for a_name, a_pagination_controller in self.pagination_controllers.items():
+            a_pagination_controller.refresh_current_page()

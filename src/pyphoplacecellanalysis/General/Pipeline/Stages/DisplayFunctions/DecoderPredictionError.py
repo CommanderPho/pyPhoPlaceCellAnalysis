@@ -1294,6 +1294,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         final_text: str = weighted_corr_data_item.build_display_text()
 
         ## Build or Update:
+        assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
         extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
         extant_wcorr_text_label = extant_plots_dict.get('wcorr_text', None)
         # plot the radon transform line on the epoch:    
