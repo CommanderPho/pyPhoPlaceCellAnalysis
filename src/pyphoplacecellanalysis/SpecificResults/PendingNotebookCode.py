@@ -49,7 +49,7 @@ def compute_local_peak_probabilities(probs, n_adjacent: int):
 
 
 
-def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1):
+def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, debug_plot_axs=None, debug_plot_name=None):
     """ 2024-02-29 - New smart replay heuristic scoring
 
 
@@ -73,6 +73,7 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
     n_time_bins: int = a_result.nbins[an_epoch_idx]
+    time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
 
     # a_p_x_given_n
     # a_result.p_x_given_n_list
@@ -90,7 +91,8 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     # Position indices corresponding to the local peaks for each time bin: [55 54 55 58 58 59 57  0 59]
     # Local peak probabilities including adjacent position bins for each time bin: [0.784589 0.785263 0.851714 0.840573 0.607828 0.478891 0.40594 0.185163 0.478891]
     # Position indices corresponding to the local peaks for each time bin: [55 54 55 58 58 59 57  1 59]
-    print(f'np.shape(a_p_x_given_n): {np.shape(a_p_x_given_n)}')
+    if debug_print:
+        print(f'np.shape(a_p_x_given_n): {np.shape(a_p_x_given_n)}')
 
 
     track_coverage = np.nansum(a_p_x_given_n, axis=-1) # sum over all time bins
@@ -105,24 +107,89 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
     epoch_change_direction
 
+    position = deepcopy(a_most_likely_positions_list)
+    velocity = a_first_order_diff / float(a_result.decoding_time_bin_size) # velocity with real world units of cm/sec
+    acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
+
+    position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
+    print(f'time_window_centers: {time_window_centers}')
+    print(f'position: {position}')
+    print(f'velocity: {velocity}')
+    print(f'acceleration: {acceleration}')
+
+    position_derivative_column_names = ['x', 'vel_x', 'accel_x']
+    position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
+    position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
+    # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
+    print(f'\tposition_derivative_means: {position_derivative_means}')
+    print(f'\tposition_derivative_medians: {position_derivative_medians}')
+
+    # Plot the accelerations over time
+    # plt.plot(time_window_centers, acceleration, label='Acceleration', marker='o')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Acceleration (m/s²)')
+    # plt.title('Acceleration vs. Time')
+    # plt.legend()
+    # plt.show()
+
+    # Setup the figure and subplots
+    
+    if debug_plot_axs is None:
+        fig, debug_plot_axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+    if debug_plot_name is None:
+        debug_plot_name = ''
+
+    common_plot_kwargs = dict(marker='o', linestyle='None', alpha=0.6)
+
+    # Plot the position data on the first subplot
+    debug_plot_axs[0].plot(time_window_centers, position, label=f'{debug_plot_name}_Position', **common_plot_kwargs) # , color='blue'
+    debug_plot_axs[0].set_ylabel('Position (m)')
+    debug_plot_axs[0].legend()
+
+    # Plot the velocity data on the second subplot
+    debug_plot_axs[1].plot(time_window_centers, velocity, label=f'{debug_plot_name}_Velocity', **common_plot_kwargs) # , color='orange'
+    debug_plot_axs[1].set_ylabel('Velocity (m/s)')
+    debug_plot_axs[1].legend()
+
+    # Plot the acceleration data on the third subplot
+    debug_plot_axs[2].plot(time_window_centers, acceleration, label=f'{debug_plot_name}_Acceleration', **common_plot_kwargs) # , color='green'
+    debug_plot_axs[2].set_ylabel('Acceleration (m/s²)')
+    debug_plot_axs[2].set_xlabel('Time (s)')
+    debug_plot_axs[2].legend()
+
+    # # Set a shared title for the subplots
+    # plt.suptitle('Position, Velocity and Acceleration vs. Time')
+
+    # # Adjust the layout so the subplots fit nicely
+    # plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave space for the suptitle at the top
+
+    # # Show the subplots
+    # plt.show()
+
+
+
     # Now split the array at each point where a direction change occurs
     # Calculate the signs of the differences
     a_first_order_diff_sign = np.sign(a_first_order_diff)
     # Calculate where the sign changes occur (non-zero after taking diff of signs)
     sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
     num_direction_changes: int = len(sign_change_indices)
-    print(f'num_direction_changes: {num_direction_changes}')
+    if debug_print:
+        print(f'num_direction_changes: {num_direction_changes}')
 
     # Split the array at each index where a sign change occurs
     split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, sign_change_indices)
     split_first_order_diff_arrays = np.split(a_first_order_diff, sign_change_indices)
 
     continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
-    print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
+    if debug_print:
+        print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
     longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-    print("Longest sequence of time bins without a direction change:", longest_sequence_length)
+    if debug_print:
+        print("Longest sequence of time bins without a direction change:", longest_sequence_length)
     contiguous_total_change_quantity = [np.nansum(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
-    print(f'contiguous_total_change_quantity: {contiguous_total_change_quantity}')
+    if debug_print:
+        print(f'contiguous_total_change_quantity: {contiguous_total_change_quantity}')
     max_total_change_quantity = np.nanmax(np.abs(contiguous_total_change_quantity))
     print(f'max_total_change_quantity: {max_total_change_quantity}')
 
@@ -130,8 +197,6 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     #     print(f"Sequence {i}: {a_split_most_likely_positions_array}, {a_split_first_order_diff_array}")
     #     a_split_first_order_diff_array
     #     np.nansum(a_split_first_order_diff_array)
-
-
 
     is_non_congruent_direction_bin = (a_first_order_diff_sign != epoch_change_direction)
     is_congruent_direction_bins = np.logical_not(is_non_congruent_direction_bin)
@@ -144,7 +209,8 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     total_congruent_direction_change: float = np.nansum(np.abs(congruent_bin_diffs)) # the total quantity of change in the congruent direction
     total_incongruent_direction_change: float = np.nansum(np.abs(incongruent_bin_diffs))
     print(f'total_congruent_direction_change: {total_congruent_direction_change}, total_incongruent_direction_change: {total_incongruent_direction_change}')
-    return longest_sequence_length, num_direction_changes, num_congruent_direction_bins_score, total_congruent_direction_change
+    return longest_sequence_length, num_direction_changes, num_congruent_direction_bins_score, total_congruent_direction_change, position_derivatives_df
+
 
 
 def register_type_display(func_to_register, type_to_register):
