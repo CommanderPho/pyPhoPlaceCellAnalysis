@@ -543,6 +543,15 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
 
 
+    def filtered_by_epoch_times(self, included_epoch_start_times):
+        subset = deepcopy(self)
+        original_num_filter_epochs = subset.num_filter_epochs
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        found_data_indicies = subset.filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=included_epoch_start_times)
+        return subset.filtered_by_epochs(found_data_indicies)
+
+
     def filtered_by_epochs(self, included_epoch_indicies):
         """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
         subset = deepcopy(self)

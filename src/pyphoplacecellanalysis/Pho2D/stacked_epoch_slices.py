@@ -1,3 +1,4 @@
+import builtins
 from copy import deepcopy
 from typing import Dict, List, Optional
 from matplotlib.backend_bases import MouseButton
@@ -677,6 +678,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         new_obj = cls(params, plots_data, plots, ui)
         
         new_obj.params.debug_print = debug_print
+        new_obj.ui.print = builtins.print # the print function to use
+
         new_obj.plots_data.paginator = new_obj._subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, new_obj.params.debug_print)  # assign the paginator
         new_obj.params.active_identifying_figure_ctx = active_context # set context before calling `plot_paginated_decoded_epoch_slices` which will set the rest of the properties
 
@@ -745,7 +748,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 self.params.is_selected[a_selected_index] = True
         else:
             # Revert to the old way using indicies to handle legacy saved annotations
-            print(f'falling back to the old index-only method of setting selected epochs.')
+            self.ui.print(f'falling back to the old index-only method of setting selected epochs.')
             for a_selected_index in selections.selected_indicies:
                 assert a_selected_index in self.params.flat_all_data_indicies, f"a_selected_index: {a_selected_index} is not in flat_all_data_indicies: {self.params.flat_all_data_indicies}"
                 self.params.is_selected[a_selected_index] = True
@@ -779,29 +782,30 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     ## Supposed to be the right callback:
     def on_selected_epochs_changed(self, event):
         ## Forward the click event to the `_out_pagination_controller.on_click` callback. This will update the `_out_pagination_controller.params.is_selected`
-        print(f'DecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed(...)')
+        self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed(...)')
         pre_selected_times = deepcopy(self.selected_epoch_times)
         self.on_click(event=event)
         ## Determine the Epochs that have actually been selected so they can be saved/stored somehow:
         # selected_epoch_times = self.selected_epoch_times # returns an S x 2 array of epoch start/end times that are currently selected.
         if self.params.debug_print:
-            print(f'\tselection_indicies: {self.selected_indicies}')
+            self.ui.print(f'\tselection_indicies: {self.selected_indicies}')
 
-        print(f'\tselected_epoch_times: {self.selected_epoch_times}')
+        self.ui.print(f'\tselected_epoch_times: {self.selected_epoch_times}')
         post_selected_times = deepcopy(self.selected_epoch_times)
         # did_selection_change: bool = (pre_selected_times != post_selected_times)
         # did_selection_change: bool = np.logical_not(np.all(pre_selected_times == post_selected_times))
         did_selection_change: bool = not np.array_equal(pre_selected_times, post_selected_times)
         if did_selection_change:
-            print(f'\tDecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed: selection changed!')
+            self.ui.print(f'\tDecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed: selection changed!')
             self.draw() # Redraw
 
 
     # Lifecycle Methods __________________________________________________________________________________________________ #
     def configure(self, **kwargs):
         """ assigns and computes needed variables for rendering. """
+        self.ui.print = self.private_print # builtins.print # the print function to use
         if self.params.debug_print:
-            print(f'DecodedEpochSlicesPaginatedFigureController.configure(**kwargs: {kwargs})')
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.configure(**kwargs: {kwargs})')
         # self.params.debug_print = kwargs.pop('debug_print', False)
         self._subfn_helper_setup_selectability()
         ## Setup Selectability
@@ -811,7 +815,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def initialize(self, **kwargs):
         """ sets up Figures """
         if self.params.debug_print:
-            print(f'DecodedEpochSlicesPaginatedFigureController.initialize(**kwargs: {kwargs})')
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.initialize(**kwargs: {kwargs})')
         
         ## Setup on_click callback:
         self.connect_on_click_callback() # connect the page
@@ -830,14 +834,18 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def update(self, **kwargs):
         """ called to specifically render data on the figure. """
         if self.params.debug_print:
-            print(f'DecodedEpochSlicesPaginatedFigureController.update(**kwargs: {kwargs})')
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.update(**kwargs: {kwargs})')
 
 
     def on_close(self):
         """ called when the figure is closed. """
         if self.params.debug_print:
-            print(f'DecodedEpochSlicesPaginatedFigureController.on_close()')
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.on_close()')
 
+
+    def private_print(self, *args, **kwargs):
+        """ wraps the default print function or whatever needs to be called. """
+        print(*args, **kwargs)
 
 
 
@@ -888,14 +896,20 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         self.plots.fig.canvas.mpl_disconnect(self.params.callback_id)
         self.params.callback_id = None
 
+
     def on_jump_to_page(self, page_idx: int):
-        """ Update: made to depend on self """
+        """ Update: made to depend on self 
+        
+        Performs `self.params.on_render_page_callbacks`
+
+
+        """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`
         if self.params.debug_print:
-            print(f'on_jump_to_page(page_idx: {page_idx})') # for page_idx == max_index this is called but doesn't continue
+            self.ui.print(f'on_jump_to_page(page_idx: {page_idx})') # for page_idx == max_index this is called but doesn't continue
         included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=page_idx)
         if self.params.debug_print:
-            print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
+            self.ui.print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
     
         for i, curr_ax in enumerate(self.plots.axs):
             try:
@@ -908,7 +922,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 curr_most_likely_positions = curr_posterior_container.most_likely_positions_1D
                 
                 if self.params.debug_print:
-                    print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
+                    self.ui.print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
 
                 ## Clear the axis here:
                 curr_ax.clear()
@@ -934,11 +948,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 on_render_page_callbacks = self.params.get('on_render_page_callbacks', {})
                 for a_callback_name, a_callback in on_render_page_callbacks.items():
                     if self.params.debug_print:
-                        print(f'performing callback with name: "{a_callback_name}" for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax}')
+                        self.ui.print(f'performing callback with name: "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}')
                     try:
-                        self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idx, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
+                        self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idx, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print, epoch_slice=curr_epoch_slice, curr_time_bin_container=curr_time_bin_container)
                     except Exception as e:
-                        print(f'\t encountered exception in callback with name {a_callback_name} for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax}: exception: {e}')
+                        self.ui.print(f'\t encountered exception in callback with name {a_callback_name} for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}: exception: {e}')
                         # raise e
                         raise UserWarning(e)
                         ## Continue...
@@ -949,9 +963,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 assert curr_slice_idx in self.params.is_selected, f"curr_slice_idx: {curr_slice_idx} is not in self.params.is_selected!"
                 curr_is_selected: bool = self.params.is_selected[curr_slice_idx] # need to get whether the data indicies (curr_slice_idxs) are selected
                 if self.params.debug_print:
-                    print(f'updating selection for ax[i={i}]\n\tcurr_slice_idxs: {curr_slice_idx}')
-                    print(f'\tcurr_is_selected: {curr_is_selected}')
-                    print(f'\tself.current_page_idx: {self.current_page_idx}')
+                    self.ui.print(f'updating selection for ax[i={i}]\n\tcurr_slice_idxs: {curr_slice_idx}')
+                    self.ui.print(f'\tcurr_is_selected: {curr_is_selected}')
+                    self.ui.print(f'\tself.current_page_idx: {self.current_page_idx}')
 
                 self.perform_update_ax_selected_state(ax=curr_ax, is_selected=curr_is_selected)
                 curr_ax.set_visible(True)
@@ -959,7 +973,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             except IndexError as e:
                 # Occurs when there are more plots on the page than there are data to plot for that page (happens on the last page)
                 if self.params.debug_print:
-                    print(f'WARNING: exceeded data indicies (probably on last page). (for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax})')
+                    self.ui.print(f'WARNING: exceeded data indicies (probably on last page). (for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax})')
                 curr_ax.set_visible(False)
 
             except Exception as e:
@@ -986,7 +1000,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def on_click(self, event):
         """ called when an axis is clicked to toggle the selection. """
         if self.params.debug_print:
-            print(f'DecodedEpochSlicesPaginatedFigureController.on_click(...) OVERRIDE:')
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.on_click(...) OVERRIDE:')
 
         # key = event.key # The key(s) pressed. Could be None, a single case sensitive Unicode character ("g", "G", "#", etc.), a special key ("control", "shift", "f1", "up", etc.) or a combination of the above (e.g., "ctrl+alt+g", "ctrl+alt+G").
         # modifiers = event.modifiers
@@ -1001,30 +1015,30 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             current_page_idx = self.current_page_idx
             curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
             found_data_index = curr_page_data_indicies[found_index]
-            print(f'{current_page_idx = }, {found_data_index =}') # array([[0, 1, 2, 3, 4, 5, 6, 7]])
+            self.ui.print(f'{current_page_idx = }, {found_data_index =}') # array([[0, 1, 2, 3, 4, 5, 6, 7]])
         else:
-            print(f'\tWARNING: could not find the clicked ax: {ax} in the list of axes: {self.plots.axs}')
+            self.ui.print(f'\tWARNING: could not find the clicked ax: {ax} in the list of axes: {self.plots.axs}')
             found_data_index = None
 
         # Get the event extra info
         mouse_button = event.button # None or MouseButton or {'up', 'down'}
         if mouse_button is not None:
             if self.params.debug_print:
-                print(f'mouse_button: {mouse_button}')
+                self.ui.print(f'mouse_button: {mouse_button}')
             if (mouse_button == MouseButton.LEFT):
                 if self.params.debug_print:
-                    print(f'\tPrimary click recognized.')
+                    self.ui.print(f'\tPrimary click recognized.')
                 self.on_primary_click(event, clicked_ax=ax, clicked_data_index=found_data_index)
             elif (mouse_button == MouseButton.MIDDLE):
                 if self.params.debug_print:
-                    print(f'\tMiddle click recognized.')
+                    self.ui.print(f'\tMiddle click recognized.')
                 self.on_middle_click(event, clicked_ax=ax, clicked_data_index=found_data_index)
             elif (mouse_button == MouseButton.RIGHT):
                 if self.params.debug_print:
-                    print(f'\tSecondary click recognized.')
+                    self.ui.print(f'\tSecondary click recognized.')
                 self.on_secondary_click(event, clicked_ax=ax, clicked_data_index=found_data_index)
             else:
-                print(f'\tWARNING:unhandled mouse button: {mouse_button}')
+                self.ui.print(f'\tWARNING:unhandled mouse button: {mouse_button}')
 
         # Redraw the figure to show the updated selection
         # event.canvas.draw()
@@ -1035,7 +1049,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """ a primary (Usually left)-click event. Called manually from self.on_click(...) for appropriate mouse button events.
         """
         if self.params.debug_print:
-            print(f'on_primary_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
+            self.ui.print(f'on_primary_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
         if ((clicked_data_index is not None) and (clicked_ax is not None)):
             # Toggle the selection status of the clicked Axes
             self.params.is_selected[clicked_data_index] = not self.params.is_selected.get(clicked_data_index, False) # if never set before, assume that it's not selected
@@ -1046,11 +1060,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def on_middle_click(self, event, clicked_ax=None, clicked_data_index=None):
         """ a middle-click event. Called manually from self.on_click(...) for appropriate mouse button events.
         """
-        print(f'on_middle_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
+        self.ui.print(f'on_middle_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
         if clicked_data_index is not None:
             clicked_epoch_is_selected = self.params.is_selected[clicked_data_index]
             clicked_epoch_start_stop_time = self.plots_data.epoch_slices[clicked_data_index]
-            print(f'\tclicked_epoch_is_selected: {clicked_epoch_is_selected}\n\tclicked_epoch_start_stop_time: {clicked_epoch_start_stop_time}')
+            self.ui.print(f'\tclicked_epoch_is_selected: {clicked_epoch_is_selected}\n\tclicked_epoch_start_stop_time: {clicked_epoch_start_stop_time}')
         else:
             clicked_epoch_is_selected = None
             clicked_epoch_start_stop_time = None
@@ -1058,11 +1072,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         on_middle_click_item_callbacks = self.params.get('on_middle_click_item_callbacks', {})
         for a_callback_name, a_callback in on_middle_click_item_callbacks.items():
             if self.params.debug_print:
-                print(f'\tperforming callback with name: "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}')
+                self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}')
             try:
                 a_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time)
             except Exception as e:
-                print(f'\t\t encountered exception in callback with name {a_callback_name} for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {e}')
+                self.ui.print(f'\t\t encountered exception in callback with name {a_callback_name} for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {e}')
                 # raise e
                 raise UserWarning(e)
                 ## Continue...
@@ -1072,7 +1086,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def on_secondary_click(self, event, clicked_ax=None, clicked_data_index=None):
         """ a secondary (usually right)-click event. Called manually from self.on_click(...) for appropriate mouse button events.
         """
-        print(f'on_secondary_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
+        self.ui.print(f'on_secondary_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
 
 
 
@@ -1080,7 +1094,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
         """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
         if self.params.debug_print:
-            print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_ax_selected_state(ax: {ax}, is_selected: {is_selected}) OVERRIDE:')
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_ax_selected_state(ax: {ax}, is_selected: {is_selected}) OVERRIDE:')
         # Set the face color of the clicked Axes based on its selection status
         if is_selected:
             ax.patch.set_facecolor('gray')
@@ -1091,19 +1105,19 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         a_selection_rect = selection_rectangles_dict.get(ax, None)
         if a_selection_rect is not None:
             if self.params.debug_print:
-                print(f'\ta_selection_rect.set_visible({is_selected})')
+                self.ui.print(f'\ta_selection_rect.set_visible({is_selected})')
             a_selection_rect.set_visible(is_selected)
         else:
             if self.params.debug_print:
-                print(f'\ta_selection_rect is None!')
+                self.ui.print(f'\ta_selection_rect is None!')
         if self.params.debug_print:
-            print(f'\tdone.')
+            self.ui.print(f'\tdone.')
 
 
     def perform_update_selections(self, defer_render:bool=True):
         """ called to update the selection when the page is changed or something else happens. """
         if self.params.debug_print:
-            print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_selections(...) OVERRIDE:')
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_selections(...) OVERRIDE:')
         current_page_idx = self.current_page_idx
         curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
         assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
@@ -1538,7 +1552,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return saved_selections_dict
 
 
-    def print_user_annotations(self):
+    def print_user_annotations(self, should_copy_to_clipboard=True):
         """ Builds user annotations and outputs them. 
 
         >>> Prints Output Like:
@@ -1549,6 +1563,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             user_annotations[IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-09_1-22-43',display_fn_name='DecodedEpochSlices',epochs='ripple',decoder='short_RL',user_annotation='selections')] = np.array([array([125.06, 125.21]), array([149.959, 150.254])])
         
         """
+        if should_copy_to_clipboard:
+            from pyphocorehelpers.programming_helpers import copy_to_clipboard
         from neuropy.core.user_annotations import UserAnnotationsManager
         annotations_man = UserAnnotationsManager()
         user_annotations = annotations_man.get_user_annotations()
@@ -1563,13 +1579,21 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # Updates the context. Needs to generate the code.
 
         # ## Generate code to insert int user_annotations:
-        print('Add the following code to `pyphoplacecellanalysis.General.Model.user_annotations.UserAnnotationsManager.get_user_annotations()` function body:')
+        self.ui.print('Add the following code to `pyphoplacecellanalysis.General.Model.user_annotations.UserAnnotationsManager.get_user_annotations()` function body:')
+        code_strings: List[str] = []
         for a_name, a_saved_selection in saved_selections_dict.items():
             a_context = saved_selections_context_dict[a_name]
+            a_string = f"user_annotations[{a_context.get_initialization_code_string()}] = {a_saved_selection.epoch_times}"
+            code_strings.append(a_string)
             # print(f"user_annotations[{a_context.get_initialization_code_string()}] = np.array({list(a_saved_selection.flat_all_data_indicies[a_saved_selection.is_selected])})")
-            print(f"user_annotations[{a_context.get_initialization_code_string()}] = np.array({list(a_saved_selection.epoch_times)})")
+            # print(a_string)
     
-        return user_annotations
+        code_string: str = '\n'.join(code_strings)
+        if should_copy_to_clipboard:
+            copy_to_clipboard(code_string, message_print=True)
+        else:
+            self.ui.print(code_string)
+        return code_strings
     
 
     def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None):
@@ -1641,7 +1665,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             a_paginator = a_pagination_controller.paginator
             total_num_pages = int(a_paginator.num_pages)
             page_context = display_context.overwriting_context(page=current_page_idx, num_pages=total_num_pages)
-            print(page_context)
+            self.ui.print(page_context)
 
             ## Get the figure/axes:
             a_plots = a_pagination_controller.plots # RenderPlots

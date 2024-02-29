@@ -882,6 +882,29 @@ class PaginatedPlotDataProvider:
             _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
 
 
+    # @classmethod
+    # def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+    #     """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+
+    #     Needs only: curr_time_bins, plots_data, i
+    #     Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+
+    #     Called with:
+
+    #     self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
+
+        
+    #     Data:
+    #         plots_data.weighted_corr_data
+    #     Plots:
+    #         plots['weighted_corr']
+
+    #     """
+    #     pass
+
+
+
+
 @define
 class RadonTransformPlotData:
     line_y: np.ndarray = field()
@@ -1049,7 +1072,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
 
     @classmethod
-    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
         """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
 
         Needs only: curr_time_bins, plots_data, i
@@ -1076,15 +1099,22 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         
         debug_print = kwargs.pop('debug_print', True)
         if debug_print:
-            print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
+            print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
             
+        if epoch_slice is not None:
+            print(f'\tepoch_slice: {epoch_slice}')
+
+        if curr_time_bin_container is not None:
+            print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
+
+
         # Add replay score text to top-right corner:
-        final_text = f"{plots_data.radon_transform_data[i].score_text}\n{plots_data.radon_transform_data[i].speed_text}\n{plots_data.radon_transform_data[i].intercept_text}"
-        if plots_data.radon_transform_data[i].extra_text is not None:
-            final_text = f"{final_text}\n{plots_data.radon_transform_data[i].extra_text}"
+        final_text = f"{plots_data.radon_transform_data[data_idx].score_text}\n{plots_data.radon_transform_data[data_idx].speed_text}\n{plots_data.radon_transform_data[data_idx].intercept_text}"
+        if plots_data.radon_transform_data[data_idx].extra_text is not None:
+            final_text = f"{final_text}\n{plots_data.radon_transform_data[data_idx].extra_text}"
             
 
-        extant_plots = plots[cls.plots_group_identifier_key].get(i, {})
+        extant_plots = plots[cls.plots_group_identifier_key].get(data_idx, {})
         extant_line = extant_plots.get('line', None)
         extant_score_text = extant_plots.get('score_text', None)
         # plot the radon transform line on the epoch:    
@@ -1103,7 +1133,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         ## Plot the line plot. Could update this like I did for the text?
         active_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha,
                              marker='+', markersize=2, markerfacecolor='#e5ff00', markeredgecolor='#e5ff00') # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
-        radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[i].line_y, **active_kwargs)
+        radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **active_kwargs)
 
 
         if (extant_score_text is not None):
@@ -1119,7 +1149,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
 
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][i] = {'line':radon_transform_plot, 'score_text':anchored_text}
+        plots[cls.plots_group_identifier_key][data_idx] = {'line':radon_transform_plot, 'score_text':anchored_text}
         
         if debug_print:
             print(f'\t success!')
@@ -1134,21 +1164,42 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
 @define(slots=False, repr=False)
 class WeightedCorrelationPlotData:
+    # epoch_identity_str: str = field(default='')
+    start_t_text: str = field()
+    stop_t_text: str = field()
+
     wcorr_text: str = field()
     P_decoder_text: str = field(default='')
     pearson_r_text: str = field(default='')
 
     @classmethod
-    def init_from_df_columns(cls, epoch_wcorr, epoch_P_decoder, pearson_r) -> "WeightedCorrelationPlotData":
+    def init_from_df_columns(cls, epoch_start, epoch_end, epoch_wcorr, epoch_P_decoder, pearson_r) -> "WeightedCorrelationPlotData":
         """ TODO: make general """
         with np.printoptions(precision=3, suppress=True, threshold=5):
+            default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
+            start_t_text = default_float_formatting_fn(epoch_start)
+            stop_t_text = default_float_formatting_fn(epoch_end)
             wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
             P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
             if pearson_r is not None:
                 pearson_r_text = f"pearsonr: " + str(np.array([pearson_r])).lstrip("[").rstrip("]")
-            return cls(wcorr_text=wcorr_text, P_decoder_text=P_decoder_text, pearson_r_text=pearson_r_text)
+            return cls(start_t_text=start_t_text, stop_t_text=stop_t_text, wcorr_text=wcorr_text, P_decoder_text=P_decoder_text, pearson_r_text=pearson_r_text)
 
 
+    def build_display_text(self) -> str:
+        """ builds the final display string to be rendered in the label. """
+        final_text: str = f"[{self.start_t_text}, {self.stop_t_text}]"
+        if len(self.wcorr_text) > 0:
+            ## Add the P_decoder line:
+            final_text = f"{final_text}\n{self.wcorr_text}"
+        if len(self.P_decoder_text) > 0:
+            ## Add the P_decoder line:
+            final_text = f"{final_text}\n{self.P_decoder_text}"
+        if len(self.pearson_r_text) > 0:
+            ## Add the P_decoder line:
+            final_text = f"{final_text}\n{self.pearson_r_text}"
+        return final_text
+    
 
 # @define(slots=False, repr=False)
 class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
@@ -1194,7 +1245,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             
         
     @classmethod
-    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
         """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
 
         Needs only: curr_time_bins, plots_data, i
@@ -1204,7 +1255,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
 
-        
         Data:
             plots_data.weighted_corr_data
         Plots:
@@ -1216,28 +1266,41 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         debug_print = kwargs.pop('debug_print', True)
         if debug_print:
-            print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., i: {i}, curr_time_bins: {curr_time_bins})')
+            print(f'WeightedCorrelationPaginatedPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
         
+        if epoch_slice is not None:
+            if debug_print:
+                print(f'\tepoch_slice: {epoch_slice}')
+            assert len(epoch_slice) == 2
+            epoch_start_t, epoch_end_t = epoch_slice # unpack
+            if debug_print:
+                print(f'\tepoch_start_t: {epoch_start_t}, epoch_end_t: {epoch_end_t}')
+        else:
+            raise NotImplementedError(f'epoch_slice is REQUIRED to index into the wcorr_data dict, but is None!')
+        
+        if curr_time_bin_container is not None:
+            if debug_print:
+                print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
+
         # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
         extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
 
+        # data_index_value = data_idx # OLD MODE
+        data_index_value = epoch_start_t
+
         # Add replay score text to top-right corner:
-        final_text: str = f"{plots_data.weighted_corr_data[i].wcorr_text}" # \n{plots_data.radon_transform_data[i].speed_text}
-        if len(plots_data.weighted_corr_data[i].P_decoder_text) > 0:
-            ## Add the P_decoder line:
-            final_text = f"{final_text}\n{plots_data.weighted_corr_data[i].P_decoder_text}"
-        if len(plots_data.weighted_corr_data[i].pearson_r_text) > 0:
-            ## Add the P_decoder line:
-            final_text = f"{final_text}\n{plots_data.weighted_corr_data[i].pearson_r_text}"
+        assert data_index_value in plots_data.weighted_corr_data, f"plots_data.weighted_corr_data does not contain index {data_index_value}"
+        weighted_corr_data_item: WeightedCorrelationPlotData = plots_data.weighted_corr_data[data_index_value]
+        final_text: str = weighted_corr_data_item.build_display_text()
 
         ## Build or Update:
-        extant_plots = plots[cls.plots_group_identifier_key].get(i, {})
-        extant_wcorr_text = extant_plots.get('wcorr_text', None)
+        extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
+        extant_wcorr_text_label = extant_plots_dict.get('wcorr_text', None)
         # plot the radon transform line on the epoch:    
-        if (extant_wcorr_text is not None):
+        if (extant_wcorr_text_label is not None):
             # already exists, update the existing ones. 
-            assert isinstance(extant_wcorr_text, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text)} but is expected to be of type AnchoredText."
-            anchored_text: AnchoredText = extant_wcorr_text
+            assert isinstance(extant_wcorr_text_label, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
+            anchored_text: AnchoredText = extant_wcorr_text_label
             anchored_text.txt.set_text(final_text)
         else:
             ## Create a new one:
@@ -1245,9 +1308,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             anchored_text.patch.set_ec("none")
             anchored_text.set_alpha(0.4)
 
-
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][i] = {'wcorr_text':anchored_text}
+        plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text':anchored_text}
         
         if debug_print:
             print(f'\t success!')
@@ -1271,12 +1333,29 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             P_decoder_col_name: str = 'P_decoder'
             pearson_r_col_name: str = 'pearsonr'
             wcorr_data = {}
-            for epoch_idx, epoch_wcorr, epoch_P_decoder, epoch_pearsonr in zip(np.arange(num_filter_epochs), active_filter_epochs_df[wcorr_col_name].values, active_filter_epochs_df[P_decoder_col_name].values, active_filter_epochs_df[pearson_r_col_name].values):
-                # with np.printoptions(precision=3, suppress=True, threshold=5):
-                #     wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
-                #     P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
-                # wcorr_data[epoch_idx] = WeightedCorrelationPlotData(wcorr_text=wcorr_text, P_decoder_text=P_decoder_text)
-                wcorr_data[epoch_idx] = WeightedCorrelationPlotData.init_from_df_columns(epoch_wcorr, epoch_P_decoder, epoch_pearsonr)
+            
+            df_column_names = ['start', 'stop', 'label', 'duration', 'end', 'wcorr', 'P_decoder', 'pearsonr']
+            # default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
+            
+            # printed_df_column_names = ['start', 'stop', 'wcorr', 'P_decoder', 'pearsonr']
+            # df_value_formatting_fns = [default_float_formatting_fn, default_float_formatting_fn, default_float_formatting_fn, default_float_formatting_fn, default_float_formatting_fn]
+            # df_value_formatting_dict = dict(zip(printed_df_column_names, df_value_formatting_fns))
+                                            
+            for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
+                # print(f"a_tuple.start: {a_tuple.start}, a_tuple.stop: {a_tuple.stop}")
+                # formatted_values = {a_col:a_fn(a_tuple[a_col]) for a_col, a_fn in df_value_formatting_dict.items()}
+                # print(f'formatted_values')
+                # df_value_formatting_dict
+                ## NOTE: uses a_tuple.start as the index in to the data dict:
+                wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
+
+
+            # for epoch_idx, epoch_wcorr, epoch_P_decoder, epoch_pearsonr in zip(np.arange(num_filter_epochs), active_filter_epochs_df[wcorr_col_name].values, active_filter_epochs_df[P_decoder_col_name].values, active_filter_epochs_df[pearson_r_col_name].values):
+            #     # with np.printoptions(precision=3, suppress=True, threshold=5):
+            #     #     wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+            #     #     P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
+            #     # wcorr_data[epoch_idx] = WeightedCorrelationPlotData(wcorr_text=wcorr_text, P_decoder_text=P_decoder_text)
+            #     wcorr_data[epoch_idx] = WeightedCorrelationPlotData.init_from_df_columns(epoch_wcorr, epoch_P_decoder, epoch_pearsonr)
                 
             return wcorr_data
 

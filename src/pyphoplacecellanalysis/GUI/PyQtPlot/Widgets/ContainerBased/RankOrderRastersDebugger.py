@@ -29,6 +29,7 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ScrollBarWithSpinBox.ScrollBarWithSpinBox import ScrollBarWithSpinBox
+from pyphoplacecellanalysis.GUI.Qt.Widgets.LogViewerTextEdit import LogViewer
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
@@ -254,7 +255,7 @@ class RankOrderRastersDebugger:
 
 
     @classmethod
-    def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, rank_order_results: RankOrderComputationsContainer, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], **param_kwargs):
+    def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, rank_order_results: RankOrderComputationsContainer, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], dock_add_locations=None, **param_kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -326,16 +327,33 @@ class RankOrderRastersDebugger:
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False))))
         # dock_add_locations = (['left'], ['left'], ['right'], ['right'])
         # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right'])))
-        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
+        # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
+
+        if (dock_add_locations is None):
+            # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
+            dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), ((lambda a_decoder_name: ['left']), (lambda a_decoder_name: ['bottom']), (lambda a_decoder_name: ['right']), (lambda a_decoder_name: ['bottom', root_dockAreaWindow.find_display_dock('short_LR')]))))
+
+        else:
+            assert len(dock_add_locations) == len(dock_configs), f"len(dock_add_locations): {len(dock_add_locations)} != len(dock_configs): {len(dock_configs)}"
 
         for i, (a_decoder_name, a_win) in enumerate(all_windows.items()):
-            if (a_decoder_name == 'short_RL'):
-                short_LR_dock = root_dockAreaWindow.find_display_dock('short_LR')
-                assert short_LR_dock is not None
-                dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
-                print(f'using overriden dock location.')
+            active_dock_add_location_fn = dock_add_locations[a_decoder_name]
+            if callable(active_dock_add_location_fn):
+                # the value is a lambda-wrapped function that returns a list:
+                active_dock_add_location = active_dock_add_location_fn(a_decoder_name)
+            else:
+                ## the value is just a regular list of string
+                active_dock_add_location = active_dock_add_location_fn
 
-            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name], autoOrientation=False)
+            # if (a_decoder_name == 'short_RL'):
+            #     short_LR_dock = root_dockAreaWindow.find_display_dock('short_LR')
+            #     assert short_LR_dock is not None
+            #     dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
+            #     print(f'using overriden dock location.')
+
+            # _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name], autoOrientation=False)
+            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=active_dock_add_location, display_config=dock_configs[a_decoder_name], autoOrientation=False)
+
 
 
 
@@ -370,7 +388,7 @@ class RankOrderRastersDebugger:
         ctrls_widget.setValue(10)
 
         def valueChanged(new_val:int):
-            print(f'valueChanged(new_val: {new_val})')
+            print(f'ScrollBarWithSpinBox valueChanged(new_val: {new_val})')
             _obj.on_update_epoch_IDX(int(new_val))
 
         ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
@@ -408,8 +426,7 @@ class RankOrderRastersDebugger:
         # Add the tab widget to the layout
         ctrl_layout.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=1)
     
-
-        logTextEdit = pg.QtWidgets.QTextEdit()
+        logTextEdit = LogViewer() # QTextEdit subclass
         logTextEdit.setReadOnly(True)
         logTextEdit.setObjectName("logTextEdit")
         # logTextEdit.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
@@ -704,7 +721,14 @@ class RankOrderRastersDebugger:
 
     def write_to_log(self, log_messages):
         """ logs text to the text widget at the bottom """
-        self.ui.logTextEdit.append(log_messages)
+        self.ui.logTextEdit.write_to_log(log_messages)
+        # self.ui.logTextEdit.append(log_messages)
+        # # Automatically scroll to the bottom
+        # self.ui.logTextEdit.verticalScrollBar().setValue(
+        #     self.ui.logTextEdit.verticalScrollBar().maximum()
+        # )
+
+
 
     def get_ipywidget(self):
         """ Displays a slider that allows the user to select the epoch_IDX instead of having to type it and call it manually
@@ -740,6 +764,13 @@ class RankOrderRastersDebugger:
         # Display the slider
         # display(slider)
 
+
+    def set_top_info_bar_visibility(self, is_visible=False):
+        """Hides/Shows the top info bar dock """
+        LongShortColumnsInfo_dock_layout, LongShortColumnsInfo_dock_Dock = self.plots.dock_widgets['LongShortColumnsInfo_dock']
+        # LongShortColumnsInfo_dock_layout.hide() # No use
+        # _out_ripple_rasters.ui.long_short_info_layout.hide() # No use
+        LongShortColumnsInfo_dock_Dock.setVisible(is_visible)
 
 
     def save_figure(self, export_path: Path):
