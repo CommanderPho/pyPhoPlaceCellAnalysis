@@ -1351,12 +1351,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
     # User Selections/Annotations ________________________________________________________________________________________ #
-    def save_selections(self) -> Dict[str, SelectionsObject]:
+    def save_selections(self) -> Dict[str, EpochSelectionsObject]:
         """ Capture current user selections for each child controller 
         Usage:
             saved_selections_dict: Dict[str, SelectionsObject] = self.save_selections()
         """
-        saved_selections_dict: Dict[str, SelectionsObject] = {a_name:a_ctrlr.save_selection() for a_name, a_ctrlr in self.pagination_controllers.items()}
+        saved_selections_dict: Dict[str, EpochSelectionsObject] = {a_name:a_ctrlr.save_selection() for a_name, a_ctrlr in self.pagination_controllers.items()}
         return saved_selections_dict
 
 
