@@ -18,6 +18,135 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 from functools import wraps, partial
 
+
+# ==================================================================================================================== #
+# 2024-02-29 - Pho Replay Heuristic Metric                                                                             #
+# ==================================================================================================================== #
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
+
+
+def compute_local_peak_probabilities(probs, n_adjacent: int):
+    n_positions, n_time_bins = probs.shape
+    local_peak_probabilities = np.zeros(n_time_bins)
+    peak_position_indices = np.zeros(n_time_bins, dtype=int)
+
+    for t in range(n_time_bins):
+        time_slice = probs[:, t]
+        for pos in range(n_positions):
+            # The lower and upper bounds ensuring we don't go beyond the array bounds
+            lower_bound = max(pos - n_adjacent, 0)
+            upper_bound = min(pos + n_adjacent + 1, n_positions)  # The upper index is exclusive
+
+            # Summing the local probabilities, including the adjacent bins
+            local_sum = np.nansum(time_slice[lower_bound:upper_bound])
+
+            # If this local sum is higher than a previous local peak, we record it
+            if local_sum > local_peak_probabilities[t]:
+                local_peak_probabilities[t] = local_sum
+                peak_position_indices[t] = pos  # Save the position index
+
+    return local_peak_probabilities, peak_position_indices
+
+
+
+def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1):
+    """ 2024-02-29 - New smart replay heuristic scoring
+
+
+    a_result: DecodedFilterEpochsResult = a_decoded_filter_epochs_decoder_result_dict['long_LR']
+
+    Want to maximize: longest_nonchanging_sequence, total_congruent_direction_change
+    Want to minimize: num_direction_changes
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_pho_heuristic_replay_scores
+        _out_new_scores = {}
+        an_epoch_idx: int = 4 # 7
+        for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
+            print(f'\na_name: {a_name}')
+            _out_new_scores[a_name] = compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx)
+
+        _out_new_scores
+
+
+    """
+    a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+    a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+    n_time_bins: int = a_result.nbins[an_epoch_idx]
+
+    # a_p_x_given_n
+    # a_result.p_x_given_n_list
+    # a_result.marginal_x_list
+    # a_result.marginal_y_list
+
+    # Usage example:
+    # # Set the number of adjacent bins you want to include on either side of the peak
+    # n_adjacent_position_bins = 0  # or any other integer value you need
+    # # a_p_x_given_n should already be defined as a (62, 9) shape array
+    # peak_probabilities_with_adjacent, peak_positions = compute_local_peak_probabilities(a_p_x_given_n, n_adjacent_position_bins)
+    # print("Local peak probabilities including adjacent position bins for each time bin:", peak_probabilities_with_adjacent)
+    # print("Position indices corresponding to the local peaks for each time bin:", peak_positions)
+    # Local peak probabilities including adjacent position bins for each time bin: [0.31841 0.321028 0.374347 0.367907 0.2261 0.172176 0.140867 0.0715084 0.172176]
+    # Position indices corresponding to the local peaks for each time bin: [55 54 55 58 58 59 57  0 59]
+    # Local peak probabilities including adjacent position bins for each time bin: [0.784589 0.785263 0.851714 0.840573 0.607828 0.478891 0.40594 0.185163 0.478891]
+    # Position indices corresponding to the local peaks for each time bin: [55 54 55 58 58 59 57  1 59]
+    print(f'np.shape(a_p_x_given_n): {np.shape(a_p_x_given_n)}')
+
+
+    track_coverage = np.nansum(a_p_x_given_n, axis=-1) # sum over all time bins
+    print(f'track_coverage: {track_coverage}')
+
+
+    # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[0.0])
+    a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+    a_first_order_diff
+    total_first_order_change: float = np.nansum(a_first_order_diff[1:])
+    total_first_order_change
+    epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
+    epoch_change_direction
+
+    # Now split the array at each point where a direction change occurs
+    # Calculate the signs of the differences
+    a_first_order_diff_sign = np.sign(a_first_order_diff)
+    # Calculate where the sign changes occur (non-zero after taking diff of signs)
+    sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
+    num_direction_changes: int = len(sign_change_indices)
+    print(f'num_direction_changes: {num_direction_changes}')
+
+    # Split the array at each index where a sign change occurs
+    split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, sign_change_indices)
+    split_first_order_diff_arrays = np.split(a_first_order_diff, sign_change_indices)
+
+    continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
+    print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
+    longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
+    print("Longest sequence of time bins without a direction change:", longest_sequence_length)
+    contiguous_total_change_quantity = [np.nansum(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
+    print(f'contiguous_total_change_quantity: {contiguous_total_change_quantity}')
+    max_total_change_quantity = np.nanmax(np.abs(contiguous_total_change_quantity))
+    print(f'max_total_change_quantity: {max_total_change_quantity}')
+
+    # for i, (a_split_most_likely_positions_array, a_split_first_order_diff_array) in enumerate(zip(split_most_likely_positions_arrays, split_first_order_diff_arrays)):
+    #     print(f"Sequence {i}: {a_split_most_likely_positions_array}, {a_split_first_order_diff_array}")
+    #     a_split_first_order_diff_array
+    #     np.nansum(a_split_first_order_diff_array)
+
+
+
+    is_non_congruent_direction_bin = (a_first_order_diff_sign != epoch_change_direction)
+    is_congruent_direction_bins = np.logical_not(is_non_congruent_direction_bin)
+
+    congruent_bin_diffs = a_first_order_diff[is_congruent_direction_bins]
+    incongruent_bin_diffs = a_first_order_diff[is_non_congruent_direction_bin]
+
+    num_congruent_direction_bins_score: float = float(len(congruent_bin_diffs)) / float(n_time_bins - 1)
+    print(f'num_congruent_direction_bins_score: {num_congruent_direction_bins_score}')
+    total_congruent_direction_change: float = np.nansum(np.abs(congruent_bin_diffs)) # the total quantity of change in the congruent direction
+    total_incongruent_direction_change: float = np.nansum(np.abs(incongruent_bin_diffs))
+    print(f'total_congruent_direction_change: {total_congruent_direction_change}, total_incongruent_direction_change: {total_incongruent_direction_change}')
+    return longest_sequence_length, num_direction_changes, num_congruent_direction_bins_score, total_congruent_direction_change
+
+
 def register_type_display(func_to_register, type_to_register):
     """ adds the display function (`func_to_register`) it decorates to the class (`type_to_register) as a method
 

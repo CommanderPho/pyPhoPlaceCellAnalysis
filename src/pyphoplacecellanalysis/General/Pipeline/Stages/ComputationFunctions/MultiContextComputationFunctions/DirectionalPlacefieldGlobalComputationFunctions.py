@@ -1785,7 +1785,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
     decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = serialized_field(default=None)
     decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = serialized_field(default=None)
-    
+
     decoder_laps_radon_transform_df_dict: Dict = serialized_field(default=None)
     decoder_ripple_radon_transform_df_dict: Dict = serialized_field(default=None)
         
@@ -1800,39 +1800,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
     laps_simple_pf_pearson_merged_df: pd.DataFrame = serialized_field(default=None)
     ripple_simple_pf_pearson_merged_df: pd.DataFrame = serialized_field(default=None)
     
-
-    @classmethod
-    def validate_has_directional_decoded_epochs_evaluations(cls, curr_active_pipeline, computation_filter_name='maze') -> bool:
-        """ Validates that the decoding is complete
-        """
-        directional_decoders_decode_epochs_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
-        if directional_decoders_decode_epochs_result is None:
-            return False
-        pos_bin_size: float = directional_decoders_decode_epochs_result.pos_bin_size
-        if pos_bin_size is None:
-            return False
-        ripple_decoding_time_bin_size: float = directional_decoders_decode_epochs_result.ripple_decoding_time_bin_size
-        if ripple_decoding_time_bin_size is None:
-            return False
-        laps_decoding_time_bin_size: float = directional_decoders_decode_epochs_result.laps_decoding_time_bin_size
-        if laps_decoding_time_bin_size is None:
-            return False
-
-        decoder_laps_filter_epochs_decoder_result_dict = directional_decoders_decode_epochs_result.decoder_laps_filter_epochs_decoder_result_dict
-        if decoder_laps_filter_epochs_decoder_result_dict is None:
-            return False
-
-        decoder_ripple_filter_epochs_decoder_result_dict = directional_decoders_decode_epochs_result.decoder_ripple_filter_epochs_decoder_result_dict
-        if decoder_ripple_filter_epochs_decoder_result_dict is None:
-            return False
-
-        laps_simple_pf_pearson_merged_df = directional_decoders_decode_epochs_result.laps_simple_pf_pearson_merged_df
-        if laps_simple_pf_pearson_merged_df is None:
-            return False
-
-        #TODO 2024-02-16 13:52: - [ ] Rest of properties
-        return True
-
     @classmethod
     def compute_matching_best_indicies(cls, a_marginals_df: pd.DataFrame, index_column_name: str = 'most_likely_decoder_index', second_index_column_name: str = 'best_decoder_index', enable_print=True):
         """ count up the number of rows that the RadonTransform and the most-likely direction agree 
@@ -1846,24 +1813,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
         if enable_print:
             print(f'agreeing_rows_count/num_total_epochs: {agreeing_rows_count}/{num_total_epochs}\n\tagreeing_rows_ratio: {agreeing_rows_ratio}')
         return agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs)
-
-
-    # def __getitem__(self, key):
-    #     """
-    #     Allows dictionary-like access to the attributes of the object.
-    #     If the key doesn't correspond to an attribute, it raises an AttributeError.
-
-    #     Args:
-    #         key (str): The attribute name to retrieve the value for.
-
-    #     Returns:
-    #         The value of the attribute named 'key'.
-    #     """
-    #     if hasattr(self, key):
-    #         return getattr(self, key)
-    #     else:
-    #         raise KeyError(f"'{key}' is not a valid attribute of '{self.__class__.__name__}'")
-
 
 
     def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float]):
@@ -1933,8 +1882,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
             
         return export_files_dict
     
-
-
     # ## For serialization/pickling:
     # def __getstate__(self):
     # 	# Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
