@@ -14,7 +14,7 @@ from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
-
+from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
 
 
 """ refactored to avoid:
@@ -114,9 +114,21 @@ class PaginatedFigureBaseController:
 
     ## Computed properties:
     @property
-    def paginator(self):
+    def paginator(self) -> Paginator:
         """The paginator property."""
         return self.plots_data.paginator
+
+
+    @property
+    def paginator_controller_widget(self) -> PaginationControlWidget:
+        """ the widget that goes left and right by pages in the bottom of the left plot. """
+        return self.ui.mw.ui.paginator_controller_widget
+    
+    @property
+    def plot_widget(self) -> "MatplotlibTimeSynchronizedWidget":
+        """ the list of plotting child widgets. """
+        return self.ui.mw
+
 
     @property
     def current_page_idx(self) -> int:
@@ -168,7 +180,6 @@ class PaginatedFigureBaseController:
         # Post:
         self.perform_update_selections(defer_render=defer_render)
         
-
     def on_click(self, event):
         """ called when an axis is clicked to toggle the selection. """
         if self.params.debug_print:
@@ -195,7 +206,6 @@ class PaginatedFigureBaseController:
         else:
             print(f'\tcould not find the clicked ax: {ax} in the list of axes: {self.plots.axs}')
 
-
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
         """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
         if self.params.debug_print:
@@ -212,8 +222,6 @@ class PaginatedFigureBaseController:
         a_selection_rect = selection_rectangles_dict.get(ax, None)
         if a_selection_rect is not None:
             a_selection_rect.set_visible(is_selected)
-
-
 
     def perform_update_selections(self, defer_render:bool = False):
         """ called to update the selection when the page is changed or something else happens. """
@@ -238,8 +246,6 @@ class PaginatedFigureBaseController:
             self.plots.fig.canvas.draw_idle()
             ax.get_figure().canvas.draw()
 
-
-
     def _subfn_build_selectibility_rects_if_needed(self, axs, curr_page_data_indicies):
         """ adds the selectibility rectangles (patches), one for each axis, to the matplotlib axes provided
         
@@ -251,17 +257,19 @@ class PaginatedFigureBaseController:
 
         if not self.plots.has_attr('selection_rectangles_dict'):
             ## Create the dict if needed and it doesn't exist:
-            print(f'building new self.plots.selection_rectangles_dict as one does not exist')
+            if self.params.debug_print:
+                print(f'building new self.plots.selection_rectangles_dict as one does not exist')
             self.plots.selection_rectangles_dict = {} # empty dict to start
 
         ## INPUTS: curr_page_data_indicies, axs
         assert len(axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
-        for ax, found_data_idx in zip(axs, list(curr_page_data_indicies)): # TODO: might fail for the last page?
+        for ax, found_data_idx in zip(axs, list(curr_page_data_indicies)):
             ## First get the ax
             a_selection_rect = self.plots.selection_rectangles_dict.get(ax, None)
             if a_selection_rect is None:
                 # create a new one
-                print(f'needed a new selection rect.')
+                if self.params.debug_print:
+                    print(f'needed a new selection rect.')
                 a_selection_rect = add_selection_patch(ax, selection_color='green', alpha=0.6, zorder=-1, defer_draw=True)
                 self.plots.selection_rectangles_dict[ax] = a_selection_rect ## add to dict
 
@@ -285,6 +293,12 @@ class PaginatedFigureBaseController:
         self.params.flat_all_data_indicies = np.hstack(flat_all_data_indicies)
         ## Initialize `params.is_selected` to False for each item:
         self.params.is_selected = dict(zip(self.params.flat_all_data_indicies, np.repeat(False, self.total_number_of_items_to_show))) # Repeat "False" for each item
+
+
+    def _perform_clear_all_selections(self):
+        """ Resets all selections (setting is_selected to False) internally, not graphical.
+        """
+        self._subfn_helper_setup_selectability()
 
     # Context and titles _________________________________________________________________________________________________ #
     def perform_update_titles_from_context(self, page_idx:int, included_page_data_indicies, **kwargs):

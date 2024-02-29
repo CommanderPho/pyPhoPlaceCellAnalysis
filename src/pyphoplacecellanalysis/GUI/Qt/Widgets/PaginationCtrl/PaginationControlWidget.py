@@ -182,6 +182,12 @@ class PaginationControlWidget(QWidget):
             self.jump_to_page.emit(updated_page_idx)
             
 
+    @pyqtExceptionPrintingSlot(int)
+    def update_page_idx(self, updated_page_idx: int):
+        """ this value is safe to bind to. """
+        return self.programmatically_update_page_idx(updated_page_idx=updated_page_idx, block_signals=False)
+
+
     def programmatically_update_page_idx(self, updated_page_idx: int, block_signals:bool=False):
         """ Programmatically updates the spinBoxPage with the zero-based page_number 
         page number (1-based) is always one greater than the page_index (0-based)

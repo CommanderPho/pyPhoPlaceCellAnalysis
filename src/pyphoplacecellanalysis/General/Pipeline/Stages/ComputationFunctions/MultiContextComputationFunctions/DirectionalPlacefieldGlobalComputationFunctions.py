@@ -1771,7 +1771,7 @@ def _workaround_validate_has_directional_decoded_continuous_epochs(curr_active_p
 
 @define(slots=False, repr=False)
 class DecoderDecodedEpochsResult(ComputedResult):
-    """ Docstring for DecoderDecodedEpochsResult.
+    """ Contains Decoded Epochs (such as laps, ripple) for a given Decoder.
 
     2024-02-15 - Computed by `_decode_and_evaluate_epochs_using_directional_decoders`
     
@@ -1783,8 +1783,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
     ripple_decoding_time_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
     laps_decoding_time_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
 
-    decoder_laps_filter_epochs_decoder_result_dict: Dict = serialized_field(default=None)
-    decoder_ripple_filter_epochs_decoder_result_dict: Dict = serialized_field(default=None)
+    decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = serialized_field(default=None)
+    decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = serialized_field(default=None)
+    
     decoder_laps_radon_transform_df_dict: Dict = serialized_field(default=None)
     decoder_ripple_radon_transform_df_dict: Dict = serialized_field(default=None)
         

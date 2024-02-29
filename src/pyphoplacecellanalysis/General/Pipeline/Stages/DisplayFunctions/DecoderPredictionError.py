@@ -866,7 +866,8 @@ class PaginatedPlotDataProvider:
         """
         enable_radon_transform_info = True
 
-        _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data
+        # _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data
+        _out_pagination_controller.plots_data[cls.plots_group_data_identifier_key] = radon_transform_data
         _out_pagination_controller.plots[cls.plots_group_identifier_key] = {}
 
         # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
@@ -914,6 +915,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     """
     callback_identifier_string: str = 'plot_radon_transform_line_data'
     plots_group_identifier_key: str = 'radon_transform' # _out_pagination_controller.plots['weighted_corr']
+    plots_group_data_identifier_key: str = 'radon_transform_data'
 
     @classmethod
     def add_data_to_pagination_controller(cls, _out_pagination_controller, radon_transform_data, update_controller_on_apply:bool=False):
@@ -921,7 +923,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         """
         enable_radon_transform_info = True
 
-        _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data
+        _out_pagination_controller.plots_data[cls.plots_group_data_identifier_key] = radon_transform_data
         _out_pagination_controller.plots[cls.plots_group_identifier_key] = {}
 
         # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
@@ -938,9 +940,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
     @classmethod
     def _subfn_build_radon_transform_plotting_data(cls, active_filter_epochs_df: pd.DataFrame, num_filter_epochs: int, time_bin_containers: List["BinningContainer"], radon_transform_column_names: Optional[List[str]]=None):
-        """ 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
+        """ Builds the Radon-transform data to a single decoder.
         
-        
+        2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
         
         Usage:
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _build_radon_transform_plotting_data
@@ -1164,6 +1166,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     # callback_identifier_string: str = 'plot_radon_transform_line_data'
     callback_identifier_string: str = 'plot_wcorr_data'
     plots_group_identifier_key: str = 'weighted_corr' # _out_pagination_controller.plots['weighted_corr']
+    plots_group_data_identifier_key: str = 'weighted_corr_data'
 
     text_color: str = '#ff886a'
     
@@ -1173,7 +1176,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         """
         enable_weighted_correlation_info = True
 
-        _out_pagination_controller.plots_data.weighted_corr_data = weighted_corr_data
+        # _out_pagination_controller.plots_data.weighted_corr_data = weighted_corr_data
+        _out_pagination_controller.plots_data[cls.plots_group_data_identifier_key] = weighted_corr_data
         _out_pagination_controller.plots[cls.plots_group_identifier_key] = {}
 
         # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
@@ -1182,7 +1186,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
         ## add or update this callback:
         if enable_weighted_correlation_info:
-            _out_pagination_controller.params.on_render_page_callbacks[cls.callback_identifier_string] = cls._callback_update_wcorr_decoded_single_epoch_slice_plot
+            _out_pagination_controller.params.on_render_page_callbacks[cls.callback_identifier_string] = cls._callback_update_curr_single_epoch_slice_plot
             
         # Trigger the update
         if update_controller_on_apply:
@@ -1190,7 +1194,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             
         
     @classmethod
-    def _callback_update_wcorr_decoded_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
         """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
 
         Needs only: curr_time_bins, plots_data, i

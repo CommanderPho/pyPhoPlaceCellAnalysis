@@ -183,8 +183,10 @@ class RankOrderRastersDebugger:
 
     # Data Convenience Accessors _________________________________________________________________________________________ #
     @property
-    def combined_epoch_stats_df(self) -> pd.DataFrame:
+    def combined_epoch_stats_df(self) -> Optional[pd.DataFrame]:
         """ returns combined_epoch_stats_df. """
+        if self.rank_order_results is None:
+            return None
         is_laps: bool = self.params.is_laps
         if is_laps:
             return self.rank_order_results.laps_combined_epoch_stats_df
@@ -192,8 +194,10 @@ class RankOrderRastersDebugger:
             return self.rank_order_results.ripple_combined_epoch_stats_df
         
     @property
-    def active_epoch_result_df(self) -> pd.DataFrame:
+    def active_epoch_result_df(self) -> Optional[pd.DataFrame]:
         """ returns a the combined_epoch_stats_df describing the single epoch corresponding to `self.active_epoch_IDX`. """
+        if self.combined_epoch_stats_df is None:
+            return None
         # curr_epoch_label = self.lookup_label_from_index(self.active_epoch_IDX)
         # return self.combined_epoch_stats_df[self.combined_epoch_stats_df.label == curr_epoch_label]
         assert np.shape(self.combined_epoch_stats_df)[0] == np.shape(self.active_epochs_df)[0], f"np.shape(self.combined_epoch_stats_df)[0]: {np.shape(self.combined_epoch_stats_df)[0]} != np.shape(self.active_epochs_df)[0]: {np.shape(self.active_epochs_df)[0]}"
@@ -499,12 +503,18 @@ class RankOrderRastersDebugger:
 
         _obj.register_internal_callbacks()
 
+        try:
+            ctrl_widgets_dict['models_dict']['combined_epoch_stats'] = SimplePandasModel(_obj.combined_epoch_stats_df.copy())
+            # Create and associate view with model
+            ctrl_widgets_dict['views_dict']['combined_epoch_stats'].setModel(ctrl_widgets_dict['models_dict']['combined_epoch_stats'])
 
-        ctrl_widgets_dict['models_dict']['combined_epoch_stats'] = SimplePandasModel(_obj.combined_epoch_stats_df.copy())
+        except AttributeError as e:
+            # AttributeError: 'NoneType' object has no attribute 'ripple_combined_epoch_stats_df'
+            print(f'WARNING: {e}')
 
-        # Create and associate view with model
-        # view = pg.QtWidgets.QTableView()
-        ctrl_widgets_dict['views_dict']['combined_epoch_stats'].setModel(ctrl_widgets_dict['models_dict']['combined_epoch_stats'])
+        except Exception as e:
+            raise e
+
         
 
         return _obj
@@ -1252,25 +1262,30 @@ class RankOrderRastersDebugger:
             # a_real_value = rank_order_results_debug_values[a_decoder_name][0][an_idx]
             a_std_column_name: str = self.decoder_name_to_column_name_prefix_map[a_decoder_name]
 
-            all_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
-            active_column_names = []
-            # print(active_column_names)
-            if self.params.enable_show_spearman:
-                active_column_names = [col for col in all_column_names if col.endswith("_spearman")]
-                if self.params.enable_show_Z_values:
-                    active_column_names += [col for col in all_column_names if col.endswith("_spearman_Z")]
+            if (curr_new_results_df is not None):
+                all_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
+                active_column_names = []
+                # print(active_column_names)
+                if self.params.enable_show_spearman:
+                    active_column_names = [col for col in all_column_names if col.endswith("_spearman")]
+                    if self.params.enable_show_Z_values:
+                        active_column_names += [col for col in all_column_names if col.endswith("_spearman_Z")]
 
 
-            if self.params.enable_show_pearson:
-                active_column_names += [col for col in all_column_names if col.endswith("_pearson")]
-                if self.params.enable_show_Z_values:
-                    active_column_names += [col for col in all_column_names if col.endswith("_pearson_Z")]
+                if self.params.enable_show_pearson:
+                    active_column_names += [col for col in all_column_names if col.endswith("_pearson")]
+                    if self.params.enable_show_Z_values:
+                        active_column_names += [col for col in all_column_names if col.endswith("_pearson_Z")]
 
 
-            active_column_values = curr_new_results_df[active_column_names]
-            active_values_dict = active_column_values.iloc[0].to_dict() # {'LR_Long_spearman': -0.34965034965034975, 'LR_Long_pearson': -0.5736588716389961, 'LR_Long_spearman_Z': -0.865774983083525, 'LR_Long_pearson_Z': -1.4243571733839517}
-            active_raw_col_val_dict = {k.replace(f'{a_std_column_name}_', ''):v for k,v in active_values_dict.items()} # remove the "LR_Long" prefix so it's just the variable names
-
+                active_column_values = curr_new_results_df[active_column_names]
+                active_values_dict = active_column_values.iloc[0].to_dict() # {'LR_Long_spearman': -0.34965034965034975, 'LR_Long_pearson': -0.5736588716389961, 'LR_Long_spearman_Z': -0.865774983083525, 'LR_Long_pearson_Z': -1.4243571733839517}
+                active_raw_col_val_dict = {k.replace(f'{a_std_column_name}_', ''):v for k,v in active_values_dict.items()} # remove the "LR_Long" prefix so it's just the variable names
+            else:
+                ## No RankOrderResults
+                print(f'WARN: No RankOrderResults')
+                active_raw_col_val_dict = {}
+                
             active_formatted_col_val_list = [':'.join([generate_html_string(str(k), color='grey', bold=False), generate_html_string(f'{v:0.3f}', color='white', bold=True)]) for k,v in active_raw_col_val_dict.items()]
             final_values_string: str = '; '.join(active_formatted_col_val_list)
 
