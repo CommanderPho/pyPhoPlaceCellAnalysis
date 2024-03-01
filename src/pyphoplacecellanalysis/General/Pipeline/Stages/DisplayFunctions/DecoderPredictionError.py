@@ -1302,7 +1302,18 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # already exists, update the existing ones. 
             assert isinstance(extant_wcorr_text_label, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
             anchored_text: AnchoredText = extant_wcorr_text_label
+            # Check if the AnchoredText object was removed. This happens when ax.clear() is called in `.on_jump_to_page(...)` before the callbacks part
+            if anchored_text.axes is None:
+                if debug_print:
+                    print("The AnchoredText object has been removed from the Axes and will be re-added.")
+                # Re-add the anchored text if necessary
+                curr_ax.add_artist(anchored_text)
+            # else:
+            #     if debug_print:
+            #         print("The AnchoredText object is still in the Axes.")
+            # Update the text afterwards:
             anchored_text.txt.set_text(final_text)
+
         else:
             ## Create a new one:
             anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, **extra_text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
