@@ -364,7 +364,7 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
         plots.secondary_yaxes = {} # initialize to an empty dictionary
 
     # Left side y-label for the start time
-    curr_ax.set_ylabel(f'{a_slice_label}\n{a_slice_start_t:.2f}') # format to two decimal places
+    curr_ax.set_ylabel(f'{a_slice_label}\n{a_slice_start_t:.3f}') # format to two decimal places
     
     ## Add the right-aligned axis
     # From http://notes.brooks.nu/2008/03/plotting-on-left-and-right-axis-simulateously-using-matplotlib-and-numpy
@@ -376,7 +376,7 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
         plots.secondary_yaxes[curr_ax] = secax_y # set the secondary axis for this curr_ax
         
     assert secax_y is not None
-    secax_y.set_ylabel(f'{a_slice_end_t:.2f}')
+    secax_y.set_ylabel(f'{a_slice_end_t:.3f}')
     secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
     # Do I need to save this temporary axes? No, it appears that's not needed
 
