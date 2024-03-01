@@ -1458,26 +1458,22 @@ class PipelineWithComputedPipelineStageMixin:
             return sucessfully_updated_keys, successfully_loaded_keys
         
 
-
-
-
-    def load_split_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
-        """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+    @classmethod
+    def try_load_split_pickled_global_computation_results(cls, global_computation_results_pickle_path, debug_print=True):
+        """ just tries to load the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
         Reciprocal: `save_split_global_computation_results`
         
         allow_overwrite_existing_allow_keys: keys allowed to be overwritten in the current computation_results if they can be loaded from disk.
         
         Usage:
             sucessfully_updated_keys, successfully_loaded_keys, found_split_paths = curr_active_pipeline.load_split_pickled_global_computation_results(allow_overwrite_existing_allow_keys=['DirectionalLaps', 'RankOrder'])
+
+            
+        global_computation_results_pickle_path = override_global_computation_results_pickle_path or self.global_computation_results_pickle_path
+
+
         """
-        allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
-        
-        if override_global_computation_results_pickle_path is None:
-            # Use the default if no override is provided.
-            global_computation_results_pickle_path = self.global_computation_results_pickle_path
-        else:
-            global_computation_results_pickle_path = override_global_computation_results_pickle_path
-        
+        assert global_computation_results_pickle_path is not None
         if not isinstance(global_computation_results_pickle_path, Path):
             global_computation_results_pickle_path = Path(global_computation_results_pickle_path).resolve()
             
@@ -1496,8 +1492,9 @@ class PipelineWithComputedPipelineStageMixin:
         
         found_split_paths = []
         successfully_loaded_keys = {}
-        sucessfully_updated_keys = []
-        
+        failed_loaded_keys = {}
+
+
         for p in split_save_folder.rglob('Split_*.pkl'):
             if debug_print:
                 print(f'p: {p}')
@@ -1505,10 +1502,33 @@ class PipelineWithComputedPipelineStageMixin:
             curr_result_key: str = p.stem.removeprefix('Split_') # the key name into global_computation_results, parsed back from the file name
             
             # Actually do the loading:
-            loaded_value = loadData(p)
-            loaded_global_computation_results[curr_result_key] = loaded_value
-            successfully_loaded_keys[curr_result_key] = p
+            try:
+                loaded_value = loadData(p)
+                loaded_global_computation_results[curr_result_key] = loaded_value
+                successfully_loaded_keys[curr_result_key] = p
 
+            except BaseException as e:
+                print(f'Error loading {curr_result_key} from "{p}": {e}')
+                failed_loaded_keys[curr_result_key] = p
+
+        return loaded_global_computation_results, successfully_loaded_keys, failed_loaded_keys, found_split_paths
+    
+
+
+    def load_split_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
+        """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+        Reciprocal: `save_split_global_computation_results`
+        
+        allow_overwrite_existing_allow_keys: keys allowed to be overwritten in the current computation_results if they can be loaded from disk.
+        
+        Usage:
+            sucessfully_updated_keys, successfully_loaded_keys, found_split_paths = curr_active_pipeline.load_split_pickled_global_computation_results(allow_overwrite_existing_allow_keys=['DirectionalLaps', 'RankOrder'])
+        """
+        allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
+        loaded_global_computation_results, successfully_loaded_keys, failed_loaded_keys, found_split_paths = self.try_load_split_pickled_global_computation_results(global_computation_results_pickle_path = (override_global_computation_results_pickle_path or self.global_computation_results_pickle_path),
+                                                                                                                                                                    debug_print=debug_print)
+        
+        sucessfully_updated_keys = {}
         ## append them to the extant global_computations (`curr_active_pipeline.global_computation_results.computed_data`)
         for curr_result_key, loaded_value in loaded_global_computation_results.items():
             should_apply: bool = False
@@ -1540,6 +1560,6 @@ class PipelineWithComputedPipelineStageMixin:
 
                 self.global_computation_results.computed_data[curr_result_key] = loaded_result_dict
 
-        return sucessfully_updated_keys, successfully_loaded_keys, found_split_paths
+        return sucessfully_updated_keys, successfully_loaded_keys, failed_loaded_keys, found_split_paths
     
 
