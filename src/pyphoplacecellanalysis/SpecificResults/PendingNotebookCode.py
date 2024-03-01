@@ -1917,7 +1917,7 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
     row_column_kwargs = dict(row='all', col=scatter_column_index)
 
     ## new methods
-    _extras_output_dict["y_zero_line"] = fig.add_hline(y=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
+    _extras_output_dict["y_zero_line"] = fig.add_hline(y=0.0, line=dict(color="rgba(0.2,0.2,0.2,.25)", width=9), **row_column_kwargs)
     vertical_divider_line = fig.add_vline(x=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
 
     # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
