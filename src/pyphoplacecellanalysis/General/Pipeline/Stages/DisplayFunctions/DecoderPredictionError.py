@@ -276,7 +276,9 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         
         if ((not skip_plotting_measured_positions) and (measured_position_df is not None)):
             # Actual Position Plots (red line):
-            ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+            line_measured_position = ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        else:
+            line_measured_position = None
 
         ax.set_title(variable_name)
        
@@ -305,6 +307,9 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=True, **main_plot_kwargs)
             ax.set_xlim((xmin, xmax))
             ax.set_ylim((ymin, ymax))
+        else:
+            im_posterior_x = None
+
 
         # Most-likely Estimated Position Plots (grey line):
         if ((not skip_plotting_most_likely_positions) and (active_most_likely_positions_1D is not None)):
@@ -329,9 +334,11 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             else:
                 active_time_window_variable = time_window_centers
             
-            ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True) # (Num windows x 2)
+            line_most_likely_position = ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True) # (Num windows x 2)
             # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
-        
+        else:
+            line_most_likely_position = None
+
         return fig, ax
     
 
@@ -1140,6 +1147,10 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             # already exists, update the existing one:
             assert isinstance(extant_score_text, AnchoredText), f"extant_score_text is of type {type(extant_score_text)} but is expected to be of type AnchoredText."
             anchored_text: AnchoredText = extant_score_text
+            if anchored_text.axes is None:
+                # Re-add the anchored text if necessary
+                curr_ax.add_artist(anchored_text)
+
             anchored_text.txt.set_text(final_text)
         else:
             ## Create a new one:
@@ -1219,7 +1230,9 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     plots_group_identifier_key: str = 'weighted_corr' # _out_pagination_controller.plots['weighted_corr']
     plots_group_data_identifier_key: str = 'weighted_corr_data'
 
-    text_color: str = '#ff886a'
+    # text_color: str = '#ff886a' # an orange
+    # text_color: str = '#42D142' # a light green
+    text_color: str = '#66FF00' # a light green
     
     @classmethod
     def add_data_to_pagination_controller(cls, _out_pagination_controller, weighted_corr_data, update_controller_on_apply:bool=False):
@@ -1283,7 +1296,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                 print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
 
         # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
-        extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
+        # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
+        extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.70, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
 
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
