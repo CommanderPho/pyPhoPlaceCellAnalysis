@@ -864,50 +864,72 @@ class PaginatedPlotDataProvider:
     """ Provides auxillary and optional data to paginated plots, currently of decoded posteriors. 
     
     """
-    # callback_identifier_string: str = 'plot_radon_transform_line_data'
-    # plots_group_identifier_key: str = 'radon_transform' # _out_pagination_controller.plots['weighted_corr']
+    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
+    provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
+    provided_plots: Dict[str, Any] = {'weighted_corr': {}}
 
     @classmethod
-    def add_data_to_pagination_controller(cls, _out_pagination_controller, radon_transform_data, update_controller_on_apply:bool=False):
+    def get_provided_params(cls) -> Dict[str, Any]:
+        return cls.provided_params
+
+    @classmethod
+    def get_provided_plots_data(cls) -> Dict[str, Any]:
+        return cls.provided_plots_data
+    
+    @classmethod
+    def get_provided_plots(cls) -> Dict[str, Any]:
+        return cls.provided_plots
+
+    @classmethod
+    def get_provided_callbacks(cls) -> Dict[str, Dict]:
+        """ override """
+        return {'on_render_page_callbacks': 
+                {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
+        }
+
+
+    @classmethod
+    def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
         """ should be general I think.
+
+        Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
+
+        Uses: cls.provided_params
+
         """
-        enable_radon_transform_info = True
+        ## Add the .params:
+        for a_key, a_value in cls.provided_params.items():
+            if not a_pagination_controller.params.has_attr(a_key):
+                a_pagination_controller.params[a_key] = a_value
 
-        # _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data
-        _out_pagination_controller.plots_data[cls.plots_group_data_identifier_key] = radon_transform_data
-        _out_pagination_controller.plots[cls.plots_group_identifier_key] = {}
+        ## Add the .plots_data:
+        assert len(provided_data) == 1
+        # weighted_corr_data = provided_data[1]
+        assert len(provided_data) == len(cls.provided_plots_data), f"len(provided_data): {len(provided_data)} != len(cls.provided_plots_data): {len(cls.provided_plots_data)}"
+        active_plots_data = {k:(provided_data[i] or default_class_value) for i, (k, default_class_value) in enumerate(cls.provided_plots_data.items())}
 
-        # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
-        on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
-        if on_render_page_callbacks is None:
-            _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
-        ## add or update this callback:
-        if enable_radon_transform_info:
-            _out_pagination_controller.params.on_render_page_callbacks[cls.callback_identifier_string] = cls._callback_update_curr_single_epoch_slice_plot
+        for a_key, a_value in active_plots_data.items():
+            a_pagination_controller.plots_data[a_key] = a_value
+
+        ## Add the .plots:
+        for a_key, a_value in cls.provided_plots.items():
+            a_pagination_controller.plots[a_key] = a_value
+
+
+        ## Add the callbacks
+        for a_callback_type, a_callback_dict in cls.get_provided_callbacks().items():
+            # a_callback_type: like 'on_render_page_callbacks'
+            pagination_controller_callbacks_dict = a_pagination_controller.params.get(a_callback_type, None)
+            if pagination_controller_callbacks_dict is None:
+                a_pagination_controller.params[a_callback_type] = {} # allocate a new dict to hold callbacks
+            # register the specific callbacks of this type:
+            for a_callback_id, a_callback_fn in a_callback_dict.items():
+                a_pagination_controller.params[a_callback_type][a_callback_id] = a_callback_fn
+
         # Trigger the update
         if update_controller_on_apply:
-            _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
-
-
-    # @classmethod
-    # def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", i:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
-    #     """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
-
-    #     Needs only: curr_time_bins, plots_data, i
-    #     Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
-
-    #     Called with:
-
-    #     self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
-
+            a_pagination_controller.on_paginator_control_widget_jump_to_page(0)
         
-    #     Data:
-    #         plots_data.weighted_corr_data
-    #     Plots:
-    #         plots['weighted_corr']
-
-    #     """
-    #     pass
 
 
 
@@ -946,26 +968,24 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     callback_identifier_string: str = 'plot_radon_transform_line_data'
     plots_group_identifier_key: str = 'radon_transform' # _out_pagination_controller.plots['weighted_corr']
     plots_group_data_identifier_key: str = 'radon_transform_data'
+    
+    provided_params: Dict[str, Any] = dict(enable_radon_transform_info = True)
+    provided_plots_data: Dict[str, Any] = {'radon_transform_data': None}
+    provided_plots: Dict[str, Any] = {'radon_transform': {}}
 
     @classmethod
-    def add_data_to_pagination_controller(cls, _out_pagination_controller, radon_transform_data, update_controller_on_apply:bool=False):
-        """ should be general I think.
-        """
-        enable_radon_transform_info = True
+    def get_provided_callbacks(cls) -> Dict[str, Dict]:
+        return {'on_render_page_callbacks': 
+                {'plot_radon_transform_line_data': cls._callback_update_curr_single_epoch_slice_plot}
+        }
 
-        _out_pagination_controller.plots_data[cls.plots_group_data_identifier_key] = radon_transform_data
-        _out_pagination_controller.plots[cls.plots_group_identifier_key] = {}
 
-        # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
-        on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
-        if on_render_page_callbacks is None:
-            _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
-        ## add or update this callback:
-        if enable_radon_transform_info:
-            _out_pagination_controller.params.on_render_page_callbacks[cls.callback_identifier_string] = cls._callback_update_curr_single_epoch_slice_plot
-        # Trigger the update
-        if update_controller_on_apply:
-            _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
+    # @classmethod
+    # def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
+    #     """ 
+    #     Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
+    #     """
+    #     return super().add_data_to_pagination_controller(a_pagination_controller=a_pagination_controller, *provided_data, update_controller_on_apply=update_controller_on_apply)
 
 
     @classmethod
@@ -1173,6 +1193,10 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
 
 
+# ==================================================================================================================== #
+# Score: Weighted Correlation                                                                                          #
+# ==================================================================================================================== #
+
 @define(slots=False, repr=False)
 class WeightedCorrelationPlotData:
     # epoch_identity_str: str = field(default='')
@@ -1233,29 +1257,26 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     # text_color: str = '#ff886a' # an orange
     # text_color: str = '#42D142' # a light green
     text_color: str = '#66FF00' # a light green
-    
+
+    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
+    provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
+    provided_plots: Dict[str, Any] = {'weighted_corr': {}}
+
     @classmethod
-    def add_data_to_pagination_controller(cls, _out_pagination_controller, weighted_corr_data, update_controller_on_apply:bool=False):
-        """ should be general I think.
-        """
-        enable_weighted_correlation_info = True
+    def get_provided_callbacks(cls) -> Dict[str, Dict]:
+        return {'on_render_page_callbacks': 
+                {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
+        }
 
-        # _out_pagination_controller.plots_data.weighted_corr_data = weighted_corr_data
-        _out_pagination_controller.plots_data[cls.plots_group_data_identifier_key] = weighted_corr_data
-        _out_pagination_controller.plots[cls.plots_group_identifier_key] = {}
 
-        # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
-        on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
-        if on_render_page_callbacks is None:
-            _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
-        ## add or update this callback:
-        if enable_weighted_correlation_info:
-            _out_pagination_controller.params.on_render_page_callbacks[cls.callback_identifier_string] = cls._callback_update_curr_single_epoch_slice_plot
+    # @classmethod
+    # def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
+    #     """ 
+    #     Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
+    #     """
+    #     return super().add_data_to_pagination_controller(a_pagination_controller=a_pagination_controller, *provided_data, update_controller_on_apply=update_controller_on_apply)
             
-        # Trigger the update
-        if update_controller_on_apply:
-            _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
-            
+        
         
     @classmethod
     def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
