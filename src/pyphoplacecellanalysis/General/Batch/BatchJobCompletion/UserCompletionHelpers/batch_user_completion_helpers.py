@@ -520,8 +520,9 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
-    curr_active_pipeline.reload_default_computation_functions()
-    batch_extended_computations(curr_active_pipeline, include_includelist=['directional_decoders_evaluate_epochs'], include_global_functions=True, fail_on_exception=True, force_recompute=True)
+    ## Doesn't force recompute! Assumes that the DirectionalDecodersEpochsEvaluations result is new
+    # curr_active_pipeline.reload_default_computation_functions()
+    # batch_extended_computations(curr_active_pipeline, include_includelist=['directional_decoders_evaluate_epochs'], include_global_functions=True, fail_on_exception=True, force_recompute=True)
     
     ## Extract Data:
     directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
