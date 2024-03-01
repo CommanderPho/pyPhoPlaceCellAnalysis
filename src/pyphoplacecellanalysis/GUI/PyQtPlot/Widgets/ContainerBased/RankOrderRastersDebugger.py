@@ -264,8 +264,7 @@ class RankOrderRastersDebugger:
 
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
-        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
-
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
 
         _obj = cls(global_spikes_df=global_spikes_df, active_epochs_df=active_epochs_df.copy(), track_templates=track_templates, rank_order_results=rank_order_results,
              RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
@@ -300,26 +299,6 @@ class RankOrderRastersDebugger:
         icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
         if icon is not None:
             root_dockAreaWindow.setWindowIcon(icon)
-
-        ## Build Dock Widgets:
-        def get_utility_dock_colors(orientation, is_dim):
-            """ used for CustomDockDisplayConfig for non-specialized utility docks """
-            # Common to all:
-            if is_dim:
-                fg_color = '#aaa' # Grey
-            else:
-                fg_color = '#fff' # White
-
-            # a purplish-royal-blue
-            if is_dim:
-                bg_color = '#d8d8d8'
-                border_color = '#717171'
-            else:
-                bg_color = '#9d9d9d'
-                border_color = '#3a3a3a'
-
-            return fg_color, bg_color, border_color
-
 
         # decoder_names_list = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
         _out_dock_widgets = {}
@@ -435,6 +414,7 @@ class RankOrderRastersDebugger:
 
         _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
 
+        # Top Info Bar: ______________________________________________________________________________________________________ #
         ## Add two labels in the top row that show the Long/Short column values:
         long_short_info_layout = pg.LayoutWidget()
         long_short_info_layout.setObjectName('layoutLongShortInfo')
