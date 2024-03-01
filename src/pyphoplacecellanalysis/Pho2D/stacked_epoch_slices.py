@@ -1579,6 +1579,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         """
         if should_copy_to_clipboard:
             from pyphocorehelpers.programming_helpers import copy_to_clipboard
+            
         from neuropy.core.user_annotations import UserAnnotationsManager
         annotations_man = UserAnnotationsManager()
         user_annotations = annotations_man.get_user_annotations()
@@ -1597,9 +1598,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         code_strings: List[str] = []
         for a_name, a_saved_selection in saved_selections_dict.items():
             a_context = saved_selections_context_dict[a_name]
-            a_string = f"user_annotations[{a_context.get_initialization_code_string()}] = {a_saved_selection.epoch_times}"
+            # a_string = f"user_annotations[{a_context.get_initialization_code_string()}] = {a_saved_selection.epoch_times}"
+            a_string = f"user_annotations[{a_context.get_initialization_code_string()}] = array({list(a_saved_selection.epoch_times)})"
             code_strings.append(a_string)
-            # print(f"user_annotations[{a_context.get_initialization_code_string()}] = np.array({list(a_saved_selection.flat_all_data_indicies[a_saved_selection.is_selected])})")
             # print(a_string)
     
         code_string: str = '\n'.join(code_strings)
