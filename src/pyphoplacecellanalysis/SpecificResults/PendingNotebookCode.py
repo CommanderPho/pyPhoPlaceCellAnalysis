@@ -235,7 +235,6 @@ def register_type_display(func_to_register, type_to_register):
 # ==================================================================================================================== #
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.path import Path
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 
@@ -252,6 +251,8 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bi
 
     """
     # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
+    from matplotlib.path import Path
+
     from pyphocorehelpers.geometry_helpers import BoundsRect
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
@@ -1755,18 +1756,29 @@ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_acro
 """
 
 import matplotlib.pyplot as plt
+
 import plotly.subplots as sp
 import plotly.express as px
 import plotly.graph_objs as go
 
 
-def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histogram_bins:int=25):
-    """ 
+def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25, px_scatter_kwargs=None, histogram_variable_name='P_Long',
+                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None):
+    """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
+    
+    px_scatter_kwargs: only used if out_scatter_fig is None
+    time_delta_tuple=(earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end)
+
+
     Usage:
+
+        import plotly.io as pio
+        template: str = 'plotly_dark' # set plotl template
+        pio.templates.default = template
 
         histogram_bins: int = 25
 
-        new_laps_fig = complete_plotly_figure(data_results_df=deepcopy(all_sessions_laps_df), out_scatter_fig=fig_laps, histogram_bins=histogram_bins)
+        new_laps_fig = plotly_pre_post_delta_scatter(data_results_df=deepcopy(all_sessions_laps_df), out_scatter_fig=fig_laps, histogram_bins=histogram_bins)
         new_laps_fig
 
     """
@@ -1781,33 +1793,44 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
     time_bin_sizes: int = data_results_df['time_bin_size'].unique()
     num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
 
+    # f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
+    # main_title: str = f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
+    if num_unique_sessions == 1:
+        # print(f'single-session mode')
+        main_title: str = f"Session {px_scatter_kwargs.get('title', 'UNKNOWN')}"
+    else:
+        main_title: str = f"Across Sessions ({num_unique_sessions} Sessions)"
+
+
+    if num_unique_time_bins > 1:
+        main_title = main_title + f" - {num_unique_time_bins} Time Bin Sizes"
+    else:
+        time_bin_size = time_bin_sizes[0]
+        main_title = main_title + f" - time bin size: {time_bin_size} sec"
+
+    
+
     print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
 
+
+    # common_plot_kwargs = dict(color="time_bin_size")
+    common_plot_kwargs = dict(color=None)
 
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
 
-    # X_all = data_results_df['delta_aligned_start_t'].to_numpy()
-    # Y_all = data_results_df['P_Long'].to_numpy()
-
-    # X_pre_delta = pre_delta_df['delta_aligned_start_t'].to_numpy()
-    # X_post_delta = post_delta_df['delta_aligned_start_t'].to_numpy()
-
-    # Y_pre_delta = pre_delta_df['P_Long'].to_numpy()
-    # Y_post_delta = post_delta_df['P_Long'].to_numpy()
-
     # creating subplots
-    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta",f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"])
+    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta", main_title, "Post-delta"])
 
     # Pre-Delta Histogram ________________________________________________________________________________________________ #
     # adding first histogram
-    pre_delta_fig = px.histogram(pre_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+    pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
     print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
     # time_bin_sizes
     for a_trace in pre_delta_fig.data:
         fig.add_trace(a_trace, row=1, col=1)
-        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+        fig.update_layout(yaxis=dict(range=forced_range_y))
 
     # Calculate the histogram data
     # hist1, bins1 = np.histogram(X_pre_delta, bins=histogram_bins)
@@ -1818,22 +1841,36 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
     # 	go.Histogram(y=Y_pre_delta, name='pre-delta', marker_color='#EB89B5'),
     #     row=1, col=1
     # )
-    # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+    # fig.update_layout(yaxis=dict(range=forced_range_y))
 
     # Scatter Plot _______________________________________________________________________________________________________ #
     # adding scatter plot
-    for a_trace in out_scatter_fig.data:
-        fig.add_trace(a_trace, row=1, col=2)
-        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+    if out_scatter_fig is not None:
+        for a_trace in out_scatter_fig.data:
+            fig.add_trace(a_trace, row=1, col=2)
+            if forced_range_y is not None:
+                fig.update_layout(yaxis=dict(range=forced_range_y))
+    else:
+        assert px_scatter_kwargs is not None
+        out_scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
+
+        for i, a_trace in enumerate(out_scatter_fig.data):
+            # print(f'a_trace: {a_trace}')
+            a_trace = fig.add_trace(a_trace, row=1, col=2)
+            is_first_item: bool = (i == 0)
+            if (not is_first_item):
+                a_trace.showlegend = False
+            if forced_range_y is not None:
+                fig.update_layout(yaxis=dict(range=forced_range_y))
 
 
     # Post-Delta Histogram _______________________________________________________________________________________________ #
     # adding the second histogram
-    post_delta_fig = px.histogram(post_delta_df, y="P_Long", color="time_bin_size", opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+    post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
 
     for a_trace in post_delta_fig.data:
         fig.add_trace(a_trace, row=1, col=3)
-        fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+        fig.update_layout(yaxis=dict(range=forced_range_y))
         
     # Calculate the histogram data for second half
     # hist2, bins2 = np.histogram(X_post_delta, bins=histogram_bins)
@@ -1844,11 +1881,54 @@ def complete_plotly_figure(data_results_df: pd.DataFrame, out_scatter_fig, histo
     #     row=1, col=3
     # )
 
-    # fig.update_layout(layout_yaxis_range=[0.0, 1.0])
-    fig.update_layout(yaxis=dict(range=[0.0, 1.0]), barmode='overlay')
+    # fig.update_layout(layout_yaxis_range=forced_range_y)
+    fig.update_layout(yaxis=dict(range=forced_range_y), barmode='overlay')
+
+
+    # Epoch Shapes
+    if time_delta_tuple is not None:
+        assert len(time_delta_tuple) == 3
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = time_delta_tuple
+        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=2, t_start=delta_relative_t_start, t_split=delta_relative_t_delta, t_end=delta_relative_t_end)
+
+
     return fig
 
 
+@function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
+def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float):
+    """ adds shapes representing the epochs to the scatter plot at index scatter_column_index 
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plotly_helper_add_epoch_shapes
+        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=scatter_column, t_start=earliest_delta_aligned_t_start, t_split=t_split, t_end=latest_delta_aligned_t_end)
+
+
+    """
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+    _extras_output_dict = {}
+    ## Get the track configs for the colors:
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.long_epoch_config.mpl_color)
+    short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config.mpl_color)
+        
+    row_column_kwargs = dict(row='all', col=scatter_column_index)
+
+    ## new methods
+    _extras_output_dict["y_zero_line"] = fig.add_hline(y=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
+    vertical_divider_line = fig.add_vline(x=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
+
+    # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
+
+    blue_shape = fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs) # , fillcolor="green", opacity=0.25
+    red_shape = fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs)
+
+    _extras_output_dict["long_region"] = blue_shape
+    _extras_output_dict["short_region"] = red_shape
+    _extras_output_dict["divider_line"] = vertical_divider_line
+    return _extras_output_dict
 
 
 def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
@@ -1862,7 +1942,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     import plotly.express as px
     import plotly.graph_objects as go
     
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers, LongShortDisplayConfigManager
+    
 
     barmode='overlay'
     # barmode='stack'
@@ -2057,6 +2137,9 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     if (enable_scatter_plot and enable_epoch_shading_shapes):
         
         t_split: float = 0.0
+
+
+
         #TODO 2024-02-02 04:36: - [ ] Should get the specific session t_start/t_end instead of using the general `earliest_delta_aligned_t_start`
         # _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
         # for a_shape_name, a_shape in _extras_output_dict.items():
@@ -2066,53 +2149,13 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         #             fig.add_shape(a_shape, name=a_shape_name, row=row_index, col=scatter_column)
         #     else:
         #         fig.add_shape(a_shape, name=a_shape_name, row=1, col=scatter_column)
-    
 
-        # 2024-02-08 Rewrite of shape plotting using simpler functions _______________________________________________________ #
-        t_start: float = earliest_delta_aligned_t_start
-        t_end: float = latest_delta_aligned_t_end
-
-        yrange = [0.0, 1.0]
-        assert (yrange is not None) and (len(yrange) == 2)
-        ymin, ymax = yrange # unpack y-range
-        assert (ymin < ymax)
-
-        _extras_output_dict = {}
-        ## Get the track configs for the colors:
-        long_short_display_config_manager = LongShortDisplayConfigManager()
-        # long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
-        # short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
-
-        # long_epoch_kwargs = dict(fillcolor="blue")
-        # short_epoch_kwargs = dict(fillcolor="red")
-        long_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.long_epoch_config.mpl_color)
-        short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config.mpl_color)
-        
-        # blue_shape = dict(type="rect", xref="x", yref="paper", x0=t_start, y0=ymin, x1=t_split, y1=ymax, opacity=0.5, layer="below", line_width=1, **long_epoch_kwargs) 
-        # red_shape = dict(type="rect", xref="x", yref="paper", x0=t_split, y0=ymin, x1=t_end, y1=ymax, opacity=0.5, layer="below", line_width=1, **short_epoch_kwargs)
-        # vertical_divider_line = dict(type="line", x0=t_split, y0=ymin, x1=t_split, y1=ymax, line=dict(color="rgba(0,0,0,.25)", width=3, ), )
-            
-        row_column_kwargs = dict(row='all', col=scatter_column)
-
-        ## new methods
-        _extras_output_dict["y_zero_line"] = fig.add_hline(y=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
-        vertical_divider_line = fig.add_vline(x=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
-
-        # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
-
-        blue_shape = fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs) # , fillcolor="green", opacity=0.25
-        red_shape = fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs)
-
-        _extras_output_dict["long_region"] = blue_shape
-        _extras_output_dict["short_region"] = red_shape
-        _extras_output_dict["divider_line"] = vertical_divider_line
-        
-
+        ## Inputs: fig, t_start: float, t_end: float
+        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=scatter_column, t_start=earliest_delta_aligned_t_start, t_split=t_split, t_end=latest_delta_aligned_t_end)
 
 
     # Update title and height
-    
-    
+        
     if (main_plot_mode == 'separate_row_per_session'):
         row_height = 250
         required_figure_height = (num_unique_sessions*row_height)
@@ -2136,8 +2179,6 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         # margin=dict(b=140), # increase bottom margin to show the footer
     )
     return fig
-
-    
 
 
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
