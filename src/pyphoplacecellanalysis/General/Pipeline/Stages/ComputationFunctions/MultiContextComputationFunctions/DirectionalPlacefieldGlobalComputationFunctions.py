@@ -1825,6 +1825,108 @@ class DecoderDecodedEpochsResult(ComputedResult):
             df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
         return df
 
+    @classmethod
+    @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-01 22:58', related_items=[])
+    def load_user_selected_epoch_times(cls, curr_active_pipeline, track_templates=None, epochs_name = 'ripple') -> Tuple[Dict[str, NDArray], NDArray]:
+        """
+
+        Usage:    
+            decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = load_user_selected_epoch_times(curr_active_pipeline)
+            # Finds the indicies into the dataframe (`filtered_ripple_simple_pf_pearson_merged_df`) from the decoder_user_selected_epoch_times_dict
+            # Inputs: filtered_ripple_simple_pf_pearson_merged_df, decoder_user_selected_epoch_times_dict
+
+            new_selections_dict = {}
+            for a_name, a_start_stop_arr in decoder_user_selected_epoch_times_dict.items():
+                # a_pagination_controller = self.pagination_controllers[a_name] # DecodedEpochSlicesPaginatedFigureController
+                if len(a_start_stop_arr) > 0:
+                    assert np.shape(a_start_stop_arr)[1] == 2, f"input should be start, stop times as a numpy array"
+                    # new_selections_dict[a_name] = filtered_ripple_simple_pf_pearson_merged_df.epochs.find_data_indicies_from_epoch_times(a_start_stop_arr) # return indicies into dataframe
+                    new_selections_dict[a_name] = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(a_start_stop_arr) # return sliced dataframes
+                    
+            new_selections_dict
+
+        """
+        # Inputs: curr_active_pipeline (for curr_active_pipeline.build_display_context_for_session)
+        from neuropy.utils.misc import numpyify_array
+        from neuropy.core.user_annotations import UserAnnotationsManager
+        annotations_man = UserAnnotationsManager()
+        user_annotations = annotations_man.get_user_annotations()
+
+        if track_templates is None:
+            # Get from the pipeline:
+            directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+            rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: float = rank_order_results.included_qclu_values
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only
+        
+        
+        loaded_selections_context_dict = {a_name:curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name, user_annotation='selections') for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+        decoder_user_selected_epoch_times_dict = {a_name:numpyify_array(user_annotations.get(a_selections_ctx, [])) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
+        # loaded_selections_dict
+
+        ## Inputs: loaded_selections_dict, 
+        ## Find epochs that are present in any of the decoders:
+        concatenated_selected_epoch_times = np.concatenate([a_start_stop_arr for a_name, a_start_stop_arr in decoder_user_selected_epoch_times_dict.items()], axis=0)
+        any_good_selected_epoch_times: NDArray = np.unique(concatenated_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+        return decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-01 22:58', related_items=[])
+    def filter_epochs_dfs_by_annotation_times(cls, curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size, *dfs_list):
+        """ filter the ripple results scores by the user annotations. 
+        
+        *dfs_list: a series of dataframes to join
+
+        """   
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+
+        filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df = dfs_list
+
+        hand_selected_ripple_simple_pf_pearson_merged_df = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+        # hand_selected_ripple_simple_pf_pearson_merged_df
+
+        df: pd.DataFrame = hand_selected_ripple_simple_pf_pearson_merged_df.copy()
+        direction_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+        track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+        # Get only the best direction long/short values for each metric:
+        df['long_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['long_LR_pf_peak_x_pearsonr'], df['long_RL_pf_peak_x_pearsonr'])
+        df['short_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['short_LR_pf_peak_x_pearsonr'], df['short_RL_pf_peak_x_pearsonr'])
+        df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']) # drop the directional column names
+
+        # Outputs: df
+
+        ## Add new weighted correlation results as new columns in existing filter_epochs df:
+        # Inputs: ripple_weighted_corr_merged_df, df from previous step
+
+        ## Perfrom a 1D matching of the epoch start times:
+        ## ORDER MATTERS:
+        elements =  df['ripple_start_t'].to_numpy()
+        test_elements = ripple_weighted_corr_merged_df['ripple_start_t'].to_numpy()
+        valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0]
+        hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True)
+
+        ## Add the wcorr columns to `df`:
+        wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
+        df[wcorr_column_names] = hand_selected_ripple_weighted_corr_merged_df[wcorr_column_names] # add the columns to the dataframe
+        df['long_best_wcorr'] = np.where(direction_max_indices, df['wcorr_long_LR'], df['wcorr_long_RL'])
+        df['short_best_wcorr'] = np.where(direction_max_indices, df['wcorr_short_LR'], df['wcorr_short_RL'])
+        df = df.drop(columns=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']) # drop the directional column names
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
+        # df = _add_maze_id_to_epochs(df, t_delta)
+        df["time_bin_size"] = ripple_decoding_time_bin_size
+
+        ## Add differences:
+        df['wcorr_abs_diff'] = df['long_best_wcorr'].abs() - df['short_best_wcorr'].abs()
+        df['pearsonr_abs_diff'] = df['long_best_pf_peak_x_pearsonr'].abs() - df['short_best_pf_peak_x_pearsonr'].abs()
+        df['is_user_annotated_epoch'] = True # if it's filtered here, it's true
+
+        return df
+
 
     def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float]):
         """ export as separate .csv files. 
@@ -1835,14 +1937,21 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         active_context = curr_active_pipeline.get_session_context()
         session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+        session_name: str = curr_active_pipeline.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+        histogram_bins = 25
+        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
+        any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
+        df
+
 
             
         """
         assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
         output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
-
-
-       
 
         # Export CSVs:
         def export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)'):
