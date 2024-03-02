@@ -2188,6 +2188,11 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
                                           laps_title_prefix: str = f"Laps", ripple_title_prefix: str = f"Ripples",
                                           save_figures=False, figure_save_extension='.png', debug_print=False):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
+
+    - Processes both ripple and laps
+    - generates a single column of plots with the scatter plot in the middle flanked on both sides by the Pre/Post-delta histograms
+    
+
     Produces and then saves figures out the the f'{directory}/figures/' subfolder
 
     Unknowingly captured: session_name
