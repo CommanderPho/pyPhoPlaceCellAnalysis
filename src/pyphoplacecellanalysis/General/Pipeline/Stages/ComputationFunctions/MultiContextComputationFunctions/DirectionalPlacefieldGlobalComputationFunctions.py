@@ -1873,6 +1873,53 @@ class DecoderDecodedEpochsResult(ComputedResult):
         any_good_selected_epoch_times: NDArray = np.unique(concatenated_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
         return decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times
 
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:28', related_items=[])
+    def merge_decoded_epochs_result_dfs(cls, *dfs_list, should_drop_directional_columns:bool=True, start_t_idx_name='ripple_start_t'):
+        """ filter the ripple results scores by the user annotations. 
+        
+        *dfs_list: a series of dataframes to join
+        should_drop_directional_columns:bool - if True, the direction (LR/RL) columns are dropped and only the _best_ columns are left.
+        """   
+        filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df = dfs_list
+
+        df: pd.DataFrame = filtered_ripple_simple_pf_pearson_merged_df.copy()
+        direction_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+        track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+        # Get only the best direction long/short values for each metric:
+        df['long_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['long_LR_pf_peak_x_pearsonr'], df['long_RL_pf_peak_x_pearsonr'])
+        df['short_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['short_LR_pf_peak_x_pearsonr'], df['short_RL_pf_peak_x_pearsonr'])
+        if should_drop_directional_columns:
+            df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']) # drop the directional column names
+
+        # Outputs: df
+
+        ## Add new weighted correlation results as new columns in existing filter_epochs df:
+        # Inputs: ripple_weighted_corr_merged_df, df from previous step
+
+        ## Perfrom a 1D matching of the epoch start times:
+        ## ORDER MATTERS:
+        elements =  df[start_t_idx_name].to_numpy()
+        test_elements = ripple_weighted_corr_merged_df[start_t_idx_name].to_numpy()
+        valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0]
+        hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True)
+
+        ## Add the wcorr columns to `df`:
+        wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
+        df[wcorr_column_names] = hand_selected_ripple_weighted_corr_merged_df[wcorr_column_names] # add the columns to the dataframe
+        df['long_best_wcorr'] = np.where(direction_max_indices, df['wcorr_long_LR'], df['wcorr_long_RL'])
+        df['short_best_wcorr'] = np.where(direction_max_indices, df['wcorr_short_LR'], df['wcorr_short_RL'])
+        if should_drop_directional_columns:
+            df = df.drop(columns=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']) # drop the directional column names
+        
+        ## Add differences:
+        df['wcorr_abs_diff'] = df['long_best_wcorr'].abs() - df['short_best_wcorr'].abs()
+        df['pearsonr_abs_diff'] = df['long_best_pf_peak_x_pearsonr'].abs() - df['short_best_pf_peak_x_pearsonr'].abs()
+
+        return df
+
+
     @classmethod
     @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-01 22:58', related_items=[])
     def filter_epochs_dfs_by_annotation_times(cls, curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size, *dfs_list):
@@ -1888,46 +1935,61 @@ class DecoderDecodedEpochsResult(ComputedResult):
         hand_selected_ripple_simple_pf_pearson_merged_df = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
         # hand_selected_ripple_simple_pf_pearson_merged_df
 
-        df: pd.DataFrame = hand_selected_ripple_simple_pf_pearson_merged_df.copy()
-        direction_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
-        track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
-        # Get only the best direction long/short values for each metric:
-        df['long_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['long_LR_pf_peak_x_pearsonr'], df['long_RL_pf_peak_x_pearsonr'])
-        df['short_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['short_LR_pf_peak_x_pearsonr'], df['short_RL_pf_peak_x_pearsonr'])
-        df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']) # drop the directional column names
+        df: pd.DataFrame = cls.merge_decoded_epochs_result_dfs(hand_selected_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df, should_drop_directional_columns=True)
 
-        # Outputs: df
-
-        ## Add new weighted correlation results as new columns in existing filter_epochs df:
-        # Inputs: ripple_weighted_corr_merged_df, df from previous step
-
-        ## Perfrom a 1D matching of the epoch start times:
-        ## ORDER MATTERS:
-        elements =  df['ripple_start_t'].to_numpy()
-        test_elements = ripple_weighted_corr_merged_df['ripple_start_t'].to_numpy()
-        valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0]
-        hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True)
-
-        ## Add the wcorr columns to `df`:
-        wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
-        df[wcorr_column_names] = hand_selected_ripple_weighted_corr_merged_df[wcorr_column_names] # add the columns to the dataframe
-        df['long_best_wcorr'] = np.where(direction_max_indices, df['wcorr_long_LR'], df['wcorr_long_RL'])
-        df['short_best_wcorr'] = np.where(direction_max_indices, df['wcorr_short_LR'], df['wcorr_short_RL'])
-        df = df.drop(columns=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']) # drop the directional column names
         # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
-
         session_name: str = curr_active_pipeline.session_name
         t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
         # df = _add_maze_id_to_epochs(df, t_delta)
         df["time_bin_size"] = ripple_decoding_time_bin_size
-
-        ## Add differences:
-        df['wcorr_abs_diff'] = df['long_best_wcorr'].abs() - df['short_best_wcorr'].abs()
-        df['pearsonr_abs_diff'] = df['long_best_pf_peak_x_pearsonr'].abs() - df['short_best_pf_peak_x_pearsonr'].abs()
         df['is_user_annotated_epoch'] = True # if it's filtered here, it's true
 
         return df
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['NOT-FINISHED', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    def try_add_in_user_annotation_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times):
+        """ tries to add a 'is_user_annotated_epoch' column to the dataframe. """
+        if (any_good_selected_epoch_times is None):
+            return False
+
+        any_good_selected_epoch_indicies = None
+        try:
+            # print(f'adding user annotation column!')
+            any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(any_good_selected_epoch_times)
+        except BaseException as e:
+            # print(f'failed for {a_df_name}. Going to try method 2.')
+            pass
+
+        if any_good_selected_epoch_indicies is None:
+            ## try method 2
+            try:
+                # print(f'trying method 2 for {a_df_name}!')
+                any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',])
+            except AttributeError as e:
+                # print(f'failed method 2 for {a_df_name}.')
+                pass
+            except BaseException as e:
+                # print(f'failed for {a_df_name}. Going to try method 2.')
+                pass            
+
+        if any_good_selected_epoch_indicies is None:
+            return False
+
+        # print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+        a_df['is_user_annotated_epoch'] = False
+        a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
+        return True
+
+
+    # @classmethod
+    # def try_add_in_user_annotation_column_from_selections(cls, a_df, user_annotation_selections=None):
+    #     if (user_annotation_selections is None):
+    #         return False
+    #     any_good_selected_epoch_times = user_annotation_selections.get(an_epochs_source_name, None) # like ripple
+    #     if any_good_selected_epoch_times is not None:
+    #         return cls.try_add_in_user_annotation_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times)
 
 
     def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None):
@@ -2012,20 +2074,13 @@ class DecoderDecodedEpochsResult(ComputedResult):
                         ## try method 2
                         try:
                             print(f'trying method 2 for {a_df_name}!')
-                            # if np.shape(any_good_selected_epoch_times)[1] == 2:
-                            #     start_only_any_good_selected_epoch_times = np.squeeze(any_good_selected_epoch_times[:,0])
-                            #     any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(start_only_any_good_selected_epoch_times)
                             any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',])
                             # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, any_good_selected_epoch_times, t_column_names=['ripple_start_t',])
-
                         except AttributeError as e:
-                            print(f'failed method 2 for {a_df_name}.')        
+                            print(f'failed method 2 for {a_df_name}. Out of options.')        
                         except BaseException as e:
-                            print(f'failed for {a_df_name}. Going to try method 2.')
+                            print(f'failed for {a_df_name}. Out of options.')
                         
-                    # finally:
-                    #     a_df = a_df.drop(columns=['is_user_annotated_epoch'])
-
                     if any_good_selected_epoch_indicies is not None:
                         print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
                         a_df['is_user_annotated_epoch'] = False
