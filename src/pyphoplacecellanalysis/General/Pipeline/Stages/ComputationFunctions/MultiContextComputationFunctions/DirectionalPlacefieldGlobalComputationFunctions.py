@@ -23,9 +23,11 @@ from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer, override_dict # used to build config
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch
+from neuropy.core.epoch import find_data_indicies_from_epoch_times
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
+
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalMergedDecodersResult
@@ -1928,7 +1930,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         return df
 
 
-    def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float]):
+    def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None):
         """ export as separate .csv files. 
         active_context = curr_active_pipeline.get_session_context()
         curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
@@ -1980,6 +1982,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         extracted_dfs_dict = {a_df_name:getattr(self, a_df_name) for a_df_name in _df_variables_names}
         for a_df_name, a_df in extracted_dfs_dict.items():
             an_epochs_source_name: str = a_df_name.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
+
             a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
             a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
             ## Add t_bin column method
@@ -1990,7 +1993,48 @@ class DecoderDecodedEpochsResult(ComputedResult):
             # TODO: add in custom columns
             # ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
             # ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
-        
+            if (user_annotation_selections is not None):
+                any_good_selected_epoch_times = user_annotation_selections.get(an_epochs_source_name, None) # like ripple
+                if any_good_selected_epoch_times is not None:
+                    any_good_selected_epoch_indicies = None
+                    try:
+                        print(f'adding user annotation column!')
+                        any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(any_good_selected_epoch_times)
+
+                    except AttributeError as e:
+                        print(f'failed for {a_df_name}. Going to try method 2.')
+                    except BaseException as e:
+                        print(f'failed for {a_df_name}. Going to try method 2.')
+
+
+                    if any_good_selected_epoch_indicies is None:
+                        ## try method 2
+                        try:
+                            print(f'trying method 2 for {a_df_name}!')
+                            # if np.shape(any_good_selected_epoch_times)[1] == 2:
+                            #     start_only_any_good_selected_epoch_times = np.squeeze(any_good_selected_epoch_times[:,0])
+                            #     any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(start_only_any_good_selected_epoch_times)
+                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',])
+                            # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, any_good_selected_epoch_times, t_column_names=['ripple_start_t',])
+
+                        except AttributeError as e:
+                            print(f'failed method 2 for {a_df_name}.')        
+                        except BaseException as e:
+                            print(f'failed for {a_df_name}. Going to try method 2.')
+                        
+                    # finally:
+                    #     a_df = a_df.drop(columns=['is_user_annotated_epoch'])
+
+                    if any_good_selected_epoch_indicies is not None:
+                        print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+                        a_df['is_user_annotated_epoch'] = False
+                        a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                    else:
+                        print(f'\t failed all methods for annotations')
+
+
+                        
+
             export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str)
             
         return export_files_dict
