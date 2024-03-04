@@ -1409,7 +1409,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         # Add functions ______________________________________________________________________________________________________ #
 
-        
+        root_dockAreaWindow.ui.print = print
+
         # ## Cleanup when done:
         # for a_decoder_name, a_root_plot in _obj.plots.root_plots.items():
         #     a_root_plot.setTitle(title=a_decoder_name)
@@ -1734,7 +1735,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         new_selections_dict = {}
         for a_name, a_start_stop_arr in loaded_selections_dict.items():
             a_pagination_controller = self.pagination_controllers[a_name] # DecodedEpochSlicesPaginatedFigureController
-            if len(a_start_stop_arr) > 0:
+            if (a_start_stop_arr is not None) and (len(a_start_stop_arr) > 0):
                 assert np.shape(a_start_stop_arr)[1] == 2, f"input should be start, stop times as a numpy array"
                 new_selections_dict[a_name] = a_pagination_controller.restore_selections_from_epoch_times(a_start_stop_arr) # TODO: only accepts epoch_times specifications
 
