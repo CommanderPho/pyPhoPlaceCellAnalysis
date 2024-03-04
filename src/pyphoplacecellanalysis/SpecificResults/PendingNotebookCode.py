@@ -22,6 +22,7 @@ from functools import wraps, partial
 # ==================================================================================================================== #
 # 2024-02-29 - Pho Replay Heuristic Metric                                                                             #
 # ==================================================================================================================== #
+from nptyping import NDArray
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 
 
@@ -48,6 +49,35 @@ def compute_local_peak_probabilities(probs, n_adjacent: int):
     return local_peak_probabilities, peak_position_indices
 
 
+class HeuristicReplayScoring:
+    
+    # Single-time bin metrics: `sb_metric_*` ____________________________________________________________________________________________ #
+    # these metrics act on a single decoded time bin
+    def sb_metric_position_spread(self):
+        """ provides a metric that punishes diffuse decoded posterior positions. For example, a posterior bin with two peaks far apart from one another. """
+        pass
+
+
+    # Across time-bin metrics ____________________________________________________________________________________________ #
+    # These metrics operate on a series of decoded posteriors (multiple time bins)
+    def metric_jump_distance(self, a_p_x_given_n: NDArray, time_window_centers):
+        """ provides a metric that punishes long jumps in sequential maximal prob. position bins """
+        max_indicies = a_p_x_given_n.idxmax(axis=0)
+        a_first_order_diff = np.diff(max_indicies, n=1, prepend=[max_indicies[0]])
+
+
+        pass
+    
+
+    def metric_position_covered_distance(self, a_p_x_given_n: NDArray, time_window_centers):
+        """ provides a metric that punishes posteriors focused only on a small fraction of the environment, favoring those that sweep the track """
+        # max_indicies = a_p_x_given_n.idxmax(axis=0)
+        # a_first_order_diff = np.diff(max_indicies, n=1, prepend=[max_indicies[0]])
+        pass
+    
+
+
+    
 
 def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, debug_plot_axs=None, debug_plot_name=None):
     """ 2024-02-29 - New smart replay heuristic scoring
@@ -1942,8 +1972,6 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     import plotly.express as px
     import plotly.graph_objects as go
     
-    
-
     barmode='overlay'
     # barmode='stack'
     histogram_kwargs = dict(barmode=barmode)
