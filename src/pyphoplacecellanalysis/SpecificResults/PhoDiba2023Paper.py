@@ -239,6 +239,7 @@ class AssigningEpochs:
         return filter_epoch_spikes_df, self.filter_epochs_df
 
 
+    @function_attributes(short_name=None, tags=['user-annotations','selections'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-04 15:30', related_items=[])
     def filter_by_user_selections(self, curr_active_pipeline, allow_interactive_selection:bool = False):
         """Get the manual user annotations to determine the good replays for both long/short decoding
         
