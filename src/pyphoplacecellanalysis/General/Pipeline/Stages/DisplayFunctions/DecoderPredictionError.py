@@ -1381,7 +1381,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             pearson_r_col_name: str = 'pearsonr'
             wcorr_data = {}
             
-            df_column_names = ['start', 'stop', 'label', 'duration', 'end', 'wcorr', 'P_decoder', 'pearsonr']
+            df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
+
             # default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
             
             # printed_df_column_names = ['start', 'stop', 'wcorr', 'P_decoder', 'pearsonr']
