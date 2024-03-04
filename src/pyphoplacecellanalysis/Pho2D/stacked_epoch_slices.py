@@ -1586,6 +1586,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return saved_selections_dict
 
 
+
     def print_user_annotations(self, should_copy_to_clipboard=True):
         """ Builds user annotations and outputs them. 
 
@@ -1597,6 +1598,72 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             user_annotations[IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-09_1-22-43',display_fn_name='DecodedEpochSlices',epochs='ripple',decoder='short_RL',user_annotation='selections')] = np.array([array([125.06, 125.21]), array([149.959, 150.254])])
         
         """
+        def _subfn_listify(arr):
+            return [list(a) for a in arr]
+        
+        def _sub_subfn_wrapped_in_brackets(s: str, bracket_strings = ("[", "]")) -> str:
+                return bracket_strings[0] + s + bracket_strings[1]
+            
+        def _sub_subfn_format_nested_list(arr, precision:int=3, num_sep=", ", array_sep=', ') -> str:
+            """
+            Converts a nested list of floats into a single string,
+            with each float formatted to the specified precision.
+            
+            arr = np.array([[491.798, 492.178], [940.016, 940.219]])
+            _sub_subfn_format_nested_list(arr)
+
+            >> '[[491.798, 492.178], [940.016, 940.219]]'
+
+            arr = np.array([[785.738, 785.923]])
+            _sub_subfn_format_nested_list(arr)
+            >> '[[785.738, 785.923]]'
+            """
+            return _sub_subfn_wrapped_in_brackets(array_sep.join([_sub_subfn_wrapped_in_brackets(num_sep.join([f"{num:.{precision}f}" for num in row])) for row in arr]))
+            
+
+
+        def _subfn_build_new_nested_context_str(common_context, user_annotations):
+            """ Builds a nested hierarchy of annotations like:
+                with IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-07_16-40-19',display_fn_name='DecodedEpochSlices',user_annotation='selections') as ctx:
+                    with (ctx + IdentifyingContext(epochs='replays')) as ctx:
+                        user_annotations[ctx + Ctx(decoder='long_results_obj')] = [5,  13,  15,  17,  20,  21,  24,  31,  33,  43,  44,  49,  63, 64,  66,  68,  70,  71,  74,  76,  77,  78,  84,  90,  94,  95, 104, 105, 122, 123]
+                        user_annotations[ctx + Ctx(decoder='short_results_obj')] = [ 12,  13,  15,  17,  20,  24,  30,  31,  32,  33,  41,  43,  49, 54,  55,  68,  70,  71,  73,  76,  77,  78,  84,  89,  94, 100, 104, 105, 111, 114, 115, 117, 118, 122, 123, 131]
+                    with (ctx + IdentifyingContext(epochs='ripple')) as ctx:
+                        user_annotations[ctx + Ctx(decoder='long_LR')] = [[292.624, 292.808], [304.44, 304.656], [380.746, 380.904], [873.001, 873.269], [953.942, 954.258], [2212.47, 2212.54], [2214.24, 2214.44], [2214.65, 2214.68], [2219.73, 2219.87], [2422.6, 2422.82], [2451.06, 2451.23], [2452.07, 2452.22], [2453.38, 2453.55], [2470.82, 2470.97], [2473, 2473.15]]
+                        user_annotations[ctx + Ctx(decoder='long_RL')] = [[487.205, 487.451], [518.52, 518.992], [802.912, 803.114], [803.592, 803.901], [804.192, 804.338], [831.621, 831.91], [893.989, 894.103], [982.605, 982.909], [1034.82, 1034.86], [1035.12, 1035.31], [1200.7, 1200.9], [1273.35, 1273.54], [1274.12, 1274.44], [1380.75, 1380.89], [1448.17, 1448.34], [1746.25, 1746.43], [1871, 1871.22], [2050.89, 2050.99], [2051.25, 2051.68]]
+                        user_annotations[ctx + Ctx(decoder='short_LR')] = [[876.27, 876.452], [950.183, 950.448], [953.942, 954.258], [1044.95, 1045.45], [1129.65, 1129.84], [1259.29, 1259.44], [1259.72, 1259.88], [1511.2, 1511.43], [1511.97, 1512.06], [1549.24, 1549.37], [1558.47, 1558.68], [1560.66, 1560.75], [1561.31, 1561.41], [1561.82, 1561.89], [1655.99, 1656.21], [1730.89, 1731.07], [1734.81, 1734.95], [1861.41, 1861.53], [1909.78, 1910.04], [1967.74, 1968.09], [2036.97, 2037.33], [2038.03, 2038.27], [2038.53, 2038.73], [2042.39, 2042.64], [2070.82, 2071.03], [2153.03, 2153.14], [2191.26, 2191.39], [2192.12, 2192.36], [2193.78, 2193.99], [2194.56, 2194.76], [2200.65, 2200.8], [2201.85, 2202.03], [2219.73, 2219.87], [2248.61, 2248.81], [2249.7, 2249.92], [2313.89, 2314.06], [2422.6, 2422.82], [2462.67, 2462.74], [2482.13, 2482.61], [2484.41, 2484.48], [2530.72, 2530.92], [2531.22, 2531.3], [2556.11, 2556.38], [2556.6, 2556.92]]
+                        user_annotations[ctx + Ctx(decoder='short_RL')] = [[66.6616, 66.779], [888.227, 888.465], [890.87, 891.037], [910.571, 911.048], [1014.1, 1014.28], [1200.7, 1200.9], [1211.21, 1211.33], [1214.61, 1214.83], [1317.71, 1318.22], [1333.49, 1333.69], [1380.75, 1380.89], [1381.96, 1382.32], [1448.17, 1448.34], [1499.59, 1499.71], [1744.34, 1744.59], [1798.64, 1798.77], [1970.81, 1970.95], [1994.07, 1994.25], [2050.89, 2050.99], [2051.25, 2051.68], [2132.66, 2132.98], [2203.73, 2203.82], [2204.54, 2204.66], [2317.03, 2317.12], [2330.01, 2330.16], [2331.84, 2331.96], [2403.11, 2403.41], [2456.24, 2456.33], [2456.47, 2456.57], [2457.49, 2458.01]]
+
+            """
+            def _indent_str(an_indent_level: int) -> str:
+                return "\t" * an_indent_level
+            
+            def _with_block_template(an_indent_level: int, ctxt):
+                # global indent_level
+                return f"{_indent_str(an_indent_level)}with {ctxt.get_initialization_code_string(class_name_override='Ctx')} as ctx:"
+            def _sub_ctxt_block_template(an_indent_level: int, ctxt):
+                # global indent_level
+                # indent_level = indent_level + 1
+                return f"{_indent_str(an_indent_level)}with (ctx + {ctxt.get_initialization_code_string(class_name_override='Ctx')}) as ctx:"
+            def _leaf_ctxt_assignment_template(an_indent_level: int, ctxt, value):
+                # indent_level = indent_level + 1
+                return f"{_indent_str(an_indent_level)}user_annotations[ctx + {ctxt.get_initialization_code_string(class_name_override='Ctx')}] = {value}"
+                # return f"{_indent_str(an_indent_level)}user_annotations[ctx + {ctxt.get_initialization_code_string(class_name_override='Ctx')}] = {list(value)}"
+                # return f"{_indent_str(an_indent_level)}user_annotations[ctx + {ctxt.get_initialization_code_string(class_name_override='Ctx')}] = {_sub_subfn_format_nested_list(value)}"
+            
+            
+            indent_level: int = 0
+            code_strs: List[str] = []
+            code_strs.append(_with_block_template(indent_level, common_context))
+            indent_level = indent_level + 1
+            common_context_user_annotations = IdentifyingContext.converting_to_relative_contexts(common_context, user_annotations)
+            for k, v in common_context_user_annotations.items():
+                code_strs.append(_leaf_ctxt_assignment_template(indent_level, k, v))
+
+            # code_str = code_str + '\n'.join(code_strs)
+            return code_strs
+
+
         if should_copy_to_clipboard:
             from pyphocorehelpers.programming_helpers import copy_to_clipboard
             
@@ -1613,17 +1680,38 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         # Updates the context. Needs to generate the code.
 
+        use_new_concise_nested_context_format = True # 2024-03-04 - Concise 
+
         # ## Generate code to insert int user_annotations:
         self.ui.print('Add the following code to `pyphoplacecellanalysis.General.Model.user_annotations.UserAnnotationsManager.get_user_annotations()` function body:')
-        code_strings: List[str] = []
-        for a_name, a_saved_selection in saved_selections_dict.items():
-            a_context = saved_selections_context_dict[a_name]
-            # a_string = f"user_annotations[{a_context.get_initialization_code_string()}] = {a_saved_selection.epoch_times}"
-            a_string = f"user_annotations[{a_context.get_initialization_code_string()}] = array({list(a_saved_selection.epoch_times)})"
-            code_strings.append(a_string)
-            # print(a_string)
-    
+
+        if use_new_concise_nested_context_format:
+            # Post 2024-03-04 method of nested strings:
+            # active_annotations_dict = {a_context:user_annotations[a_context] for a_name, a_context in saved_selections_context_dict.items()}
+            # active_annotations_dict = {a_context:saved_selections_dict[a_name].epoch_times for a_name, a_context in saved_selections_context_dict.items()}
+            active_annotations_dict = {a_context:_sub_subfn_format_nested_list(saved_selections_dict[a_name].epoch_times) for a_name, a_context in saved_selections_context_dict.items()} # active_annotations_strs_dict
+            common_context = IdentifyingContext.find_longest_common_context(active_annotations_dict)
+            code_strings: List[str] = _subfn_build_new_nested_context_str(common_context, user_annotations=active_annotations_dict)
+
+        else:
+            # Pre 2024-03-04 method of explicit string representations:
+            code_strings: List[str] = []
+            for a_name, a_saved_selection in saved_selections_dict.items():
+                a_context = saved_selections_context_dict[a_name]
+                if use_new_concise_nested_context_format:
+                    pass
+                else:
+                    # a_string = f"user_annotations[{a_context.get_initialization_code_string()}] = {a_saved_selection.epoch_times}"
+                    # a_string = f"user_annotations[{a_context.get_initialization_code_string()}] = array({list(a_saved_selection.epoch_times)})"
+                    a_string = f"user_annotations[{a_context.get_initialization_code_string(class_name_override='Ctx')}] = {list(a_saved_selection.epoch_times)}"
+
+                code_strings.append(a_string)
+                # print(a_string)
+        
+
         code_string: str = '\n'.join(code_strings)
+        code_string = f"\n{code_string}\n" # make it easier to copy by adding newlines before and after it
+
         if should_copy_to_clipboard:
             copy_to_clipboard(code_string, message_print=True)
         else:
