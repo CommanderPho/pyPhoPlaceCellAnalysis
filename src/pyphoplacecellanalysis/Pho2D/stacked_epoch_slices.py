@@ -414,7 +414,7 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     if plot_function_name is None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
     params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
-    # plots.figure_id = 'stacked_epoch_slices_matplotlib'    
+    # plots.figure_id = 'stacked_epoch_slices_matplotlib'
     plots.figure_id = plots.name # copy the name as the figure_id
     
     ## Create the main figure and plot axes:
@@ -1421,7 +1421,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return app, root_dockAreaWindow
 
     @classmethod
-    def init_from_track_templates(cls, curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict, epochs_name:str ='laps', included_epoch_indicies=None, name = 'CombinedDirectionalDecoderDecodedEpochsWindow', title='Pho Combined Directional Decoder Decoded Epochs', defer_show=False, **kwargs):
+    def init_from_track_templates(cls, curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict, epochs_name:str ='laps', included_epoch_indicies=None,
+                                   name='CombinedDirectionalDecoderDecodedEpochsWindow', title='Pho Combined Directional Decoder Decoded Epochs', defer_show=False, **kwargs):
         """ 2024-02-28 - Combines the previously separate ._subfn_prepare_plot_multi_decoders_stacked_epoch_slices +  .init_from_pagination_controller_dict approaches. 
         Usage:
             ## Example 1 Ripples:
