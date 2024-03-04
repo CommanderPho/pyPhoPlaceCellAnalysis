@@ -15,6 +15,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # for stacked_epoc
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 
 from neuropy.core.epoch import Epoch
+from neuropy.utils.dynamic_container import DynamicContainer, override_dict, overriding_dict_with, get_dict_subset
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
@@ -50,7 +51,7 @@ These functions help render a vertically stacked column of subplots that represe
 # Stacked Epoch Slices View                                                                                            #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['helper', 'common', 'setup', 'axes', 'figure', 'stacked'], input_requires=[], output_provides=[], uses=[], used_by=['stacked_epoch_slices_view'], creation_date='2023-03-28 00:00', related_items=[])
-def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, single_plot_fixed_width=200.0, debug_test_max_num_variants=64, should_use_MatplotlibTimeSynchronizedWidget=True, debug_print=False):
+def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, single_plot_fixed_width=200.0, debug_test_max_num_variants=64, should_use_MatplotlibTimeSynchronizedWidget=True, debug_print=False, **additional_params_kwargs):
     """ Builds the common setup/containers for all stacked-epoch type plots:
     
     epoch_description_list: list of length 
@@ -63,7 +64,7 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
 
     """
     num_slices = np.shape(epoch_slices)[0]
-    
+
     ## Init containers:
     params = VisualizationParameters(name=name)
     plots_data = RenderPlotsData(name=name)
@@ -71,19 +72,29 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
     ui = PhoUIContainer(name=name)
     ui.connections = PhoUIContainer(name=name)
 
-    params.name = name
-    params.window_title = plot_function_name
-    params.num_slices = num_slices
+
+    default_params_dict = {'name': name, 'window_title': plot_function_name,
+    'num_slices': num_slices, '_debug_test_max_num_slices': debug_test_max_num_slices, 'active_num_slices': min(num_slices, debug_test_max_num_slices),
+        'global_epoch_start_t': np.nanmin(epoch_slices[:, 0], axis=0), 'global_epoch_end_t': np.nanmax(epoch_slices[:, 1], axis=0),
+        'single_plot_fixed_height': single_plot_fixed_height, 'all_plots_height': float(min(num_slices, debug_test_max_num_slices)) * float(single_plot_fixed_height),
+        'should_use_MatplotlibTimeSynchronizedWidget': should_use_MatplotlibTimeSynchronizedWidget, **additional_params_kwargs}
+
+    params.update(**default_params_dict)
+
+    # params.name = name
+    # params.window_title = plot_function_name
+    # params.num_slices = num_slices
     
-    params._debug_test_max_num_slices = debug_test_max_num_slices
-    params.active_num_slices = min(num_slices, params._debug_test_max_num_slices)
-    params.global_epoch_start_t = np.nanmin(epoch_slices[:, 0], axis=0)
-    params.global_epoch_end_t = np.nanmax(epoch_slices[:, 1], axis=0)
-    # params.global_epoch_start_t, params.global_epoch_end_t # (1238.0739798661089, 2067.4688883359777)
-    params.single_plot_fixed_height = single_plot_fixed_height
-    params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
-    params.should_use_MatplotlibTimeSynchronizedWidget = should_use_MatplotlibTimeSynchronizedWidget
-    
+    # params._debug_test_max_num_slices = debug_test_max_num_slices
+    # params.active_num_slices = min(num_slices, params._debug_test_max_num_slices)
+    # params.global_epoch_start_t = np.nanmin(epoch_slices[:, 0], axis=0)
+    # params.global_epoch_end_t = np.nanmax(epoch_slices[:, 1], axis=0)
+    # # params.global_epoch_start_t, params.global_epoch_end_t # (1238.0739798661089, 2067.4688883359777)
+    # params.single_plot_fixed_height = single_plot_fixed_height
+    # params.all_plots_height = float(params.active_num_slices) * float(params.single_plot_fixed_height)
+    # params.should_use_MatplotlibTimeSynchronizedWidget = should_use_MatplotlibTimeSynchronizedWidget
+
+
     if (epoch_labels is None) or (epoch_labels == []):
         # Build defaults for the plots
         epoch_labels = [f'epoch[{a_slice_idx}]' for a_slice_idx in np.arange(num_slices)]
@@ -1507,14 +1518,20 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S) = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, defer_render=False)
         """
         debug_print = kwargs.get('debug_print', False)
-        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True)
+
+        ## Extract params_kwargs
+        params_kwargs = kwargs.pop('params_kwargs', {})
+        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True) | params_kwargs
+
+        print(f'params_kwargs: {params_kwargs}')
+
         pagination_controller_dict = {}
         for a_name, a_decoder in track_templates.get_decoders_dict().items():
             pagination_controller_dict[a_name] = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(decoder_decoded_epochs_result_dict[a_name].filter_epochs,
                                                                                                 decoder_decoded_epochs_result_dict[a_name],
                                                                                                 xbin=a_decoder.xbin, global_pos_df=curr_active_pipeline.sess.position.df,
-                                                                                                a_name='DecodedEpochSlices', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
-                                                                                                max_subplots_per_page=8, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, **params_kwargs) # , save_figure=save_figure
+                                                                                                a_name=f'DecodedEpochSlices[{a_name}]', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
+                                                                                                max_subplots_per_page=8, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=params_kwargs) # , save_figure=save_figure
 
             # pagination_controller_dict[a_name], active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict[a_name], curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
             # fig_L = pagination_controller_L.plots.fig

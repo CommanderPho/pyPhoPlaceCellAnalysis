@@ -1134,12 +1134,12 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         if debug_print:
             print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
             
-        if epoch_slice is not None:
-            print(f'\tepoch_slice: {epoch_slice}')
+        # if debug_print:
+        #     if epoch_slice is not None:
+        #         print(f'\tepoch_slice: {epoch_slice}')
 
-        if curr_time_bin_container is not None:
-            print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
-
+        #     if curr_time_bin_container is not None:
+        #         print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
 
         # Add replay score text to top-right corner:
         final_text = f"{plots_data.radon_transform_data[data_idx].score_text}\n{plots_data.radon_transform_data[data_idx].speed_text}\n{plots_data.radon_transform_data[data_idx].intercept_text}"
