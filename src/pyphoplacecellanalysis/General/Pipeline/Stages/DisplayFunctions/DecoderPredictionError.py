@@ -1122,9 +1122,15 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         line_alpha = 0.8  # Faint line
         marker_alpha = 0.8  # More opaque markers
-        extra_text_kwargs = dict(stroke_alpha=0.35, text_alpha=0.8)
+        text_kwargs = dict(loc='upper left', strokewidth=5, stroke_foreground='k', stroke_alpha=0.35, text_foreground='#e5ff00', text_alpha=0.8)
+        plot_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha,
+                            marker='+', markersize=2, markerfacecolor='#e5ff00', markeredgecolor='#e5ff00') # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
         
         debug_print = kwargs.pop('debug_print', True)
+
+        ## Extract the visibility:
+        should_enable_radon_transform_info: bool = params.enable_radon_transform_info
+
         if debug_print:
             print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
             
@@ -1157,26 +1163,40 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             # curr_ax.clear()
 
 
-        ## Plot the line plot. Could update this like I did for the text?
-        active_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha,
-                             marker='+', markersize=2, markerfacecolor='#e5ff00', markeredgecolor='#e5ff00') # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
-        radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **active_kwargs)
-
+        ## Plot the line plot. Could update this like I did for the text?        
+        if should_enable_radon_transform_info:
+            ## Perform plotting of the radon transform lines:
+            radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs)
+        else:
+            ## Remove the existing one
+            radon_transform_plot = None
 
         if (extant_score_text is not None):
             # already exists, update the existing one:
             assert isinstance(extant_score_text, AnchoredText), f"extant_score_text is of type {type(extant_score_text)} but is expected to be of type AnchoredText."
             anchored_text: AnchoredText = extant_score_text
-            if anchored_text.axes is None:
-                # Re-add the anchored text if necessary
-                curr_ax.add_artist(anchored_text)
 
-            anchored_text.txt.set_text(final_text)
+            if should_enable_radon_transform_info:
+                # if we want to see the radon transform info:
+                if anchored_text.axes is None:
+                    # Re-add the anchored text if necessary
+                    curr_ax.add_artist(anchored_text)
+
+                anchored_text.txt.set_text(final_text)
+            else:
+                ## Otherwise we need to hide the existing text or remove it:
+                anchored_text.remove() # remove it
+                anchored_text = None
+
         else:
             ## Create a new one:
-            anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, loc='upper left', strokewidth=5, stroke_foreground='k', text_foreground='#e5ff00', **extra_text_kwargs)
-            anchored_text.patch.set_ec("none")
-            anchored_text.set_alpha(0.4)
+            if should_enable_radon_transform_info:
+                # if we want to see the radon transform info:
+                anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, **text_kwargs)
+                anchored_text.patch.set_ec("none")
+                anchored_text.set_alpha(0.4)
+            else:
+                anchored_text = None # remain with no score text
 
 
         # Store the plot objects for future updates:
@@ -1277,92 +1297,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     #     return super().add_data_to_pagination_controller(a_pagination_controller=a_pagination_controller, *provided_data, update_controller_on_apply=update_controller_on_apply)
             
         
-        
-    @classmethod
-    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
-        """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
-
-        Needs only: curr_time_bins, plots_data, i
-        Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
-
-        Called with:
-
-        self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
-
-        Data:
-            plots_data.weighted_corr_data
-        Plots:
-            plots['weighted_corr']
-
-        """
-        from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
-        from matplotlib.offsetbox import AnchoredText
-
-        debug_print = kwargs.pop('debug_print', True)
-        if debug_print:
-            print(f'WeightedCorrelationPaginatedPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
-        
-        if epoch_slice is not None:
-            if debug_print:
-                print(f'\tepoch_slice: {epoch_slice}')
-            assert len(epoch_slice) == 2
-            epoch_start_t, epoch_end_t = epoch_slice # unpack
-            if debug_print:
-                print(f'\tepoch_start_t: {epoch_start_t}, epoch_end_t: {epoch_end_t}')
-        else:
-            raise NotImplementedError(f'epoch_slice is REQUIRED to index into the wcorr_data dict, but is None!')
-        
-        if curr_time_bin_container is not None:
-            if debug_print:
-                print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
-
-        # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
-        # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
-        extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.70, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
-
-        # data_index_value = data_idx # OLD MODE
-        data_index_value = epoch_start_t
-
-        # Add replay score text to top-right corner:
-        assert data_index_value in plots_data.weighted_corr_data, f"plots_data.weighted_corr_data does not contain index {data_index_value}"
-        weighted_corr_data_item: WeightedCorrelationPlotData = plots_data.weighted_corr_data[data_index_value]
-        final_text: str = weighted_corr_data_item.build_display_text()
-
-        ## Build or Update:
-        assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
-        extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
-        extant_wcorr_text_label = extant_plots_dict.get('wcorr_text', None)
-        # plot the radon transform line on the epoch:    
-        if (extant_wcorr_text_label is not None):
-            # already exists, update the existing ones. 
-            assert isinstance(extant_wcorr_text_label, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
-            anchored_text: AnchoredText = extant_wcorr_text_label
-            # Check if the AnchoredText object was removed. This happens when ax.clear() is called in `.on_jump_to_page(...)` before the callbacks part
-            if anchored_text.axes is None:
-                if debug_print:
-                    print("The AnchoredText object has been removed from the Axes and will be re-added.")
-                # Re-add the anchored text if necessary
-                curr_ax.add_artist(anchored_text)
-            # else:
-            #     if debug_print:
-            #         print("The AnchoredText object is still in the Axes.")
-            # Update the text afterwards:
-            anchored_text.txt.set_text(final_text)
-
-        else:
-            ## Create a new one:
-            anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, **extra_text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
-            anchored_text.patch.set_ec("none")
-            anchored_text.set_alpha(0.4)
-
-        # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text':anchored_text}
-        
-        if debug_print:
-            print(f'\t success!')
-        return params, plots_data, plots, ui
-
-
     @classmethod
     def decoder_build_weighted_correlation_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
         """ builds the Radon Transform data for each of the four decoders. 
@@ -1425,6 +1359,101 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         return wcorr_data_dict
     
+
+
+        
+    @classmethod
+    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+
+        Needs only: curr_time_bins, plots_data, i
+        Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+
+        Called with:
+
+        self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
+
+        Data:
+            plots_data.weighted_corr_data
+        Plots:
+            plots['weighted_corr']
+
+        """
+        from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
+        from matplotlib.offsetbox import AnchoredText
+
+        debug_print = kwargs.pop('debug_print', True)
+        if debug_print:
+            print(f'WeightedCorrelationPaginatedPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
+        
+        if epoch_slice is not None:
+            if debug_print:
+                print(f'\tepoch_slice: {epoch_slice}')
+            assert len(epoch_slice) == 2
+            epoch_start_t, epoch_end_t = epoch_slice # unpack
+            if debug_print:
+                print(f'\tepoch_start_t: {epoch_start_t}, epoch_end_t: {epoch_end_t}')
+        else:
+            raise NotImplementedError(f'epoch_slice is REQUIRED to index into the wcorr_data dict, but is None!')
+        
+        if curr_time_bin_container is not None:
+            if debug_print:
+                print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
+
+
+        ## Extract the visibility:
+        should_enable_weighted_correlation_info: bool = params.enable_weighted_correlation_info
+
+        # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
+        # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
+        extra_text_kwargs = dict(loc='upper right', stroke_alpha=0.70, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+
+        # data_index_value = data_idx # OLD MODE
+        data_index_value = epoch_start_t
+
+        # Add replay score text to top-right corner:
+        assert data_index_value in plots_data.weighted_corr_data, f"plots_data.weighted_corr_data does not contain index {data_index_value}"
+        weighted_corr_data_item: WeightedCorrelationPlotData = plots_data.weighted_corr_data[data_index_value]
+        final_text: str = weighted_corr_data_item.build_display_text()
+
+        ## Build or Update:
+        assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
+        extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
+        extant_wcorr_text_label = extant_plots_dict.get('wcorr_text', None)
+        # plot the radon transform line on the epoch:    
+        if (extant_wcorr_text_label is not None):
+            # already exists, update the existing ones. 
+            assert isinstance(extant_wcorr_text_label, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
+            anchored_text: AnchoredText = extant_wcorr_text_label
+            # Check if the AnchoredText object was removed. This happens when ax.clear() is called in `.on_jump_to_page(...)` before the callbacks part
+            if should_enable_weighted_correlation_info:
+                if anchored_text.axes is None:
+                    if debug_print:
+                        print("The AnchoredText object has been removed from the Axes and will be re-added.")
+                    # Re-add the anchored text if necessary
+                    curr_ax.add_artist(anchored_text)
+                # Update the text afterwards:
+                anchored_text.txt.set_text(final_text)
+            else:
+                ## Weighted Correlation info not wanted, clear/hide or remove the label
+                anchored_text.remove()
+                anchored_text = None
+
+        else:
+            if should_enable_weighted_correlation_info:
+                ## Create a new one:
+                anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, **extra_text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
+                anchored_text.patch.set_ec("none")
+                anchored_text.set_alpha(0.4)
+            else:
+                anchored_text = None
+
+        # Store the plot objects for future updates:
+        plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text':anchored_text}
+        
+        if debug_print:
+            print(f'\t success!')
+        return params, plots_data, plots, ui
 
 
 
