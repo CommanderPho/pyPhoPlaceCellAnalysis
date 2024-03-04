@@ -662,7 +662,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """
 
     @classmethod
-    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False, **kwargs):
+    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False, params_kwargs: Optional[Dict]=None, **kwargs):
         """ new version (replacing `plot_paginated_decoded_epoch_slices`) calls `plot_decoded_epoch_slices` which produces the state variables (params, plots_data, plots, ui), a new instance of this object type is then initialized with those variables and then updated with any specific properties. """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
         
@@ -674,6 +674,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, **kwargs)
         # new_obj = cls(params=params, plots_data=plots_data, plots=plots, ui=ui)
+        if params_kwargs is not None:
+            params.update(**params_kwargs)
 
         new_obj = cls(params, plots_data, plots, ui)
         
