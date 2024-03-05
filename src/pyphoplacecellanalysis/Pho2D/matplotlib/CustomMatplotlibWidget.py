@@ -4,6 +4,9 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
+import io
+import sys
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from qtpy import QtCore, QtWidgets, QtGui
 
@@ -192,6 +195,50 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         #TODO 2023-07-06 15:05: - [ ] PERFORMANCE - REDRAW
         self.ui.canvas.draw()
         
+
+    def copy_figure_to_clipboard(self):
+        """ Copies its figure to the clipboard as an image. """
+        from PIL import Image
+        from pyphocorehelpers.programming_helpers import copy_image_to_clipboard
+
+        canvas = self.ui.canvas
+
+        canvas.draw()  # Ensure the canvas has been drawn once before copying the figure        
+        buf = io.BytesIO()
+        canvas.print_png(buf)
+        buf.seek(0)
+        img = Image.open(buf)
+        # Send the image to the clipboard
+        copy_image_to_clipboard(img)
+        buf.close()
+
+
+    def copy_axis_to_clipboard(self, an_ax):
+        """ Copies the specified axis to the clipboard as an image. 
+        
+        """
+        canvas = self.ui.canvas
+
+        # Redraw the canvas if it might not be up-to-date
+        canvas.draw()
+
+        # Get the bbox of the axis to extract it
+        bbox = an_ax.get_tightbbox(canvas.get_renderer()).transformed(self.getFigure().dpi_scale_trans.inverted())
+
+        # Save just the region of the figure that contains the axis to a buffer
+        buf = io.BytesIO()
+        self.getFigure().savefig(buf, format='png', bbox_inches=bbox)
+        buf.seek(0)
+        qimage = QtGui.QImage.fromData(buf.getvalue())
+        buf.close()
+        
+        # Convert QImage to QPixmap and copy to clipboard
+        qpixmap = QtGui.QPixmap.fromImage(qimage)
+
+        ## Sets the QApplication's clipboard:
+        clipboard = QtWidgets.QApplication.clipboard()
+        clipboard.setPixmap(qpixmap)
+
 
     # ==================================================================================================================== #
     # QT Slots                                                                                                             #
