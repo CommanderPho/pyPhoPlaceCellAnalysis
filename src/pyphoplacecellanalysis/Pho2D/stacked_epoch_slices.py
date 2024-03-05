@@ -1178,8 +1178,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         self.ui.print(f'on_secondary_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
 
 
-
-
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
         """ simply updates the visual appearance of the provided ax to indicate whether it's selected. """
         if self.params.debug_print:
@@ -1631,13 +1629,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                                 a_name=f'DecodedEpochSlices[{a_name}]', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
                                                                                                 max_subplots_per_page=8, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
 
-            # pagination_controller_dict[a_name], active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict[a_name], curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
-            # fig_L = pagination_controller_L.plots.fig
-            # ax_L = fig_L.get_axes()
-            # if defer_render:
-            #     widget_L = pagination_controller_L.ui.mw # MatplotlibTimeSynchronizedWidget
-            #     widget_L.close()
-            #     pagination_controller_L = None
 
         # Constrains each of the plotters at least to the minimum height:
         for a_name, a_pagination_controller in pagination_controller_dict.items():
