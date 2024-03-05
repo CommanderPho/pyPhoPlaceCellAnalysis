@@ -1010,7 +1010,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # # Update selection (could also do just in above loop):
         # self.perform_update_selections()
 
-        self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies) # , collision_prefix='_DecodedEpochSlices_plot_test_', display_fn_name='plot_single_epoch_slice', plot_result_set='shared'
+        if self.params.get('enable_update_window_title_on_page_change', True):
+            # this call was found to be slow:
+            self.perform_update_titles_from_context(page_idx=page_idx, included_page_data_indicies=included_page_data_indicies) # , collision_prefix='_DecodedEpochSlices_plot_test_', display_fn_name='plot_single_epoch_slice', plot_result_set='shared'
+
+        
         self.ui.mw.draw()
 
 
@@ -1166,8 +1170,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 
         # Redraw the figure to show the updated selection
         # assert defer_render
-        if not defer_render:
+        if (not defer_render):
             self.draw()
+
+
 
     def draw(self):
         """ Calls .draw() on child MatplotlibTimeSynchronizedWidget.
