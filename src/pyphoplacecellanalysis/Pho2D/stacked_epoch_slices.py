@@ -741,7 +741,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         Uses:
             self.plots_data.epoch_slices
         """
-        return np.nonzero(np.isclose(self.plots_data.epoch_slices, epoch_times[:, None], atol=1e-3, rtol=1e-3).all(axis=2).any(axis=0))[0]
+        from neuropy.core.epoch import find_data_indicies_from_epoch_times
+        epoch_slices_df = pd.DataFrame(self.plots_data.epoch_slices, columns=['start', 'stop'])
+        return find_data_indicies_from_epoch_times(epoch_slices_df, epoch_times=epoch_times, atol=0.01, not_found_action='skip_index', debug_print=True)
+        # return np.nonzero(np.isclose(self.plots_data.epoch_slices, epoch_times[:, None], atol=1e-3, rtol=1e-3).all(axis=2).any(axis=0))[0]
 
     def save_selection(self) -> EpochSelectionsObject:
         active_selections_object = EpochSelectionsObject.init_from_visualization_params(self.params, epoch_times=deepcopy(self.selected_epoch_times))

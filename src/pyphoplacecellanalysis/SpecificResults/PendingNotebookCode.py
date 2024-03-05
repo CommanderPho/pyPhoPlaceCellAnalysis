@@ -1792,7 +1792,8 @@ import plotly.express as px
 import plotly.graph_objs as go
 
 
-def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25, px_scatter_kwargs=None, histogram_variable_name='P_Long',
+def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25, px_scatter_kwargs=None,
+                                   histogram_variable_name='P_Long', hist_kwargs=None,
                                    forced_range_y=[0.0, 1.0], time_delta_tuple=None):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
     
@@ -1838,29 +1839,49 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         time_bin_size = time_bin_sizes[0]
         main_title = main_title + f" - time bin size: {time_bin_size} sec"
 
-    
 
+    
     print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
 
 
     # common_plot_kwargs = dict(color="time_bin_size")
-    common_plot_kwargs = dict(color=None)
+    common_plot_kwargs = dict() # color=None
+    
+    hist_kwargs = hist_kwargs | dict(opacity=0.5, range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+    print(f'hist_kwargs: {hist_kwargs}')
+
 
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
 
+
+    # ==================================================================================================================== #
+    # Build Figure                                                                                                         #
+    # ==================================================================================================================== #
     # creating subplots
     fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta", main_title, "Post-delta"])
+    already_added_legend_entries = set()  # Keep track of trace names that are already added
 
     # Pre-Delta Histogram ________________________________________________________________________________________________ #
     # adding first histogram
-    pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, opacity=0.5, title="Pre-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+    pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title="Pre-delta")
     print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
     # time_bin_sizes
     for a_trace in pre_delta_fig.data:
+        a_trace_name = a_trace.name
+        if a_trace_name in already_added_legend_entries:
+            # For already added trace categories, set showlegend to False
+            a_trace.showlegend = False
+        else:
+            # For the first trace of each category, keep showlegend as True
+            already_added_legend_entries.add(a_trace_name)
+            a_trace.showlegend = True  # This is usually true by default, can be omitted
+
         fig.add_trace(a_trace, row=1, col=1)
-        fig.update_layout(yaxis=dict(range=forced_range_y))
+
+
+    # fig.update_layout(yaxis=dict(range=forced_range_y))
 
     # Calculate the histogram data
     # hist1, bins1 = np.histogram(X_pre_delta, bins=histogram_bins)
@@ -1878,30 +1899,59 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     if out_scatter_fig is not None:
         for a_trace in out_scatter_fig.data:
             fig.add_trace(a_trace, row=1, col=2)
-            if forced_range_y is not None:
-                fig.update_layout(yaxis=dict(range=forced_range_y))
+            # if forced_range_y is not None:
+            #     fig.update_layout(yaxis=dict(range=forced_range_y))
     else:
+        ## Create a new scatter plot:
         assert px_scatter_kwargs is not None
         out_scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
 
         for i, a_trace in enumerate(out_scatter_fig.data):
-            # print(f'a_trace: {a_trace}')
-            a_trace = fig.add_trace(a_trace, row=1, col=2)
-            is_first_item: bool = (i == 0)
-            if (not is_first_item):
+            a_trace_name = a_trace.name
+            if a_trace_name in already_added_legend_entries:
+                # For already added trace categories, set showlegend to False
                 a_trace.showlegend = False
-            if forced_range_y is not None:
-                fig.update_layout(yaxis=dict(range=forced_range_y))
+            else:
+                # For the first trace of each category, keep showlegend as True
+                already_added_legend_entries.add(a_trace_name)
+                a_trace.showlegend = True  # This is usually true by default, can be omitted
+            
+            # is_first_item: bool = (i == 0)
+            # if (not is_first_item):
+            #     a_trace['showlegend'] = False
+                # a_trace.showlegend = False    
+            # print(f'a_trace: {a_trace}')
+            # a_trace = fig.add_trace(a_trace, row=1, col=2)
+            fig.add_trace(a_trace, row=1, col=2)
+
+        # if forced_range_y is not None:
+        #     fig.update_layout(yaxis=dict(range=forced_range_y))
 
 
     # Post-Delta Histogram _______________________________________________________________________________________________ #
     # adding the second histogram
-    post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, opacity=0.5, title="Post-delta", range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+    post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title="Post-delta")
 
     for a_trace in post_delta_fig.data:
+        a_trace_name = a_trace.name
+        if a_trace_name in already_added_legend_entries:
+            # For already added trace categories, set showlegend to False
+            a_trace.showlegend = False
+        else:
+            # For the first trace of each category, keep showlegend as True
+            a_trace.showlegend = True  # This is usually true by default, can be omitted
+            already_added_legend_entries.add(a_trace_name)
+            
         fig.add_trace(a_trace, row=1, col=3)
-        fig.update_layout(yaxis=dict(range=forced_range_y))
+
+
+    # fig.update_layout(yaxis=dict(range=forced_range_y))
         
+
+    if forced_range_y is not None:
+        fig.update_layout(yaxis=dict(range=forced_range_y))
+
+
     # Calculate the histogram data for second half
     # hist2, bins2 = np.histogram(X_post_delta, bins=histogram_bins)
     # Adding the second histogram

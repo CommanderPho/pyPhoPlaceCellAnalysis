@@ -1640,8 +1640,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
             assert epoch_label_column_name in active_epochs_df
             active_epochs_df[epoch_label_column_name] = pd.to_numeric(active_epochs_df[epoch_label_column_name]).astype(int) # 'Int64'
 
-        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=epoch_label_column_name, should_replace_existing_column=True) # , override_time_variable_name='t_seconds'
-        spikes_df = spikes_df[(spikes_df['Probe_Epoch_id'] != -1)] # ['lap', 'maze_relative_lap', 'maze_id']
+        spikes_df = spikes_df.spikes.adding_epochs_identity_column(active_epochs_df, epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=epoch_label_column_name,
+                                                                    should_replace_existing_column=True, drop_non_epoch_spikes=True) # , override_time_variable_name='t_seconds'
+        # spikes_df = spikes_df[(spikes_df['Probe_Epoch_id'] != -1)] # ['lap', 'maze_relative_lap', 'maze_id']
         spikes_df, neuron_id_to_new_IDX_map = spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
         # spikes_df
 
@@ -1674,6 +1675,10 @@ class DirectionalMergedDecodersResult(ComputedResult):
         # spikes_df
 
         ## Compute the spike-t v. pf_peak_x correlation for each of the decoders
+        required_min_percentage_of_active_cells: float = 0.333333 # 20% of active cells
+        active_min_num_unique_aclu_inclusions_requirement: int = 15 # track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells)
+        min_num_required_unique_aclus_list = [max(5, int(float(len(a_decoder_neuron_IDs)) * 0.333)) for a_decoder_neuron_IDs in neuron_IDs_lists]
+            
 
         _simple_corr_results_dict = {}
         partitioned_dfs: Dict[int, pd.DataFrame] = dict(zip(*partition_df(spikes_df, partitionColumn='Probe_Epoch_id')))
@@ -1683,7 +1688,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
            
             # _temp_dfs = []
             _simple_corr_results_dict[an_epoch_idx] = []
-            for a_peak_x_col_name, a_decoder_neuron_IDs in zip(_pf_peak_x_column_names, neuron_IDs_lists):
+            for a_peak_x_col_name, a_decoder_neuron_IDs, min_num_required_unique_aclus in zip(_pf_peak_x_column_names, neuron_IDs_lists, min_num_required_unique_aclus_list):
                 ## For each decoder, so we can slice by that decoder's included neuron ids:
 
                 # a_decoder_specific_spikes_df = deepcopy(an_epoch_spikes_df).spikes.sliced_by_neuron_id(a_decoder_neuron_IDs)
@@ -1691,7 +1696,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
                 a_decoder_specific_spikes_df = a_decoder_specific_spikes_df[a_decoder_specific_spikes_df['aclu'].isin(a_decoder_neuron_IDs)]
                 active_epoch_decoder_active_aclus = a_decoder_specific_spikes_df.aclu.unique()
 
-                min_num_required_unique_aclus = max(5, int(float(len(a_decoder_neuron_IDs)) * 0.333))
+                # min_num_required_unique_aclus = max(5, int(float(len(a_decoder_neuron_IDs)) * 0.333))
                 if len(active_epoch_decoder_active_aclus) < min_num_required_unique_aclus:
                     _simple_corr_results_dict[an_epoch_idx].append(np.nan)
                 else:
@@ -2102,37 +2107,35 @@ class DecoderDecodedEpochsResult(ComputedResult):
             if (user_annotation_selections is not None):
                 any_good_selected_epoch_times = user_annotation_selections.get(an_epochs_source_name, None) # like ripple
                 if any_good_selected_epoch_times is not None:
+                    num_user_selected_times: int = len(any_good_selected_epoch_times)
+                    print(f'num_user_selected_times: {num_user_selected_times}')
                     any_good_selected_epoch_indicies = None
-                    try:
-                        print(f'adding user annotation column!')
-                        any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(any_good_selected_epoch_times)
+                    print(f'adding user annotation column!')
 
-                    except AttributeError as e:
-                        print(f'failed for {a_df_name}. Going to try method 2.')
-                    except BaseException as e:
-                        print(f'failed for {a_df_name}. Going to try method 2.')
-
+                    # try:
+                    #     any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(any_good_selected_epoch_times)
+                    # except AttributeError as e:
+                    #     print(f'failed for {a_df_name}. Going to try method 2.')
+                    # except BaseException as e:
+                    #     print(f'failed for {a_df_name}. Going to try method 2.')
 
                     if any_good_selected_epoch_indicies is None:
                         ## try method 2
                         try:
-                            print(f'trying method 2 for {a_df_name}!')
-                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',])
+                            # print(f'trying method 2 for {a_df_name}!')
+                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=True)
                             # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, any_good_selected_epoch_times, t_column_names=['ripple_start_t',])
                         except AttributeError as e:
-                            print(f'failed method 2 for {a_df_name}. Out of options.')        
+                            print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
                         except BaseException as e:
-                            print(f'failed for {a_df_name}. Out of options.')
+                            print(f'ERROR: failed for {a_df_name}. Out of options.')
                         
                     if any_good_selected_epoch_indicies is not None:
-                        print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_user_selected_times} user selections) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
                         a_df['is_user_annotated_epoch'] = False
                         a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
                     else:
                         print(f'\t failed all methods for annotations')
-
-
-                        
 
             export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str)
             
