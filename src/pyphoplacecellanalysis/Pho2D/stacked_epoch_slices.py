@@ -1186,12 +1186,20 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_ax_selected_state(ax: {ax}, is_selected: {is_selected}) OVERRIDE:')
         # Set the face color of the clicked Axes based on its selection status
         if is_selected:
-            ax.patch.set_facecolor('gray')
+            ax.patch.set_facecolor('seagreen')
+            set_ax_emphasis_color(ax, emphasis_color='darkgreen', defer_draw=True)
         else:
             ax.patch.set_facecolor('white')
+            set_ax_emphasis_color(ax, emphasis_color='dimgrey', defer_draw=True)
+
         # Update the selection rectangles for this ax if we have them:
-        selection_rectangles_dict = self.plots.get('selection_rectangles_dict', {})
-        a_selection_rect = selection_rectangles_dict.get(ax, None)
+        selection_artists_dict = self.plots.get('selection_artists_dict', {})
+        a_selection_artists = selection_artists_dict.get(ax, {})
+        
+
+
+        # Update the selection rectangles for this ax if we have them:
+        a_selection_rect = a_selection_artists.get('rectangles', None)        
         if a_selection_rect is not None:
             if self.params.debug_print:
                 self.ui.print(f'\ta_selection_rect.set_visible({is_selected})')
@@ -1199,6 +1207,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         else:
             if self.params.debug_print:
                 self.ui.print(f'\ta_selection_rect is None!')
+
+        an_action_buttons_list = a_selection_artists.get('action_buttons', None)
+        if an_action_buttons_list is not None:
+            ## TODO: do something here?
+            if self.params.debug_print:
+                self.ui.print(f'\tan_action_buttons_list({is_selected})')
         if self.params.debug_print:
             self.ui.print(f'\tdone.')
 
