@@ -16,6 +16,8 @@ from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 
 from neuropy.core.epoch import Epoch
 from neuropy.utils.dynamic_container import DynamicContainer, override_dict, overriding_dict_with, get_dict_subset
+from neuropy.utils.matplotlib_helpers import set_ax_emphasis_color
+
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
@@ -803,24 +805,44 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     
 
     ## Supposed to be the right callback:
-    def on_selected_epochs_changed(self, event):
-        ## Forward the click event to the `_out_pagination_controller.on_click` callback. This will update the `_out_pagination_controller.params.is_selected`
+    def on_selected_epochs_changed(self, clicked_ax, clicked_data_index: int) -> bool:
+        """ 
+
+        Called by `_out_pagination_controller.on_click` to try to toggle the clicked_data_index sis_selected value, and performs the graphical updates if anything changed.
+
+        Updates:
+            `_out_pagination_controller.params.is_selected`
+
+        History:
+            Used to be the opposite direction. This function was bound to the matplotlib axis click callback, and it forwarded the click event to the `_out_pagination_controller.on_click` callback. 
+
+        """
         self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed(...)')
         pre_selected_times = deepcopy(self.selected_epoch_times)
-        self.on_click(event=event)
+
+        # Actually perform the changes here: _________________________________________________________________________________ #
+        # Toggle the selection status of the clicked Axes
+        self.params.is_selected[clicked_data_index] = not self.params.is_selected.get(clicked_data_index, False) # if never set before, assume that it's not selected
+        
         ## Determine the Epochs that have actually been selected so they can be saved/stored somehow:
         # selected_epoch_times = self.selected_epoch_times # returns an S x 2 array of epoch start/end times that are currently selected.
         if self.params.debug_print:
             self.ui.print(f'\tselection_indicies: {self.selected_indicies}')
 
-        self.ui.print(f'\tselected_epoch_times: {self.selected_epoch_times}')
+        if self.params.debug_print:
+            self.ui.print(f'\tselected_epoch_times: {self.selected_epoch_times}')
+        
         post_selected_times = deepcopy(self.selected_epoch_times)
         # did_selection_change: bool = (pre_selected_times != post_selected_times)
         # did_selection_change: bool = np.logical_not(np.all(pre_selected_times == post_selected_times))
         did_selection_change: bool = not np.array_equal(pre_selected_times, post_selected_times)
         if did_selection_change:
             self.ui.print(f'\tDecodedEpochSlicesPaginatedFigureController.on_selected_epochs_changed: selection changed!')
-            self.draw() # Redraw
+            ## Update visual apperance of axis:
+            self.perform_update_ax_selected_state(ax=clicked_ax, is_selected=self.params.is_selected[clicked_data_index])
+            self.draw() # redraws
+
+        return did_selection_change
 
 
     # Lifecycle Methods __________________________________________________________________________________________________ #
@@ -908,11 +930,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
 
     def connect_on_click_callback(self):
-        """ connects the button_press_event callback to self.on_selected_epochs_changed """
+        """ connects the button_press_event callback to self.on_click """
         if not self.params.has_attr('callback_id') or self.params.get('callback_id', None) is None:
             # _out_pagination_controller.params.callback_id = _out_pagination_controller.plots.fig.canvas.mpl_connect('button_press_event', _out_pagination_controller.on_click) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
-            self.params.callback_id = self.plots.fig.canvas.mpl_connect('button_press_event', self.on_selected_epochs_changed) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
-
+            self.params.callback_id = self.plots.fig.canvas.mpl_connect('button_press_event', self.on_click) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
 
     def disconnect_on_click_callback(self):
         """ disconnects the button_press_event callback for the figure."""
@@ -1092,9 +1113,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.ui.print(f'on_primary_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
         if ((clicked_data_index is not None) and (clicked_ax is not None)):
             # Toggle the selection status of the clicked Axes
-            self.params.is_selected[clicked_data_index] = not self.params.is_selected.get(clicked_data_index, False) # if never set before, assume that it's not selected
-            ## Update visual apperance of axis:
-            self.perform_update_ax_selected_state(ax=clicked_ax, is_selected=self.params.is_selected[clicked_data_index])
+            self.on_selected_epochs_changed(clicked_ax=clicked_ax, clicked_data_index=clicked_data_index)
+
     
 
     def on_middle_click(self, event, clicked_ax=None, clicked_data_index=None):
