@@ -375,8 +375,12 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
         plots.secondary_yaxes = {} # initialize to an empty dictionary
 
     # Left side y-label for the start time
-    curr_ax.set_ylabel(f'{a_slice_label}\n{a_slice_start_t:.3f}') # format to two decimal places
-    
+    should_disable_ylabel = params.get('disable_y_label', False)
+    if not should_disable_ylabel:
+        curr_ax.set_ylabel(f'{a_slice_label}\n{a_slice_start_t:.3f}') # format to two decimal places
+    else:
+        curr_ax.set_ylabel('')
+
     ## Add the right-aligned axis
     # From http://notes.brooks.nu/2008/03/plotting-on-left-and-right-axis-simulateously-using-matplotlib-and-numpy
     # Create right axis and plots.  It is the frameon=False that makes this plot transparent so that you can see the left axis plot that will be underneath it. The sharex option causes
@@ -387,7 +391,10 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
         plots.secondary_yaxes[curr_ax] = secax_y # set the secondary axis for this curr_ax
         
     assert secax_y is not None
-    secax_y.set_ylabel(f'{a_slice_end_t:.3f}')
+    if not should_disable_ylabel:
+        secax_y.set_ylabel(f'{a_slice_end_t:.3f}')
+    else:
+        secax_y.set_ylabel('')
     secax_y.tick_params(labelleft=False, labelbottom=False, labelright=False) # Turn off all ticks for the secondary axis
     # Do I need to save this temporary axes? No, it appears that's not needed
 
@@ -1384,7 +1391,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right'])))
 
         for i, (a_decoder_name, a_win) in enumerate(all_windows.items()):
-            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(430,700), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name], autoOrientation=False)
+            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(430,780), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name], autoOrientation=False)
 
         # #TODO 2024-02-14 18:44: - [ ] Comgbine the separate items into one of the single `DecodedEpochSlicesPaginatedFigureController` objects (or a new one)?
         # root_dockAreaWindow.resize(600, 900)
@@ -1412,6 +1419,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         root_dockAreaWindow.ui.print = print
 
         # ## Cleanup when done:
+        # 'disable_y_label': True
+        
         # for a_decoder_name, a_root_plot in _obj.plots.root_plots.items():
         #     a_root_plot.setTitle(title=a_decoder_name)
         #     # a_root_plot.setTitle(title="")
@@ -1526,13 +1535,28 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         print(f'params_kwargs: {params_kwargs}')
 
+        decoder_names: List[str] = track_templates.get_decoder_names()
+        controlling_pagination_item_name: str = decoder_names[0] # first item # 'long_LR'
+        controlled_pagination_controller_names_list = decoder_names[1:]
+
         pagination_controller_dict = {}
-        for a_name, a_decoder in track_templates.get_decoders_dict().items():
+        for i, (a_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items()):
+            is_controlling_widget: bool = (a_name == controlling_pagination_item_name)
+
+            curr_params_kwargs = deepcopy(params_kwargs)
+            curr_params_kwargs['is_controlled_widget'] = (not is_controlling_widget)
+            if ('disable_y_label' not in curr_params_kwargs):
+                # If user didn't provide an explicit 'disable_y_label' option, use the defaults which is to hide labels on all the but the controlling widget
+                if is_controlling_widget:
+                    curr_params_kwargs['disable_y_label'] = False
+                else:
+                    curr_params_kwargs['disable_y_label'] = True
+
             pagination_controller_dict[a_name] = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(decoder_decoded_epochs_result_dict[a_name].filter_epochs,
                                                                                                 decoder_decoded_epochs_result_dict[a_name],
                                                                                                 xbin=a_decoder.xbin, global_pos_df=curr_active_pipeline.sess.position.df,
                                                                                                 a_name=f'DecodedEpochSlices[{a_name}]', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
-                                                                                                max_subplots_per_page=8, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=params_kwargs) # , save_figure=save_figure
+                                                                                                max_subplots_per_page=8, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
 
             # pagination_controller_dict[a_name], active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, decoder_laps_filter_epochs_decoder_result_dict[a_name], curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
             # fig_L = pagination_controller_L.plots.fig
@@ -1548,7 +1572,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             # resize to minimum height
             a_widget = a_pagination_controller.ui.mw # MatplotlibTimeSynchronizedWidget
             # a_widget.size()
-            a_widget.setMinimumHeight(a_pagination_controller.params.all_plots_height)
+            a_widget.setMinimumHeight(a_pagination_controller.params.all_plots_height + 30) # the 30 is for the control bar
 
         return pagination_controller_dict
 
