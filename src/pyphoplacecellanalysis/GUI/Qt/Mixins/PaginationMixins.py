@@ -217,11 +217,29 @@ class PaginatedFigureBaseController:
         else:
             ax.patch.set_facecolor('white')
 
+        selection_artists_dict = self.plots.get('selection_artists_dict', {})
+        a_selection_artists = selection_artists_dict.get(ax, {})
+        
+        # ## Most general version (but unimplemented/unfinished) based off of the new `selection_artists_dict`
+        # for an_artist_key, an_artist_dict in selection_artists_dict.items():
+        #     if an_artist_dict is not None:
+        #         an_artist = an_artist_dict.get(ax, None)
+        #         if an_artist is not None:
+        #             ## TODO: call the uddate handler here:
+        #             an_artist.set_visible(is_selected)
+
+
         # Update the selection rectangles for this ax if we have them:
-        selection_rectangles_dict = self.plots.get('selection_rectangles_dict', {})
-        a_selection_rect = selection_rectangles_dict.get(ax, None)
         if a_selection_rect is not None:
             a_selection_rect.set_visible(is_selected)
+
+        # action_button_list_dict = selection_artists_dict.get('action_buttons', {})
+        # an_action_buttons_list = action_button_list_dict.get(ax, None)
+        an_action_buttons_list = a_selection_rect.get('action_buttons', None)
+        if an_action_buttons_list is not None:
+            ## TODO: do something here?
+            # an_action_buttons_list
+            pass
 
     def perform_update_selections(self, defer_render:bool = False):
         """ called to update the selection when the page is changed or something else happens. """
@@ -249,33 +267,87 @@ class PaginatedFigureBaseController:
     def _subfn_build_selectibility_rects_if_needed(self, axs, curr_page_data_indicies):
         """ adds the selectibility rectangles (patches), one for each axis, to the matplotlib axes provided
         
-        Updates: self.plots.selection_rectangles_dict
+        Updates: self.plots.selection_artists_dict,
+             self.plots.selection_artists_dict.rectangles, self.plots.selection_artists_dict.action_buttons
         Uses: self.params.is_selected
         """
         from matplotlib.patches import Rectangle
         from neuropy.utils.matplotlib_helpers import add_selection_patch
 
-        if not self.plots.has_attr('selection_rectangles_dict'):
+        if not self.plots.has_attr('selection_artists_dict'):
             ## Create the dict if needed and it doesn't exist:
             if self.params.debug_print:
-                print(f'building new self.plots.selection_rectangles_dict as one does not exist')
-            self.plots.selection_rectangles_dict = {} # empty dict to start
-
+                print(f'building new self.plots.selection_artists_dict as one does not exist')
+            self.plots.selection_artists_dict = {}
+    
         ## INPUTS: curr_page_data_indicies, axs
         assert len(axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
         for ax, found_data_idx in zip(axs, list(curr_page_data_indicies)):
             ## First get the ax
-            a_selection_rect = self.plots.selection_rectangles_dict.get(ax, None)
-            if a_selection_rect is None:
+            a_selection_artists_dict = self.plots.selection_artists_dict.get(ax, None)
+            if a_selection_artists_dict is None:
                 # create a new one
                 if self.params.debug_print:
-                    print(f'needed a new selection rect.')
-                a_selection_rect = add_selection_patch(ax, selection_color='green', alpha=0.6, zorder=-1, defer_draw=True)
-                self.plots.selection_rectangles_dict[ax] = a_selection_rect ## add to dict
+                    print(f'needed a new a_selection_artists_dict.')
+                       
+                # Define an event for toggling the properties with check buttons
+                def on_toggle_action_button(label):
+                    # Here you would toggle the associated property
+                    print(f"Property '{label}' toggled")
+                
+                button_properties = [dict(name='is_bad', value=False),
+                                     dict(name='needs_review', value=False),
+                                     dict(name='is_excluded', value=False),
+                                    ] # , action_handler_fn=on_toggle_action_button
 
+                a_selection_rect, action_buttons_list = add_selection_patch(ax, selection_color='green', alpha=0.6, zorder=-1, action_button_configs=button_properties, defer_draw=True)
+                # Connect the event handler
+                action_buttons_list.on_clicked(on_toggle_action_button)
+
+                self.plots.selection_artists_dict[ax] = {
+                                    'rectangles': a_selection_rect,
+                                    'action_buttons': action_buttons_list,
+                                    }
+    
+            else:
+                a_selection_rect = a_selection_artists_dict['rectangles']
+                action_buttons_list = a_selection_artists_dict['action_buttons']
             is_selected = self.params.is_selected.get(found_data_idx, False)
             a_selection_rect.set_visible(is_selected)
+            # action_buttons_list # do something
+            
+            ## END if a_selection_artists_dict is None:
 
+
+    def _subfn_clear_selectability_rects(self):
+        print(f'_subfn_clear_selectability_rects(): removing...')
+        for k, an_artist_dict in self.plots.selection_artists_dict.items():
+            if an_artist_dict is not None:
+                for sub_k, an_artist in an_artist_dict.items():
+                    if an_artist is not None:
+                        try:
+                            an_artist.remove()
+                        except Exception as e:
+                            print(f'exception {e}')
+                            for an_artist_part in an_artist:
+                                if an_artist_part is not None:
+                                    an_artist_part.remove()
+                                                        
+        self.plots['selection_artists_dict'] = {}
+        del self.plots['selection_artists_dict']
+
+
+        # for ax, a_selection_rect in self.plots.selection_rectangles_dict.items():
+        #     a_selection_rect.remove()
+        #     a_buttons = self.plots.action_buttons_dict.get(ax, None)
+        #     if a_buttons is not None:
+        #         for a_btn in a_buttons:
+        #             if a_btn is not None:
+        #                 a_btn.remove()
+        # self.plots[ 'rectangles'] = {}
+        # self.plots['action_buttons'] = {}
+        # del self.plots[ 'rectangles']
+        # del self.plots['action_buttons']
 
 
     def _subfn_helper_setup_selectability(self):
