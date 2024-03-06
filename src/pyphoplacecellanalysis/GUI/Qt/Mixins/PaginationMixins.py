@@ -231,11 +231,10 @@ class PaginatedFigureBaseController:
 
 
         # Update the selection rectangles for this ax if we have them:
+        a_selection_rect = a_selection_artists.get('rectangles', None)
         if a_selection_rect is not None:
             a_selection_rect.set_visible(is_selected)
 
-        # action_button_list_dict = selection_artists_dict.get('action_buttons', {})
-        # an_action_buttons_list = action_button_list_dict.get(ax, None)
         an_action_buttons_list = a_selection_rect.get('action_buttons', None)
         if an_action_buttons_list is not None:
             ## TODO: do something here?
@@ -275,6 +274,8 @@ class PaginatedFigureBaseController:
         from matplotlib.patches import Rectangle
         from neuropy.utils.matplotlib_helpers import add_selection_patch
 
+        enable_per_epoch_action_buttons: bool = self.params.get('enable_per_epoch_action_buttons', False)
+
         if not self.plots.has_attr('selection_artists_dict'):
             ## Create the dict if needed and it doesn't exist:
             if self.params.debug_print:
@@ -291,30 +292,50 @@ class PaginatedFigureBaseController:
                 if self.params.debug_print:
                     print(f'needed a new a_selection_artists_dict.')
                        
-                # Define an event for toggling the properties with check buttons
-                def on_toggle_action_button(label):
-                    # Here you would toggle the associated property
-                    print(f"Property '{label}' toggled")
                 
-                button_properties = [dict(name='is_bad', value=False),
-                                     dict(name='needs_review', value=False),
-                                     dict(name='is_excluded', value=False),
-                                    ] # , action_handler_fn=on_toggle_action_button
+                if enable_per_epoch_action_buttons:
+                    # Define an event for toggling the properties with check buttons
+                    def on_toggle_action_button(label):
+                        # Here you would toggle the associated property
+                        print(f"Property '{label}' toggled")
+                    
+                    button_properties = [dict(name='is_bad', value=False),
+                                        dict(name='needs_review', value=False),
+                                        dict(name='is_excluded', value=False),
+                                        ] # , action_handler_fn=on_toggle_action_button
+                else:
+                    button_properties = None
 
                 a_selection_rect, action_buttons_list = add_selection_patch(ax, selection_color='green', alpha=0.6, zorder=-1, action_button_configs=button_properties, defer_draw=True)
-                # Connect the event handler
-                action_buttons_list.on_clicked(on_toggle_action_button)
 
                 self.plots.selection_artists_dict[ax] = {
                                     'rectangles': a_selection_rect,
-                                    'action_buttons': action_buttons_list,
+                                    # 'action_buttons': action_buttons_list,
                                     }
-    
+                
+
+                if action_buttons_list is not None:
+                    # Connect the event handler
+                    action_buttons_list.on_clicked(on_toggle_action_button)
+                    self.plots.selection_artists_dict[ax]['action_buttons'] = action_buttons_list
+
             else:
                 a_selection_rect = a_selection_artists_dict['rectangles']
-                action_buttons_list = a_selection_artists_dict['action_buttons']
+                action_buttons_list = a_selection_artists_dict.get('action_buttons', None)
+
+
             is_selected = self.params.is_selected.get(found_data_idx, False)
             a_selection_rect.set_visible(is_selected)
+
+            if (action_buttons_list is not None) and (not enable_per_epoch_action_buttons):
+                ##TODO: remove the action buttons or hide them
+                action_buttons_list.set_visible(is_selected)
+
+            if (enable_per_epoch_action_buttons and (action_buttons_list is None)):
+                print(f'WARN: enable_per_epoch_action_buttons: true but action buttons are only created on the first run of `_subfn_build_selectibility_rects_if_needed`. If you want them you can remove all selctions stuff using the clear function and re-add')
+
+
+            ## Do something with the action buttons
             # action_buttons_list # do something
 
             ## END if a_selection_artists_dict is None:
