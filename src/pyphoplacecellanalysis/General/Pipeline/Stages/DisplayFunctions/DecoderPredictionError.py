@@ -860,77 +860,7 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 # ==================================================================================================================== #
 
 
-class PaginatedPlotDataProvider:
-    """ Provides auxillary and optional data to paginated plots, currently of decoded posteriors. 
-    
-    """
-    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
-    provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
-    provided_plots: Dict[str, Any] = {'weighted_corr': {}}
-
-    @classmethod
-    def get_provided_params(cls) -> Dict[str, Any]:
-        return cls.provided_params
-
-    @classmethod
-    def get_provided_plots_data(cls) -> Dict[str, Any]:
-        return cls.provided_plots_data
-    
-    @classmethod
-    def get_provided_plots(cls) -> Dict[str, Any]:
-        return cls.provided_plots
-
-    @classmethod
-    def get_provided_callbacks(cls) -> Dict[str, Dict]:
-        """ override """
-        return {'on_render_page_callbacks': 
-                {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
-        }
-
-
-    @classmethod
-    def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
-        """ should be general I think.
-
-        Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
-
-        Uses: cls.provided_params
-
-        """
-        ## Add the .params:
-        for a_key, a_value in cls.provided_params.items():
-            if not a_pagination_controller.params.has_attr(a_key):
-                a_pagination_controller.params[a_key] = a_value
-
-        ## Add the .plots_data:
-        assert len(provided_data) == 1
-        # weighted_corr_data = provided_data[1]
-        assert len(provided_data) == len(cls.provided_plots_data), f"len(provided_data): {len(provided_data)} != len(cls.provided_plots_data): {len(cls.provided_plots_data)}"
-        active_plots_data = {k:(provided_data[i] or default_class_value) for i, (k, default_class_value) in enumerate(cls.provided_plots_data.items())}
-
-        for a_key, a_value in active_plots_data.items():
-            a_pagination_controller.plots_data[a_key] = a_value
-
-        ## Add the .plots:
-        for a_key, a_value in cls.provided_plots.items():
-            a_pagination_controller.plots[a_key] = a_value
-
-
-        ## Add the callbacks
-        for a_callback_type, a_callback_dict in cls.get_provided_callbacks().items():
-            # a_callback_type: like 'on_render_page_callbacks'
-            pagination_controller_callbacks_dict = a_pagination_controller.params.get(a_callback_type, None)
-            if pagination_controller_callbacks_dict is None:
-                a_pagination_controller.params[a_callback_type] = {} # allocate a new dict to hold callbacks
-            # register the specific callbacks of this type:
-            for a_callback_id, a_callback_fn in a_callback_dict.items():
-                a_pagination_controller.params[a_callback_type][a_callback_id] = a_callback_fn
-
-        # Trigger the update
-        if update_controller_on_apply:
-            a_pagination_controller.on_paginator_control_widget_jump_to_page(0)
-        
-
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedPlotDataProvider
 
 
 
@@ -1287,15 +1217,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         return {'on_render_page_callbacks': 
                 {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
         }
-
-
-    # @classmethod
-    # def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
-    #     """ 
-    #     Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
-    #     """
-    #     return super().add_data_to_pagination_controller(a_pagination_controller=a_pagination_controller, *provided_data, update_controller_on_apply=update_controller_on_apply)
-            
         
     @classmethod
     def decoder_build_weighted_correlation_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
