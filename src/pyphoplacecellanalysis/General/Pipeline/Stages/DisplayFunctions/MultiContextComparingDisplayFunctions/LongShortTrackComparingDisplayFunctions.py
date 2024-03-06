@@ -797,32 +797,34 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             Usage:
                 (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S) = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, defer_render=False)
             """
+            from neuropy.utils.result_context import IdentifyingContext
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
 
-            ## long_short_decoding_analyses:
-            curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
-            ## Extract variables from results object:
-            long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            active_session_context: IdentifyingContext = kwargs.pop('active_context', curr_active_pipeline.get_session_context())
 
-            pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='long_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
-            fig_L = pagination_controller_L.plots.fig
-            ax_L = fig_L.get_axes()
-            if defer_render:
-                widget_L = pagination_controller_L.ui.mw # MatplotlibTimeSynchronizedWidget
-                widget_L.close()
-                pagination_controller_L = None
+            with (active_session_context + IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='replays')) as active_display_context:
+                ## long_short_decoding_analyses:
+                curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
+                ## Extract variables from results object:
+                long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
+                long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+                pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, (active_display_context + IdentifyingContext(decoder='long_results_obj')), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
+                fig_L = pagination_controller_L.plots.fig
+                ax_L = fig_L.get_axes()
+                if defer_render:
+                    widget_L = pagination_controller_L.ui.mw # MatplotlibTimeSynchronizedWidget
+                    widget_L.close()
+                    pagination_controller_L = None
+                
+                pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, (active_display_context + IdentifyingContext(decoder='short_results_obj')), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
+                fig_S = pagination_controller_S.plots.fig
+                ax_S = fig_S.get_axes()
+                if defer_render:
+                    widget_S = pagination_controller_S.ui.mw # MatplotlibTimeSynchronizedWidget
+                    widget_S.close()
+                    pagination_controller_S = None
 
-            
-            pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs='replays', decoder='short_results_obj'), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
-            fig_S = pagination_controller_S.plots.fig
-            ax_S = fig_S.get_axes()
-            if defer_render:
-                widget_S = pagination_controller_S.ui.mw # MatplotlibTimeSynchronizedWidget
-                widget_S.close()
-                pagination_controller_S = None
-
-            return (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S)
+                return (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S)
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         pagination_controllers, figs, axs, ctxts, out_figure_paths = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(owning_pipeline_reference, included_epoch_indicies=included_epoch_indicies, defer_render=defer_render, save_figure=save_figure, **kwargs)
