@@ -1,3 +1,4 @@
+from copy import deepcopy
 from logging import warning
 from typing import Any, Dict
 import numpy as np
@@ -122,22 +123,22 @@ class PaginatedPlotDataProvider:
 
     @classmethod
     def get_provided_params(cls) -> Dict[str, Any]:
-        return cls.provided_params
+        return deepcopy(cls.provided_params)
 
     @classmethod
     def get_provided_plots_data(cls) -> Dict[str, Any]:
-        return cls.provided_plots_data
+        return deepcopy(cls.provided_plots_data)
     
     @classmethod
     def get_provided_plots(cls) -> Dict[str, Any]:
-        return cls.provided_plots
+        return deepcopy(cls.provided_plots)
 
     @classmethod
     def get_provided_callbacks(cls) -> Dict[str, Dict]:
         """ override """
-        return {'on_render_page_callbacks': 
+        return deepcopy({'on_render_page_callbacks': 
                 {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
-        }
+        })
 
     @classmethod
     def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
@@ -149,22 +150,22 @@ class PaginatedPlotDataProvider:
 
         """
         ## Add the .params:
-        for a_key, a_value in cls.provided_params.items():
+        for a_key, a_value in cls.get_provided_params().items():
             if not a_pagination_controller.params.has_attr(a_key):
-                a_pagination_controller.params[a_key] = a_value
+                a_pagination_controller.params[a_key] = a_value # DEEPCOPY ALT
 
         ## Add the .plots_data:
         assert len(provided_data) == 1
         # weighted_corr_data = provided_data[1]
         assert len(provided_data) == len(cls.provided_plots_data), f"len(provided_data): {len(provided_data)} != len(cls.provided_plots_data): {len(cls.provided_plots_data)}"
-        active_plots_data = {k:(provided_data[i] or default_class_value) for i, (k, default_class_value) in enumerate(cls.provided_plots_data.items())}
+        active_plots_data = {k:(deepcopy(provided_data[i]) or default_class_value) for i, (k, default_class_value) in enumerate(cls.get_provided_plots_data().items())}
 
         for a_key, a_value in active_plots_data.items():
-            a_pagination_controller.plots_data[a_key] = a_value
+            a_pagination_controller.plots_data[a_key] = a_value # DEEPCOPY ALT
 
         ## Add the .plots:
-        for a_key, a_value in cls.provided_plots.items():
-            a_pagination_controller.plots[a_key] = a_value
+        for a_key, a_value in cls.get_provided_plots().items():
+            a_pagination_controller.plots[a_key] = a_value # DEEPCOPY ALT
 
         ## Add the callbacks
         for a_callback_type, a_callback_dict in cls.get_provided_callbacks().items():
@@ -180,44 +181,6 @@ class PaginatedPlotDataProvider:
         if update_controller_on_apply:
             a_pagination_controller.on_paginator_control_widget_jump_to_page(0)
         
-
-    # @classmethod
-    # def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer",
-    #                                                    data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
-    #     """ 
-    #     Called with:
-
-    #         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
-
-    #     Data:
-    #         plots_data.weighted_corr_data
-    #     Plots:
-    #         plots['weighted_corr']
-
-    #     """
-    #     from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
-    #     from matplotlib.offsetbox import AnchoredText
-
-    #     debug_print = kwargs.pop('debug_print', True)
-    #     if debug_print:
-    #         print(f'WeightedCorrelationPaginatedPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
-        
-    #     if epoch_slice is not None:
-    #         if debug_print:
-    #             print(f'\tepoch_slice: {epoch_slice}')
-    #         assert len(epoch_slice) == 2
-    #         epoch_start_t, epoch_end_t = epoch_slice # unpack
-    #         if debug_print:
-    #             print(f'\tepoch_start_t: {epoch_start_t}, epoch_end_t: {epoch_end_t}')
-    #     else:
-    #         raise NotImplementedError(f'epoch_slice is REQUIRED to index into the wcorr_data dict, but is None!')
-        
-    #     raise NotImplementedError(f"inheriting classes should be overriding this method!")
-
-    #     if debug_print:
-    #         print(f'\t success!')
-    #     return params, plots_data, plots, ui
-
 
 
 

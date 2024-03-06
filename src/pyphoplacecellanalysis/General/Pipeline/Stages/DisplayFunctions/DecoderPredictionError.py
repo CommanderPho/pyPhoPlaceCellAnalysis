@@ -1063,11 +1063,6 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
 
         
-        Data:
-            plots_data.weighted_corr_data
-        Plots:
-            plots['weighted_corr']
-
         """
         from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
         # line_alpha = 0.2  # Faint line
@@ -1085,7 +1080,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         should_enable_radon_transform_info: bool = params.enable_radon_transform_info
 
         if debug_print:
-            print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
+            print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
         
         # Add replay score text to top-right corner:
         final_text =  plots_data.radon_transform_data[data_idx].build_display_text()
@@ -1099,24 +1094,33 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             # Let's assume we want to remove the 'Quadratic' line (line2)
             if extant_line is not None:
                 extant_line.remove()
-            # if extant_score_text is not None:
-            #     extant_score_text.remove()
-
+            extant_line = None
+            if extant_score_text is not None:
+                extant_score_text.remove()
+            extant_score_text = None
             # Is .clear() needed? Why doesn't it remove the heatmap as well?
             # curr_ax.clear()
+            pass
 
 
         ## Plot the line plot. Could update this like I did for the text?        
         if should_enable_radon_transform_info:
             ## Perform plotting of the radon transform lines:
-            radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
+            if extant_line is not None:
+                # extant_line.remove()
+                if extant_line.axes is None:
+                    # Re-add the line to the axis if necessary
+                    curr_ax.add_artist(extant_line)
             
-            # Assume new_time_bins and new_radon_transform_data are defined and contain your new data.
-            radon_transform_plot.set_data(new_time_bins, new_radon_transform_data)
-
-
+                extant_line.set_data(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y)
+                radon_transform_plot = extant_line
+            else:
+                radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
+            
         else:
             ## Remove the existing one
+            if extant_line is not None:
+                extant_line.remove()
             radon_transform_plot = None
 
         if (extant_score_text is not None):
@@ -1175,8 +1179,10 @@ class WeightedCorrelationPlotData:
     P_decoder_text: str = field(default='')
     pearson_r_text: str = field(default='')
 
+    should_include_epoch_times: bool = field(default=False)
+
     @classmethod
-    def init_from_df_columns(cls, epoch_start, epoch_end, epoch_wcorr, epoch_P_decoder, pearson_r) -> "WeightedCorrelationPlotData":
+    def init_from_df_columns(cls, epoch_start, epoch_end, epoch_wcorr, epoch_P_decoder, pearson_r, should_include_epoch_times=False) -> "WeightedCorrelationPlotData":
         """ TODO: make general """
         with np.printoptions(precision=3, suppress=True, threshold=5):
             default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
@@ -1186,22 +1192,24 @@ class WeightedCorrelationPlotData:
             P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
             if pearson_r is not None:
                 pearson_r_text = f"pearsonr: " + str(np.array([pearson_r])).lstrip("[").rstrip("]")
-            return cls(start_t_text=start_t_text, stop_t_text=stop_t_text, wcorr_text=wcorr_text, P_decoder_text=P_decoder_text, pearson_r_text=pearson_r_text)
+            return cls(start_t_text=start_t_text, stop_t_text=stop_t_text, wcorr_text=wcorr_text, P_decoder_text=P_decoder_text, pearson_r_text=pearson_r_text, should_include_epoch_times=should_include_epoch_times)
 
 
     def build_display_text(self) -> str:
         """ builds the final display string to be rendered in the label. """
-        final_text: str = f"[{self.start_t_text}, {self.stop_t_text}]"
+        final_text_arr = []
+        if self.should_include_epoch_times:
+            final_text_arr.append(f"[{self.start_t_text}, {self.stop_t_text}]")
         if len(self.wcorr_text) > 0:
             ## Add the P_decoder line:
-            final_text = f"{final_text}\n{self.wcorr_text}"
+            final_text_arr.append(f"{self.wcorr_text}")
         if len(self.P_decoder_text) > 0:
             ## Add the P_decoder line:
-            final_text = f"{final_text}\n{self.P_decoder_text}"
+            final_text_arr.append(f"{self.P_decoder_text}")
         if len(self.pearson_r_text) > 0:
             ## Add the P_decoder line:
-            final_text = f"{final_text}\n{self.pearson_r_text}"
-        return final_text
+            final_text_arr.append(f"{self.pearson_r_text}")
+        return "\n".join(final_text_arr)
     
 
 # @define(slots=False, repr=False)

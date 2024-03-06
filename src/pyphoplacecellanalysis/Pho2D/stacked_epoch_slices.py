@@ -976,7 +976,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`
         if self.params.debug_print:
-            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.on_jump_to_page(page_idx: {page_idx})') # for page_idx == max_index this is called but doesn't continue
+            self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.on_jump_to_page(page_idx: {page_idx}): {self.params.name}') # for page_idx == max_index this is called but doesn't continue
         included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=page_idx)
         if self.params.debug_print:
             self.ui.print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
@@ -1017,7 +1017,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 ## Perform callback here:
                 on_render_page_callbacks = self.params.get('on_render_page_callbacks', {})
                 if self.params.debug_print:
-                    self.ui.print(f'performing on_render_page_callbacks ({len(on_render_page_callbacks)} callbacks):')
+                    self.ui.print(f'{self.params.name}: performing on_render_page_callbacks ({len(on_render_page_callbacks)} callbacks):')
                 for a_callback_name, a_callback in on_render_page_callbacks.items():
                     if self.params.debug_print:
                         self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}')
@@ -1608,13 +1608,16 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             raise NotImplementedError(f"epoch_type_name: {epoch_type_name}")
 
         # Build Radon Transforms and add them:
-        radon_transform_epochs_data_dict = RadonTransformPlotDataProvider.decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=deepcopy(decoder_decoded_epochs_result_dict))
-        if radon_transform_epochs_data_dict is not None:
-            ## Add the radon_transform_lines to each of the four figures:
-            for a_name, a_pagination_controller in self.pagination_controllers.items():
-                if radon_transform_epochs_data_dict[a_name] is not None:
-                    RadonTransformPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, radon_transform_epochs_data_dict[a_name], update_controller_on_apply=False)
-            
+        # radon_transform_epochs_data_dict = RadonTransformPlotDataProvider.decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=deepcopy(decoder_decoded_epochs_result_dict))
+        # if radon_transform_epochs_data_dict is not None:
+        ## Add the radon_transform_lines to each of the four figures:
+        for a_name, a_pagination_controller in self.pagination_controllers.items():
+            a_radon_transform_epochs_data = RadonTransformPlotDataProvider.decoder_build_single_radon_transform_data(deepcopy(decoder_decoded_epochs_result_dict[a_name]))
+            # if radon_transform_epochs_data_dict[a_name] is not None:
+            #     RadonTransformPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, radon_transform_epochs_data_dict[a_name], update_controller_on_apply=False)
+            if a_radon_transform_epochs_data is not None:
+                RadonTransformPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, a_radon_transform_epochs_data, update_controller_on_apply=False)
+
 
         # Build Weighted Correlation Data Info and add them:    
         wcorr_epochs_data_dict = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_weighted_correlation_data_dict(track_templates, decoder_decoded_epochs_result_dict=deepcopy(decoder_decoded_epochs_result_dict))
