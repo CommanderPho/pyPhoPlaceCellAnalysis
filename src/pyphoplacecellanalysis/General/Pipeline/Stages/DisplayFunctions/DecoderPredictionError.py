@@ -1459,7 +1459,7 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
     ## add or update this callback:
     if enable_radon_transform_info:
-        _out_pagination_controller.params.on_render_page_callbacks['plot_radon_transform_line_data'] = RadonTransformPlotDataProvider._callback_update_decoded_single_epoch_slice_plot
+        _out_pagination_controller.params.on_render_page_callbacks['plot_radon_transform_line_data'] = RadonTransformPlotDataProvider._callback_update_curr_single_epoch_slice_plot
     
     # Trigger the update
     _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
