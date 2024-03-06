@@ -1446,20 +1446,26 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         
         radon_transform_data = RadonTransformPlotDataProvider._subfn_build_radon_transform_plotting_data(active_filter_epochs_df=active_filter_epochs_df,
                 num_filter_epochs = num_filter_epochs, time_bin_containers = time_bin_containers, radon_transform_column_names=['score', 'velocity', 'intercept', 'speed'])
-        _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data        
+        # _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data        
+        RadonTransformPlotDataProvider.add_data_to_pagination_controller(_out_pagination_controller, radon_transform_data, update_controller_on_apply=False)
 
     else:
         # radon transform info disabled:
         _out_pagination_controller.plots_data.radon_transform_data = {}
         _out_pagination_controller.plots['radon_transform'] = {}
 
+
+    # WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, wcorr_epochs_data_dict[a_name], update_controller_on_apply=False)
+
     # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
-    on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
-    if on_render_page_callbacks is None:
-        _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
-    ## add or update this callback:
-    if enable_radon_transform_info:
-        _out_pagination_controller.params.on_render_page_callbacks['plot_radon_transform_line_data'] = RadonTransformPlotDataProvider._callback_update_curr_single_epoch_slice_plot
+    # on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
+    # if on_render_page_callbacks is None:
+    #     _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
+    # ## add or update this callback:
+    # if enable_radon_transform_info:
+    #     _out_pagination_controller.params.on_render_page_callbacks['plot_radon_transform_line_data'] = RadonTransformPlotDataProvider._callback_update_curr_single_epoch_slice_plot
+    
+
     
     # Trigger the update
     _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
