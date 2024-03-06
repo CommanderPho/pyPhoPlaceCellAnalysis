@@ -22,7 +22,7 @@ import pandas as pd
 from copy import deepcopy
 from attrs import define, field, Factory
 import shutil # copy_files_in_filelist_to_dest
-from pyphocorehelpers.print_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import CapturedException
 import tables as tb
 from tables import (
     Group, Int8Col, Int16Col, Int32Col, Int64Col, NoSuchNodeError,

@@ -11,7 +11,7 @@ from attr import define, field, Factory
 
 from neuropy.core import Epoch
 from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
-from pyphocorehelpers.print_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import CapturedException
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
 from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations

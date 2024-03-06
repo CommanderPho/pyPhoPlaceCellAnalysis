@@ -17,7 +17,7 @@ from neuropy.utils.misc import compute_paginated_grid_config # for paginating sh
 # pyphocorehelpers
 
 from pyphocorehelpers.function_helpers import function_attributes
-from pyphocorehelpers.print_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import CapturedException
 
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator

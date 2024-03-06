@@ -1039,7 +1039,7 @@ class BatchResultDataframeAccessor():
         return good_only_batch_progress_df, batch_progress_df
 
 
-from pyphocorehelpers.print_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import CapturedException
 
 
 # ==================================================================================================================== #

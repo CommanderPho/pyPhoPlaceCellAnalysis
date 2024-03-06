@@ -29,6 +29,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
@@ -1020,15 +1021,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 for a_callback_name, a_callback in on_render_page_callbacks.items():
                     if self.params.debug_print:
                         self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}')
-                    try:
+                    with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}: exception: {formatted_exception_str}'))):
                         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idx, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print, epoch_slice=curr_epoch_slice, curr_time_bin_container=curr_time_bin_container)
                         if self.params.debug_print:
                             self.ui.print(f'\t\tcallback with name: "{a_callback_name}" complete.')
-                    except Exception as e:
-                        self.ui.print(f'\t\t WARNING: encountered exception in callback with name {a_callback_name} for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}: exception: {e}')
-                        # raise e
-                        # raise UserWarning(e)
-                        ## Continue...
+                    
                     
                 curr_ax.set_xlim(*curr_epoch_slice)
                 curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
@@ -1158,14 +1155,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         for a_callback_name, a_callback in on_middle_click_item_callbacks.items():
             if self.params.debug_print:
                 self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}')
-            try:
+
+            with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}"  for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {formatted_exception_str}'))):        
                 a_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time)
-            except Exception as e:
-                self.ui.print(f'\t\t encountered exception in callback with name {a_callback_name} for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {e}')
-                # raise e
-                raise UserWarning(e)
-                ## Continue...
-            
+
 
 
     def on_secondary_click(self, event, clicked_ax=None, clicked_data_index=None):

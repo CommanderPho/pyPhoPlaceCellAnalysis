@@ -39,7 +39,7 @@ import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _wrap_multi_context_computation_function
 
-from pyphocorehelpers.print_helpers import CapturedException # used in _execute_computation_functions for error handling
+from pyphocorehelpers.exception_helpers import CapturedException # used in _execute_computation_functions for error handling
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 

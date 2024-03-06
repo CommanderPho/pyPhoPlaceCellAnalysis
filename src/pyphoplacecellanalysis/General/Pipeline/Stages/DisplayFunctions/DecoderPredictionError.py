@@ -21,7 +21,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 from pyphocorehelpers.indexing_helpers import interleave_elements
-
+from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
@@ -718,11 +718,9 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
         params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
         on_render_page_callbacks = params.get('on_render_page_callbacks', {})
         for a_callback_name, a_callback in on_render_page_callbacks.items():
-            try:
+            with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\t encountered exception in callback "{a_callback_name}": {formatted_exception_str}'))):
                 params, plots_data, plots, ui = a_callback(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
-            except Exception as e:
-                print(f'\t encountered exception in callback: {e}')
-                pass            
+
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','matplotlib'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view', '_subfn_update_decoded_epoch_slices'], used_by=['_display_plot_decoded_epoch_slices', 'DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data'], creation_date='2023-05-08 16:31', related_items=[])
@@ -1111,7 +1109,12 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         ## Plot the line plot. Could update this like I did for the text?        
         if should_enable_radon_transform_info:
             ## Perform plotting of the radon transform lines:
-            radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs)
+            radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
+            
+            # Assume new_time_bins and new_radon_transform_data are defined and contain your new data.
+            radon_transform_plot.set_data(new_time_bins, new_radon_transform_data)
+
+
         else:
             ## Remove the existing one
             radon_transform_plot = None
@@ -1214,7 +1217,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPlotter
     """
-    # callback_identifier_string: str = 'plot_radon_transform_line_data'
     callback_identifier_string: str = 'plot_wcorr_data'
     plots_group_identifier_key: str = 'weighted_corr' # _out_pagination_controller.plots['weighted_corr']
     plots_group_data_identifier_key: str = 'weighted_corr_data'
@@ -1471,47 +1473,6 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     # _tmp_out_selections = paginated_multi_decoder_decoded_epochs_window.restore_selections_from_user_annotations()
 
     ### 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
-    # if enable_radon_transform_info:
-    #     # `active_filter_epochs_df` native columns approach
-    #     active_filter_epochs_df = curr_results_obj.active_filter_epochs.to_dataframe().copy()
-    #     assert np.isin(['score', 'velocity', 'intercept', 'speed'], active_filter_epochs_df.columns).all()
-    #     epochs_linear_fit_df = active_filter_epochs_df[['score', 'velocity', 'intercept', 'speed']].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
-
-    #     # epochs_linear_fit_df approach
-    #     assert curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
-
-    #     _out_pagination_controller.plots_data.radon_transform_data = {}
-    #     _out_pagination_controller.plots['radon_transform'] = {}
-
-    #     num_filter_epochs:int = curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs # curr_results_obj.num_filter_epochs
-    #     try:
-    #         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
-    #     except AttributeError as e:
-    #         # AttributeError: 'LeaveOneOutDecodingAnalysisResult' object has no attribute 'time_bin_containers' is expected when `curr_results_obj: LeaveOneOutDecodingAnalysisResult - for Long/Short plotting`
-    #         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers) # for curr_results_obj: LeaveOneOutDecodingAnalysisResult - for Long/Short plotting
-        
-    #     radon_transform_data = RadonTransformPlotDataProvider._subfn_build_radon_transform_plotting_data(active_filter_epochs_df=active_filter_epochs_df,
-    #             num_filter_epochs = num_filter_epochs, time_bin_containers = time_bin_containers, radon_transform_column_names=['score', 'velocity', 'intercept', 'speed'])
-    #     # _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data        
-    #     RadonTransformPlotDataProvider.add_data_to_pagination_controller(_out_pagination_controller, radon_transform_data, update_controller_on_apply=False)
-
-    # else:
-    #     # radon transform info disabled:
-    #     _out_pagination_controller.plots_data.radon_transform_data = {}
-    #     _out_pagination_controller.plots['radon_transform'] = {}
-
-
-    # WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, wcorr_epochs_data_dict[a_name], update_controller_on_apply=False)
-
-    # .params.on_render_page_callbacks: a dict of callbacks to be called when the page changes and needs to be re-rendered
-    # on_render_page_callbacks = _out_pagination_controller.params.get('on_render_page_callbacks', None)
-    # if on_render_page_callbacks is None:
-    #     _out_pagination_controller.params.on_render_page_callbacks = {} # allocate a new list
-    # ## add or update this callback:
-    # if enable_radon_transform_info:
-    #     _out_pagination_controller.params.on_render_page_callbacks['plot_radon_transform_line_data'] = RadonTransformPlotDataProvider._callback_update_curr_single_epoch_slice_plot
-    
-
 
     # Trigger the update
     _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
