@@ -321,22 +321,31 @@ class PaginatedFigureBaseController:
 
 
     def _subfn_clear_selectability_rects(self):
+        from matplotlib.widgets import Widget
+        import matplotlib.artist as martist
         print(f'_subfn_clear_selectability_rects(): removing...')
-        for k, an_artist_dict in self.plots.selection_artists_dict.items():
-            if an_artist_dict is not None:
-                for sub_k, an_artist in an_artist_dict.items():
-                    if an_artist is not None:
-                        try:
-                            an_artist.remove()
-                        except Exception as e:
-                            print(f'exception {e}')
-                            for an_artist_part in an_artist:
+        for an_ax, a_selection_artists in self.plots.selection_artists_dict.items():
+            if a_selection_artists is not None:
+                for sub_k, a_renderable in a_selection_artists.items():
+                    if a_renderable is not None:
+                        if isinstance(a_renderable, martist.Artist):
+                            a_renderable.remove()
+                        elif isinstance(a_renderable, Widget):
+                            # Widget removal mechanism.
+                            for child in a_renderable.ax.get_children():
+                                child.remove()
+                            a_renderable.disconnect_events()
+                        elif isinstance(a_renderable, (list, tuple)) and all(isinstance(item, martist.Artist) for item in a_renderable):
+                            for an_artist_part in a_renderable:
                                 if an_artist_part is not None:
                                     an_artist_part.remove()
+                        else:
+                            raise UserWarning(f"sub_k: {sub_k} -- Neither an artist nor a list of artists")
+                            pass
+
                                                         
         self.plots['selection_artists_dict'] = {}
         del self.plots['selection_artists_dict']
-
 
         # for ax, a_selection_rect in self.plots.selection_rectangles_dict.items():
         #     a_selection_rect.remove()
