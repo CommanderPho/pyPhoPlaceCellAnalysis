@@ -34,7 +34,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow # for PhoPaginatedMultiDecoderDecodedEpochsWindow
-from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
+from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget, PaginationControlWidgetState
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
 from neuropy.core.user_annotations import UserAnnotationsManager # used in `interactive_good_epoch_selections`
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # used in `interactive_good_epoch_selections`, `PhoPaginatedMultiDecoderDecodedEpochsWindow`
@@ -710,10 +710,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         a_widget.setMinimumHeight(new_obj.params.all_plots_height)
         # new_obj.params.scrollability_mode
 
-        ## Add the PaginationControlWidget
-        new_obj._subfn_helper_add_pagination_control_widget(new_obj.plots_data.paginator, new_obj.ui.mw, defer_render=False) # minimum height is 21
-
-
         ## Real setup:
         new_obj.configure()
         new_obj.initialize()
@@ -851,12 +847,13 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         self.ui.print = self.private_print # builtins.print # the print function to use
         if self.params.debug_print:
             self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.configure(**kwargs: {kwargs})')
-        # self.params.debug_print = kwargs.pop('debug_print', False)
-        self._subfn_helper_setup_selectability()
+        
+        ## Add the PaginationControlWidget or setup the PaginationControlWidgetState depending on isPaginatorControlWidgetBackedMode
+        self._helper_setup_pagination_control()
         ## Setup Selectability
+        self._subfn_helper_setup_selectability()
         
         
-
     def initialize(self, **kwargs):
         """ sets up Figures """
         if self.params.debug_print:
@@ -872,8 +869,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         ## 2. Update:
         self.on_jump_to_page(page_idx=0)
-        _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
-        self.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
+        if self.params.setdefault('isPaginatorControlWidgetBackedMode', True):
+            _a_connection = self.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(self.on_paginator_control_widget_jump_to_page) # bind connection
+            self.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
 
         # self._subfn_build_selectibility_rects_if_needed(axs=)
         self.perform_update_selections(defer_render=False)
@@ -1399,6 +1397,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     @property
     def paginator_controller_widget(self) -> PaginationControlWidget:
         """ the widget that goes left and right by pages in the bottom of the left plot. """
+        assert self.params.get('isPaginatorControlWidgetBackedMode', True)
         a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
         paginator_controller_widget = a_controlling_pagination_controller.ui.mw.ui.paginator_controller_widget
         return paginator_controller_widget
@@ -1537,7 +1536,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         # app, root_dockAreaWindow, _out_dock_widgets, dock_configs
 
-
         if not defer_show:
             root_dockAreaWindow.show()
             
@@ -1563,14 +1561,20 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
     ## Add a jump to page function
     def jump_to_page(self, page_idx: int):
-        # updates the embedded pagination widget
-        # self.paginator_controller_widget.programmatically_update_page_idx(page_idx, block_signals=False) # don't block signals and then we don't have to call updates.        
-        self.paginator_controller_widget.programmatically_update_page_idx(page_idx, block_signals=True) # don't block signals and then we don't have to call updates.        
+        if self.params.get('isPaginatorControlWidgetBackedMode', True):
+            # MODE(isPaginatorControlWidgetBackedMode) == True: paginator_controller_widget (PaginationControlWidget) backed-mode (default)
+            # updates the embedded pagination widget
+            # self.paginator_controller_widget.programmatically_update_page_idx(page_idx, block_signals=False) # don't block signals and then we don't have to call updates.
+            self.paginator_controller_widget.programmatically_update_page_idx(page_idx, block_signals=True) # don't block signals and then we don't have to call updates.
+        else:
+            # MODE(isPaginatorControlWidgetBackedMode) == False: Proposed state-backed (PaginationControlWidgetState) mode without `paginator_controller_widget` (2024-03-06)
+            #TODO 2024-03-06 08:16: - [ ] If we add a footer pagination widget to the window we would update it here.
+            pass
+        
+        ## Call programmatically_update_page_idx on the children
         for a_name, a_paginated_controller in self.pagination_controllers.items():
-            # a_paginated_controller.on_paginator_control_widget_jump_to_page(page_idx=page_idx)
-            a_paginated_controller.paginator_controller_widget.programmatically_update_page_idx(updated_page_idx=page_idx, block_signals=False) # should ensure a_paginated_controller.current_page_idx is updated
+            a_paginated_controller.programmatically_update_page_idx(updated_page_idx=page_idx, block_signals=False) # should ensure a_paginated_controller.current_page_idx is updated
             assert (a_paginated_controller.current_page_idx == page_idx), f"a_paginated_controller.current_page_idx: {a_paginated_controller.current_page_idx} does not equal the desired page index: {page_idx}"
-            # on_jump_to_page
             a_paginated_controller.perform_update_selections(defer_render=False) # update selections
 
         self.draw()
@@ -1634,9 +1638,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## Extract params_kwargs
         params_kwargs = kwargs.pop('params_kwargs', {})
-        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True) | params_kwargs
-
-        print(f'params_kwargs: {params_kwargs}')
+        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
+        # print(f'params_kwargs: {params_kwargs}')
 
         decoder_names: List[str] = track_templates.get_decoder_names()
         controlling_pagination_item_name: str = decoder_names[0] # first item # 'long_LR'
@@ -1686,13 +1689,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         for a_controlled_pagination_controller in controlled_pagination_controllers_list:
             # hide the pagination widget:
             a_controlled_widget = a_controlled_pagination_controller.ui.mw # MatplotlibTimeSynchronizedWidget
-            # a_controlled_widget.on_paginator_control_widget_jump_to_page(page_idx=0)
-            # a_connection = a_controlling_pagination_controller.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(a_controlled_pagination_controller.on_paginator_control_widget_jump_to_page) # bind connection
-            a_connection = a_controlling_pagination_controller.paginator_controller_widget.jump_to_page.connect(a_controlled_pagination_controller.paginator_controller_widget.update_page_idx)
 
-            new_connections_dict.append(a_connection)
-            # a_controlled_widget.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
-            a_controlled_widget.ui.paginator_controller_widget.hide()
+            if a_controlled_pagination_controller.params.get('isPaginatorControlWidgetBackedMode', True):
+                # a_controlled_widget.on_paginator_control_widget_jump_to_page(page_idx=0)
+                # a_connection = a_controlling_pagination_controller.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(a_controlled_pagination_controller.on_paginator_control_widget_jump_to_page) # bind connection
+                a_connection = a_controlling_pagination_controller.paginator_controller_widget.jump_to_page.connect(a_controlled_pagination_controller.paginator_controller_widget.update_page_idx)
+                new_connections_dict.append(a_connection)
+                # a_controlled_widget.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
+                a_controlled_widget.ui.paginator_controller_widget.hide()
 
         return new_connections_dict
 

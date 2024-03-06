@@ -235,20 +235,82 @@ class PaginatedFigureBaseController:
 
 
     @property
-    def paginator_controller_widget(self) -> PaginationControlWidget:
-        """ the widget that goes left and right by pages in the bottom of the left plot. """
-        return self.ui.mw.ui.paginator_controller_widget
-    
-    @property
     def plot_widget(self) -> "MatplotlibTimeSynchronizedWidget":
         """ the list of plotting child widgets. """
         return self.ui.mw
 
 
+    # MODE(isPaginatorControlWidgetBackedMode) == True: paginator_controller_widget (PaginationControlWidget) backed-mode (default) __________________________________________________________________ #
+    @property
+    def paginator_controller_widget(self) -> PaginationControlWidget:
+        """ the widget that goes left and right by pages in the bottom of the left plot. """
+        assert self.params.get('isPaginatorControlWidgetBackedMode', True)
+        return self.ui.mw.ui.paginator_controller_widget
+    
+    # MODE(isPaginatorControlWidgetBackedMode) == False: Proposed state-backed (PaginationControlWidgetState) mode without `paginator_controller_widget` (2024-03-06) ______________________________________ #
+    # self isn't QtObject-based so can't emit signals
+    # this section is entirely copied from the interface provided by `PaginationControlWidget` as a compatibility replacement
+
+    def get_total_pages(self) -> int:
+        if self.params.get('isPaginatorControlWidgetBackedMode', True):
+            # MODE(isPaginatorControlWidgetBackedMode) == True: paginator_controller_widget (PaginationControlWidget) backed-mode (default)
+            return self.paginator_controller_widget.get_total_pages()
+        else:
+            # MODE(isPaginatorControlWidgetBackedMode) == False: Proposed state-backed (PaginationControlWidgetState) mode without `paginator_controller_widget` (2024-03-06)
+            return self.pagination_state.n_pages
+
+    @property
+    def pagination_state(self) -> PaginationControlWidgetState:
+        """ Used only when isPaginatorControlWidgetBackedMode == False. The state normally owned by PaginationControlWidget """
+        assert (not self.params.get('isPaginatorControlWidgetBackedMode', False))
+        return self.params.state
+        
+
     @property
     def current_page_idx(self) -> int:
-        """The curr_page_index property."""
-        return self.ui.mw.ui.paginator_controller_widget.current_page_idx
+        """ the 0-based index of the current page. """
+        if self.params.get('isPaginatorControlWidgetBackedMode', True):
+            # MODE(isPaginatorControlWidgetBackedMode) == True: paginator_controller_widget (PaginationControlWidget) backed-mode (default)
+            return self.paginator_controller_widget.current_page_idx
+        else:
+            # MODE(isPaginatorControlWidgetBackedMode) == False: Proposed state-backed (PaginationControlWidgetState) mode without `paginator_controller_widget` (2024-03-06)
+            return self.pagination_state.current_page_idx
+    
+    def go_to_page(self, page_number: int):
+        """ one-based page_number """
+        if self.params.get('isPaginatorControlWidgetBackedMode', True):
+            # MODE(isPaginatorControlWidgetBackedMode) == True: paginator_controller_widget (PaginationControlWidget) backed-mode (default)
+            return self.paginator_controller_widget.go_to_page(page_number)
+        else:
+            # MODE(isPaginatorControlWidgetBackedMode) == False: Proposed state-backed (PaginationControlWidgetState) mode without `paginator_controller_widget` (2024-03-06)
+            if page_number > 0 and page_number <= self.get_total_pages():
+                updated_page_idx = page_number - 1 # convert the page number to a page index
+                self.pagination_state.current_page_idx = updated_page_idx ## update the state
+
+    def update_page_idx(self, updated_page_idx: int):
+        """ this value is safe to bind to. """
+        return self.programmatically_update_page_idx(updated_page_idx=updated_page_idx, block_signals=False)
+
+    def programmatically_update_page_idx(self, updated_page_idx: int, block_signals:bool=False) -> bool:
+        """ Programmatically updates the spinBoxPage with the zero-based page_number 
+        page number (1-based) is always one greater than the page_index (0-based)
+        """
+        updated_page_number = updated_page_idx + 1 # page number (1-based) is always one greater than the page_index (0-based)
+        assert ((updated_page_number > 0) and (updated_page_number <= self.get_total_pages())), f"programmatically_update_page_idx(updated_page_idx: {updated_page_idx}) is invalid! updated_page_number: {updated_page_number}, total_pages: {self.get_total_pages()}"
+        if self.params.get('isPaginatorControlWidgetBackedMode', True):
+            # MODE(isPaginatorControlWidgetBackedMode) == True: paginator_controller_widget (PaginationControlWidget) backed-mode (default)
+            did_change: bool = (self.paginator_controller_widget.current_page_idx != updated_page_idx)
+            self.paginator_controller_widget.programmatically_update_page_idx(updated_page_idx, block_signals=block_signals) # updates the embedded pagination widget
+        else:
+            # MODE(isPaginatorControlWidgetBackedMode) == False: Proposed state-backed (PaginationControlWidgetState) mode without `paginator_controller_widget` (2024-03-06)
+            did_change: bool = (self.pagination_state.current_page_idx != updated_page_idx)
+            self.pagination_state.current_page_idx = updated_page_idx ## update the state
+
+        return did_change
+
+
+    # MODE(isPaginatorControlWidgetBackedMode): Common ___________________________________________________________________ #
+
 
     @property
     def total_number_of_items_to_show(self) -> int:
@@ -275,10 +337,6 @@ class PaginatedFigureBaseController:
 
     def save_selection(self) -> SelectionsObject:
         # active_params_backup: VisualizationParameters = _out_pagination_controller.params
-        # list(_out_pagination_controller.params.keys())
-        # active_params_dict: benedict = benedict(active_params_backup.to_dict())
-        # active_params_dict = active_params_dict.subset(['global_epoch_start_t', 'global_epoch_end_t', 'variable_name', 'active_identifying_figure_ctx', 'flat_all_data_indicies', 'epoch_labels', 'is_selected'])
-        # active_params_dict['is_selected'] = active_params_dict['is_selected'].values() # dump
         active_selections_object = SelectionsObject.init_from_visualization_params(self.params)
         return active_selections_object
 
@@ -557,6 +615,20 @@ class PaginatedFigureBaseController:
         self.ui.mw.draw()
 
 
+    def _helper_setup_pagination_control(self):
+        """ Add the PaginationControlWidget or setup the PaginationControlWidgetState depending on isPaginatorControlWidgetBackedMode. 
+        """
+        ## 
+        isPaginatorControlWidgetBackedMode = self.params.get('isPaginatorControlWidgetBackedMode', None)
+        if isPaginatorControlWidgetBackedMode is None:
+            isPaginatorControlWidgetBackedMode = True
+            self.params.isPaginatorControlWidgetBackedMode = isPaginatorControlWidgetBackedMode
+        
+        if isPaginatorControlWidgetBackedMode:
+            self._subfn_helper_add_pagination_control_widget(self.paginator, self.ui.mw, defer_render=False) # minimum height is 21
+        else:
+            self.params.state = PaginationControlWidgetState(n_pages=self.paginator.num_pages, current_page_idx=0)
+
     # ==================================================================================================================== #
     # Static Methods                                                                                                       #
     # ==================================================================================================================== #
@@ -614,121 +686,6 @@ class PaginatedFigureController(PaginatedFigureBaseController):
 
 
     
-# ==================================================================================================================== #
-# Pagination Data Providers                                                                                            #
-# ==================================================================================================================== #
-
-class PaginatedPlotDataProvider:
-    """ Provides auxillary and optional data to paginated plots, currently of decoded posteriors. 
-
-    from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedPlotDataProvider
-
-    
-    
-    """
-    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
-    provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
-    provided_plots: Dict[str, Any] = {'weighted_corr': {}}
-
-    @classmethod
-    def get_provided_params(cls) -> Dict[str, Any]:
-        return cls.provided_params
-
-    @classmethod
-    def get_provided_plots_data(cls) -> Dict[str, Any]:
-        return cls.provided_plots_data
-    
-    @classmethod
-    def get_provided_plots(cls) -> Dict[str, Any]:
-        return cls.provided_plots
-
-    @classmethod
-    def get_provided_callbacks(cls) -> Dict[str, Dict]:
-        """ override """
-        return {'on_render_page_callbacks': 
-                {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
-        }
-
-
-    @classmethod
-    def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
-        """ should be general I think.
-
-        Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
-
-        Uses: cls.provided_params
-
-        """
-        ## Add the .params:
-        for a_key, a_value in cls.provided_params.items():
-            if not a_pagination_controller.params.has_attr(a_key):
-                a_pagination_controller.params[a_key] = a_value
-
-        ## Add the .plots_data:
-        assert len(provided_data) == 1
-        # weighted_corr_data = provided_data[1]
-        assert len(provided_data) == len(cls.provided_plots_data), f"len(provided_data): {len(provided_data)} != len(cls.provided_plots_data): {len(cls.provided_plots_data)}"
-        active_plots_data = {k:(provided_data[i] or default_class_value) for i, (k, default_class_value) in enumerate(cls.provided_plots_data.items())}
-
-        for a_key, a_value in active_plots_data.items():
-            a_pagination_controller.plots_data[a_key] = a_value
-
-        ## Add the .plots:
-        for a_key, a_value in cls.provided_plots.items():
-            a_pagination_controller.plots[a_key] = a_value
-
-        ## Add the callbacks
-        for a_callback_type, a_callback_dict in cls.get_provided_callbacks().items():
-            # a_callback_type: like 'on_render_page_callbacks'
-            pagination_controller_callbacks_dict = a_pagination_controller.params.get(a_callback_type, None)
-            if pagination_controller_callbacks_dict is None:
-                a_pagination_controller.params[a_callback_type] = {} # allocate a new dict to hold callbacks
-            # register the specific callbacks of this type:
-            for a_callback_id, a_callback_fn in a_callback_dict.items():
-                a_pagination_controller.params[a_callback_type][a_callback_id] = a_callback_fn
-
-        # Trigger the update
-        if update_controller_on_apply:
-            a_pagination_controller.on_paginator_control_widget_jump_to_page(0)
-        
-
-    # @classmethod
-    # def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer",
-    #                                                    data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
-    #     """ 
-    #     Called with:
-
-    #         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
-
-    #     Data:
-    #         plots_data.weighted_corr_data
-    #     Plots:
-    #         plots['weighted_corr']
-
-    #     """
-    #     from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
-    #     from matplotlib.offsetbox import AnchoredText
-
-    #     debug_print = kwargs.pop('debug_print', True)
-    #     if debug_print:
-    #         print(f'WeightedCorrelationPaginatedPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
-        
-    #     if epoch_slice is not None:
-    #         if debug_print:
-    #             print(f'\tepoch_slice: {epoch_slice}')
-    #         assert len(epoch_slice) == 2
-    #         epoch_start_t, epoch_end_t = epoch_slice # unpack
-    #         if debug_print:
-    #             print(f'\tepoch_start_t: {epoch_start_t}, epoch_end_t: {epoch_end_t}')
-    #     else:
-    #         raise NotImplementedError(f'epoch_slice is REQUIRED to index into the wcorr_data dict, but is None!')
-        
-    #     raise NotImplementedError(f"inheriting classes should be overriding this method!")
-
-    #     if debug_print:
-    #         print(f'\t success!')
-    #     return params, plots_data, plots, ui
-
 
 
 
