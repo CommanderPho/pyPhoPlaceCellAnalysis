@@ -978,6 +978,23 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         return radon_transform_data
 
+
+    @classmethod
+    def decoder_build_single_radon_transform_data(cls, curr_results_obj):
+        """ builds for a single decoder. """
+        curr_radon_transform_column_names: List[str] = ['score', 'velocity', 'intercept', 'speed']
+        num_filter_epochs:int = curr_results_obj.num_filter_epochs
+        time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
+        active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
+        if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
+            active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
+
+        return cls._subfn_build_radon_transform_plotting_data(active_filter_epochs_df=active_filter_epochs_df.copy(),
+                                                                    num_filter_epochs=num_filter_epochs, time_bin_containers=time_bin_containers,
+                                                                    radon_transform_column_names=curr_radon_transform_column_names)
+            
+    
+
     @classmethod
     def decoder_build_radon_transform_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
         """ builds the Radon Transform data for each of the four decoders. 
@@ -1218,6 +1235,39 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                 {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
         }
         
+
+    @classmethod
+    def decoder_build_single_weighted_correlation_data(cls, curr_results_obj):
+        """ builds for a single decoder. 
+        Usage:
+
+        """
+        def _subfn_wcorr_data_build(active_filter_epochs_df: pd.DataFrame):
+            num_filter_epochs = np.shape(active_filter_epochs_df)[0]
+            wcorr_col_name: str = 'wcorr'
+            P_decoder_col_name: str = 'P_decoder'
+            pearson_r_col_name: str = 'pearsonr'
+            wcorr_data = {}
+            
+            df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
+           
+            for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
+                ## NOTE: uses a_tuple.start as the index in to the data dict:
+                wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
+
+            return wcorr_data
+
+
+        # curr_results_obj 
+        active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
+        if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
+            active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
+
+        wcorr_data = _subfn_wcorr_data_build(active_filter_epochs_df=active_filter_epochs_df.copy())
+
+        return wcorr_data
+
+
     @classmethod
     def decoder_build_weighted_correlation_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
         """ builds the Radon Transform data for each of the four decoders. 
@@ -1237,29 +1287,11 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             wcorr_data = {}
             
             df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
-
-            # default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
-            
-            # printed_df_column_names = ['start', 'stop', 'wcorr', 'P_decoder', 'pearsonr']
-            # df_value_formatting_fns = [default_float_formatting_fn, default_float_formatting_fn, default_float_formatting_fn, default_float_formatting_fn, default_float_formatting_fn]
-            # df_value_formatting_dict = dict(zip(printed_df_column_names, df_value_formatting_fns))
-                                            
+           
             for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
-                # print(f"a_tuple.start: {a_tuple.start}, a_tuple.stop: {a_tuple.stop}")
-                # formatted_values = {a_col:a_fn(a_tuple[a_col]) for a_col, a_fn in df_value_formatting_dict.items()}
-                # print(f'formatted_values')
-                # df_value_formatting_dict
                 ## NOTE: uses a_tuple.start as the index in to the data dict:
                 wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
 
-
-            # for epoch_idx, epoch_wcorr, epoch_P_decoder, epoch_pearsonr in zip(np.arange(num_filter_epochs), active_filter_epochs_df[wcorr_col_name].values, active_filter_epochs_df[P_decoder_col_name].values, active_filter_epochs_df[pearson_r_col_name].values):
-            #     # with np.printoptions(precision=3, suppress=True, threshold=5):
-            #     #     wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
-            #     #     P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
-            #     # wcorr_data[epoch_idx] = WeightedCorrelationPlotData(wcorr_text=wcorr_text, P_decoder_text=P_decoder_text)
-            #     wcorr_data[epoch_idx] = WeightedCorrelationPlotData.init_from_df_columns(epoch_wcorr, epoch_P_decoder, epoch_pearsonr)
-                
             return wcorr_data
 
         from pyphocorehelpers.indexing_helpers import NumpyHelpers
@@ -1421,38 +1453,43 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     
     # active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
     _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(curr_results_obj.active_filter_epochs, curr_results_obj.all_included_filter_epochs_decoder_result, 
-        xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name=controller_name, active_context=display_context,  max_subplots_per_page=max_subplots_per_page, included_epoch_indicies=included_epoch_indicies, **kwargs) # 10
+            xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name=controller_name, active_context=display_context,
+            max_subplots_per_page=max_subplots_per_page, included_epoch_indicies=included_epoch_indicies, params_kwargs=params_kwargs, **kwargs) # 10
     # _out_pagination_controller
 
+
+    _out_pagination_controller.add_data_overlays(curr_results_obj)
+    # _tmp_out_selections = paginated_multi_decoder_decoded_epochs_window.restore_selections_from_user_annotations()
+
     ### 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
-    if enable_radon_transform_info:
-        # `active_filter_epochs_df` native columns approach
-        active_filter_epochs_df = curr_results_obj.active_filter_epochs.to_dataframe().copy()
-        assert np.isin(['score', 'velocity', 'intercept', 'speed'], active_filter_epochs_df.columns).all()
-        epochs_linear_fit_df = active_filter_epochs_df[['score', 'velocity', 'intercept', 'speed']].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
+    # if enable_radon_transform_info:
+    #     # `active_filter_epochs_df` native columns approach
+    #     active_filter_epochs_df = curr_results_obj.active_filter_epochs.to_dataframe().copy()
+    #     assert np.isin(['score', 'velocity', 'intercept', 'speed'], active_filter_epochs_df.columns).all()
+    #     epochs_linear_fit_df = active_filter_epochs_df[['score', 'velocity', 'intercept', 'speed']].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
 
-        # epochs_linear_fit_df approach
-        assert curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
+    #     # epochs_linear_fit_df approach
+    #     assert curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
 
-        _out_pagination_controller.plots_data.radon_transform_data = {}
-        _out_pagination_controller.plots['radon_transform'] = {}
+    #     _out_pagination_controller.plots_data.radon_transform_data = {}
+    #     _out_pagination_controller.plots['radon_transform'] = {}
 
-        num_filter_epochs:int = curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs # curr_results_obj.num_filter_epochs
-        try:
-            time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
-        except AttributeError as e:
-            # AttributeError: 'LeaveOneOutDecodingAnalysisResult' object has no attribute 'time_bin_containers' is expected when `curr_results_obj: LeaveOneOutDecodingAnalysisResult - for Long/Short plotting`
-            time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers) # for curr_results_obj: LeaveOneOutDecodingAnalysisResult - for Long/Short plotting
+    #     num_filter_epochs:int = curr_results_obj.all_included_filter_epochs_decoder_result.num_filter_epochs # curr_results_obj.num_filter_epochs
+    #     try:
+    #         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
+    #     except AttributeError as e:
+    #         # AttributeError: 'LeaveOneOutDecodingAnalysisResult' object has no attribute 'time_bin_containers' is expected when `curr_results_obj: LeaveOneOutDecodingAnalysisResult - for Long/Short plotting`
+    #         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers) # for curr_results_obj: LeaveOneOutDecodingAnalysisResult - for Long/Short plotting
         
-        radon_transform_data = RadonTransformPlotDataProvider._subfn_build_radon_transform_plotting_data(active_filter_epochs_df=active_filter_epochs_df,
-                num_filter_epochs = num_filter_epochs, time_bin_containers = time_bin_containers, radon_transform_column_names=['score', 'velocity', 'intercept', 'speed'])
-        # _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data        
-        RadonTransformPlotDataProvider.add_data_to_pagination_controller(_out_pagination_controller, radon_transform_data, update_controller_on_apply=False)
+    #     radon_transform_data = RadonTransformPlotDataProvider._subfn_build_radon_transform_plotting_data(active_filter_epochs_df=active_filter_epochs_df,
+    #             num_filter_epochs = num_filter_epochs, time_bin_containers = time_bin_containers, radon_transform_column_names=['score', 'velocity', 'intercept', 'speed'])
+    #     # _out_pagination_controller.plots_data.radon_transform_data = radon_transform_data        
+    #     RadonTransformPlotDataProvider.add_data_to_pagination_controller(_out_pagination_controller, radon_transform_data, update_controller_on_apply=False)
 
-    else:
-        # radon transform info disabled:
-        _out_pagination_controller.plots_data.radon_transform_data = {}
-        _out_pagination_controller.plots['radon_transform'] = {}
+    # else:
+    #     # radon transform info disabled:
+    #     _out_pagination_controller.plots_data.radon_transform_data = {}
+    #     _out_pagination_controller.plots['radon_transform'] = {}
 
 
     # WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, wcorr_epochs_data_dict[a_name], update_controller_on_apply=False)
@@ -1466,7 +1503,7 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     #     _out_pagination_controller.params.on_render_page_callbacks['plot_radon_transform_line_data'] = RadonTransformPlotDataProvider._callback_update_curr_single_epoch_slice_plot
     
 
-    
+
     # Trigger the update
     _out_pagination_controller.on_paginator_control_widget_jump_to_page(0)
 
