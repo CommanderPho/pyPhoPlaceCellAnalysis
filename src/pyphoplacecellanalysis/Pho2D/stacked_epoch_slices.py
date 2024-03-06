@@ -1922,6 +1922,63 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
 
 
+
+    # def export_all_pages(self, curr_active_pipeline):
+    #     """ exports each pages single-decoder figures separately
+
+    #     Usage:
+    #         export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
+
+    #     """
+                
+    # a_paginator = a_pagination_controller.paginator
+    # total_num_pages = int(a_paginator.num_pages)
+    # page_idx_sweep = np.arange(total_num_pages)
+    # page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
+    # # page_num_sweep
+
+    # for a_page_idx, a_page_num in zip(page_idx_sweep, page_num_sweep):
+    #     print(f'switching to page: a_page_idx: {a_page_idx}, a_page_num: {a_page_num} of total_num_pages: {total_num_pages}')
+    #     a_pagination_controller.on_paginator_control_widget_jump_to_page(page_idx=a_page_idx)
+    #     a_pagination_controller.ui.mw.draw()
+    #     export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
+
+
+    #     import matplotlib as mpl
+
+    #     pagination_controller_dict = self.pagination_controllers
+
+    #     page_idx_sweep = np.arange(total_num_pages)
+    #     page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
+        
+    #     # paginator_dict = {a_name:a_pagination_controller.paginator for a_name, a_pagination_controller in pagination_controller_dict.items()}
+
+    #     for a_name, a_pagination_controller in pagination_controller_dict.items():
+    #         display_context = a_pagination_controller.params.get('active_identifying_figure_ctx', IdentifyingContext())
+
+    #         # Get context for current page of items:
+    #         current_page_idx: int = int(a_pagination_controller.current_page_idx)
+    #         a_paginator = a_pagination_controller.paginator
+    #         total_num_pages = int(a_paginator.num_pages)
+    #         page_context = display_context.overwriting_context(page=current_page_idx, num_pages=total_num_pages)
+    #         self.ui.print(page_context)
+
+    #         page_idx_sweep = np.arange(total_num_pages)
+    #         page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
+            
+
+    #         ## Get the figure/axes:
+    #         a_plots = a_pagination_controller.plots # RenderPlots
+    #         a_params = a_pagination_controller.params
+            
+    #         # with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+    #         with mpl.rc_context({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+    #             figs = a_plots.fig
+    #             axs = a_plots.axs
+    #             curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
+
+
+
     # ==================================================================================================================== #
     # MatplotlibTimeSynchronizedWidget Wrappers                                                                            #
     # ==================================================================================================================== #
