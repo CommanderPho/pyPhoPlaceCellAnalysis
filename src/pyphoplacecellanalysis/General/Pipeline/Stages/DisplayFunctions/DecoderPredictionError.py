@@ -873,6 +873,14 @@ class RadonTransformPlotData:
     intercept_text: str = field(default='')
     extra_text: Optional[str] = field(default=None)
 
+    def build_display_text(self) -> str:
+        """ builds the final display string to be rendered in the label. """
+        final_text = f"{self.score_text}\n{self.speed_text}\n{self.intercept_text}"
+        if (self.extra_text is not None) and (len(self.extra_text) > 0):
+            final_text = f"{final_text}\n{self.extra_text}"
+        return final_text
+    
+
 
 # @define(slots=False, repr=False)
 class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
@@ -1080,19 +1088,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         if debug_print:
             print(f'_callback_update_wcorr_decoded_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
-            
-        # if debug_print:
-        #     if epoch_slice is not None:
-        #         print(f'\tepoch_slice: {epoch_slice}')
-
-        #     if curr_time_bin_container is not None:
-        #         print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
-
+        
         # Add replay score text to top-right corner:
-        final_text = f"{plots_data.radon_transform_data[data_idx].score_text}\n{plots_data.radon_transform_data[data_idx].speed_text}\n{plots_data.radon_transform_data[data_idx].intercept_text}"
-        if plots_data.radon_transform_data[data_idx].extra_text is not None:
-            final_text = f"{final_text}\n{plots_data.radon_transform_data[data_idx].extra_text}"
-            
+        final_text =  plots_data.radon_transform_data[data_idx].build_display_text()
 
         extant_plots = plots[cls.plots_group_identifier_key].get(data_idx, {})
         extant_line = extant_plots.get('line', None)
