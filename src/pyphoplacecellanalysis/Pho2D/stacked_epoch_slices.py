@@ -1397,11 +1397,17 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     @property
     def paginator_controller_widget(self) -> PaginationControlWidget:
         """ the widget that goes left and right by pages in the bottom of the left plot. """
-        assert self.params.get('isPaginatorControlWidgetBackedMode', True)
+        assert self.isPaginatorControlWidgetBackedMode
         a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
         paginator_controller_widget = a_controlling_pagination_controller.ui.mw.ui.paginator_controller_widget
         return paginator_controller_widget
     
+    @property
+    def isPaginatorControlWidgetBackedMode(self) -> bool:
+        """ whether it's isPaginatorControlWidgetBackedMode """
+        a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
+        return a_controlling_pagination_controller.params.isPaginatorControlWidgetBackedMode
+        
 
     @property
     def paginated_widgets(self) -> Dict[str, MatplotlibTimeSynchronizedWidget]:
@@ -1561,7 +1567,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
     ## Add a jump to page function
     def jump_to_page(self, page_idx: int):
-        if self.params.get('isPaginatorControlWidgetBackedMode', True):
+        if self.isPaginatorControlWidgetBackedMode:
             # MODE(isPaginatorControlWidgetBackedMode) == True: paginator_controller_widget (PaginationControlWidget) backed-mode (default)
             # updates the embedded pagination widget
             # self.paginator_controller_widget.programmatically_update_page_idx(page_idx, block_signals=False) # don't block signals and then we don't have to call updates.
