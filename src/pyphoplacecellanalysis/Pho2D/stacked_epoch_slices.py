@@ -967,13 +967,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # a_pagination_controller.params.on_middle_click_item_callbacks['an_alt_clicked_epoch_callback'] = an_alt_clicked_epoch_callback
 
 
-
-
     def on_jump_to_page(self, page_idx: int):
-        """ Update: made to depend on self 
+        """ Called when the page index is changed to update the figure
         
         Performs `self.params.on_render_page_callbacks`
-
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # used in `plot_decoded_epoch_slices`

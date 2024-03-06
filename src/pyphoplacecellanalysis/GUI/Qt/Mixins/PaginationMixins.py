@@ -1,3 +1,4 @@
+from logging import warning
 from typing import Any, Dict
 import numpy as np
 from nptyping import NDArray
@@ -305,6 +306,9 @@ class PaginatedFigureBaseController:
             # MODE(isPaginatorControlWidgetBackedMode) == False: Proposed state-backed (PaginationControlWidgetState) mode without `paginator_controller_widget` (2024-03-06)
             did_change: bool = (self.pagination_state.current_page_idx != updated_page_idx)
             self.pagination_state.current_page_idx = updated_page_idx ## update the state
+            # since there are no signals that will be emited from the paginator_controller_widget to trigger updates of self, need to manually call the function that's usually bound
+            if not block_signals:
+                self.on_jump_to_page(page_idx=updated_page_idx)
 
         return did_change
 
@@ -683,6 +687,18 @@ class PaginatedFigureController(PaginatedFigureBaseController):
         """ called when the figure is closed. """
         pass
     
+
+    def on_jump_to_page(self, page_idx: int):
+        """ Called when the page index is changed to update the figure
+    
+        """
+        warning(f"WARN: Implementors should override this function to handle updates when the page is changed.")
+        if self.params.debug_print:
+            self.ui.print(f'PaginatedFigureController.on_jump_to_page(page_idx: {page_idx})') # for page_idx == max_index this is called but doesn't continue
+        included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=page_idx)
+        if self.params.debug_print:
+            self.ui.print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
+
 
 
     

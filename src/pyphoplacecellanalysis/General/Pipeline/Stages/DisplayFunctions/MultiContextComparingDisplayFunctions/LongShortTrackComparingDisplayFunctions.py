@@ -2414,8 +2414,11 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         self.ui.mw.draw()
         self.ui.mw.show()
 
-    def on_paginator_control_widget_jump_to_page(self, page_idx: int):
-        """ Update captures `a_paginator`, 'mw' """
+
+    def on_jump_to_page(self, page_idx: int):
+        """ Called when the page index is changed to update the figure
+        
+        """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_rr_aclu
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_figure_basename_from_display_context, session_context_to_relative_path
 
@@ -2441,6 +2444,13 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
         self.perform_update_selections()
 
         self.ui.mw.draw()
+
+            
+
+    def on_paginator_control_widget_jump_to_page(self, page_idx: int):
+        """ Update captures `a_paginator`, 'mw' """
+        return self.on_jump_to_page(page_idx=page_idx)
+
 
 
 # ==================================================================================================================== #
