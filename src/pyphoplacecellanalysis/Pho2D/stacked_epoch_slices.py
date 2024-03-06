@@ -867,7 +867,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # if not self.params.has_attr('callback_id') or self.params.get('callback_id', None) is None:
         #     self.params.callback_id = self.plots.fig.canvas.mpl_connect('button_press_event', self.on_click) ## TypeError: unhashable type: 'DecodedEpochSlicesPaginatedFigureController'
 
-        self.build_internal_callbacks()
+        if self.params.get('build_internal_callbacks', True):
+            self.build_internal_callbacks()
 
         ## 2. Update:
         self.on_jump_to_page(page_idx=0)
@@ -1246,6 +1247,37 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # self.plots.fig.canvas.draw_idle()
         # or with ax being the clicked axis:
         # ax.get_figure().canvas.draw()
+
+
+    def add_data_overlays(self, decoder_decoded_epochs_result, included_columns=None, defer_refresh=False):
+        """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
+
+        # self: PaginatedFigureController
+
+        # a_pagination_controller = self
+
+        ## Choose which columns from the filter_epochs dataframe to include on the plot.
+        if included_columns is None:
+            included_columns = []
+
+        # Build Radon Transforms and add them:
+        radon_transform_epochs_data = RadonTransformPlotDataProvider.decoder_build_single_radon_transform_data(deepcopy(decoder_decoded_epochs_result))
+        if radon_transform_epochs_data is not None:
+            RadonTransformPlotDataProvider.add_data_to_pagination_controller(self, radon_transform_epochs_data, update_controller_on_apply=False)
+    
+
+        # Build Weighted Correlation Data Info and add them:    
+        wcorr_epochs_data = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_single_weighted_correlation_data(deepcopy(decoder_decoded_epochs_result))
+        if wcorr_epochs_data is not None:
+            WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(self, wcorr_epochs_data, update_controller_on_apply=False)
+
+        if not defer_refresh:
+            self.refresh_current_page()
+
 
 
 
