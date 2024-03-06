@@ -1446,7 +1446,18 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
 
     max_subplots_per_page = kwargs.pop('max_subplots_per_page', 200)
     controller_name = kwargs.pop('name', 'TestDecodedEpochSlicesPaginationController')
-        
+    debug_print = kwargs.get('debug_print', False)
+
+    ## Extract params_kwargs
+    params_kwargs = kwargs.pop('params_kwargs', {})
+    params_kwargs={'skip_plotting_measured_positions': True, 'skip_plotting_most_likely_positions': True,
+                    'enable_per_epoch_action_buttons': False,
+                    'enable_radon_transform_info': True, 'enable_weighted_correlation_info': True,
+                    # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                    # 'disable_y_label': True
+                    'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': False,
+                    }  | params_kwargs
+    
 
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
