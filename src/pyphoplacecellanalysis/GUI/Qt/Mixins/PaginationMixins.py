@@ -499,8 +499,11 @@ class PaginatedFigureBaseController:
                 a_selection_rect = a_selection_artists_dict['rectangles']
                 action_buttons_list = a_selection_artists_dict.get('action_buttons', None)
 
-
-            is_selected = self.params.is_selected.get(found_data_idx, False)
+            if found_data_idx is None:
+                is_selected = False
+            else:
+                is_selected = self.params.is_selected.get(found_data_idx, False)
+                
             a_selection_rect.set_visible(is_selected)
 
             if (action_buttons_list is not None) and (not enable_per_epoch_action_buttons):

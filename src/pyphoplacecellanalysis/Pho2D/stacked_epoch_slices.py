@@ -1217,7 +1217,14 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.perform_update_selections(...) OVERRIDE:')
         current_page_idx = self.current_page_idx
         curr_page_data_indicies = self.paginator.get_page_data(page_idx=current_page_idx)[0] # the [0] returns only the indicies and not the data
-        assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}"
+        
+        ## add Nones to end of curr_page_data_indicies list:
+        num_unused_axes: int = len(self.plots.axs) - len(curr_page_data_indicies)
+        # curr_page_data_indicies: np.array([120])
+        curr_page_data_indicies = np.array(list(curr_page_data_indicies) + (num_unused_axes * [None]))
+        # curr_page_data_indicies: [120, None, None, None, None, None, None, None]
+        assert len(self.plots.axs) == len(curr_page_data_indicies), f"len(plots.axs): {len(self.plots.axs)}, len(curr_page_data_indicies): {len(curr_page_data_indicies)}" ## fails on last page with AssertionError: len(plots.axs): 8, len(curr_page_data_indicies): 1
+
         ## This seems uneeeded, but we'll see:
         self._subfn_build_selectibility_rects_if_needed(self.plots.axs, list(curr_page_data_indicies))
 
@@ -1898,7 +1905,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
     # Export/Output ______________________________________________________________________________________________________ #
-    def export_decoder_pagination_controller_figure_page(self, curr_active_pipeline):
+    def export_decoder_pagination_controller_figure_page(self, curr_active_pipeline, **kwargs):
         """ exports each pages single-decoder figures separately
 
         Usage:
@@ -1906,6 +1913,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         """
         import matplotlib as mpl
+
+        output_figure_kwargs = dict(write_vector_format=True, write_png=True) | kwargs
 
         pagination_controller_dict = self.pagination_controllers
         for a_name, a_pagination_controller in pagination_controller_dict.items():
@@ -1920,70 +1929,78 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
             ## Get the figure/axes:
             a_plots = a_pagination_controller.plots # RenderPlots
-            a_params = a_pagination_controller.params
+            # a_params = a_pagination_controller.params
             
             # with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
             with mpl.rc_context({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', 'savefig.transparent': True, 'ps.fonttype': 42, }):
                 figs = a_plots.fig
-                axs = a_plots.axs
-                curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
+                # axs = a_plots.axs
+                curr_active_pipeline.output_figure(final_context=page_context, fig=figs, **output_figure_kwargs)
 
 
 
-    # def export_all_pages(self, curr_active_pipeline):
-    #     """ exports each pages single-decoder figures separately
+    def export_all_pages(self, curr_active_pipeline, **kwargs):
+        """ exports each pages single-decoder figures separately
 
-    #     Usage:
-    #         export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
+        Usage:
+            export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
 
-    #     """
+        """
+        output_figure_kwargs = dict(write_vector_format=True, write_png=True) | kwargs
+
+        # assert self.isPaginatorControlWidgetBackedMode
+        a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
+        a_paginator = a_controlling_pagination_controller.paginator
+        total_num_pages = int(a_paginator.num_pages)
+        page_idx_sweep = np.arange(total_num_pages)
+        page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
+        # page_num_sweep
+        print(f'export_all_pages(...): preparing to export {total_num_pages} pages from 4 decoders:')
+
+        for a_page_idx, a_page_num in zip(page_idx_sweep, page_num_sweep):
+            print(f'switching to page: a_page_idx: {a_page_idx}, a_page_num: {a_page_num} of total_num_pages: {total_num_pages}')
+            # a_pagination_controller.on_paginator_control_widget_jump_to_page(page_idx=a_page_idx)
+            # a_pagination_controller.ui.mw.draw()
+            # export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
+
+            self.jump_to_page(page_idx=a_page_idx)
+            self.draw()
+            self.export_decoder_pagination_controller_figure_page(curr_active_pipeline=curr_active_pipeline, **output_figure_kwargs)
+
+            # import matplotlib as mpl
+
+            # pagination_controller_dict = self.pagination_controllers
+
+            # page_idx_sweep = np.arange(total_num_pages)
+            # page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
+            
+            # # paginator_dict = {a_name:a_pagination_controller.paginator for a_name, a_pagination_controller in pagination_controller_dict.items()}
+
+            # for a_name, a_pagination_controller in pagination_controller_dict.items():
+            #     display_context = a_pagination_controller.params.get('active_identifying_figure_ctx', IdentifyingContext())
+
+            #     # Get context for current page of items:
+            #     current_page_idx: int = int(a_pagination_controller.current_page_idx)
+            #     a_paginator = a_pagination_controller.paginator
+            #     total_num_pages = int(a_paginator.num_pages)
+            #     page_context = display_context.overwriting_context(page=current_page_idx, num_pages=total_num_pages)
+            #     self.ui.print(page_context)
+
+            #     page_idx_sweep = np.arange(total_num_pages)
+            #     page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
                 
-    # a_paginator = a_pagination_controller.paginator
-    # total_num_pages = int(a_paginator.num_pages)
-    # page_idx_sweep = np.arange(total_num_pages)
-    # page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
-    # # page_num_sweep
 
-    # for a_page_idx, a_page_num in zip(page_idx_sweep, page_num_sweep):
-    #     print(f'switching to page: a_page_idx: {a_page_idx}, a_page_num: {a_page_num} of total_num_pages: {total_num_pages}')
-    #     a_pagination_controller.on_paginator_control_widget_jump_to_page(page_idx=a_page_idx)
-    #     a_pagination_controller.ui.mw.draw()
-    #     export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
+            #     ## Get the figure/axes:
+            #     a_plots = a_pagination_controller.plots # RenderPlots
+            #     a_params = a_pagination_controller.params
+                
+            #     # with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+            #     with mpl.rc_context({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', 'savefig.transparent': True, 'ps.fonttype': 42, }):
+            #         figs = a_plots.fig
+            #         axs = a_plots.axs
+            #         curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
 
-
-    #     import matplotlib as mpl
-
-    #     pagination_controller_dict = self.pagination_controllers
-
-    #     page_idx_sweep = np.arange(total_num_pages)
-    #     page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
-        
-    #     # paginator_dict = {a_name:a_pagination_controller.paginator for a_name, a_pagination_controller in pagination_controller_dict.items()}
-
-    #     for a_name, a_pagination_controller in pagination_controller_dict.items():
-    #         display_context = a_pagination_controller.params.get('active_identifying_figure_ctx', IdentifyingContext())
-
-    #         # Get context for current page of items:
-    #         current_page_idx: int = int(a_pagination_controller.current_page_idx)
-    #         a_paginator = a_pagination_controller.paginator
-    #         total_num_pages = int(a_paginator.num_pages)
-    #         page_context = display_context.overwriting_context(page=current_page_idx, num_pages=total_num_pages)
-    #         self.ui.print(page_context)
-
-    #         page_idx_sweep = np.arange(total_num_pages)
-    #         page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
-            
-
-    #         ## Get the figure/axes:
-    #         a_plots = a_pagination_controller.plots # RenderPlots
-    #         a_params = a_pagination_controller.params
-            
-    #         # with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
-    #         with mpl.rc_context({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', 'savefig.transparent': True, 'ps.fonttype': 42, }):
-    #             figs = a_plots.fig
-    #             axs = a_plots.axs
-    #             curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
-
+        print(f'\tdone.')
 
 
     # ==================================================================================================================== #
