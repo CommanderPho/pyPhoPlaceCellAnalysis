@@ -14,9 +14,8 @@ from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
 from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
-from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
+from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget, PaginationControlWidgetState
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
-
 
 """ refactored to avoid:
 
@@ -103,6 +102,121 @@ class SelectionsObject(SubsettableDictRepresentable):
         if not was_annotation_found:
             print(f'WARNING: no matching context found in {len(user_annotations_dict)} annotations. `saved_selection` will be returned unaltered.')
         return self
+
+# ==================================================================================================================== #
+# Pagination Data Providers                                                                                            #
+# ==================================================================================================================== #
+
+class PaginatedPlotDataProvider:
+    """ Provides auxillary and optional data to paginated plots, currently of decoded posteriors. 
+
+    from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedPlotDataProvider
+
+    
+    
+    """
+    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
+    provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
+    provided_plots: Dict[str, Any] = {'weighted_corr': {}}
+
+    @classmethod
+    def get_provided_params(cls) -> Dict[str, Any]:
+        return cls.provided_params
+
+    @classmethod
+    def get_provided_plots_data(cls) -> Dict[str, Any]:
+        return cls.provided_plots_data
+    
+    @classmethod
+    def get_provided_plots(cls) -> Dict[str, Any]:
+        return cls.provided_plots
+
+    @classmethod
+    def get_provided_callbacks(cls) -> Dict[str, Dict]:
+        """ override """
+        return {'on_render_page_callbacks': 
+                {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
+        }
+
+    @classmethod
+    def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
+        """ should be general I think.
+
+        Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
+
+        Uses: cls.provided_params
+
+        """
+        ## Add the .params:
+        for a_key, a_value in cls.provided_params.items():
+            if not a_pagination_controller.params.has_attr(a_key):
+                a_pagination_controller.params[a_key] = a_value
+
+        ## Add the .plots_data:
+        assert len(provided_data) == 1
+        # weighted_corr_data = provided_data[1]
+        assert len(provided_data) == len(cls.provided_plots_data), f"len(provided_data): {len(provided_data)} != len(cls.provided_plots_data): {len(cls.provided_plots_data)}"
+        active_plots_data = {k:(provided_data[i] or default_class_value) for i, (k, default_class_value) in enumerate(cls.provided_plots_data.items())}
+
+        for a_key, a_value in active_plots_data.items():
+            a_pagination_controller.plots_data[a_key] = a_value
+
+        ## Add the .plots:
+        for a_key, a_value in cls.provided_plots.items():
+            a_pagination_controller.plots[a_key] = a_value
+
+        ## Add the callbacks
+        for a_callback_type, a_callback_dict in cls.get_provided_callbacks().items():
+            # a_callback_type: like 'on_render_page_callbacks'
+            pagination_controller_callbacks_dict = a_pagination_controller.params.get(a_callback_type, None)
+            if pagination_controller_callbacks_dict is None:
+                a_pagination_controller.params[a_callback_type] = {} # allocate a new dict to hold callbacks
+            # register the specific callbacks of this type:
+            for a_callback_id, a_callback_fn in a_callback_dict.items():
+                a_pagination_controller.params[a_callback_type][a_callback_id] = a_callback_fn
+
+        # Trigger the update
+        if update_controller_on_apply:
+            a_pagination_controller.on_paginator_control_widget_jump_to_page(0)
+        
+
+    # @classmethod
+    # def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer",
+    #                                                    data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+    #     """ 
+    #     Called with:
+
+    #         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
+
+    #     Data:
+    #         plots_data.weighted_corr_data
+    #     Plots:
+    #         plots['weighted_corr']
+
+    #     """
+    #     from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
+    #     from matplotlib.offsetbox import AnchoredText
+
+    #     debug_print = kwargs.pop('debug_print', True)
+    #     if debug_print:
+    #         print(f'WeightedCorrelationPaginatedPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
+        
+    #     if epoch_slice is not None:
+    #         if debug_print:
+    #             print(f'\tepoch_slice: {epoch_slice}')
+    #         assert len(epoch_slice) == 2
+    #         epoch_start_t, epoch_end_t = epoch_slice # unpack
+    #         if debug_print:
+    #             print(f'\tepoch_start_t: {epoch_start_t}, epoch_end_t: {epoch_end_t}')
+    #     else:
+    #         raise NotImplementedError(f'epoch_slice is REQUIRED to index into the wcorr_data dict, but is None!')
+        
+    #     raise NotImplementedError(f"inheriting classes should be overriding this method!")
+
+    #     if debug_print:
+    #         print(f'\t success!')
+    #     return params, plots_data, plots, ui
+
 
 
 
