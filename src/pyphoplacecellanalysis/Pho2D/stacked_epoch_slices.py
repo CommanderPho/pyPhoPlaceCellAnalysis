@@ -1021,7 +1021,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 for a_callback_name, a_callback in on_render_page_callbacks.items():
                     if self.params.debug_print:
                         self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}')
-                    with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}: exception: {formatted_exception_str}'))):
+                    with ExceptionPrintingContext(suppress=self.params.get("should_suppress_callback_exceptions", True), exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}" for page_idx: {page_idx}, i: {i}, data_idx: {curr_slice_idx}, curr_ax: {curr_ax}: exception: {formatted_exception_str}'))):
                         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idx, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print, epoch_slice=curr_epoch_slice, curr_time_bin_container=curr_time_bin_container)
                         if self.params.debug_print:
                             self.ui.print(f'\t\tcallback with name: "{a_callback_name}" complete.')
@@ -1156,7 +1156,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             if self.params.debug_print:
                 self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}')
 
-            with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}"  for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {formatted_exception_str}'))):        
+            with ExceptionPrintingContext(suppress=self.params.get("should_suppress_callback_exceptions", True), exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}"  for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {formatted_exception_str}'))):        
                 a_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time)
 
 

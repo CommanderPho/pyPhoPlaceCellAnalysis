@@ -305,7 +305,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             x_first_extent = (xmin, xmax, ymin, ymax)
             active_extent = x_first_extent
             im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=True, **main_plot_kwargs)
-            ax.set_xlim((xmin, xmax))
+            ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
             ax.set_ylim((ymin, ymax))
         else:
             im_posterior_x = None
@@ -714,11 +714,10 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
         if skip_plotting_most_likely_positions:
             curr_most_likely_positions = None
 
-            
         params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
         on_render_page_callbacks = params.get('on_render_page_callbacks', {})
         for a_callback_name, a_callback in on_render_page_callbacks.items():
-            with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\t encountered exception in callback "{a_callback_name}": {formatted_exception_str}'))):
+            with ExceptionPrintingContext(suppress=params.get("should_suppress_callback_exceptions", True), exception_print_fn=(lambda formatted_exception_str: print(f'\t encountered exception in callback "{a_callback_name}": {formatted_exception_str}'))):
                 params, plots_data, plots, ui = a_callback(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
 
 
