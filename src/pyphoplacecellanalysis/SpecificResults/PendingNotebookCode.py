@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 from typing import List, Optional, Dict, Tuple, Any, Union
+import attrs
 import matplotlib as mpl
 import napari
 from neuropy.analyses.placefields import PfND
@@ -143,8 +144,14 @@ def debug_plot_position_and_derivatives_figure(time_window_centers, position, ve
     return fig, debug_plot_axs
     
 
-def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, debug_plot_axs=None, debug_plot_name=None):
+# C2 = attrs.make_class("C2", {"longest_sequence_length": field(default=42), "num_direction_changes": field()})
+HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "num_direction_changes", "num_congruent_direction_bins_score", "total_congruent_direction_change", "position_derivatives_df")})
+
+@function_attributes(short_name=None, tags=['heuristic', 'replay', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 08:00', related_items=[])
+def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, debug_plot_axs=None, common_plot_kwargs=None, debug_plot_name=None) -> HeuristicScoresTuple:
     """ 2024-02-29 - New smart replay heuristic scoring
+
+    For a single_decoder, single_epoch
 
     a_result: DecodedFilterEpochsResult = a_decoded_filter_epochs_decoder_result_dict['long_LR']
 
@@ -160,7 +167,6 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
             _out_new_scores[a_name] = compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx)
 
         _out_new_scores
-
 
     """
     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
@@ -219,8 +225,10 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     print(f'\tposition_derivative_means: {position_derivative_means}')
     print(f'\tposition_derivative_medians: {position_derivative_medians}')
 
-    fig, debug_plot_axs = debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration,
-                                                                      debug_plot_axs=debug_plot_axs, debug_plot_name=debug_plot_name, common_plot_kwargs=common_plot_kwargs)
+    # if debug_plot_name is not None:
+    #     # disable plotting if debug_plot_name is None
+    #     fig, debug_plot_axs = debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration,
+    #                                                                     debug_plot_axs=debug_plot_axs, debug_plot_name=debug_plot_name, common_plot_kwargs=common_plot_kwargs)
 
 
     # Now split the array at each point where a direction change occurs
@@ -264,7 +272,7 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     total_congruent_direction_change: float = np.nansum(np.abs(congruent_bin_diffs)) # the total quantity of change in the congruent direction
     total_incongruent_direction_change: float = np.nansum(np.abs(incongruent_bin_diffs))
     print(f'total_congruent_direction_change: {total_congruent_direction_change}, total_incongruent_direction_change: {total_incongruent_direction_change}')
-    return longest_sequence_length, num_direction_changes, num_congruent_direction_bins_score, total_congruent_direction_change, position_derivatives_df
+    return HeuristicScoresTuple(longest_sequence_length, num_direction_changes, num_congruent_direction_bins_score, total_congruent_direction_change, position_derivatives_df)
 
 
 
