@@ -1,5 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
+from typing import List
 from attrs import define, field, Factory
 from nptyping import NDArray # for DecodedFilterEpochsResult
 # import pathlib
@@ -418,6 +419,13 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     def active_filter_epochs(self):
         """ for compatibility """
         return deepcopy(self.filter_epochs)
+
+
+    @property
+    def time_window_centers(self) -> List[NDArray]:
+        """ for compatibility """
+        return deepcopy([self.time_bin_containers[an_epoch_idx].centers for an_epoch_idx in np.arange(self.num_filter_epochs)])
+
 
 
     @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=[], creation_date='2024-02-13 17:25', related_items=[])
