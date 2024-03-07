@@ -1069,7 +1069,29 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         line_alpha = 0.8  # Faint line
         marker_alpha = 0.8  # More opaque markers
-        text_kwargs = dict(loc='upper left', strokewidth=5, stroke_foreground='k', stroke_alpha=0.35, text_foreground='#e5ff00', text_alpha=0.8)
+        text_kwargs = dict(strokewidth=5, stroke_foreground='k', stroke_alpha=0.35, text_foreground='#e5ff00', text_alpha=0.8)
+        
+        # Get the axes bounding box in figure coordinates
+        a_fig = curr_ax.get_figure()
+        bbox = curr_ax.get_position()
+        half_x_margin_width = (1.0 - bbox.width) / 2.0
+        half_y_margin_width = (1.0 - bbox.ymax) / 2.0
+        bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
+        # bbox_offset_magnitude: float = params.setdefault('bbox_offset_magnitude', 0.075)
+
+        ## Positioning kwargs:
+        text_kwargs |= dict(loc='upper left', 
+                                # horizontalalignment='center', ## DOES NOTHING?
+                                #verticalalignment='center', ## BREAKS IT
+                                # multialignment='r', ## BREAKS IT
+                                # horizontalalignment='right',  
+                                rotation=45, #transform=curr_ax.transAxes,
+                                # bbox_to_anchor=(-bbox_offset_magnitude, (1.0 + bbox_offset_magnitude)), bbox_transform=curr_ax.transAxes,                        
+                                bbox_to_anchor=(-bbox_offset_magnitude[0], (1.0 + bbox_offset_magnitude[1])), bbox_transform=curr_ax.transAxes, transform=a_fig.transFigure,
+                                ) # oriented in upper-right corner, at a diagonal angle
+        
+
+
         plot_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha,
                             marker='+', markersize=2, markerfacecolor='#e5ff00', markeredgecolor='#e5ff00') # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
         
@@ -1363,10 +1385,30 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         ## Extract the visibility:
         should_enable_weighted_correlation_info: bool = params.enable_weighted_correlation_info
+        # bbox_offset_magnitude: float = params.setdefault('bbox_offset_magnitude', 0.075)
+
+        # Get the axes bounding box in figure coordinates
+        a_fig = curr_ax.get_figure()
+        bbox = curr_ax.get_position()
+        half_x_margin_width = (1.0 - bbox.width) / 2.0
+        half_y_margin_width = (1.0 - bbox.ymax) / 2.0
+        bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
+
 
         # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
         # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
-        extra_text_kwargs = dict(loc='upper right', stroke_alpha=0.70, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+        extra_text_kwargs = dict(stroke_alpha=0.70, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+
+        ## Positioning kwargs:
+        extra_text_kwargs |= dict(loc='upper right',
+                                # horizontalalignment='center', ## DOES NOTHING?
+                                #verticalalignment='center', ## BREAKS IT
+                                # multialignment='r', ## BREAKS IT
+                                # horizontalalignment='right',  
+                                rotation=-45, #transform=curr_ax.transAxes,
+                                bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=curr_ax.transAxes, transform=a_fig.transFigure,
+                                # bbox_to_anchor=((1.0 + bbox_offset_magnitude), (1.0 + bbox_offset_magnitude)), bbox_transform=curr_ax.transAxes,                        
+                                ) # oriented in upper-right corner, at a diagonal angle
 
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
