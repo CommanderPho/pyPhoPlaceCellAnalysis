@@ -1714,7 +1714,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             screen = a_widget.screen()
             screen_size = screen.size()
 
-            target_height = a_pagination_controller.params.get('scrollAreaContents_MinimumHeight', None) | (a_pagination_controller.params.all_plots_height + 30)
+            target_height = a_pagination_controller.params.get('scrollAreaContents_MinimumHeight', None)
+            if target_height is None:
+                target_height = (a_pagination_controller.params.all_plots_height + 30)
             desired_final_height = int(min(target_height, screen_size.height())) # don't allow the height to exceed the screen height.
             print(f'target_height: {target_height}, {  desired_final_height = }')
             # a_widget.size()
