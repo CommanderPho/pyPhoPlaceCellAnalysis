@@ -1646,10 +1646,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         params_kwargs = kwargs.pop('params_kwargs', {})
         params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
         # print(f'params_kwargs: {params_kwargs}')
+        max_subplots_per_page: int = kwargs.pop('max_subplots_per_page', params_kwargs.pop('max_subplots_per_page', 8)) # kwargs overrides params_kwargs
+        
 
         decoder_names: List[str] = track_templates.get_decoder_names()
         controlling_pagination_item_name: str = decoder_names[0] # first item # 'long_LR'
-        controlled_pagination_controller_names_list = decoder_names[1:]
+        # controlled_pagination_controller_names_list = decoder_names[1:]
 
         pagination_controller_dict = {}
         for i, (a_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items()):
@@ -1668,7 +1670,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                                 decoder_decoded_epochs_result_dict[a_name],
                                                                                                 xbin=a_decoder.xbin, global_pos_df=curr_active_pipeline.sess.position.df,
                                                                                                 a_name=f'DecodedEpochSlices[{a_name}]', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
-                                                                                                max_subplots_per_page=8, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
+                                                                                                max_subplots_per_page=max_subplots_per_page, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
 
 
         # Constrains each of the plotters at least to the minimum height:
