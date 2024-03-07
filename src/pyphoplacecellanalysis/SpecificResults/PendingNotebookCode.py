@@ -108,13 +108,13 @@ def debug_plot_position_and_derivatives_figure(time_window_centers, position, ve
     if debug_plot_axs is None:
         fig, debug_plot_axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
     else:
-        fig = fig.get_figure()
+        fig = debug_plot_axs[0].get_figure()
 
     if debug_plot_name is None:
         debug_plot_name = ''
 
-    common_plot_kwargs = common_plot_kwargs | {}
-    common_plot_kwargs = common_plot_kwargs | dict(marker='o', linestyle='None', alpha=0.6)
+    common_plot_kwargs = common_plot_kwargs or {}
+    common_plot_kwargs = common_plot_kwargs or dict(marker='o', linestyle='None', alpha=0.6)
 
     # Plot the position data on the first subplot
     debug_plot_axs[0].plot(time_window_centers, position, label=f'{debug_plot_name}_Position', **common_plot_kwargs) # , color='blue'
@@ -148,7 +148,7 @@ def debug_plot_position_and_derivatives_figure(time_window_centers, position, ve
 HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "num_direction_changes", "num_congruent_direction_bins_score", "total_congruent_direction_change", "position_derivatives_df")})
 
 @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 08:00', related_items=[])
-def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, debug_plot_axs=None, common_plot_kwargs=None, debug_plot_name=None) -> HeuristicScoresTuple:
+def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, enable_debug_plot=False, debug_plot_axs=None, common_plot_kwargs=None, debug_plot_name=None) -> HeuristicScoresTuple:
     """ 2024-02-29 - New smart replay heuristic scoring
 
     For a single_decoder, single_epoch
@@ -172,7 +172,8 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
+    # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
+    time_window_centers = a_result.time_window_centers[an_epoch_idx]
 
     # a_p_x_given_n
     # a_result.p_x_given_n_list
@@ -195,7 +196,8 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
 
 
     track_coverage = np.nansum(a_p_x_given_n, axis=-1) # sum over all time bins
-    print(f'track_coverage: {track_coverage}')
+    if debug_print:
+        print(f'track_coverage: {track_coverage}')
 
 
     # The idea here was to look at the most-likely positions and their changes (derivatives) to see if these were predictive of good vs. bad ripples. For example, bad ripples might have extreme accelerations while good ones fall within a narrow window of physiologically consistent accelerations
@@ -213,22 +215,24 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
 
     position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
-    print(f'time_window_centers: {time_window_centers}')
-    print(f'position: {position}')
-    print(f'velocity: {velocity}')
-    print(f'acceleration: {acceleration}')
+    if debug_print:
+        print(f'time_window_centers: {time_window_centers}')
+        print(f'position: {position}')
+        print(f'velocity: {velocity}')
+        print(f'acceleration: {acceleration}')
 
     position_derivative_column_names = ['x', 'vel_x', 'accel_x']
     position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
     position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
     # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
-    print(f'\tposition_derivative_means: {position_derivative_means}')
-    print(f'\tposition_derivative_medians: {position_derivative_medians}')
+    if debug_print:
+        print(f'\tposition_derivative_means: {position_derivative_means}')
+        print(f'\tposition_derivative_medians: {position_derivative_medians}')
 
-    # if debug_plot_name is not None:
-    #     # disable plotting if debug_plot_name is None
-    #     fig, debug_plot_axs = debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration,
-    #                                                                     debug_plot_axs=debug_plot_axs, debug_plot_name=debug_plot_name, common_plot_kwargs=common_plot_kwargs)
+    if enable_debug_plot:
+        # disable plotting if debug_plot_name is None
+        fig, debug_plot_axs = debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration,
+                                                                        debug_plot_axs=debug_plot_axs, debug_plot_name=debug_plot_name, common_plot_kwargs=(common_plot_kwargs or {}))
 
 
     # Now split the array at each point where a direction change occurs
@@ -254,7 +258,8 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     if debug_print:
         print(f'contiguous_total_change_quantity: {contiguous_total_change_quantity}')
     max_total_change_quantity = np.nanmax(np.abs(contiguous_total_change_quantity))
-    print(f'max_total_change_quantity: {max_total_change_quantity}')
+    if debug_print:
+        print(f'max_total_change_quantity: {max_total_change_quantity}')
 
     # for i, (a_split_most_likely_positions_array, a_split_first_order_diff_array) in enumerate(zip(split_most_likely_positions_arrays, split_first_order_diff_arrays)):
     #     print(f"Sequence {i}: {a_split_most_likely_positions_array}, {a_split_first_order_diff_array}")
@@ -268,10 +273,12 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     incongruent_bin_diffs = a_first_order_diff[is_non_congruent_direction_bin]
 
     num_congruent_direction_bins_score: float = float(len(congruent_bin_diffs)) / float(n_time_bins - 1)
-    print(f'num_congruent_direction_bins_score: {num_congruent_direction_bins_score}')
+    if debug_print:
+        print(f'num_congruent_direction_bins_score: {num_congruent_direction_bins_score}')
     total_congruent_direction_change: float = np.nansum(np.abs(congruent_bin_diffs)) # the total quantity of change in the congruent direction
     total_incongruent_direction_change: float = np.nansum(np.abs(incongruent_bin_diffs))
-    print(f'total_congruent_direction_change: {total_congruent_direction_change}, total_incongruent_direction_change: {total_incongruent_direction_change}')
+    if debug_print:
+        print(f'total_congruent_direction_change: {total_congruent_direction_change}, total_incongruent_direction_change: {total_incongruent_direction_change}')
     return HeuristicScoresTuple(longest_sequence_length, num_direction_changes, num_congruent_direction_bins_score, total_congruent_direction_change, position_derivatives_df)
 
 
