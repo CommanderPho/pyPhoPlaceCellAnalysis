@@ -49,8 +49,19 @@ def compute_local_peak_probabilities(probs, n_adjacent: int):
     return local_peak_probabilities, peak_position_indices
 
 
+
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+
+@metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
+@define(slots=False, repr=False)
 class HeuristicReplayScoring:
+    """ Measures of replay quality ("scores") that are better aligned with my (human-rated) intuition. Mostly based on the decoded posteriors.
     
+    
+    """
+    decoded_filter_epochs_decoder_result: DecodedFilterEpochsResult = field()
+
     # Single-time bin metrics: `sb_metric_*` ____________________________________________________________________________________________ #
     # these metrics act on a single decoded time bin
     def sb_metric_position_spread(self):
@@ -77,11 +88,63 @@ class HeuristicReplayScoring:
     
 
 
+def debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration, debug_plot_axs=None, debug_plot_name=None, common_plot_kwargs=None):
+    """ 
+    
+    fig, debug_plot_axs = debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration, debug_plot_axs=None, debug_plot_name=None, common_plot_kwargs=None)
+
+    """
+    # Plot the accelerations over time
+    # plt.plot(time_window_centers, acceleration, label='Acceleration', marker='o')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Acceleration (m/s²)')
+    # plt.title('Acceleration vs. Time')
+    # plt.legend()
+    # plt.show()
+
+    # Setup the figure and subplots
+    
+    if debug_plot_axs is None:
+        fig, debug_plot_axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+    else:
+        fig = fig.get_figure()
+
+    if debug_plot_name is None:
+        debug_plot_name = ''
+
+    common_plot_kwargs = common_plot_kwargs | {}
+    common_plot_kwargs = common_plot_kwargs | dict(marker='o', linestyle='None', alpha=0.6)
+
+    # Plot the position data on the first subplot
+    debug_plot_axs[0].plot(time_window_centers, position, label=f'{debug_plot_name}_Position', **common_plot_kwargs) # , color='blue'
+    debug_plot_axs[0].set_ylabel('Position (m)')
+    debug_plot_axs[0].legend()
+
+    # Plot the velocity data on the second subplot
+    debug_plot_axs[1].plot(time_window_centers, velocity, label=f'{debug_plot_name}_Velocity', **common_plot_kwargs) # , color='orange'
+    debug_plot_axs[1].set_ylabel('Velocity (m/s)')
+    debug_plot_axs[1].legend()
+
+    # Plot the acceleration data on the third subplot
+    debug_plot_axs[2].plot(time_window_centers, acceleration, label=f'{debug_plot_name}_Acceleration', **common_plot_kwargs) # , color='green'
+    debug_plot_axs[2].set_ylabel('Acceleration (m/s²)')
+    debug_plot_axs[2].set_xlabel('Time (s)')
+    debug_plot_axs[2].legend()
+
+    # # Set a shared title for the subplots
+    plt.suptitle('Position, Velocity and Acceleration vs. Time')
+
+    # # Adjust the layout so the subplots fit nicely
+    plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave space for the suptitle at the top
+
+    # # Show the subplots
+    # plt.show()
+
+    return fig, debug_plot_axs
     
 
 def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, debug_plot_axs=None, debug_plot_name=None):
     """ 2024-02-29 - New smart replay heuristic scoring
-
 
     a_result: DecodedFilterEpochsResult = a_decoded_filter_epochs_decoder_result_dict['long_LR']
 
@@ -129,6 +192,8 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     print(f'track_coverage: {track_coverage}')
 
 
+    # The idea here was to look at the most-likely positions and their changes (derivatives) to see if these were predictive of good vs. bad ripples. For example, bad ripples might have extreme accelerations while good ones fall within a narrow window of physiologically consistent accelerations
+
     # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[0.0])
     a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
     a_first_order_diff
@@ -154,48 +219,8 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     print(f'\tposition_derivative_means: {position_derivative_means}')
     print(f'\tposition_derivative_medians: {position_derivative_medians}')
 
-    # Plot the accelerations over time
-    # plt.plot(time_window_centers, acceleration, label='Acceleration', marker='o')
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('Acceleration (m/s²)')
-    # plt.title('Acceleration vs. Time')
-    # plt.legend()
-    # plt.show()
-
-    # Setup the figure and subplots
-    
-    if debug_plot_axs is None:
-        fig, debug_plot_axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
-    if debug_plot_name is None:
-        debug_plot_name = ''
-
-    common_plot_kwargs = dict(marker='o', linestyle='None', alpha=0.6)
-
-    # Plot the position data on the first subplot
-    debug_plot_axs[0].plot(time_window_centers, position, label=f'{debug_plot_name}_Position', **common_plot_kwargs) # , color='blue'
-    debug_plot_axs[0].set_ylabel('Position (m)')
-    debug_plot_axs[0].legend()
-
-    # Plot the velocity data on the second subplot
-    debug_plot_axs[1].plot(time_window_centers, velocity, label=f'{debug_plot_name}_Velocity', **common_plot_kwargs) # , color='orange'
-    debug_plot_axs[1].set_ylabel('Velocity (m/s)')
-    debug_plot_axs[1].legend()
-
-    # Plot the acceleration data on the third subplot
-    debug_plot_axs[2].plot(time_window_centers, acceleration, label=f'{debug_plot_name}_Acceleration', **common_plot_kwargs) # , color='green'
-    debug_plot_axs[2].set_ylabel('Acceleration (m/s²)')
-    debug_plot_axs[2].set_xlabel('Time (s)')
-    debug_plot_axs[2].legend()
-
-    # # Set a shared title for the subplots
-    # plt.suptitle('Position, Velocity and Acceleration vs. Time')
-
-    # # Adjust the layout so the subplots fit nicely
-    # plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave space for the suptitle at the top
-
-    # # Show the subplots
-    # plt.show()
-
+    fig, debug_plot_axs = debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration,
+                                                                      debug_plot_axs=debug_plot_axs, debug_plot_name=debug_plot_name, common_plot_kwargs=common_plot_kwargs)
 
 
     # Now split the array at each point where a direction change occurs
