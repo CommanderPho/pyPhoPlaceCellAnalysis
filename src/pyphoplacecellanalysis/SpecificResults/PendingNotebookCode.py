@@ -88,6 +88,30 @@ class HeuristicReplayScoring:
         pass
     
 
+@function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 14:30', related_items=[])
+def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size):
+    """try recomputing velocties/accelerations
+    
+    decoding_time_bin_size = a_result.decoding_time_bin_size
+    """ 
+    position = deepcopy(position)
+    a_first_order_diff = np.diff(position, n=1, prepend=[position[0]]) 
+    velocity = a_first_order_diff / float(decoding_time_bin_size) # velocity with real world units of cm/sec
+    acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
+
+    position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
+    print(f'time_window_centers: {time_window_centers}')
+    print(f'position: {position}')
+    print(f'velocity: {velocity}')
+    print(f'acceleration: {acceleration}')
+
+    position_derivative_column_names = ['x', 'vel_x', 'accel_x']
+    position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
+    position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
+    # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
+    print(f'\tposition_derivative_means: {position_derivative_means}')
+    print(f'\tposition_derivative_medians: {position_derivative_medians}')
+    return position_derivatives_df
 
 def debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration, debug_plot_axs=None, debug_plot_name=None, common_plot_kwargs=None):
     """ 
