@@ -1,6 +1,7 @@
 import sys
 from copy import deepcopy
-from typing import Tuple, Optional, List, Dict
+from typing import Tuple, Optional, List, Dict, Union
+from nptyping import NDArray
 from enum import Enum # for TrackPositionClassification
 from attrs import define, field, Factory
 from collections import namedtuple
@@ -149,10 +150,10 @@ class LinearTrackDimensions:
 
     """
     # all units in [cm]
-    track_width: float = 6.2
-    track_length: float = 100.0
-    platform_side_length: float = 22.0
-    minor_axis_platform_side_width: Optional[float] = None
+    track_width: float = field(default=6.2)
+    track_length: float = field(default=100.0)
+    platform_side_length: float = field(default=22.0)
+    minor_axis_platform_side_width: Optional[float] = field(default=None)
 
     # grid_bin_bounds: Optional[BoundsRect] = None #TODO 2023-09-20 12:33: - [ ] Allow storing grid_bin_bounds to help with offset computations
 
@@ -606,8 +607,8 @@ class LinearTrackInstance:
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
     
     """
-    track_dimensions: LinearTrackDimensions
-    grid_bin_bounds: BoundsRect #= None #TODO 2023-09-20 12:33: - [ ] Allow storing grid_bin_bounds to help with offset computations
+    track_dimensions: LinearTrackDimensions = field()
+    grid_bin_bounds: BoundsRect = field() #= None #TODO 2023-09-20 12:33: - [ ] Allow storing grid_bin_bounds to help with offset computations
     
     @property
     def rects(self):
@@ -615,7 +616,7 @@ class LinearTrackInstance:
         return self.track_dimensions._build_component_rectangles(is_zero_centered=True, offset_point=offset_point, include_rendering_properties=False)
 
     @classmethod
-    def init_from_grid_bin_bounds(cls, grid_bin_bounds: BoundsRect, debug_print=False):
+    def init_from_grid_bin_bounds(cls, grid_bin_bounds: Union[BoundsRect, Tuple, List, NDArray], debug_print=False):
         """ Builds the object and the maze mesh data from the grid_bin_bounds provided.
         
         ## Add the 3D Maze Shape
@@ -628,6 +629,9 @@ class LinearTrackInstance:
 
 
         """
+        if isinstance(grid_bin_bounds, (Tuple, List, NDArray)):
+            grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
+
         _obj = cls(LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds), grid_bin_bounds=grid_bin_bounds)
         return _obj
 
@@ -643,6 +647,40 @@ class LinearTrackInstance:
 
     def is_on_endcap(self, points):
         return np.array([self.classify_x_position(test_x).is_endcap for test_x in points])
+
+
+
+def get_track_length_dict(long_grid_bin_bounds, short_grid_bin_bounds) -> Tuple[Dict[str, float], Dict[str, float]]:
+    """ Gets the actual track lengths from the grid_bin_bounds
+    
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import get_track_length_dict
+
+    long_grid_bin_bounds = ((22.397021260868584, 245.3970212608686), (133.66465594522782, 155.97244934208123)),
+    short_grid_bin_bounds = ((22.397021260868584, 245.3970212608686), (133.66465594522782, 155.97244934208123))
+
+    actual_track_length_dict, idealized_track_length_dict = get_track_length_dict(long_pf2D.config.grid_bin_bounds, short_pf2D.config.grid_bin_bounds)
+    actual_track_length_dict
+    idealized_track_length_dict
+
+    >>
+        {'long': 223.0, 'short': 223.0}
+        {'long': 214.0, 'short': 144.0}
+
+    """
+    ## Theoretical ideals:
+    long_ideal_track_dims = LinearTrackDimensions(track_length=170.0)
+    short_ideal_track_dims = LinearTrackDimensions(track_length=100.0)
+
+    long_linear_track, short_linear_track = [LinearTrackInstance.init_from_grid_bin_bounds(grid_bin_bounds=deepcopy(a_grid_bin_bounds), debug_print=True) for a_grid_bin_bounds in (long_grid_bin_bounds, short_grid_bin_bounds)]
+    # {'long': long_linear_track, 'short': short_linear_track}
+    long_linear_track.track_dimensions.total_length
+    short_linear_track.track_dimensions.total_length
+
+    long_ideal_track_dims.total_length
+    short_ideal_track_dims.total_length
+
+    return {'long': long_linear_track.track_dimensions.total_length, 'short': short_linear_track.track_dimensions.total_length}, {'long': long_ideal_track_dims.total_length, 'short': short_ideal_track_dims.total_length}
+
 
 
 # ==================================================================================================================== #
