@@ -1244,6 +1244,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # ax.get_figure().canvas.draw()
 
 
+    # ==================================================================================================================== #
+    # Single pagination_controller versions of PhoPaginatedMultiDecoderDecodedEpochsWindow's methods                       #
+    # ==================================================================================================================== #
+
     def add_data_overlays(self, decoder_decoded_epochs_result, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
         
@@ -1274,7 +1278,36 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.refresh_current_page()
 
 
+    def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None, defer_render:bool=False):
+        """ Restures the user's selections to this pagination controller
 
+        Uses: self.params.active_identifying_figure_ctx
+
+        from neuropy.core.user_annotations import UserAnnotationsManager
+        
+        user_annotations = UserAnnotationsManager().get_user_annotations()
+        new_selections = a_ctrl.restore_selections_from_user_annotations(user_annotations)
+
+        
+        """
+        if user_annotations is None:
+            from neuropy.core.user_annotations import UserAnnotationsManager
+            annotations_man = UserAnnotationsManager()
+            user_annotations = annotations_man.get_user_annotations()
+        
+        a_figure_ctx = self.params.active_identifying_figure_ctx
+        a_selections_ctx = a_figure_ctx.adding_context_if_missing(user_annotation='selections')
+        loaded_selections = user_annotations.get(a_selections_ctx, None)
+        new_selections = loaded_selections
+        if loaded_selections is not None:
+            a_start_stop_arr = self.selected_epoch_times
+            if (a_start_stop_arr is not None) and (len(a_start_stop_arr) > 0):
+                assert np.shape(a_start_stop_arr)[1] == 2, f"input should be start, stop times as a numpy array"
+                new_selections = self.restore_selections_from_epoch_times(a_start_stop_arr, defer_render=defer_render) # TODO: only accepts epoch_times specifications
+        else:
+            print(f'no found selections.')
+            
+        return new_selections
 
     
 
@@ -1375,12 +1408,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     ## Ripples:
     pagination_controller_dict =  PhoPaginatedMultiDecoderDecodedEpochsWindow._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, epochs_name='ripple', included_epoch_indicies=None, defer_render=False, save_figure=False)
     app, root_dockAreaWindow = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_pagination_controller_dict(pagination_controller_dict) # Combine to a single figure
-    root_dockAreaWindow.add_data_overlays(track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
+    root_dockAreaWindow.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
             
     ## Laps:
     laps_pagination_controller_dict =  PhoPaginatedMultiDecoderDecodedEpochsWindow._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', included_epoch_indicies=None, defer_render=False, save_figure=False)
     laps_app, laps_root_dockAreaWindow = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_pagination_controller_dict(laps_pagination_controller_dict) # Combine to a single figure
-    laps_root_dockAreaWindow.add_data_overlays(track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
+    laps_root_dockAreaWindow.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
 
     """
     @property
@@ -1583,7 +1616,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         self.draw()
         
 
-    def add_data_overlays(self, track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, included_columns=None, defer_refresh=False):
+    def add_data_overlays(self, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data and adds them to the plot.
         
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
@@ -1607,25 +1640,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         else:
             raise NotImplementedError(f"epoch_type_name: {epoch_type_name}")
 
-        # Build Radon Transforms and add them:
-        # radon_transform_epochs_data_dict = RadonTransformPlotDataProvider.decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=deepcopy(decoder_decoded_epochs_result_dict))
-        # if radon_transform_epochs_data_dict is not None:
         ## Add the radon_transform_lines to each of the four figures:
-        for a_name, a_pagination_controller in self.pagination_controllers.items():
-            a_radon_transform_epochs_data = RadonTransformPlotDataProvider.decoder_build_single_radon_transform_data(deepcopy(decoder_decoded_epochs_result_dict[a_name]))
-            # if radon_transform_epochs_data_dict[a_name] is not None:
-            #     RadonTransformPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, radon_transform_epochs_data_dict[a_name], update_controller_on_apply=False)
-            if a_radon_transform_epochs_data is not None:
-                RadonTransformPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, a_radon_transform_epochs_data, update_controller_on_apply=False)
+        for a_name, a_pagination_controller in self.pagination_controllers.items():            
+            a_pagination_controller.add_data_overlays(decoder_decoded_epochs_result=decoder_decoded_epochs_result_dict[a_name], included_columns=included_columns, defer_refresh=True)
 
-
-        # Build Weighted Correlation Data Info and add them:    
-        wcorr_epochs_data_dict = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_weighted_correlation_data_dict(track_templates, decoder_decoded_epochs_result_dict=deepcopy(decoder_decoded_epochs_result_dict))
-        ## Add the radon_transform_lines to each of the four figures:
-        if wcorr_epochs_data_dict is not None:
-            for a_name, a_pagination_controller in self.pagination_controllers.items():
-                if wcorr_epochs_data_dict[a_name] is not None:
-                    WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(a_pagination_controller, wcorr_epochs_data_dict[a_name], update_controller_on_apply=False)
 
         if not defer_refresh:
             self.refresh_current_page()
@@ -1666,8 +1684,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 else:
                     curr_params_kwargs['disable_y_label'] = True
 
-            pagination_controller_dict[a_name] = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(decoder_decoded_epochs_result_dict[a_name].filter_epochs,
-                                                                                                decoder_decoded_epochs_result_dict[a_name],
+            # a_name: str = 
+            a_decoder_decoded_epochs_result = decoder_decoded_epochs_result_dict[a_name]
+            pagination_controller_dict[a_name] = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(a_decoder_decoded_epochs_result.filter_epochs,
+                                                                                                a_decoder_decoded_epochs_result,
                                                                                                 xbin=a_decoder.xbin, global_pos_df=curr_active_pipeline.sess.position.df,
                                                                                                 a_name=f'DecodedEpochSlices[{a_name}]', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
                                                                                                 max_subplots_per_page=max_subplots_per_page, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
@@ -1852,7 +1872,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return code_strings
     
 
-    def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None):
+    def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None, defer_render:bool=False):
         if user_annotations is None:
             from neuropy.core.user_annotations import UserAnnotationsManager
             annotations_man = UserAnnotationsManager()
@@ -1864,14 +1884,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         loaded_selections_context_dict = {a_name:a_figure_ctx.adding_context_if_missing(user_annotation='selections') for a_name, a_figure_ctx in figure_ctx_dict.items()}
         loaded_selections_dict = {a_name:user_annotations.get(a_selections_ctx, None) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
 
-        new_selections_dict = {}
-        for a_name, a_start_stop_arr in loaded_selections_dict.items():
-            a_pagination_controller = self.pagination_controllers[a_name] # DecodedEpochSlicesPaginatedFigureController
-            if (a_start_stop_arr is not None) and (len(a_start_stop_arr) > 0):
-                assert np.shape(a_start_stop_arr)[1] == 2, f"input should be start, stop times as a numpy array"
-                new_selections_dict[a_name] = a_pagination_controller.restore_selections_from_epoch_times(a_start_stop_arr) # TODO: only accepts epoch_times specifications
-
-        self.draw()
+        new_selections_dict = {a_decoder_name:a_pagination_controller.restore_selections_from_user_annotations(user_annotations, defer_render=defer_render) for a_decoder_name, a_pagination_controller in self.pagination_controllers.items()}
+        # self.draw()
         return new_selections_dict
     
 
