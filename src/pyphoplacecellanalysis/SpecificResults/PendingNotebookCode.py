@@ -15,7 +15,7 @@ import pandas as pd
 from attrs import define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
 
 from functools import wraps, partial
 
@@ -51,8 +51,61 @@ def compute_local_peak_probabilities(probs, n_adjacent: int):
 
 
 
-from pyphocorehelpers.programming_helpers import metadata_attributes
-from pyphocorehelpers.function_helpers import function_attributes
+
+
+@function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 14:30', related_items=[])
+def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size):
+    """try recomputing velocties/accelerations
+    
+    decoding_time_bin_size = a_result.decoding_time_bin_size
+    """ 
+    position = deepcopy(position)
+    a_first_order_diff = np.diff(position, n=1, prepend=[position[0]]) 
+    velocity = a_first_order_diff / float(decoding_time_bin_size) # velocity with real world units of cm/sec
+    acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
+
+    position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
+    print(f'time_window_centers: {time_window_centers}')
+    print(f'position: {position}')
+    print(f'velocity: {velocity}')
+    print(f'acceleration: {acceleration}')
+
+    position_derivative_column_names = ['x', 'vel_x', 'accel_x']
+    position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
+    position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
+    # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
+    print(f'\tposition_derivative_means: {position_derivative_means}')
+    print(f'\tposition_derivative_medians: {position_derivative_medians}')
+    return position_derivatives_df
+
+
+@function_attributes(short_name='travel', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
+def bin_wise_position_difference(a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+    """ Bin-wise most-likely position difference. Contiguous trajectories have small deltas between adjacent time bins, while non-contiguous ones can jump wildly (up to the length of the track)
+    ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
+    """
+    a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+    a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+    n_time_bins: int = a_result.nbins[an_epoch_idx]
+    # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
+    time_window_centers = a_result.time_window_centers[an_epoch_idx]
+
+    # compute the 1st-order diff of all positions
+    a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+    a_first_order_diff
+    # add up the differences over all time bins
+    total_first_order_change: float = np.nansum(np.abs(a_first_order_diff[1:])) # use .abs() to sum the total distance traveled in either direction
+    total_first_order_change
+
+    ## convert to a score
+
+    # normalize by the number of bins to allow comparions between different Epochs (so epochs with more bins don't intrinsically have a larger score.
+    total_first_order_change_score: float = float(total_first_order_change) / float(n_time_bins - 1)
+    total_first_order_change_score
+    # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
+    total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
+    ## RETURNS: total_first_order_change_score
+    return total_first_order_change_score
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
 @define(slots=False, repr=False)
@@ -88,30 +141,7 @@ class HeuristicReplayScoring:
         pass
     
 
-@function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 14:30', related_items=[])
-def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size):
-    """try recomputing velocties/accelerations
-    
-    decoding_time_bin_size = a_result.decoding_time_bin_size
-    """ 
-    position = deepcopy(position)
-    a_first_order_diff = np.diff(position, n=1, prepend=[position[0]]) 
-    velocity = a_first_order_diff / float(decoding_time_bin_size) # velocity with real world units of cm/sec
-    acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
 
-    position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
-    print(f'time_window_centers: {time_window_centers}')
-    print(f'position: {position}')
-    print(f'velocity: {velocity}')
-    print(f'acceleration: {acceleration}')
-
-    position_derivative_column_names = ['x', 'vel_x', 'accel_x']
-    position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
-    position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
-    # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
-    print(f'\tposition_derivative_means: {position_derivative_means}')
-    print(f'\tposition_derivative_medians: {position_derivative_medians}')
-    return position_derivatives_df
 
 def debug_plot_position_and_derivatives_figure(time_window_centers, position, velocity, acceleration, debug_plot_axs=None, debug_plot_name=None, common_plot_kwargs=None):
     """ 
