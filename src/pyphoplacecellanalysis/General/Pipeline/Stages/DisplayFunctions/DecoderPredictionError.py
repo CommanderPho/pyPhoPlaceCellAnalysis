@@ -303,8 +303,6 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
                 'cmap': cmap,
                 'interpolation':'nearest',
                 'aspect':'auto',
-            }
-                
             } | posterior_heatmap_imshow_kwargs # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
             # Posterior distribution heatmaps at each point.
             # X

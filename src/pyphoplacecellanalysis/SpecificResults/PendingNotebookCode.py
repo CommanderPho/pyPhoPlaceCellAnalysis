@@ -628,10 +628,34 @@ def _run_all_score_computations(track_templates: TrackTemplates, a_decoded_filte
     all_epochs_scores_df = pd.DataFrame(all_epochs_scores_dict)
     return all_epochs_scores_df
 
+def _add_lap_extended_info_columns(filter_epochs: pd.DataFrame, t_start, t_delta, t_end, labels_column_name='lap_id'):
+    """ Ensures the laps df passed has the required track and directional information ('maze_id', 'lap_dir'], and from this info builds a new 'truth_decoder_name' column containing the name of the decoder built from the corresponding lap
+    
+    Usage:    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_lap_extended_info_columns
+
+        ## INPUTS: all_directional_laps_filter_epochs_decoder_result_value, labels_column_name
+        # Creates Columns: 'maze_id', 'truth_decoder_name':
+        labels_column_name='label'
+        # labels_column_name='lap_id'
+        filter_epochs = all_directional_laps_filter_epochs_decoder_result_value.filter_epochs.to_dataframe()
+        filter_epochs, all_epochs_position_derivatives_df = _add_lap_extended_info_columns(filter_epochs, labels_column_name=labels_column_name)
+        filter_epochs
+
+    """
+    from neuropy.core.epoch import Epoch, ensure_dataframe
+    ## INPUTS: filter_epochs: pd.DataFrame
+    filter_epochs = ensure_dataframe(filter_epochs).epochs.adding_maze_id_if_needed(t_start, t_delta, t_end, replace_existing=True, labels_column_name=labels_column_name)
+    # Creates Columns: 'truth_decoder_name':
+    lap_dir_keys = ['LR', 'RL']
+    maze_id_keys = ['long', 'short']
+    filter_epochs['truth_decoder_name'] = filter_epochs['maze_id'].map(dict(zip(np.arange(len(maze_id_keys)), maze_id_keys))) + '_' + filter_epochs['lap_dir'].map(dict(zip(np.arange(len(lap_dir_keys)), lap_dir_keys)))
+    return filter_epochs
+
 
 
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 19:54', related_items=[])
-def _run_all_compute_pho_heuristic_replay_scores(filter_epochs: pd.DataFrame, labels_column_name='lap_id'):
+def _run_all_compute_pho_heuristic_replay_scores(filter_epochs: pd.DataFrame, a_decoded_filter_epochs_decoder_result_dict, t_start, t_delta, t_end, labels_column_name='lap_id'):
     """ 
     
     version from earlier in the day that only computes `compute_pho_heuristic_replay_scores`. The `_run_score_computations` was generalized from this one.
@@ -653,28 +677,27 @@ def _run_all_compute_pho_heuristic_replay_scores(filter_epochs: pd.DataFrame, la
     from neuropy.core.epoch import Epoch, ensure_dataframe
     ## INPUTS: filter_epochs: pd.DataFrame
     filter_epochs = ensure_dataframe(filter_epochs).epochs.adding_maze_id_if_needed(t_start, t_delta, t_end, replace_existing=True, labels_column_name=labels_column_name)
+    # # Creates Columns: 'truth_decoder_name':
+    # filter_epochs = _add_lap_extended_info_columns(filter_epochs, t_start, t_delta, t_end, labels_column_name=labels_column_name)
+    # # # Update result's .filter_epochs
+    # # all_directional_laps_filter_epochs_decoder_result_value.filter_epochs = filter_epochs.epochs.to_Epoch()
 
-    # Creates Columns: 'truth_decoder_name':
-    lap_dir_keys = ['LR', 'RL']
-    maze_id_keys = ['long', 'short']
-    filter_epochs['truth_decoder_name'] = filter_epochs['maze_id'].map(dict(zip(np.arange(len(maze_id_keys)), maze_id_keys))) + '_' + filter_epochs['lap_dir'].map(dict(zip(np.arange(len(lap_dir_keys)), lap_dir_keys)))
-    # Update result's .filter_epochs
-    all_directional_laps_filter_epochs_decoder_result_value.filter_epochs = filter_epochs.epochs.to_Epoch()
-    ## INPUT: a_decoded_filter_epochs_decoder_result_dict, all_directional_laps_filter_epochs_decoder_result_value
-    # num_filter_epochs: int = all_directional_laps_filter_epochs_decoder_result_value
+    # ## INPUT: a_decoded_filter_epochs_decoder_result_dict, all_directional_laps_filter_epochs_decoder_result_value
+    # # num_filter_epochs: int = all_directional_laps_filter_epochs_decoder_result_value
 
-    _out_new_scores = {}
+    _out_true_decoder_new_scores = {}
 
     for i, row in enumerate(filter_epochs.itertuples()): # np.arange(num_filter_epochs)
+        ## For each epoch, it gets the known-true decoder so that it can be compared to all the others.
         # print(row.truth_decoder_name)
         curr_decoder_name: str = row.truth_decoder_name
         a_result = a_decoded_filter_epochs_decoder_result_dict[curr_decoder_name]
-        _out_new_scores[i] = compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=i, debug_plot_axs=None, debug_plot_name=None)
+        _out_true_decoder_new_scores[i] = compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=i, debug_plot_axs=None, debug_plot_name=None)
 
         # all_directional_laps_filter_epochs_decoder_result_value.it
 
-    all_epochs_position_derivatives_df = pd.concat([a_scores.position_derivatives_df for a_scores in _out_new_scores.values()], ignore_index=True)
-    return filter_epochs, all_epochs_position_derivatives_df
+    all_epochs_position_derivatives_df = pd.concat([a_scores.position_derivatives_df for a_scores in _out_true_decoder_new_scores.values()], ignore_index=True)
+    return filter_epochs, _out_true_decoder_new_scores, all_epochs_position_derivatives_df
 
 
 
@@ -2293,10 +2316,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     # common_plot_kwargs = dict(color="time_bin_size")
     common_plot_kwargs = dict() # color=None
-    
+    if hist_kwargs is None:
+        hist_kwargs = {}
     hist_kwargs = hist_kwargs | dict(opacity=0.5, range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
-    print(f'hist_kwargs: {hist_kwargs}')
-
+    # print(f'hist_kwargs: {hist_kwargs}')
 
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
