@@ -286,10 +286,14 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         if posterior is not None:
             if posterior_heatmap_imshow_kwargs is None:
                 posterior_heatmap_imshow_kwargs = {}
+
             # Get the colormap to use and set the bad color
             cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
-            cmap.set_bad(color='black')
+            cmap.set_bad(color='black', alpha=0.95)
+            cmap.set_under(color='white', alpha=0.0)
+            cmap.set_over(color='red', alpha=1.0)
             # cmap = 'turbo'
+
 
             # Compute extents for imshow:
             main_plot_kwargs = {
@@ -308,6 +312,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             x_first_extent = (xmin, xmax, ymin, ymax)
             active_extent = x_first_extent
             im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=True, **main_plot_kwargs)
+            # assert xmin < xmax
             ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
             ax.set_ylim((ymin, ymax))
         else:
