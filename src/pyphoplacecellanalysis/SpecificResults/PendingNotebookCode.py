@@ -442,7 +442,7 @@ def debug_plot_position_and_derivatives_figure(new_measured_pos_df, all_epochs_p
 HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "num_direction_changes", "num_congruent_direction_bins_score", "total_congruent_direction_change", "position_derivatives_df")})
 
 @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 08:00', related_items=[])
-def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, enable_debug_plot=False, debug_plot_axs=None, common_plot_kwargs=None, debug_plot_name=None) -> HeuristicScoresTuple:
+def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, enable_debug_plot=False, debug_plot_axs=None, common_plot_kwargs=None, debug_plot_name=None, **kwargs) -> HeuristicScoresTuple:
     """ 2024-02-29 - New smart replay heuristic scoring
 
     For a single_decoder, single_epoch
@@ -576,10 +576,11 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     return HeuristicScoresTuple(longest_sequence_length, num_direction_changes, num_congruent_direction_bins_score, total_congruent_direction_change, position_derivatives_df)
 
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
 
 
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 19:54', related_items=[])
-def _run_all_score_computations(track_templates, a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict):
+def _run_all_score_computations(track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], all_score_computations_fn_dict: Dict):
     """ 
     Performs the score computations specified in `all_score_computations_fn_dict` 
     Ideas is to have a general format for the functions that can be ran, and this function loops through all of them passing them what they need to run (all decoders, all epochs) and then collects their outputs to get simple DataFrames of scores for each epoch.
@@ -608,14 +609,20 @@ def _run_all_score_computations(track_templates, a_decoded_filter_epochs_decoder
     decoder_track_length_dict # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
     ## OUTPUTS: decoder_track_length_dict
 
-
     ## INPUTS: a_decoded_filter_epochs_decoder_result_dict, decoder_track_length_dict
     all_epochs_scores_dict = {}
     for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
-        score_name: str = bin_wise_position_difference.short_name or bin_wise_position_difference.__name__
-        column_name: str = f"{score_name}_{a_name}"
+        ## all four decoders are guaranteed to be independent
         a_decoder_track_length: float = decoder_track_length_dict[a_name]
-        all_epochs_scores_dict[column_name] = [bin_wise_position_difference(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
+
+        ## compute all scores for this decoder:
+        for score_computation_name, computation_fn in all_score_computations_fn_dict.items():
+            score_name: str = score_computation_name # bin_wise_position_difference.short_name or bin_wise_position_difference.__name__
+            column_name: str = f"{score_name}_{a_name}"
+            
+            # all_epochs_scores_dict[column_name] = [bin_wise_position_difference(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
+            all_epochs_scores_dict[column_name] = [computation_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
+
 
     ## OUTPUTS: all_epochs_scores_dict, all_epochs_scores_df
     all_epochs_scores_df = pd.DataFrame(all_epochs_scores_dict)
