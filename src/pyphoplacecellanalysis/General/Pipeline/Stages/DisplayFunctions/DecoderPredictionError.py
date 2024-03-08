@@ -1156,6 +1156,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 extant_line.set_data(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y)
                 radon_transform_plot = extant_line
             else:
+                # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
                 radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
             
         else:
@@ -1433,7 +1434,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         data_index_value = epoch_start_t
 
         # Add replay score text to top-right corner:
-        assert data_index_value in plots_data.weighted_corr_data, f"plots_data.weighted_corr_data does not contain index {data_index_value}"
+        assert data_index_value in plots_data.weighted_corr_data, f"plots_data.weighted_corr_data does not contain index {data_index_value}" # AssertionError: plots_data.weighted_corr_data does not contain index 64.08305454952642
         weighted_corr_data_item: WeightedCorrelationPlotData = plots_data.weighted_corr_data[data_index_value]
         final_text: str = weighted_corr_data_item.build_display_text()
 

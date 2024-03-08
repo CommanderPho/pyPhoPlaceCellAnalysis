@@ -1636,6 +1636,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
 
+        assert isinstance(decoder_laps_filter_epochs_decoder_result_dict, dict), f"type(decoder_laps_filter_epochs_decoder_result_dict) is {type(decoder_laps_filter_epochs_decoder_result_dict)}, if it's TrackTemplates we forgot to update the function calls"
+
         ## Choose which columns from the filter_epochs dataframe to include on the plot.
         if included_columns is None:
             included_columns = []
@@ -1655,7 +1657,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         ## Add the radon_transform_lines to each of the four figures:
         for a_name, a_pagination_controller in self.pagination_controllers.items():            
             a_pagination_controller.add_data_overlays(decoder_decoded_epochs_result=decoder_decoded_epochs_result_dict[a_name], included_columns=included_columns, defer_refresh=True)
-
 
         if not defer_refresh:
             self.refresh_current_page()
