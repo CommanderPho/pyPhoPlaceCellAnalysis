@@ -235,7 +235,7 @@ def _cached_epoch_computation_if_needed(computation_result, active_config, activ
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=[])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
-                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False):
+                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -284,6 +284,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
        
         # Posterior distribution heatmap:
         if posterior is not None:
+            if posterior_heatmap_imshow_kwargs is None:
+                posterior_heatmap_imshow_kwargs = {}
             # Get the colormap to use and set the bad color
             cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
             cmap.set_bad(color='black')
@@ -299,6 +301,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
                 'aspect':'auto',
             }
                 
+            } | posterior_heatmap_imshow_kwargs # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
             # Posterior distribution heatmaps at each point.
             # X
             xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])           
@@ -473,7 +476,7 @@ def _batch_update_posterior_image(long_results_obj, xbin, ax): # time_window_cen
 ## END
 
 @function_attributes(short_name=None, tags=['decoder', 'plot', 'position'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 12:29', related_items=[])
-def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False):
+def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False, **kwargs):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     Usage:
         fig, axs = plot_most_likely_position_comparsions(pho_custom_decoder, sess.position.to_dataframe())
@@ -519,13 +522,13 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
         _, axs[0] = plot_1D_most_likely_position_comparsions(position_df, variable_name='x', time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.xbin,
                                                     posterior=marginal_posterior_x,
                                                     active_most_likely_positions_1D=active_most_likely_positions_x, ax=axs[0],
-                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print)
+                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)
         
         # Y:
         _, axs[1] = plot_1D_most_likely_position_comparsions(position_df, variable_name='y', time_window_centers=pho_custom_decoder.active_time_window_centers, xbin=pho_custom_decoder.ybin,
                                                     posterior=marginal_posterior_y,
                                                     active_most_likely_positions_1D=active_most_likely_positions_y, ax=axs[1],
-                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print)    
+                                                    enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)    
         if created_new_figure:
             # Only update if we created a new figure:
             fig.suptitle(f'Decoded Position data component comparison')
@@ -681,7 +684,9 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
                                                         posterior=curr_posterior,
                                                         active_most_likely_positions_1D=curr_most_likely_positions,
                                                         enable_flat_line_drawing=params.enable_flat_line_drawing, debug_print=debug_print,
-                                                        skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions)
+                                                        skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
+                                                        posterior_heatmap_imshow_kwargs=params.get('posterior_heatmap_imshow_kwargs', None),
+                                                        )
     if _temp_fig is not None:
         plots.fig = _temp_fig
     
@@ -725,7 +730,7 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','matplotlib'], input_requires=[], output_provides=[], uses=['stacked_epoch_slices_matplotlib_build_view', '_subfn_update_decoded_epoch_slices'], used_by=['_display_plot_decoded_epoch_slices', 'DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data'], creation_date='2023-05-08 16:31', related_items=[])
 def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, included_epoch_indicies=None, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False,
                                 single_plot_fixed_height=100.0, debug_test_max_num_slices=20, size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True,
-                                name='stacked_epoch_slices_matplotlib_subplots', active_marginal_fn=None, debug_print=False, **kwargs):
+                                name='stacked_epoch_slices_matplotlib_subplots', active_marginal_fn=None, debug_print=False, params_kwargs=None, **kwargs):
     """ plots the decoded epoch results in a stacked slices view 
     
 
@@ -834,6 +839,9 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     params.enable_flat_line_drawing = enable_flat_line_drawing
     params.skip_plotting_measured_positions = kwargs.pop('skip_plotting_measured_positions', False)
     params.skip_plotting_most_likely_positions = kwargs.pop('skip_plotting_most_likely_positions', False)
+    
+    if params_kwargs is not None:
+        params.update(**params_kwargs)
     
     plots_data.global_pos_df = global_pos_df.copy()
     plots_data.filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result)

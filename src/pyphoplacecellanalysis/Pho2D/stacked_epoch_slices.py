@@ -693,10 +693,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             active_filter_epochs = Epoch(epochs=deepcopy(active_filter_epochs)) # convert to native Epoch object
 
         params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
-                                                                name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, **kwargs)
-        # new_obj = cls(params=params, plots_data=plots_data, plots=plots, ui=ui)
-        if params_kwargs is not None:
-            params.update(**params_kwargs)
+                                                                name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, params_kwargs=params_kwargs, **kwargs)
 
         new_obj = cls(params, plots_data, plots, ui)
         
@@ -1021,7 +1018,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                                                                 posterior=curr_posterior,
                                                                 active_most_likely_positions_1D=curr_most_likely_positions,
                                                                 enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print,
-                                                                skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions)
+                                                                skip_plotting_measured_positions=skip_plotting_measured_positions, skip_plotting_most_likely_positions=skip_plotting_most_likely_positions,
+                                                                posterior_heatmap_imshow_kwargs=self.params.get('posterior_heatmap_imshow_kwargs', None),
+                                                                )
                 
                 
                 if _temp_fig is not None:
