@@ -22,7 +22,7 @@ from functools import wraps, partial
 
 
 @function_attributes(short_name=None, tags=['filter', 'epoch_selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
-def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, active_min_num_unique_aclu_inclusions_requirement, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):
+def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, required_min_percentage_of_active_cells: float = 0.333333, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):
     """
     Filters epochs and spikes based on the specified criteria, and updates the epoch IDs.
 
@@ -61,9 +61,12 @@ def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name,
     print(f'len(active_epochs_df): {len(active_epochs_df)}')
     active_spikes_df = deepcopy(global_spikes_df)
 
-    required_min_percentage_of_active_cells: float = 0.333333 # 20% of active cells
+    ## Add to config somewhere?
+    # curr_active_pipeline.config.pre_proessing_params.required_min_percentage_of_active_cells: float = 0.333333
+    
+    # required_min_percentage_of_active_cells: float = 0.333333 # 20% of active cells
     active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells)
-    min_num_unique_aclu_inclusions = active_min_num_unique_aclu_inclusions_requirement
+    min_num_unique_aclu_inclusions: int = active_min_num_unique_aclu_inclusions_requirement
     print(f'min_num_unique_aclu_inclusions: {min_num_unique_aclu_inclusions}')
 
     # Update epochs and spikes
