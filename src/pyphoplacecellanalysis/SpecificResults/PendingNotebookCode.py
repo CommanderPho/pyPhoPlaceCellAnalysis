@@ -21,6 +21,77 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from functools import wraps, partial
 
 
+@function_attributes(short_name=None, tags=['filter', 'epoch_selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
+def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, active_min_num_unique_aclu_inclusions_requirement, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):
+    """
+    Filters epochs and spikes based on the specified criteria, and updates the epoch IDs.
+
+    Args:
+        curr_active_pipeline (object): The current active pipeline object.
+        global_epoch_name (str): The name of the global epoch.
+        track_templates (object): The track templates object.
+        active_min_num_unique_aclu_inclusions_requirement (int): The minimum number of unique ACLUs required for inclusion.
+        epoch_id_key_name (str, optional): The name of the epoch ID key. Default is 'ripple_epoch_id'.
+        no_interval_fill_value (int, optional): The value to fill for no intervals. Default is -1.
+
+    Returns:
+        tuple: A tuple containing the filtered active epochs DataFrame and the updated spikes DataFrame.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import filter_and_update_epochs_and_spikes
+
+
+        filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, active_min_num_unique_aclu_inclusions_requirement, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+        filtered_epochs_df
+
+
+    """
+    from neuropy.core import Epoch
+
+    
+    global_replays = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
+    if isinstance(global_replays, pd.DataFrame):
+        global_replays = Epoch(global_replays.epochs.get_valid_df())
+
+    global_spikes_df = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df)
+    global_spikes_df = global_spikes_df.spikes.sliced_by_neuron_id(track_templates.any_decoder_neuron_IDs)
+
+    # Start Filtering
+    active_epochs_df = deepcopy(global_replays.to_dataframe())
+    print(f'len(active_epochs_df): {len(active_epochs_df)}')
+    active_spikes_df = deepcopy(global_spikes_df)
+
+    required_min_percentage_of_active_cells: float = 0.333333 # 20% of active cells
+    active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells)
+    min_num_unique_aclu_inclusions = active_min_num_unique_aclu_inclusions_requirement
+    print(f'min_num_unique_aclu_inclusions: {min_num_unique_aclu_inclusions}')
+
+    # Update epochs and spikes
+    _label_column_type = 'int64'
+    if not isinstance(active_epochs_df, pd.DataFrame):
+        active_epochs_df = active_epochs_df.to_dataframe()
+
+    assert isinstance(active_epochs_df, pd.DataFrame), f"active_epochs should be a dataframe but it is: {type(active_epochs_df)}"
+    active_epochs_df['label'] = active_epochs_df['label'].astype(_label_column_type)
+
+    active_spikes_df = deepcopy(active_spikes_df)
+
+    active_spikes_df = active_spikes_df.spikes.adding_epochs_identity_column(epochs_df=active_epochs_df, epoch_id_key_name=epoch_id_key_name, epoch_label_column_name='label', override_time_variable_name='t_rel_seconds',
+                                                                              no_interval_fill_value=no_interval_fill_value, should_replace_existing_column=True, drop_non_epoch_spikes=True)
+
+    active_epochs_df = active_epochs_df.epochs.adding_active_aclus_information(spikes_df=active_spikes_df, epoch_id_key_name=epoch_id_key_name, add_unique_aclus_list_column=False)
+
+    active_epochs_df = active_epochs_df[active_epochs_df['n_unique_aclus'] >= active_min_num_unique_aclu_inclusions_requirement]
+    print(f'len(active_epochs_df): {len(active_epochs_df)}')
+    active_epochs_df = active_epochs_df.reset_index(drop=True)
+
+    # Update 'Probe_Epoch_id'
+    active_spikes_df = active_spikes_df.spikes.adding_epochs_identity_column(epochs_df=active_epochs_df, epoch_id_key_name=epoch_id_key_name, epoch_label_column_name='label', override_time_variable_name='t_rel_seconds',
+                                                                             no_interval_fill_value=no_interval_fill_value, should_replace_existing_column=True, drop_non_epoch_spikes=True)
+
+    return active_epochs_df, active_spikes_df
+
+
 
 # ==================================================================================================================== #
 # 2024-03-06 - measured vs. decoded position distribution comparison                                                   #
