@@ -10,6 +10,7 @@ import matplotlib as mpl
 import napari
 from neuropy.analyses.placefields import PfND
 from neuropy.core.epoch import TimeColumnAliasesProtocol
+from neuropy.utils.indexing_helpers import NumpyHelpers
 import numpy as np
 import pandas as pd
 from attrs import define, field, Factory
@@ -575,6 +576,112 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
     return HeuristicScoresTuple(longest_sequence_length, num_direction_changes, num_congruent_direction_bins_score, total_congruent_direction_change, position_derivatives_df)
 
 
+
+
+@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 19:54', related_items=[])
+def _run_all_score_computations(track_templates, a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict):
+    """ 
+    Performs the score computations specified in `all_score_computations_fn_dict` 
+    Ideas is to have a general format for the functions that can be ran, and this function loops through all of them passing them what they need to run (all decoders, all epochs) and then collects their outputs to get simple DataFrames of scores for each epoch.
+
+    Currently only have one implemented.
+    #TODO 2024-03-07 20:05: - [ ] generalize the older `compute_pho_heuristic_replay_scores` to be called from here too!
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import bin_wise_position_difference ## functions to run
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _run_all_score_computations
+
+        all_score_computations_fn_dict = {'bin_wise_position_difference': bin_wise_position_difference}
+        all_epochs_scores_df = _run_score_computations(track_templates, a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict=all_score_computations_fn_dict)
+        all_epochs_scores_df
+
+    """
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import get_track_length_dict
+
+    ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
+    decoder_grid_bin_bounds_dict = {a_name:a_decoder.pf.config.grid_bin_bounds for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+    assert NumpyHelpers.all_allclose(list(decoder_grid_bin_bounds_dict.values())), f"all decoders should have the same grid_bin_bounds (independent of whether they are built on long/short, etc but they do not! This violates following assumptions."
+    grid_bin_bounds = list(decoder_grid_bin_bounds_dict.values())[0] # tuple
+    actual_track_length_dict, idealized_track_length_dict = get_track_length_dict(grid_bin_bounds, grid_bin_bounds)
+    # idealized_track_length_dict # {'long': 214.0, 'short': 144.0}
+    decoder_track_length_dict = {a_name:idealized_track_length_dict[a_name.split('_', maxsplit=1)[0]] for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items()} # 
+    decoder_track_length_dict # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+    ## OUTPUTS: decoder_track_length_dict
+
+
+    ## INPUTS: a_decoded_filter_epochs_decoder_result_dict, decoder_track_length_dict
+    all_epochs_scores_dict = {}
+    for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
+        score_name: str = bin_wise_position_difference.short_name or bin_wise_position_difference.__name__
+        column_name: str = f"{score_name}_{a_name}"
+        a_decoder_track_length: float = decoder_track_length_dict[a_name]
+        all_epochs_scores_dict[column_name] = [bin_wise_position_difference(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
+
+    ## OUTPUTS: all_epochs_scores_dict, all_epochs_scores_df
+    all_epochs_scores_df = pd.DataFrame(all_epochs_scores_dict)
+    return all_epochs_scores_df
+
+
+
+@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 19:54', related_items=[])
+def _run_all_compute_pho_heuristic_replay_scores(filter_epochs: pd.DataFrame, labels_column_name='lap_id'):
+    """ 
+    
+    version from earlier in the day that only computes `compute_pho_heuristic_replay_scores`. The `_run_score_computations` was generalized from this one.
+
+    Usage:    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _run_all_compute_pho_heuristic_replay_scores
+
+        ## INPUTS: all_directional_laps_filter_epochs_decoder_result_value, labels_column_name
+        # Creates Columns: 'maze_id', 'truth_decoder_name':
+        labels_column_name='label'
+        # labels_column_name='lap_id'
+
+        # all_directional_laps_filter_epochs_decoder_result_value.filter_epochs # has 'lap_id',  'lap_dir', -- needs 'maze_id'
+        filter_epochs = all_directional_laps_filter_epochs_decoder_result_value.filter_epochs.to_dataframe()
+        filter_epochs, all_epochs_position_derivatives_df = _run_all_compute_pho_heuristic_replay_scores(filter_epochs, labels_column_name=labels_column_name)
+        filter_epochs
+
+    """
+    from neuropy.core.epoch import Epoch, ensure_dataframe
+    ## INPUTS: filter_epochs: pd.DataFrame
+    filter_epochs = ensure_dataframe(filter_epochs).epochs.adding_maze_id_if_needed(t_start, t_delta, t_end, replace_existing=True, labels_column_name=labels_column_name)
+
+    # Creates Columns: 'truth_decoder_name':
+    lap_dir_keys = ['LR', 'RL']
+    maze_id_keys = ['long', 'short']
+    filter_epochs['truth_decoder_name'] = filter_epochs['maze_id'].map(dict(zip(np.arange(len(maze_id_keys)), maze_id_keys))) + '_' + filter_epochs['lap_dir'].map(dict(zip(np.arange(len(lap_dir_keys)), lap_dir_keys)))
+    # Update result's .filter_epochs
+    all_directional_laps_filter_epochs_decoder_result_value.filter_epochs = filter_epochs.epochs.to_Epoch()
+    ## INPUT: a_decoded_filter_epochs_decoder_result_dict, all_directional_laps_filter_epochs_decoder_result_value
+    # num_filter_epochs: int = all_directional_laps_filter_epochs_decoder_result_value
+
+    _out_new_scores = {}
+
+    for i, row in enumerate(filter_epochs.itertuples()): # np.arange(num_filter_epochs)
+        # print(row.truth_decoder_name)
+        curr_decoder_name: str = row.truth_decoder_name
+        a_result = a_decoded_filter_epochs_decoder_result_dict[curr_decoder_name]
+        _out_new_scores[i] = compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=i, debug_plot_axs=None, debug_plot_name=None)
+
+        # all_directional_laps_filter_epochs_decoder_result_value.it
+
+    all_epochs_position_derivatives_df = pd.concat([a_scores.position_derivatives_df for a_scores in _out_new_scores.values()], ignore_index=True)
+    return filter_epochs, all_epochs_position_derivatives_df
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================== #
+# Old type display helpers                                                                                             #
+# ==================================================================================================================== #
 
 def register_type_display(func_to_register, type_to_register):
     """ adds the display function (`func_to_register`) it decorates to the class (`type_to_register) as a method
