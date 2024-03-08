@@ -239,7 +239,7 @@ def compute_local_peak_probabilities(probs, n_adjacent: int):
 
 
 @function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 14:30', related_items=[])
-def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size):
+def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size, debug_print=False):
     """try recomputing velocties/accelerations
     
     decoding_time_bin_size = a_result.decoding_time_bin_size
@@ -250,17 +250,19 @@ def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size):
     acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
 
     position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
-    print(f'time_window_centers: {time_window_centers}')
-    print(f'position: {position}')
-    print(f'velocity: {velocity}')
-    print(f'acceleration: {acceleration}')
+    if debug_print:
+        print(f'time_window_centers: {time_window_centers}')
+        print(f'position: {position}')
+        print(f'velocity: {velocity}')
+        print(f'acceleration: {acceleration}')
 
     position_derivative_column_names = ['x', 'vel_x', 'accel_x']
     position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
     position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
     # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
-    print(f'\tposition_derivative_means: {position_derivative_means}')
-    print(f'\tposition_derivative_medians: {position_derivative_medians}')
+    if debug_print:
+        print(f'\tposition_derivative_means: {position_derivative_means}')
+        print(f'\tposition_derivative_medians: {position_derivative_medians}')
     return position_derivatives_df
 
 
