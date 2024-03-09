@@ -567,19 +567,24 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         if not isinstance(subset.filter_epochs, pd.DataFrame):
             subset.filter_epochs = subset.filter_epochs.to_dataframe()
         subset.filter_epochs = subset.filter_epochs.loc[included_epoch_indicies] # the evil `.iloc[...]` creeps in again with `IndexError: positional indexers are out-of-bounds`
-        subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in included_epoch_indicies]
-        subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in included_epoch_indicies]
-        subset.marginal_x_list = [subset.marginal_x_list[i] for i in included_epoch_indicies]
-        subset.marginal_y_list = [subset.marginal_y_list[i] for i in included_epoch_indicies]
-        subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in included_epoch_indicies]
-        subset.spkcount = [subset.spkcount[i] for i in included_epoch_indicies]
-        subset.nbins = subset.nbins[included_epoch_indicies] # can be subset because it's an ndarray
-        subset.time_bin_containers = [subset.time_bin_containers[i] for i in included_epoch_indicies]
+
+        ## Convert to the real-deal: pure indicies
+        old_fashioned_indicies = np.array([subset.filter_epochs.index.get_loc(a_loc_idx) for a_loc_idx in included_epoch_indicies])
+        print(f'old_fashioned_indicies: {old_fashioned_indicies}')
+
+        subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in old_fashioned_indicies] # that's obviously not going to work because .loc[...] values are used. I need that magic trick that the new AI taught me -- `.index.get_loc(start_index)`
+        subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in old_fashioned_indicies]
+        subset.marginal_x_list = [subset.marginal_x_list[i] for i in old_fashioned_indicies]
+        subset.marginal_y_list = [subset.marginal_y_list[i] for i in old_fashioned_indicies]
+        subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in old_fashioned_indicies]
+        subset.spkcount = [subset.spkcount[i] for i in old_fashioned_indicies]
+        subset.nbins = subset.nbins[old_fashioned_indicies] # can be subset because it's an ndarray
+        subset.time_bin_containers = [subset.time_bin_containers[i] for i in old_fashioned_indicies]
         subset.num_filter_epochs = len(included_epoch_indicies)
-        subset.time_bin_edges = [subset.time_bin_edges[i] for i in included_epoch_indicies]
+        subset.time_bin_edges = [subset.time_bin_edges[i] for i in old_fashioned_indicies]
         if len(subset.epoch_description_list) == original_num_filter_epochs:
             # sometimes epoch_description_list is empty and so it doesn't need to be subsetted.
-            subset.epoch_description_list = [subset.epoch_description_list[i] for i in included_epoch_indicies]
+            subset.epoch_description_list = [subset.epoch_description_list[i] for i in old_fashioned_indicies]
             
         # Only `decoding_time_bin_size` is unchanged
         return subset
