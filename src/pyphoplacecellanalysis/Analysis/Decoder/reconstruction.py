@@ -566,7 +566,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         original_num_filter_epochs = subset.num_filter_epochs
         if not isinstance(subset.filter_epochs, pd.DataFrame):
             subset.filter_epochs = subset.filter_epochs.to_dataframe()
-        subset.filter_epochs = subset.filter_epochs.iloc[included_epoch_indicies]
+        subset.filter_epochs = subset.filter_epochs.loc[included_epoch_indicies] # the evil `.iloc[...]` creeps in again with `IndexError: positional indexers are out-of-bounds`
         subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in included_epoch_indicies]
         subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in included_epoch_indicies]
         subset.marginal_x_list = [subset.marginal_x_list[i] for i in included_epoch_indicies]
