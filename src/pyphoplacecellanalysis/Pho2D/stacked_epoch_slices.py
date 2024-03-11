@@ -1091,7 +1091,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     # Interactive Selection Overrides                                                                                      #
     # ==================================================================================================================== #
     def on_click(self, event):
-        """ called when an axis is clicked to toggle the selection. """
+        """ called when an axis is clicked via any mouse button. """
         if self.params.debug_print:
             self.ui.print(f'DecodedEpochSlicesPaginatedFigureController.on_click(...) OVERRIDE:')
 
@@ -1137,6 +1137,17 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # event.canvas.draw()
         # event.canvas.draw_idle()
 
+    def try_get_clicked_epoch(self, clicked_data_index):
+        """ a helper function to try to find the epoch info corresponding to the clicked_data_index. Used by on_middle_click and on_secondary_click.
+        """
+        if clicked_data_index is not None:
+            clicked_epoch_is_selected = self.params.is_selected[clicked_data_index]
+            clicked_epoch_start_stop_time = self.plots_data.epoch_slices[clicked_data_index]
+        else:
+            clicked_epoch_is_selected = None
+            clicked_epoch_start_stop_time = None
+        return clicked_epoch_start_stop_time, clicked_epoch_is_selected
+            
 
     def on_primary_click(self, event, clicked_ax=None, clicked_data_index=None):
         """ a primary (Usually left)-click event. Called manually from self.on_click(...) for appropriate mouse button events.
@@ -1153,20 +1164,15 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """ a middle-click event. Called manually from self.on_click(...) for appropriate mouse button events.
         """
         self.ui.print(f'on_middle_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
-        if clicked_data_index is not None:
-            clicked_epoch_is_selected = self.params.is_selected[clicked_data_index]
-            clicked_epoch_start_stop_time = self.plots_data.epoch_slices[clicked_data_index]
-            self.ui.print(f'\tclicked_epoch_is_selected: {clicked_epoch_is_selected}\n\tclicked_epoch_start_stop_time: {clicked_epoch_start_stop_time}')
-        else:
-            clicked_epoch_is_selected = None
-            clicked_epoch_start_stop_time = None
-
+        clicked_epoch_start_stop_time, clicked_epoch_is_selected = self.try_get_clicked_epoch(clicked_data_index=clicked_data_index)
+        
+        # Middle Click Callbacks _____________________________________________________________________________________________ #
         on_middle_click_item_callbacks = self.params.get('on_middle_click_item_callbacks', {})
         for a_callback_name, a_callback in on_middle_click_item_callbacks.items():
             if self.params.debug_print:
                 self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}')
 
-            with ExceptionPrintingContext(suppress=self.params.get("should_suppress_callback_exceptions", True), exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}"  for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {formatted_exception_str}'))):        
+            with ExceptionPrintingContext(suppress=self.params.get("should_suppress_callback_exceptions", True), exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {formatted_exception_str}'))):        
                 a_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time)
 
 
@@ -1175,6 +1181,18 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """ a secondary (usually right)-click event. Called manually from self.on_click(...) for appropriate mouse button events.
         """
         self.ui.print(f'on_secondary_click(event, clicked_ax={clicked_ax}, clicked_data_index={clicked_data_index})')
+        clicked_epoch_start_stop_time, clicked_epoch_is_selected = self.try_get_clicked_epoch(clicked_data_index=clicked_data_index)
+        
+        # Secondary-Click Callbacks _____________________________________________________________________________________________ #
+        on_secondary_click_item_callbacks = self.params.get('on_secondary_click_item_callbacks', {})
+        for a_callback_name, a_callback in on_secondary_click_item_callbacks.items():
+            if self.params.debug_print:
+                self.ui.print(f'\tperforming callback with name: "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}')
+
+            with ExceptionPrintingContext(suppress=self.params.get("should_suppress_callback_exceptions", True), exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {formatted_exception_str}'))):        
+                a_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time)
+
+
 
 
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
