@@ -183,6 +183,17 @@ class PaginatedPlotDataProvider:
         
 
 
+    @classmethod
+    def remove_data_from_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
+        """ Removes the added plots from the pagination_controler
+
+        """
+        raise NotImplementedError(f"TODO")
+    
+
+
+
+
 
 @define(slots=False, eq=False) # eq=False makes hashing and equality by identity, which is appropriate for this type of object
 class PaginatedFigureBaseController:
