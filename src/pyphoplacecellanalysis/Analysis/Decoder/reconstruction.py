@@ -560,17 +560,20 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return subset.filtered_by_epochs(found_data_indicies)
 
 
-    def filtered_by_epochs(self, included_epoch_indicies):
+    def filtered_by_epochs(self, included_epoch_indicies, debug_print=False):
         """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
         subset = deepcopy(self)
         original_num_filter_epochs = subset.num_filter_epochs
         if not isinstance(subset.filter_epochs, pd.DataFrame):
             subset.filter_epochs = subset.filter_epochs.to_dataframe()
-        subset.filter_epochs = subset.filter_epochs.loc[included_epoch_indicies] # the evil `.iloc[...]` creeps in again with `IndexError: positional indexers are out-of-bounds`
 
         ## Convert to the real-deal: pure indicies
         old_fashioned_indicies = np.array([subset.filter_epochs.index.get_loc(a_loc_idx) for a_loc_idx in included_epoch_indicies])
-        print(f'old_fashioned_indicies: {old_fashioned_indicies}')
+        if debug_print:
+            print(f'old_fashioned_indicies: {old_fashioned_indicies}')
+
+        ## Need to have the indicies before applying the filter:
+        subset.filter_epochs = subset.filter_epochs.loc[included_epoch_indicies] # the evil `.iloc[...]` creeps in again with `IndexError: positional indexers are out-of-bounds`
 
         subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in old_fashioned_indicies] # that's obviously not going to work because .loc[...] values are used. I need that magic trick that the new AI taught me -- `.index.get_loc(start_index)`
         subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in old_fashioned_indicies]
