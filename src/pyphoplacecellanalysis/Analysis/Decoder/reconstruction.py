@@ -380,7 +380,7 @@ class Zhang_Two_Step:
     def compute_bayesian_two_step_prob_single_timestep(cls, one_step_p_x_given_n, x_prev, all_x, sigma_t, C, k):
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
     
-from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+
 
 @custom_define(slots=False, repr=False)
 class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
@@ -478,6 +478,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 epoch_description_list: list | shape (n_epochs)
             )
         """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
         # content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
         # return f"{type(self).__name__}({content}\n)"
         attr_reprs = []
