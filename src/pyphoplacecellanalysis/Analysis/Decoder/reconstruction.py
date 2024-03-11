@@ -551,7 +551,9 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
 
 
-    def filtered_by_epoch_times(self, included_epoch_start_times):
+    def filtered_by_epoch_times(self, included_epoch_start_times) -> "DecodedFilterEpochsResult":
+        """ Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies found from the rows that match `included_epoch_start_times`.       
+        """
         subset = deepcopy(self)
         original_num_filter_epochs = subset.num_filter_epochs
         if not isinstance(subset.filter_epochs, pd.DataFrame):
@@ -560,8 +562,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return subset.filtered_by_epochs(found_data_indicies)
 
 
-    def filtered_by_epochs(self, included_epoch_indicies, debug_print=False):
-        """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
+    def filtered_by_epochs(self, included_epoch_indicies, debug_print=False) -> "DecodedFilterEpochsResult":
+        """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies.
+        
+        MOSTLY TESTED 2024-03-11 - WORKING
+
+        """
         subset = deepcopy(self)
         original_num_filter_epochs = subset.num_filter_epochs
         if not isinstance(subset.filter_epochs, pd.DataFrame):
