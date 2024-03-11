@@ -1273,7 +1273,9 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
     # text_color: str = '#ff886a' # an orange
     # text_color: str = '#42D142' # a light green
-    text_color: str = '#66FF00' # a light green
+    # text_color: str = '#66FF00' # a light green
+    text_color: str = '#013220' # a very dark forest green
+
 
     provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
@@ -1321,7 +1323,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     @classmethod
     def decoder_build_weighted_correlation_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
         """ builds the Radon Transform data for each of the four decoders. 
-        
         
         Usage:
         
@@ -1382,6 +1383,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             plots['weighted_corr']
 
         """
+        from matplotlib import font_manager
         from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
         from matplotlib.offsetbox import AnchoredText
 
@@ -1415,9 +1417,22 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         half_y_margin_width = (1.0 - bbox.ymax) / 2.0
         bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
 
+
+        # TEXT FORMATTING AND POSITIONING KWARGS _____________________________________________________________________________ #
         # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
         # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
-        text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+        # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+        text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+
+
+
+        font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+                            #   size=10,
+                            #   weight='bold',
+                            #   style='italic',
+                              )
+        text_kwargs['fontproperties'] = font_prop
+
 
         ## Positioning kwargs:
         text_kwargs |= dict(loc='upper right',
@@ -1462,6 +1477,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                 anchored_text = None
 
         else:
+            ## No existing label:
             if should_enable_weighted_correlation_info:
                 ## Create a new one:
                 anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, **text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
