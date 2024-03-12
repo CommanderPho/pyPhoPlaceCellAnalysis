@@ -2101,6 +2101,30 @@ class DecoderDecodedEpochsResult(ComputedResult):
         a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
         return True
 
+    def get_filtered_decoded_epochs_results(self, curr_active_pipeline, global_epoch_name: str, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333):
+        ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
+
+        # 2024-03-04 - Filter out the epochs based on the criteria:
+        filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline=curr_active_pipeline, global_epoch_name=global_epoch_name, track_templates=track_templates, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+
+        ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
+        # print(f"any_good_selected_epoch_times.shape: {any_good_selected_epoch_times.shape}") # (142, 2)
+
+
+        decoder_ripple_filter_epochs_decoder_result_dict = self.decoder_ripple_filter_epochs_decoder_result_dict
+
+        ## filter the epochs by something and only show those:
+        # INPUTS: filtered_epochs_df
+        # filtered_ripple_simple_pf_pearson_merged_df = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(active_epochs_df[['start', 'stop']].to_numpy())
+        ## Update the `decoder_ripple_filter_epochs_decoder_result_dict` with the included epochs:
+        filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
+        ## Constrain again now by the user selections:
+        filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(any_good_selected_epoch_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
+        # filtered_decoder_filter_epochs_decoder_result_dict
+
+        return filtered_decoder_filter_epochs_decoder_result_dict, any_good_selected_epoch_times
+
 
     # @classmethod
     # def try_add_in_user_annotation_column_from_selections(cls, a_df, user_annotation_selections=None):
