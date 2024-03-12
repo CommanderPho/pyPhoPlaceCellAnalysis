@@ -23,6 +23,109 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 
 
 
+# ==================================================================================================================== #
+# 2024-03-09 - Filtering                                                                                               #
+# ==================================================================================================================== #
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import HeuristicReplayScoring
+from neuropy.core.epoch import find_data_indicies_from_epoch_times
+
+
+def _apply_filtering_to_marginals_result_df(active_result_df, filtered_epochs_df, filtered_decoder_filter_epochs_decoder_result_dict):
+    """ after filtering the epochs (for user selections, validity, etc) apply the same filtering to a results df. 
+
+    Applied to `filtered_decoder_filter_epochs_decoder_result_dict` to build a dataframe
+    
+    """
+    ## INPUTS: active_result_df, filtered_epochs_df
+
+    # found_data_indicies = find_data_indicies_from_epoch_times(active_result_df, epoch_times=np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t'], atol=1e-2)
+    # found_data_indicies = find_data_indicies_from_epoch_times(active_result_df, epoch_times=np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t'], atol=1e-2)
+    found_data_indicies = find_data_indicies_from_epoch_times(active_result_df, epoch_times=np.squeeze(filtered_epochs_df['start'].to_numpy()), t_column_names=['ripple_start_t'], atol=1e-3)
+
+    # ripple_all_epoch_bins_marginals_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+
+    active_result_df = active_result_df.loc[found_data_indicies].copy().reset_index(drop=True)
+    direction_max_indices = active_result_df[['P_LR', 'P_RL']].values.argmax(axis=1)
+    track_identity_max_indices = active_result_df[['P_Long', 'P_Short']].values.argmax(axis=1)
+
+    ## INPUTS: filtered_decoder_filter_epochs_decoder_result_dict
+
+    df_column_names = [list(a_df.filter_epochs.columns) for a_df in filtered_decoder_filter_epochs_decoder_result_dict.values()]
+    print(f"df_column_names: {df_column_names}")
+    selected_df_column_names = ['wcorr', 'pearsonr']
+
+    # merged_dfs_dict = {a_name:a_df.filter_epochs[selected_df_column_names].add_suffix(f"_{a_name}") for a_name, a_df in filtered_decoder_filter_epochs_decoder_result_dict.items()}
+    # merged_dfs_dict = pd.concat([a_df.filter_epochs[selected_df_column_names].add_suffix(f"_{a_name}") for a_name, a_df in filtered_decoder_filter_epochs_decoder_result_dict.items()], axis='columns')
+    # merged_dfs_dict
+
+    # filtered_decoder_filter_epochs_decoder_result_dict['short_LR'][a_column_name], filtered_decoder_filter_epochs_decoder_result_dict['short_RL'][a_column_name]
+
+    ## BEST/COMPARE OUT DF:
+    # active_result_df = deepcopy(active_result_df)
+
+    # Get only the best direction long/short values for each metric:
+    for a_column_name in selected_df_column_names: # = 'wcorr'
+        assert len(direction_max_indices) == len(filtered_decoder_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)
+        active_result_df[f'long_best_{a_column_name}'] = np.where(direction_max_indices, filtered_decoder_filter_epochs_decoder_result_dict['long_LR'].filter_epochs[a_column_name].to_numpy(), filtered_decoder_filter_epochs_decoder_result_dict['long_RL'].filter_epochs[a_column_name].to_numpy())
+        active_result_df[f'short_best_{a_column_name}'] = np.where(direction_max_indices, filtered_decoder_filter_epochs_decoder_result_dict['short_LR'].filter_epochs[a_column_name].to_numpy(), filtered_decoder_filter_epochs_decoder_result_dict['short_RL'].filter_epochs[a_column_name].to_numpy())
+        active_result_df[f'{a_column_name}_abs_diff'] = active_result_df[f'long_best_{a_column_name}'].abs() - active_result_df[f'short_best_{a_column_name}'].abs()
+
+
+    ## ['wcorr_abs_diff', 'pearsonr_abs_diff']
+    return active_result_df
+
+
+## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
+def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track_templates, decoder_ripple_filter_epochs_decoder_result_dict, ripple_all_epoch_bins_marginals_df, ripple_decoding_time_bin_size: float):
+    """ the main replay epochs filtering function.
+    
+    filtered_epochs_df, filtered_decoder_filter_epochs_decoder_result_dict, filtered_ripple_all_epoch_bins_marginals_df = _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track_templates, decoder_ripple_filter_epochs_decoder_result_dict, ripple_all_epoch_bins_marginals_df)
+
+    """
+    # 2024-03-04 - Filter out the epochs based on the criteria:
+    filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+    ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
+    decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
+
+    ## filter the epochs by something and only show those:
+    # INPUTS: filtered_epochs_df
+    # filtered_ripple_simple_pf_pearson_merged_df = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(active_epochs_df[['start', 'stop']].to_numpy())
+    ## Update the `decoder_ripple_filter_epochs_decoder_result_dict` with the included epochs:
+    filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
+    # print(f"any_good_selected_epoch_times.shape: {any_good_selected_epoch_times.shape}") # (142, 2)
+    ## Constrain again now by the user selections
+    filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(any_good_selected_epoch_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
+    # filtered_decoder_filter_epochs_decoder_result_dict
+
+    # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
+    filtered_decoder_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
+
+    filtered_epochs_df = filtered_epochs_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+
+    ## OUT: filtered_decoder_filter_epochs_decoder_result_dict, filtered_epochs_df
+
+    # `ripple_all_epoch_bins_marginals_df`
+    filtered_ripple_all_epoch_bins_marginals_df = deepcopy(ripple_all_epoch_bins_marginals_df)
+    filtered_ripple_all_epoch_bins_marginals_df = _apply_filtering_to_marginals_result_df(filtered_ripple_all_epoch_bins_marginals_df, filtered_epochs_df=filtered_epochs_df, filtered_decoder_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
+    assert len(filtered_epochs_df) == len(filtered_ripple_all_epoch_bins_marginals_df), f"len(filtered_epochs_df): {len(filtered_epochs_df)} != len(active_result_df): {len(filtered_ripple_all_epoch_bins_marginals_df)}"
+
+    df = filtered_ripple_all_epoch_bins_marginals_df
+
+    # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+    session_name: str = curr_active_pipeline.session_name
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
+    # df = _add_maze_id_to_epochs(df, t_delta)
+    df["time_bin_size"] = ripple_decoding_time_bin_size
+    df['is_user_annotated_epoch'] = True # if it's filtered here, it's true
+
+
+    return filtered_epochs_df, filtered_decoder_filter_epochs_decoder_result_dict, filtered_ripple_all_epoch_bins_marginals_df
+
+
+
 
 @function_attributes(short_name=None, tags=['filter', 'epoch_selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
 def export_numpy_testing_filtered_epochs(curr_active_pipeline, global_epoch_name, track_templates, required_min_percentage_of_active_cells: float = 0.333333, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):

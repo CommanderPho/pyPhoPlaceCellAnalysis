@@ -1234,7 +1234,8 @@ class WeightedCorrelationPlotData:
         curr_formatted_strings = {k:column_formatting_fn_dict[k](v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))}
         # {'wcorr': 'wcorr: -0.707', 'P_decoder': '$P_i$: 0.402', 'pearsonr': '$\rho$: -0.487', 'travel': 'travel: 0.318', 'coverage': 'coverage: 0.318'}
         # {'wcorr': 'wcorr: 0.935', 'P_decoder': '$P_i$: 0.503', 'pearsonr': '$\rho$: -0.217', 'travel': 'travel: 0.147', 'coverage': 'coverage: 0.147'}
-        curr_formatted_text_properties_tuple = [build_label_value_formatted_text_properties(label=k, value=v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))]
+        # curr_formatted_text_properties_tuple = [build_label_value_formatted_text_properties(label=k, value=v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))]
+        curr_formatted_text_properties_tuple = None
         return cls(data_values_dict=a_tuple_dict, column_formatting_fn_dict=column_formatting_fn_dict, data_formatted_strings_dict=curr_formatted_strings, data_label_value_formatting_text_properties_tuples_dict=curr_formatted_text_properties_tuple, should_include_epoch_times=False)
     
 
@@ -1258,8 +1259,8 @@ class WeightedCorrelationPlotData:
                 'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
                 # 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
                 # 'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
-                'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
-                'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
+                # 'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
+                # 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
             }
 
             for i, a_tuple in enumerate(active_filter_epochs_df[actually_present_df_column_names].itertuples(name='EpochDataTuple')):

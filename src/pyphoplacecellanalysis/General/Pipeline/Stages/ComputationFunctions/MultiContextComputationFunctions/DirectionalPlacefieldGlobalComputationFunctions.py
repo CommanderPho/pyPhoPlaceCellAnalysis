@@ -2004,7 +2004,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df = dfs_list
 
         df: pd.DataFrame = filtered_ripple_simple_pf_pearson_merged_df.copy()
-        direction_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+        direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
         track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
         # Get only the best direction long/short values for each metric:
         df['long_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['long_LR_pf_peak_x_pearsonr'], df['long_RL_pf_peak_x_pearsonr'])
@@ -2022,7 +2022,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         elements =  df[start_t_idx_name].to_numpy()
         test_elements = ripple_weighted_corr_merged_df[start_t_idx_name].to_numpy()
         valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0]
-        hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True)
+        hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True) ## NOTE .iloc used here!
 
         ## Add the wcorr columns to `df`:
         wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
