@@ -19,8 +19,6 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 
 from functools import wraps, partial
-
-
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
@@ -214,6 +212,41 @@ def bin_wise_position_difference(a_result: DecodedFilterEpochsResult, an_epoch_i
     total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
     ## RETURNS: total_first_order_change_score
     return total_first_order_change_score
+
+@function_attributes(short_name='coverage', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
+def bin_wise_track_coverage_score_fn(a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+    """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
+
+    """
+    ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
+    a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+    a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+    n_time_bins: int = a_result.nbins[an_epoch_idx]
+    # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
+    time_window_centers = a_result.time_window_centers[an_epoch_idx]
+
+    cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per time bin.
+    
+    # compute the 1st-order diff of all positions
+    a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+    a_first_order_diff
+    # add up the differences over all time bins
+    total_first_order_change: float = np.nansum(np.abs(a_first_order_diff[1:])) # use .abs() to sum the total distance traveled in either direction
+    total_first_order_change
+
+    ## convert to a score
+
+    # normalize by the number of bins to allow comparions between different Epochs (so epochs with more bins don't intrinsically have a larger score.
+    total_first_order_change_score: float = float(total_first_order_change) / float(n_time_bins - 1)
+    total_first_order_change_score
+    # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
+    total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
+    ## RETURNS: total_first_order_change_score
+    return total_first_order_change_score
+
+
+
+
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
 @define(slots=False, repr=False)
@@ -607,7 +640,7 @@ def compute_all_heuristic_scores(track_templates: TrackTemplates, a_decoded_filt
     positions_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=False)) for fn in _positions_fns}
     positions_times_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=True)) for fn in _positions_times_fns}
         
-    all_score_computations_fn_dict = {'travel': bin_wise_position_difference, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
+    all_score_computations_fn_dict = {'travel': bin_wise_position_difference, 'coverage': bin_wise_track_coverage_score_fn,  **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
     a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df = _run_all_score_computations(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict=all_score_computations_fn_dict)
 
     _out_new_scores = {}
