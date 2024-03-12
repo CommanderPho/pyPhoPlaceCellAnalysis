@@ -1638,11 +1638,11 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## Extract params_kwargs
         params_kwargs = kwargs.pop('params_kwargs', {})
-        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
+        # params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
+        params_kwargs = params_kwargs | dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True)
         # print(f'params_kwargs: {params_kwargs}')
         max_subplots_per_page: int = kwargs.pop('max_subplots_per_page', params_kwargs.pop('max_subplots_per_page', 8)) # kwargs overrides params_kwargs
         
-
         decoder_names: List[str] = track_templates.get_decoder_names()
         controlling_pagination_item_name: str = decoder_names[0] # first item # 'long_LR'
         # controlled_pagination_controller_names_list = decoder_names[1:]
