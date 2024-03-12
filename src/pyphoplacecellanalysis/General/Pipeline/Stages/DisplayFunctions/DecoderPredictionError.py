@@ -1270,7 +1270,7 @@ class WeightedCorrelationPlotData:
         #     wcorr_data[a_tuple.start] = cls.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
 
         basic_df_column_names = ['start', 'stop', 'label', 'duration']
-        included_columns_list = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage']
+        included_columns_list = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length']
         all_df_column_names = basic_df_column_names + included_columns_list 
         actually_present_df_column_names = [k for k in all_df_column_names if (k in active_filter_epochs_df.columns)] # only include the entries that are actually in the dataframe
 
@@ -1279,13 +1279,16 @@ class WeightedCorrelationPlotData:
         # column_formatting_dict = {'wcorr': f"wcorr: ", 'P_decoder': "$P_i$: ", 'pearsonr': f"$\rho$: ", 'travel':'travel: ', 'coverage':'coverage: '}
         with np.printoptions(precision=3, suppress=True, threshold=5):
             default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
+            default_int_formatting_fn = lambda v: str(np.array([int(v)])).lstrip("[").rstrip("]")
 
             column_formatting_fn_dict = {'start':None, 'stop':None, 'label':None, 'duration':None,
                 'wcorr': (lambda v:f"wcorr: {default_float_formatting_fn(v)}"),
                 'P_decoder':(lambda v:f"$P_i$: {default_float_formatting_fn(v)}"),
                 'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
-                'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
-                'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
+                # 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
+                # 'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
+                'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
+                'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
             }
 
             for i, a_tuple in enumerate(active_filter_epochs_df[actually_present_df_column_names].itertuples(name='EpochDataTuple')):
@@ -1406,37 +1409,89 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         should_enable_weighted_correlation_info: bool = params.enable_weighted_correlation_info
         # bbox_offset_magnitude: float = params.setdefault('bbox_offset_magnitude', 0.075)
 
-        # Get the axes bounding box in figure coordinates
-        a_fig = curr_ax.get_figure()
-        bbox = curr_ax.get_position()
-        half_x_margin_width = (1.0 - bbox.width) / 2.0
-        half_y_margin_width = (1.0 - bbox.ymax) / 2.0
-        bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
+
+        def _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax):
+            """ captures nothing. """
+            # Get the axes bounding box in figure coordinates
+            a_fig = a_curr_ax.get_figure()
+            bbox = a_curr_ax.get_position()
+            half_x_margin_width = (1.0 - bbox.width) / 2.0
+            half_y_margin_width = (1.0 - bbox.ymax) / 2.0
+            bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
 
 
-        # TEXT FORMATTING AND POSITIONING KWARGS _____________________________________________________________________________ #
-        # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
-        # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
-        # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
-        text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
+            # TEXT FORMATTING AND POSITIONING KWARGS _____________________________________________________________________________ #
+            # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
+            # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
+            # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+            text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
 
-        font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
-                            #   size=10,
-                              weight='bold',
-                            #   style='italic',
-                              )
-        text_kwargs['fontproperties'] = font_prop
+            font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+                                #   size=10,
+                                weight='bold',
+                                #   style='italic',
+                                )
+            text_kwargs['fontproperties'] = font_prop
 
-        ## Positioning kwargs:
-        text_kwargs |= dict(loc='upper right',
-                                # horizontalalignment='center', ## DOES NOTHING?
-                                #verticalalignment='center', ## BREAKS IT
-                                # multialignment='r', ## BREAKS IT
-                                # horizontalalignment='right',  
-                                rotation=-45, #transform=curr_ax.transAxes,
-                                bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=curr_ax.transAxes, transform=a_fig.transFigure,
-                                # bbox_to_anchor=((1.0 + bbox_offset_magnitude), (1.0 + bbox_offset_magnitude)), bbox_transform=curr_ax.transAxes,                        
-                                ) # oriented in upper-right corner, at a diagonal angle
+            ## Positioning kwargs:
+            text_kwargs |= dict(loc='upper right',
+                                    # horizontalalignment='center', ## DOES NOTHING?
+                                    #verticalalignment='center', ## BREAKS IT
+                                    # multialignment='r', ## BREAKS IT
+                                    # horizontalalignment='right',  
+                                    rotation=-45, #transform=a_curr_ax.transAxes,
+                                    bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure,
+                                    # bbox_to_anchor=((1.0 + bbox_offset_magnitude), (1.0 + bbox_offset_magnitude)), bbox_transform=a_curr_ax.transAxes,                        
+                                    ) # oriented in upper-right corner, at a diagonal angle
+
+            return text_kwargs
+        
+
+        def _helper_build_text_kwargs_flat_top(a_curr_ax):
+            """ captures nothing. """
+            # Get the axes bounding box in figure coordinates
+            a_fig = a_curr_ax.get_figure()
+            bbox = a_curr_ax.get_position()
+            half_x_margin_width = (1.0 - bbox.width) / 2.0
+            half_y_margin_width = (1.0 - bbox.ymax) / 2.0
+            bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
+
+
+            # TEXT FORMATTING AND POSITIONING KWARGS _____________________________________________________________________________ #
+            # text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
+            # text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
+            # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+            text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
+
+            font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+                                #   size=10,
+                                weight='bold',
+                                #   style='italic',
+                                )
+            text_kwargs['fontproperties'] = font_prop
+
+            ## Positioning kwargs:
+            text_kwargs |= dict(loc='upper right',
+                                    # horizontalalignment='center', ## DOES NOTHING?
+                                    #verticalalignment='center', ## BREAKS IT
+                                    # multialignment='r', ## BREAKS IT
+                                    # horizontalalignment='right',  
+                                    # rotation=-45, #transform=a_curr_ax.transAxes,
+                                    bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure,
+                                    # bbox_to_anchor=((1.0 + bbox_offset_magnitude), (1.0 + bbox_offset_magnitude)), bbox_transform=a_curr_ax.transAxes,                        
+                                    ) # oriented in upper-right corner, at a diagonal angle
+
+            return text_kwargs
+        
+
+
+
+
+
+
+        # text_kwargs = _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax=curr_ax)
+        text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
+
 
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
@@ -1487,6 +1542,20 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         return params, plots_data, plots, ui
 
 
+    @classmethod
+    def _callback_remove_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
+        extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
+        extant_wcorr_text_label = extant_plots_dict.get('wcorr_text', None)
+        # plot the radon transform line on the epoch:    
+        if (extant_wcorr_text_label is not None):
+            # already exists, update the existing ones. 
+            assert isinstance(extant_wcorr_text_label, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
+            anchored_text: AnchoredText = extant_wcorr_text_label
+            # Check if the AnchoredText object was removed. This happens when ax.clear() is called in `.on_jump_to_page(...)` before the callbacks part
+            ## Weighted Correlation info not wanted, clear/hide or remove the label
+            anchored_text.remove()
+            anchored_text = None
 
 
 

@@ -1440,9 +1440,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             app, root_dockAreaWindow, _out_dock_widgets, dock_configs = merge_single_window(pagination_controller_dict)
 
         """
+        from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+        
         from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
         ## Convert to controlled first
@@ -1478,7 +1481,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         root_dockAreaWindow.setWindowTitle(f'{title}: dockAreaWindow')
         app = root_dockAreaWindow.app
         
-        icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/PhoPaginatedMultiDecoderDecodedEpochsWindow_icon.ico")
+        icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/paginated_multi_decoder_decoded_epochs.ico")
         if icon is not None:
             root_dockAreaWindow.setWindowIcon(icon)
 

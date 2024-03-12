@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="Icons">
+    <file>Icons/visualizations/paginated_multi_decoder_decoded_epochs.ico</file>
     <file>Icons/visualizations/rank_order_raster_debugger.ico</file>
     <file>Icons/visualizations/template_1D_debugger.ico</file>
     <file>Icons/visualizations/templates_1D.ico</file>
