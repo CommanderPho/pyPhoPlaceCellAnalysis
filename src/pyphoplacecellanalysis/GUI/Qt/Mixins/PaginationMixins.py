@@ -157,7 +157,7 @@ class PaginatedPlotDataProvider:
         ## Add the .plots_data:
         assert len(provided_data) == 1
         # weighted_corr_data = provided_data[1]
-        assert len(provided_data) == len(cls.provided_plots_data), f"len(provided_data): {len(provided_data)} != len(cls.provided_plots_data): {len(cls.provided_plots_data)}"
+        assert len(provided_data) == len(cls.get_provided_plots_data()), f"len(provided_data): {len(provided_data)} != len(cls.get_provided_plots_data()): {len(cls.get_provided_plots_data())}"
         active_plots_data = {k:(deepcopy(provided_data[i]) or default_class_value) for i, (k, default_class_value) in enumerate(cls.get_provided_plots_data().items())}
 
         for a_key, a_value in active_plots_data.items():
@@ -184,11 +184,38 @@ class PaginatedPlotDataProvider:
 
 
     @classmethod
-    def remove_data_from_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
+    def remove_data_from_pagination_controller(cls, a_pagination_controller, should_remove_params:bool=False, update_controller_on_apply:bool=False):
         """ Removes the added plots from the pagination_controler
 
         """
-        raise NotImplementedError(f"TODO")
+        ## Remove the callbacks
+        for a_callback_type, a_callback_dict in cls.get_provided_callbacks().items():
+            pagination_controller_callbacks_dict = a_pagination_controller.params.get(a_callback_type, None)
+            if pagination_controller_callbacks_dict is not None:
+                for a_callback_id in a_callback_dict.keys():
+                    if a_callback_id in pagination_controller_callbacks_dict:
+                        del pagination_controller_callbacks_dict[a_callback_id]
+
+        ## Remove the .plots:
+        for a_key in cls.get_provided_plots().keys():
+            if a_key in a_pagination_controller.plots:
+                del a_pagination_controller.plots[a_key]
+                
+        ## Remove the .plots_data:
+        for a_key, default_class_value in cls.get_provided_plots_data().items():
+            if a_key in a_pagination_controller.plots_data:
+                del a_pagination_controller.plots_data[a_key]
+                    
+        ## Remove the .params:
+        if should_remove_params:
+            for a_key in cls.get_provided_params().keys():
+                if a_pagination_controller.params.has_attr(a_key):
+                    del a_pagination_controller.params[a_key]
+
+        # Trigger the update
+        if update_controller_on_apply:
+            a_pagination_controller.on_paginator_control_widget_jump_to_page(0)
+
     
 
 

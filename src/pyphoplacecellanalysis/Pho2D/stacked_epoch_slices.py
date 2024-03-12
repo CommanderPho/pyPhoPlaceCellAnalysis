@@ -1306,6 +1306,21 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.refresh_current_page()
 
 
+    def remove_data_overlays(self, defer_refresh=False):
+        """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
+ 
+        RadonTransformPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
+        WeightedCorrelationPaginatedPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
+
+        if not defer_refresh:
+            self.refresh_current_page()
+
+
+
+
     def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None, defer_render:bool=False):
         """ Restures the user's selections to this pagination controller
 
@@ -1594,6 +1609,20 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         if not defer_refresh:
             self.refresh_current_page()
+
+
+
+    def remove_data_overlays(self, defer_refresh=False):
+        """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
+        """
+        for a_name, a_pagination_controller in self.pagination_controllers.items():
+            a_pagination_controller.remove_data_overlays(defer_refresh=True)
+
+        if not defer_refresh:
+            self.refresh_current_page()
+
+
+
 
 
     @classmethod

@@ -1362,50 +1362,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         return wcorr_data
 
 
-    # @classmethod
-    # def decoder_build_weighted_correlation_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
-    #     """ builds the Radon Transform data for each of the four decoders. 
-        
-    #     Usage:
-        
-    #         radon_transform_laps_data_dict = decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict)
-    #         radon_transform_ripple_data_dict = decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
-
-    #     """
-    #     def _subfn_wcorr_data_build(active_filter_epochs_df: pd.DataFrame):
-    #         num_filter_epochs = np.shape(active_filter_epochs_df)[0]
-    #         wcorr_col_name: str = 'wcorr'
-    #         P_decoder_col_name: str = 'P_decoder'
-    #         pearson_r_col_name: str = 'pearsonr'
-    #         wcorr_data = {}
-            
-    #         df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
-           
-    #         for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
-    #             ## NOTE: uses a_tuple.start as the index in to the data dict:
-    #             wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
-
-    #         return wcorr_data
-
-    #     from pyphocorehelpers.indexing_helpers import NumpyHelpers
-    #     # INPUTS: decoder_decoded_epochs_result_dict, a_name
-
-    #     ## Validate all decoders' results have the same number of filter_epochs and time_bin_containers
-    #     assert NumpyHelpers.all_array_equal([decoder_decoded_epochs_result_dict[a_name].num_filter_epochs for a_name in track_templates.get_decoder_names()])
-    #     assert NumpyHelpers.all_array_equal([np.shape(decoder_decoded_epochs_result_dict[a_name].time_bin_containers) for a_name in track_templates.get_decoder_names()])
-    #     wcorr_data_dict = {}
-    #     # wcorr_data_dict[a_name] = {a_name:_subfn_wcorr_data_build(active_filter_epochs_df=curr_results_obj) for a_name, curr_results_obj in decoder_decoded_epochs_result_dict.items()} # oneliner
-    #     for a_name in track_templates.get_decoder_names():
-    #         curr_results_obj = decoder_decoded_epochs_result_dict[a_name]
-    #         active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
-    #         if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
-    #             active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
-
-    #         wcorr_data_dict[a_name] = _subfn_wcorr_data_build(active_filter_epochs_df=active_filter_epochs_df.copy())
-
-    #     return wcorr_data_dict
-    
-
     @classmethod
     def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
         """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
