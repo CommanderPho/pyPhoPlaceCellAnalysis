@@ -13,12 +13,60 @@ from neuropy.core.epoch import TimeColumnAliasesProtocol
 from neuropy.utils.indexing_helpers import NumpyHelpers
 import numpy as np
 import pandas as pd
-from attrs import define, field, Factory
+from attrs import asdict, define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 
 from functools import wraps, partial
+
+
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+
+def adding_additional_df_columns(original_df: pd.DataFrame, additional_cols_df: pd.DataFrame) -> pd.DataFrame:
+    """    
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import adding_additional_df_columns
+    
+    a_result.filter_epochs = adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
+
+
+    """     
+    assert np.shape(additional_cols_df)[0] == np.shape(original_df)[0], f"np.shape(additional_cols_df)[0]: {np.shape(additional_cols_df)[0]} != np.shape(original_df)[0]: {np.shape(original_df)[0]}"
+    # For each column in additional_cols_df, add it to original_df
+    for column in additional_cols_df.columns:
+        original_df[column] = additional_cols_df[column].values
+        
+    return original_df
+
+
+
+
+def compute_all_heuristic_scores(a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]):
+    """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_heuristic_scores
+
+    a_decoded_filter_epochs_decoder_result_dict, _out_new_scores = compute_all_heuristic_scores(a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
+
+
+    """
+    _out_new_scores = {}
+
+    # all_epochs_position_derivatives_df_dict = {}
+    for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
+        # print(f'\na_name: {a_name}')
+        # _out_new_scores[a_name] = [compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx, enable_debug_plot=False, debug_plot_axs=axs, debug_plot_name=a_name) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
+        # all_epochs_position_derivatives_df_dict[a_name] = pd.concat([a_scores.position_derivatives_df for a_scores in _out_new_scores[a_name]], ignore_index=True)
+        _out_new_scores[a_name] =  pd.DataFrame([asdict(compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx, enable_debug_plot=False, debug_plot_axs=None, debug_plot_name=a_name), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
+        assert np.shape(_out_new_scores[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(_out_new_scores[a_name])[0]: {np.shape(_out_new_scores[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
+        a_result.filter_epochs = adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
+
+
+    return a_decoded_filter_epochs_decoder_result_dict, _out_new_scores
+
+
 
 
 @function_attributes(short_name=None, tags=['filter', 'epoch_selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
@@ -614,6 +662,7 @@ def compute_pho_heuristic_replay_scores(a_result: DecodedFilterEpochsResult, an_
         print(f'track_coverage: {track_coverage}')
 
 
+    assert n_time_bins > 1, f"n_time_bins must be greater than 1 for the first_order_diff to make any sense, but it it isn't. n_time_bins: {n_time_bins}"
     # The idea here was to look at the most-likely positions and their changes (derivatives) to see if these were predictive of good vs. bad ripples. For example, bad ripples might have extreme accelerations while good ones fall within a narrow window of physiologically consistent accelerations
 
     # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[0.0])
