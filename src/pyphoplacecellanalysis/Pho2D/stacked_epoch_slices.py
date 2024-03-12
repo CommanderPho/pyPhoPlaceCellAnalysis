@@ -750,7 +750,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """
         from neuropy.core.epoch import find_data_indicies_from_epoch_times
         epoch_slices_df = pd.DataFrame(self.plots_data.epoch_slices, columns=['start', 'stop'])
-        return find_data_indicies_from_epoch_times(epoch_slices_df, epoch_times=epoch_times, atol=0.01, not_found_action='skip_index', debug_print=True)
+        return find_data_indicies_from_epoch_times(epoch_slices_df, epoch_times=epoch_times, atol=0.01, not_found_action='skip_index', debug_print=self.params.get('debug_print', False))
         # return np.nonzero(np.isclose(self.plots_data.epoch_slices, epoch_times[:, None], atol=1e-3, rtol=1e-3).all(axis=2).any(axis=0))[0]
 
     def save_selection(self) -> EpochSelectionsObject:
