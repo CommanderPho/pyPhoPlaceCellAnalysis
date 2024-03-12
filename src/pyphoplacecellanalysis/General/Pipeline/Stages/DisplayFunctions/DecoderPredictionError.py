@@ -1272,6 +1272,7 @@ class WeightedCorrelationPlotData:
         basic_df_column_names = ['start', 'stop', 'label', 'duration']
         included_columns_list = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage']
         all_df_column_names = basic_df_column_names + included_columns_list 
+        actually_present_df_column_names = [k for k in all_df_column_names if (k in active_filter_epochs_df.columns)] # only include the entries that are actually in the dataframe
 
         wcorr_data = {}
 
@@ -1282,29 +1283,14 @@ class WeightedCorrelationPlotData:
             column_formatting_fn_dict = {'start':None, 'stop':None, 'label':None, 'duration':None,
                 'wcorr': (lambda v:f"wcorr: {default_float_formatting_fn(v)}"),
                 'P_decoder':(lambda v:f"$P_i$: {default_float_formatting_fn(v)}"),
-                'pearsonr':(lambda v:f"$\rho$: {default_float_formatting_fn(v)}"),
+                'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
                 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
                 'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
             }
 
-            # final_column_formatting_fn_dict = {a_col_name:(lambda v: f"{a_col_formatting_prefix}{default_float_formatting_fn(v)}") for a_col_name, a_col_formatting_prefix in column_formatting_dict.items()}
-
-            for i, a_tuple in enumerate(active_filter_epochs_df[all_df_column_names].itertuples(name='EpochDataTuple')):
+            for i, a_tuple in enumerate(active_filter_epochs_df[actually_present_df_column_names].itertuples(name='EpochDataTuple')):
                 ## NOTE: uses a_tuple.start as the index in to the data dict:
-                # column_formatting_fn_dict
-                # wcorr_data[a_tuple.start] = cls.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
-                # wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_row_tuple_and_formatting_fn_dict(a_tuple, column_formatting_fn_dict=column_formatting_fn_dict)
-                # a_tuple_dict = a_tuple._asdict()
-                # curr_formatted_strings = {k:column_formatting_fn_dict[k](v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))}
-                # {'wcorr': 'wcorr: -0.707', 'P_decoder': '$P_i$: 0.402', 'pearsonr': '$\rho$: -0.487', 'travel': 'travel: 0.318', 'coverage': 'coverage: 0.318'}
-                # {'wcorr': 'wcorr: 0.935', 'P_decoder': '$P_i$: 0.503', 'pearsonr': '$\rho$: -0.217', 'travel': 'travel: 0.147', 'coverage': 'coverage: 0.147'}
-
-                # curr_formatted_strings
-
                 wcorr_data[a_tuple.start] = cls.init_from_df_row_tuple_and_formatting_fn_dict(a_tuple=a_tuple, column_formatting_fn_dict=column_formatting_fn_dict)
-                # data_formatted_strings_dict
-                # wcorr_data[a_tuple.start].build_display_text()
-
 
         return wcorr_data
 
