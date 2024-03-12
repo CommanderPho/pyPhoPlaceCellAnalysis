@@ -1210,17 +1210,11 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 # ==================================================================================================================== #
 # Score: Weighted Correlation                                                                                          #
 # ==================================================================================================================== #
+from neuropy.utils.matplotlib_helpers import build_label_value_formatted_text_properties
+
 
 @define(slots=False, repr=False)
 class WeightedCorrelationPlotData:
-    # epoch_identity_str: str = field(default='')
-    # start_t_text: str = field()
-    # stop_t_text: str = field()
-
-    # wcorr_text: str = field()
-    # P_decoder_text: str = field(default='')
-    # pearson_r_text: str = field(default='')
-
 
     data_values_dict: Dict[str, Optional[Any]] = field(factory=dict)
     column_formatting_fn_dict: Dict[str, Optional[callable]] = field(factory=dict)
@@ -1228,22 +1222,10 @@ class WeightedCorrelationPlotData:
     data_formatted_strings_dict: Dict[str, Optional[str]] = field(factory=dict)
 
     # data_formatted_strings: List[str] = field(factory=list)
+    data_label_value_formatting_text_properties_tuples_dict: Dict[str, Optional[str]] = field(factory=dict)
+
 
     should_include_epoch_times: bool = field(default=False)
-
-    # @classmethod
-    # def init_from_df_columns(cls, epoch_start, epoch_end, epoch_wcorr, epoch_P_decoder, pearson_r, should_include_epoch_times=False) -> "WeightedCorrelationPlotData":
-    #     """ TODO: make general """
-    #     with np.printoptions(precision=3, suppress=True, threshold=5):
-    #         default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
-    #         start_t_text = default_float_formatting_fn(epoch_start)
-    #         stop_t_text = default_float_formatting_fn(epoch_end)
-    #         wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
-    #         P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
-    #         if pearson_r is not None:
-    #             pearson_r_text = f"pearsonr: " + str(np.array([pearson_r])).lstrip("[").rstrip("]")
-    #         return cls(start_t_text=start_t_text, stop_t_text=stop_t_text, wcorr_text=wcorr_text, P_decoder_text=P_decoder_text, pearson_r_text=pearson_r_text, should_include_epoch_times=should_include_epoch_times)
-
 
     @classmethod
     def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[callable]]) -> "WeightedCorrelationPlotData":
@@ -1252,23 +1234,12 @@ class WeightedCorrelationPlotData:
         curr_formatted_strings = {k:column_formatting_fn_dict[k](v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))}
         # {'wcorr': 'wcorr: -0.707', 'P_decoder': '$P_i$: 0.402', 'pearsonr': '$\rho$: -0.487', 'travel': 'travel: 0.318', 'coverage': 'coverage: 0.318'}
         # {'wcorr': 'wcorr: 0.935', 'P_decoder': '$P_i$: 0.503', 'pearsonr': '$\rho$: -0.217', 'travel': 'travel: 0.147', 'coverage': 'coverage: 0.147'}
-        return cls(data_values_dict=a_tuple_dict, column_formatting_fn_dict=column_formatting_fn_dict, data_formatted_strings_dict=curr_formatted_strings, should_include_epoch_times=False)
+        curr_formatted_text_properties_tuple = [build_label_value_formatted_text_properties(label=k, value=v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))]
+        return cls(data_values_dict=a_tuple_dict, column_formatting_fn_dict=column_formatting_fn_dict, data_formatted_strings_dict=curr_formatted_strings, data_label_value_formatting_text_properties_tuples_dict=curr_formatted_text_properties_tuple, should_include_epoch_times=False)
     
 
     @classmethod
     def init_batch_from_epochs_df(cls, active_filter_epochs_df: pd.DataFrame, should_include_epoch_times:bool=False) -> Dict[float, "WeightedCorrelationPlotData"]:
-        # num_filter_epochs = np.shape(active_filter_epochs_df)[0]
-        # wcorr_col_name: str = 'wcorr'
-        # P_decoder_col_name: str = 'P_decoder'
-        # pearson_r_col_name: str = 'pearsonr'
-        # wcorr_data = {}
-        
-        # df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
-        
-        # for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
-        #     ## NOTE: uses a_tuple.start as the index in to the data dict:
-        #     wcorr_data[a_tuple.start] = cls.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
-
         basic_df_column_names = ['start', 'stop', 'label', 'duration']
         included_columns_list = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length']
         all_df_column_names = basic_df_column_names + included_columns_list 
@@ -1302,19 +1273,15 @@ class WeightedCorrelationPlotData:
         """ builds the final display string to be rendered in the label. """
         formatted_data_strings_values: List[str] = [v for v in self.data_formatted_strings_dict.values() if ((v is not None) and (len(v) > 0))]
         return "\n".join(formatted_data_strings_values)
-        # final_text_arr = []
-        # if self.should_include_epoch_times:
-        #     final_text_arr.append(f"[{self.start_t_text}, {self.stop_t_text}]")
-        # if len(self.wcorr_text) > 0:
-        #     ## Add the P_decoder line:
-        #     final_text_arr.append(f"{self.wcorr_text}")
-        # if len(self.P_decoder_text) > 0:
-        #     ## Add the P_decoder line:
-        #     final_text_arr.append(f"{self.P_decoder_text}")
-        # if len(self.pearson_r_text) > 0:
-        #     ## Add the P_decoder line:
-        #     final_text_arr.append(f"{self.pearson_r_text}")
-        # return "\n".join(final_text_arr)
+    
+
+    # def build_display_text(self) -> str:
+    #     """ builds the final display string to be rendered in the label. """
+    #     formatted_data_strings_values: List[str] = [v for v in self.data_formatted_strings_dict.values() if ((v is not None) and (len(v) > 0))]
+    #     return "\n".join(formatted_data_strings_values)
+
+
+
     
 
 # @define(slots=False, repr=False)
@@ -1500,6 +1467,10 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         assert data_index_value in plots_data.weighted_corr_data, f"plots_data.weighted_corr_data does not contain index {data_index_value}" # AssertionError: plots_data.weighted_corr_data does not contain index 64.08305454952642
         weighted_corr_data_item: WeightedCorrelationPlotData = plots_data.weighted_corr_data[data_index_value]
         final_text: str = weighted_corr_data_item.build_display_text()
+
+
+        final_formatted_text_tuples: List[Tuple] = weighted_corr_data_item.build_display_text()
+
 
         ## Build or Update:
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
