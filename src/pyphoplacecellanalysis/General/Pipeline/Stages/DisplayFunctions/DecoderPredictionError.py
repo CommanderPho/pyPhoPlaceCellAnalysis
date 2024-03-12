@@ -1214,44 +1214,118 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 @define(slots=False, repr=False)
 class WeightedCorrelationPlotData:
     # epoch_identity_str: str = field(default='')
-    start_t_text: str = field()
-    stop_t_text: str = field()
+    # start_t_text: str = field()
+    # stop_t_text: str = field()
 
-    wcorr_text: str = field()
-    P_decoder_text: str = field(default='')
-    pearson_r_text: str = field(default='')
+    # wcorr_text: str = field()
+    # P_decoder_text: str = field(default='')
+    # pearson_r_text: str = field(default='')
+
+
+    data_values_dict: Dict[str, Optional[Any]] = field(factory=dict)
+    column_formatting_fn_dict: Dict[str, Optional[callable]] = field(factory=dict)
+
+    data_formatted_strings_dict: Dict[str, Optional[str]] = field(factory=dict)
+
+    # data_formatted_strings: List[str] = field(factory=list)
 
     should_include_epoch_times: bool = field(default=False)
 
+    # @classmethod
+    # def init_from_df_columns(cls, epoch_start, epoch_end, epoch_wcorr, epoch_P_decoder, pearson_r, should_include_epoch_times=False) -> "WeightedCorrelationPlotData":
+    #     """ TODO: make general """
+    #     with np.printoptions(precision=3, suppress=True, threshold=5):
+    #         default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
+    #         start_t_text = default_float_formatting_fn(epoch_start)
+    #         stop_t_text = default_float_formatting_fn(epoch_end)
+    #         wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+    #         P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
+    #         if pearson_r is not None:
+    #             pearson_r_text = f"pearsonr: " + str(np.array([pearson_r])).lstrip("[").rstrip("]")
+    #         return cls(start_t_text=start_t_text, stop_t_text=stop_t_text, wcorr_text=wcorr_text, P_decoder_text=P_decoder_text, pearson_r_text=pearson_r_text, should_include_epoch_times=should_include_epoch_times)
+
+
     @classmethod
-    def init_from_df_columns(cls, epoch_start, epoch_end, epoch_wcorr, epoch_P_decoder, pearson_r, should_include_epoch_times=False) -> "WeightedCorrelationPlotData":
-        """ TODO: make general """
+    def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[callable]]) -> "WeightedCorrelationPlotData":
+        a_tuple_dict = a_tuple._asdict()
+        all_df_column_keys: List[str] = list(a_tuple_dict.keys())
+        curr_formatted_strings = {k:column_formatting_fn_dict[k](v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))}
+        # {'wcorr': 'wcorr: -0.707', 'P_decoder': '$P_i$: 0.402', 'pearsonr': '$\rho$: -0.487', 'travel': 'travel: 0.318', 'coverage': 'coverage: 0.318'}
+        # {'wcorr': 'wcorr: 0.935', 'P_decoder': '$P_i$: 0.503', 'pearsonr': '$\rho$: -0.217', 'travel': 'travel: 0.147', 'coverage': 'coverage: 0.147'}
+        return cls(data_values_dict=a_tuple_dict, column_formatting_fn_dict=column_formatting_fn_dict, data_formatted_strings_dict=curr_formatted_strings, should_include_epoch_times=False)
+    
+
+    @classmethod
+    def init_batch_from_epochs_df(cls, active_filter_epochs_df: pd.DataFrame, should_include_epoch_times:bool=False) -> Dict[float, "WeightedCorrelationPlotData"]:
+        # num_filter_epochs = np.shape(active_filter_epochs_df)[0]
+        # wcorr_col_name: str = 'wcorr'
+        # P_decoder_col_name: str = 'P_decoder'
+        # pearson_r_col_name: str = 'pearsonr'
+        # wcorr_data = {}
+        
+        # df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
+        
+        # for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
+        #     ## NOTE: uses a_tuple.start as the index in to the data dict:
+        #     wcorr_data[a_tuple.start] = cls.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
+
+        basic_df_column_names = ['start', 'stop', 'label', 'duration']
+        included_columns_list = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage']
+        all_df_column_names = basic_df_column_names + included_columns_list 
+
+        wcorr_data = {}
+
+        # column_formatting_dict = {'wcorr': f"wcorr: ", 'P_decoder': "$P_i$: ", 'pearsonr': f"$\rho$: ", 'travel':'travel: ', 'coverage':'coverage: '}
         with np.printoptions(precision=3, suppress=True, threshold=5):
             default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
-            start_t_text = default_float_formatting_fn(epoch_start)
-            stop_t_text = default_float_formatting_fn(epoch_end)
-            wcorr_text = f"wcorr: " + str(np.array([epoch_wcorr])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
-            P_decoder_text = f"$P_i$: " + str(np.array([epoch_P_decoder])).lstrip("[").rstrip("]")
-            if pearson_r is not None:
-                pearson_r_text = f"pearsonr: " + str(np.array([pearson_r])).lstrip("[").rstrip("]")
-            return cls(start_t_text=start_t_text, stop_t_text=stop_t_text, wcorr_text=wcorr_text, P_decoder_text=P_decoder_text, pearson_r_text=pearson_r_text, should_include_epoch_times=should_include_epoch_times)
+
+            column_formatting_fn_dict = {'start':None, 'stop':None, 'label':None, 'duration':None,
+                'wcorr': (lambda v:f"wcorr: {default_float_formatting_fn(v)}"),
+                'P_decoder':(lambda v:f"$P_i$: {default_float_formatting_fn(v)}"),
+                'pearsonr':(lambda v:f"$\rho$: {default_float_formatting_fn(v)}"),
+                'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
+                'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
+            }
+
+            # final_column_formatting_fn_dict = {a_col_name:(lambda v: f"{a_col_formatting_prefix}{default_float_formatting_fn(v)}") for a_col_name, a_col_formatting_prefix in column_formatting_dict.items()}
+
+            for i, a_tuple in enumerate(active_filter_epochs_df[all_df_column_names].itertuples(name='EpochDataTuple')):
+                ## NOTE: uses a_tuple.start as the index in to the data dict:
+                # column_formatting_fn_dict
+                # wcorr_data[a_tuple.start] = cls.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
+                # wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_row_tuple_and_formatting_fn_dict(a_tuple, column_formatting_fn_dict=column_formatting_fn_dict)
+                # a_tuple_dict = a_tuple._asdict()
+                # curr_formatted_strings = {k:column_formatting_fn_dict[k](v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))}
+                # {'wcorr': 'wcorr: -0.707', 'P_decoder': '$P_i$: 0.402', 'pearsonr': '$\rho$: -0.487', 'travel': 'travel: 0.318', 'coverage': 'coverage: 0.318'}
+                # {'wcorr': 'wcorr: 0.935', 'P_decoder': '$P_i$: 0.503', 'pearsonr': '$\rho$: -0.217', 'travel': 'travel: 0.147', 'coverage': 'coverage: 0.147'}
+
+                # curr_formatted_strings
+
+                wcorr_data[a_tuple.start] = cls.init_from_df_row_tuple_and_formatting_fn_dict(a_tuple=a_tuple, column_formatting_fn_dict=column_formatting_fn_dict)
+                # data_formatted_strings_dict
+                # wcorr_data[a_tuple.start].build_display_text()
+
+
+        return wcorr_data
 
 
     def build_display_text(self) -> str:
         """ builds the final display string to be rendered in the label. """
-        final_text_arr = []
-        if self.should_include_epoch_times:
-            final_text_arr.append(f"[{self.start_t_text}, {self.stop_t_text}]")
-        if len(self.wcorr_text) > 0:
-            ## Add the P_decoder line:
-            final_text_arr.append(f"{self.wcorr_text}")
-        if len(self.P_decoder_text) > 0:
-            ## Add the P_decoder line:
-            final_text_arr.append(f"{self.P_decoder_text}")
-        if len(self.pearson_r_text) > 0:
-            ## Add the P_decoder line:
-            final_text_arr.append(f"{self.pearson_r_text}")
-        return "\n".join(final_text_arr)
+        formatted_data_strings_values: List[str] = [v for v in self.data_formatted_strings_dict.values() if ((v is not None) and (len(v) > 0))]
+        return "\n".join(formatted_data_strings_values)
+        # final_text_arr = []
+        # if self.should_include_epoch_times:
+        #     final_text_arr.append(f"[{self.start_t_text}, {self.stop_t_text}]")
+        # if len(self.wcorr_text) > 0:
+        #     ## Add the P_decoder line:
+        #     final_text_arr.append(f"{self.wcorr_text}")
+        # if len(self.P_decoder_text) > 0:
+        #     ## Add the P_decoder line:
+        #     final_text_arr.append(f"{self.P_decoder_text}")
+        # if len(self.pearson_r_text) > 0:
+        #     ## Add the P_decoder line:
+        #     final_text_arr.append(f"{self.pearson_r_text}")
+        # return "\n".join(final_text_arr)
     
 
 # @define(slots=False, repr=False)
@@ -1294,74 +1368,56 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         Usage:
 
         """
-        def _subfn_wcorr_data_build(active_filter_epochs_df: pd.DataFrame):
-            num_filter_epochs = np.shape(active_filter_epochs_df)[0]
-            wcorr_col_name: str = 'wcorr'
-            P_decoder_col_name: str = 'P_decoder'
-            pearson_r_col_name: str = 'pearsonr'
-            wcorr_data = {}
-            
-            df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
-           
-            for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
-                ## NOTE: uses a_tuple.start as the index in to the data dict:
-                wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
-
-            return wcorr_data
-
-
-        # curr_results_obj 
         active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
         if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
             active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
-
-        wcorr_data = _subfn_wcorr_data_build(active_filter_epochs_df=active_filter_epochs_df.copy())
-
+        wcorr_data = WeightedCorrelationPlotData.init_batch_from_epochs_df(active_filter_epochs_df=active_filter_epochs_df.copy())
+        # wcorr_data = _subfn_wcorr_data_build(active_filter_epochs_df=active_filter_epochs_df.copy())
         return wcorr_data
 
 
-    @classmethod
-    def decoder_build_weighted_correlation_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
-        """ builds the Radon Transform data for each of the four decoders. 
+    # @classmethod
+    # def decoder_build_weighted_correlation_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
+    #     """ builds the Radon Transform data for each of the four decoders. 
         
-        Usage:
+    #     Usage:
         
-            radon_transform_laps_data_dict = decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict)
-            radon_transform_ripple_data_dict = decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
+    #         radon_transform_laps_data_dict = decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict)
+    #         radon_transform_ripple_data_dict = decoder_build_radon_transform_data_dict(track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
 
-        """
-        def _subfn_wcorr_data_build(active_filter_epochs_df: pd.DataFrame):
-            num_filter_epochs = np.shape(active_filter_epochs_df)[0]
-            wcorr_col_name: str = 'wcorr'
-            P_decoder_col_name: str = 'P_decoder'
-            pearson_r_col_name: str = 'pearsonr'
-            wcorr_data = {}
+    #     """
+    #     def _subfn_wcorr_data_build(active_filter_epochs_df: pd.DataFrame):
+    #         num_filter_epochs = np.shape(active_filter_epochs_df)[0]
+    #         wcorr_col_name: str = 'wcorr'
+    #         P_decoder_col_name: str = 'P_decoder'
+    #         pearson_r_col_name: str = 'pearsonr'
+    #         wcorr_data = {}
             
-            df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
+    #         df_column_names = ['start', 'stop', 'label', 'duration', 'wcorr', 'P_decoder', 'pearsonr'] # throwing KeyError: "['end'] not in index"
            
-            for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
-                ## NOTE: uses a_tuple.start as the index in to the data dict:
-                wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
+    #         for i, a_tuple in enumerate(active_filter_epochs_df[df_column_names].itertuples(name='EpochDataTuple')):
+    #             ## NOTE: uses a_tuple.start as the index in to the data dict:
+    #             wcorr_data[a_tuple.start] = WeightedCorrelationPlotData.init_from_df_columns(a_tuple.start, a_tuple.stop, a_tuple.wcorr, a_tuple.P_decoder, a_tuple.pearsonr)
 
-            return wcorr_data
+    #         return wcorr_data
 
-        from pyphocorehelpers.indexing_helpers import NumpyHelpers
-        # INPUTS: decoder_decoded_epochs_result_dict, a_name
+    #     from pyphocorehelpers.indexing_helpers import NumpyHelpers
+    #     # INPUTS: decoder_decoded_epochs_result_dict, a_name
 
-        ## Validate all decoders' results have the same number of filter_epochs and time_bin_containers
-        assert NumpyHelpers.all_array_equal([decoder_decoded_epochs_result_dict[a_name].num_filter_epochs for a_name in track_templates.get_decoder_names()])
-        assert NumpyHelpers.all_array_equal([np.shape(decoder_decoded_epochs_result_dict[a_name].time_bin_containers) for a_name in track_templates.get_decoder_names()])
-        wcorr_data_dict = {}
-        # wcorr_data_dict[a_name] = {a_name:_subfn_wcorr_data_build(active_filter_epochs_df=curr_results_obj) for a_name, curr_results_obj in decoder_decoded_epochs_result_dict.items()} # oneliner
-        for a_name in track_templates.get_decoder_names():
-            curr_results_obj = decoder_decoded_epochs_result_dict[a_name]
-            active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
-            if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
-                active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
+    #     ## Validate all decoders' results have the same number of filter_epochs and time_bin_containers
+    #     assert NumpyHelpers.all_array_equal([decoder_decoded_epochs_result_dict[a_name].num_filter_epochs for a_name in track_templates.get_decoder_names()])
+    #     assert NumpyHelpers.all_array_equal([np.shape(decoder_decoded_epochs_result_dict[a_name].time_bin_containers) for a_name in track_templates.get_decoder_names()])
+    #     wcorr_data_dict = {}
+    #     # wcorr_data_dict[a_name] = {a_name:_subfn_wcorr_data_build(active_filter_epochs_df=curr_results_obj) for a_name, curr_results_obj in decoder_decoded_epochs_result_dict.items()} # oneliner
+    #     for a_name in track_templates.get_decoder_names():
+    #         curr_results_obj = decoder_decoded_epochs_result_dict[a_name]
+    #         active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
+    #         if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
+    #             active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
 
-            wcorr_data_dict[a_name] = _subfn_wcorr_data_build(active_filter_epochs_df=active_filter_epochs_df.copy())
+    #         wcorr_data_dict[a_name] = _subfn_wcorr_data_build(active_filter_epochs_df=active_filter_epochs_df.copy())
 
-        return wcorr_data_dict
+    #     return wcorr_data_dict
     
 
     @classmethod
