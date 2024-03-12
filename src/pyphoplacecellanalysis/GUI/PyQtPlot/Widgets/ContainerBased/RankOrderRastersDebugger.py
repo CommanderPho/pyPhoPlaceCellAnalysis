@@ -359,61 +359,10 @@ class RankOrderRastersDebugger:
 
 
         ## Build the utility controls at the bottom:
-        ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
-
-        ctrls_widget = ScrollBarWithSpinBox()
-        ctrls_widget.setObjectName("ctrls_widget")
-        ctrls_widget.update_range(0, (_obj.n_epochs-1))
-        ctrls_widget.setValue(10)
-
-        def valueChanged(new_val:int):
-            print(f'ScrollBarWithSpinBox valueChanged(new_val: {new_val})')
-            _obj.on_update_epoch_IDX(int(new_val))
-
-        ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
-        ctrl_layout = pg.LayoutWidget()
-        ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
-        ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
-
-        # Step 4: Create DataFrame and QTableView
-        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
-        # model = PandasModel(df)
-        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
-
-        # tableView = pg.QtWidgets.QTableView()
-        # tableView.setModel(pandasDataFrameTableModel)
-        # tableView.setObjectName("pandasTablePreview")
-        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-
-        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
-        # ctrl_widgets_dict['tableView'] = tableView
-
-        # # Step 5: Add TableView to LayoutWidget
-        # ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
-
-
-        # Tabbled table widget:
-        tab_widget, views_dict, models_dict = create_tabbed_table_widget(dataframes_dict={'epochs': active_epochs_df.copy(),
-                                                                                                        'spikes': global_spikes_df.copy(), 
-                                                                                                        'combined_epoch_stats': pd.DataFrame()})
-        ctrl_widgets_dict['tables_tab_widget'] = tab_widget
-        ctrl_widgets_dict['views_dict'] = views_dict
-        ctrl_widgets_dict['models_dict'] = models_dict
+        utility_controls_ui_dict, ctrls_dock_widgets_dict = _obj._build_utility_controls(root_dockAreaWindow, active_epochs_df=active_epochs_df, global_spikes_df=global_spikes_df)
+        _out_dock_widgets = ctrls_dock_widgets_dict | _out_dock_widgets
         
-
         
-        # Add the tab widget to the layout
-        ctrl_layout.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=1)
-    
-        logTextEdit = LogViewer() # QTextEdit subclass
-        logTextEdit.setReadOnly(True)
-        logTextEdit.setObjectName("logTextEdit")
-        # logTextEdit.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-
-        ctrl_layout.addWidget(logTextEdit, row=2, rowspan=1, col=2, colspan=1)
-
-        _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
-
         # Top Info Bar: ______________________________________________________________________________________________________ #
         ## Add two labels in the top row that show the Long/Short column values:
         long_short_info_layout = pg.LayoutWidget()
@@ -447,7 +396,8 @@ class RankOrderRastersDebugger:
         _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
                                            seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
                                            on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})
-        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
+        # _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references=None)
         _obj.params = VisualizationParameters(name=name, is_laps=False, enable_show_spearman=True, enable_show_pearson=False, enable_show_Z_values=True, use_plaintext_title=False, **param_kwargs)
 
 
@@ -501,6 +451,7 @@ class RankOrderRastersDebugger:
         _obj.register_internal_callbacks()
 
         try:
+            ctrl_widgets_dict = _obj.ui
             ctrl_widgets_dict['models_dict']['combined_epoch_stats'] = SimplePandasModel(_obj.combined_epoch_stats_df.copy())
             # Create and associate view with model
             ctrl_widgets_dict['views_dict']['combined_epoch_stats'].setModel(ctrl_widgets_dict['models_dict']['combined_epoch_stats'])
@@ -519,6 +470,69 @@ class RankOrderRastersDebugger:
 
 
     
+    def _build_utility_controls(self, root_dockAreaWindow, active_epochs_df, global_spikes_df):
+        """ Build the utility controls at the bottom """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
+
+        ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
+
+        ctrls_widget = ScrollBarWithSpinBox()
+        ctrls_widget.setObjectName("ctrls_widget")
+        ctrls_widget.update_range(0, (self.n_epochs-1))
+        ctrls_widget.setValue(10)
+
+        def valueChanged(new_val:int):
+            print(f'ScrollBarWithSpinBox valueChanged(new_val: {new_val})')
+            self.on_update_epoch_IDX(int(new_val))
+
+        ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
+        ctrl_layout = pg.LayoutWidget()
+        ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
+        ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
+
+        # Step 4: Create DataFrame and QTableView
+        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
+        # model = PandasModel(df)
+        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
+
+        # tableView = pg.QtWidgets.QTableView()
+        # tableView.setModel(pandasDataFrameTableModel)
+        # tableView.setObjectName("pandasTablePreview")
+        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
+        # ctrl_widgets_dict['tableView'] = tableView
+
+        # # Step 5: Add TableView to LayoutWidget
+        # ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
+
+
+        # Tabbled table widget:
+        tab_widget, views_dict, models_dict = create_tabbed_table_widget(dataframes_dict={'epochs': active_epochs_df.copy(),
+                                                                                                        'spikes': global_spikes_df.copy(), 
+                                                                                                        'combined_epoch_stats': pd.DataFrame()})
+        ctrl_widgets_dict['tables_tab_widget'] = tab_widget
+        ctrl_widgets_dict['views_dict'] = views_dict
+        ctrl_widgets_dict['models_dict'] = models_dict
+
+        # Add the tab widget to the layout
+        ctrl_layout.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=1)
+    
+        logTextEdit = LogViewer() # QTextEdit subclass
+        logTextEdit.setReadOnly(True)
+        logTextEdit.setObjectName("logTextEdit")
+        # logTextEdit.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        ctrl_layout.addWidget(logTextEdit, row=2, rowspan=1, col=2, colspan=1)
+
+        # _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
+        ctrls_dock_widgets_dict = {}
+        ctrls_dock_widgets_dict['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
+
+        ui_dict = dict(ctrl_layout=ctrl_layout, **ctrl_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit)
+        return ui_dict, ctrls_dock_widgets_dict
+
+
 
 
     def register_internal_callbacks(self):
@@ -751,6 +765,14 @@ class RankOrderRastersDebugger:
         # LongShortColumnsInfo_dock_layout.hide() # No use
         # _out_ripple_rasters.ui.long_short_info_layout.hide() # No use
         LongShortColumnsInfo_dock_Dock.setVisible(is_visible)
+
+    def set_bottom_controls_visibility(self, is_visible=False):
+        """Hides/Shows the top info bar dock """
+        found_dock_layout, found_dock_Dock = self.plots.dock_widgets['bottom_controls']
+        # LongShortColumnsInfo_dock_layout.hide() # No use
+        # _out_ripple_rasters.ui.long_short_info_layout.hide() # No use
+        found_dock_Dock.setVisible(is_visible)
+
 
 
     def save_figure(self, export_path: Path):
