@@ -1364,8 +1364,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         return wcorr_data_dict
     
 
-
-        
     @classmethod
     def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
         """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
@@ -1422,17 +1420,14 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
         # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
         # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
-        text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
-
-
+        text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
 
         font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
                             #   size=10,
-                            #   weight='bold',
+                              weight='bold',
                             #   style='italic',
                               )
         text_kwargs['fontproperties'] = font_prop
-
 
         ## Positioning kwargs:
         text_kwargs |= dict(loc='upper right',
