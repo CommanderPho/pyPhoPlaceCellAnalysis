@@ -1764,7 +1764,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
                 # a_decoder_specific_spikes_df = deepcopy(an_epoch_spikes_df).spikes.sliced_by_neuron_id(a_decoder_neuron_IDs)
                 a_decoder_specific_spikes_df = deepcopy(an_epoch_spikes_df)
-                a_decoder_specific_spikes_df = a_decoder_specific_spikes_df[a_decoder_specific_spikes_df['aclu'].isin(a_decoder_neuron_IDs)]
+                a_decoder_specific_spikes_df = a_decoder_specific_spikes_df[a_decoder_specific_spikes_df['aclu'].isin(a_decoder_neuron_IDs)] # filter down to only the decoder-unique entries
                 active_epoch_decoder_active_aclus = a_decoder_specific_spikes_df.aclu.unique()
 
                 # min_num_required_unique_aclus = max(5, int(float(len(a_decoder_neuron_IDs)) * 0.333))
