@@ -323,6 +323,10 @@ class HeuristicReplayScoring:
         longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
         if debug_print:
             print("Longest sequence of time bins without a direction change:", longest_sequence_length)
+        longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
+        longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
+        
+
         contiguous_total_change_quantity = [np.nansum(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
         if debug_print:
             print(f'contiguous_total_change_quantity: {contiguous_total_change_quantity}')
