@@ -925,15 +925,6 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 {'plot_radon_transform_line_data': cls._callback_update_curr_single_epoch_slice_plot}
         }
 
-
-    # @classmethod
-    # def add_data_to_pagination_controller(cls, a_pagination_controller, *provided_data, update_controller_on_apply:bool=False):
-    #     """ 
-    #     Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
-    #     """
-    #     return super().add_data_to_pagination_controller(a_pagination_controller=a_pagination_controller, *provided_data, update_controller_on_apply=update_controller_on_apply)
-
-
     @classmethod
     def _subfn_build_radon_transform_plotting_data(cls, active_filter_epochs_df: pd.DataFrame, num_filter_epochs: int, time_bin_containers: List["BinningContainer"], radon_transform_column_names: Optional[List[str]]=None):
         """ Builds the Radon-transform data to a single decoder.
@@ -1074,8 +1065,8 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         
         """
-        from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
-
+        from neuropy.utils.matplotlib_helpers import add_inner_title
+        from neuropy.utils.matplotlib_helpers import AnchoredCustomText
 
         def _subfn_build_kwargs(curr_ax):
             # line_alpha = 0.2  # Faint line
@@ -1119,6 +1110,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         ## Extract the visibility:
         should_enable_radon_transform_info: bool = params.enable_radon_transform_info
+        use_AnchoredCustomText: bool = params.setdefault('use_AnchoredCustomText', True)
 
         if debug_print:
             print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
@@ -1165,10 +1157,12 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 extant_line.remove()
             radon_transform_plot = None
 
+
+        # Text Labels ________________________________________________________________________________________________________ #
         if (extant_score_text is not None):
             # already exists, update the existing one:
-            assert isinstance(extant_score_text, AnchoredText), f"extant_score_text is of type {type(extant_score_text)} but is expected to be of type AnchoredText."
-            anchored_text: AnchoredText = extant_score_text
+            assert isinstance(extant_score_text, (AnchoredText, AnchoredCustomText)), f"extant_score_text is of type {type(extant_score_text)} but is expected to be of type AnchoredText."
+            anchored_text: Union[AnchoredText, AnchoredCustomText] = extant_score_text
 
             if should_enable_radon_transform_info:
                 # if we want to see the radon transform info:
@@ -1176,17 +1170,29 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                     # Re-add the anchored text if necessary
                     curr_ax.add_artist(anchored_text)
 
-                anchored_text.txt.set_text(final_text)
+                # Update the text afterwards:
+                if use_AnchoredCustomText:
+                    # anchored_text.update_text(unformatted_text_block=final_text) ## Update is currently broken
+                    anchored_text.remove()
+                    anchored_text = None
+                    anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs)
+                    anchored_text.patch.set_ec("none")
+                    anchored_text.set_alpha(0.4)
+                else:
+                    anchored_text.txt.set_text(final_text)
+
+
             else:
                 ## Otherwise we need to hide the existing text or remove it:
-                anchored_text.remove() # remove it
+                if curr_ax.axes it not None:
+                    anchored_text.remove() # remove it
                 anchored_text = None
 
         else:
             ## Create a new one:
             if should_enable_radon_transform_info:
                 # if we want to see the radon transform info:
-                anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, **text_kwargs)
+                anchored_text: Union[AnchoredText, AnchoredCustomText] = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs)
                 anchored_text.patch.set_ec("none")
                 anchored_text.set_alpha(0.4)
             else:
@@ -1486,7 +1492,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                     anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs)
                     anchored_text.patch.set_ec("none")
                     anchored_text.set_alpha(0.4)
-
                 else:
                     anchored_text.txt.set_text(final_text)
             else:
