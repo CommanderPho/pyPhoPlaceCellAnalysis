@@ -1641,8 +1641,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## Extract params_kwargs
         params_kwargs = kwargs.pop('params_kwargs', {})
-        # params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
-        params_kwargs = params_kwargs | dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True)
+        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
         # print(f'params_kwargs: {params_kwargs}')
         max_subplots_per_page: int = kwargs.pop('max_subplots_per_page', params_kwargs.pop('max_subplots_per_page', 8)) # kwargs overrides params_kwargs
         
