@@ -1,6 +1,5 @@
 # HeuristicReplayScoring
 
-
 # ==================================================================================================================== #
 # 2024-02-29 - Pho Replay Heuristic Metric                                                                             #
 # ==================================================================================================================== #
@@ -599,4 +598,30 @@ class HeuristicReplayScoring:
         maze_id_keys = ['long', 'short']
         filter_epochs['truth_decoder_name'] = filter_epochs['maze_id'].map(dict(zip(np.arange(len(maze_id_keys)), maze_id_keys))) + '_' + filter_epochs['lap_dir'].map(dict(zip(np.arange(len(lap_dir_keys)), lap_dir_keys)))
         return filter_epochs
+
+
+
+@function_attributes(short_name=None, tags=['UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-13 15:57', related_items=[])
+def compute_local_peak_probabilities(probs, n_adjacent: int):
+    n_positions, n_time_bins = probs.shape
+    local_peak_probabilities = np.zeros(n_time_bins)
+    peak_position_indices = np.zeros(n_time_bins, dtype=int)
+
+    for t in range(n_time_bins):
+        time_slice = probs[:, t]
+        for pos in range(n_positions):
+            # The lower and upper bounds ensuring we don't go beyond the array bounds
+            lower_bound = max(pos - n_adjacent, 0)
+            upper_bound = min(pos + n_adjacent + 1, n_positions)  # The upper index is exclusive
+
+            # Summing the local probabilities, including the adjacent bins
+            local_sum = np.nansum(time_slice[lower_bound:upper_bound])
+
+            # If this local sum is higher than a previous local peak, we record it
+            if local_sum > local_peak_probabilities[t]:
+                local_peak_probabilities[t] = local_sum
+                peak_position_indices[t] = pos  # Save the position index
+
+    return local_peak_probabilities, peak_position_indices
+
 

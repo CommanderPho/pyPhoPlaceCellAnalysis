@@ -2312,6 +2312,10 @@ def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame
 
     return (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
 
+# ==================================================================================================================== #
+#MARK ComputationFunctions                                                                                               
+# ==================================================================================================================== #
+
 
 
 class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
@@ -2339,7 +2343,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalLaps']['split_directional_laps_contexts_dict']
                 ['DirectionalLaps']['split_directional_laps_names']
                 ['DirectionalLaps']['computed_base_epoch_names']
-
 
         """
         if include_includelist is not None:
@@ -3204,6 +3207,38 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
         
         """
+        return global_computation_results
+
+    @function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
+        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=True)
+    def __decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
+        """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
+        
+        Requires:
+            ['sess']
+
+        Provides:
+            global_computation_results.computed_data['pf1D_Decoder_dict']
+                ['DirectionalDecodersEpochsEvaluations']['directional_lap_specific_configs']
+                ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
+                
+        Should call:
+        
+        _perform_compute_custom_epoch_decoding
+
+
+        """
+        from neuropy.core.epoch import TimeColumnAliasesProtocol
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
+
+        # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
+        filtered_decoder_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
+
+
+        raise NotImplementedError("2024-03-09- TODO!")
+
         return global_computation_results
 
 
