@@ -1210,7 +1210,6 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 # ==================================================================================================================== #
 # Score: Weighted Correlation                                                                                          #
 # ==================================================================================================================== #
-from neuropy.utils.matplotlib_helpers import build_label_value_formatted_text_properties
 
 
 @define(slots=False, repr=False)
@@ -1353,6 +1352,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         from matplotlib import font_manager
         from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
         from matplotlib.offsetbox import AnchoredText
+        from neuropy.utils.matplotlib_helpers import AnchoredCustomText
 
         debug_print = kwargs.pop('debug_print', True)
         if debug_print:
@@ -1375,8 +1375,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         ## Extract the visibility:
         should_enable_weighted_correlation_info: bool = params.enable_weighted_correlation_info
-        # bbox_offset_magnitude: float = params.setdefault('bbox_offset_magnitude', 0.075)
-
+        use_AnchoredCustomText: bool = params.setdefault('use_AnchoredCustomText', True)
 
         def _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax):
             """ captures nothing. """
@@ -1452,14 +1451,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             return text_kwargs
         
 
-
-
-
-
-
         # text_kwargs = _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax=curr_ax)
         text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
-
 
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
@@ -1469,10 +1462,6 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         weighted_corr_data_item: WeightedCorrelationPlotData = plots_data.weighted_corr_data[data_index_value]
         final_text: str = weighted_corr_data_item.build_display_text()
 
-
-        final_formatted_text_tuples: List[Tuple] = weighted_corr_data_item.build_display_text()
-
-
         ## Build or Update:
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
         extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
@@ -1480,8 +1469,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         # plot the radon transform line on the epoch:    
         if (extant_wcorr_text_label is not None):
             # already exists, update the existing ones. 
-            assert isinstance(extant_wcorr_text_label, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
-            anchored_text: AnchoredText = extant_wcorr_text_label
+            assert isinstance(extant_wcorr_text_label, (AnchoredText, AnchoredCustomText)), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
+            anchored_text = extant_wcorr_text_label # AnchoredText or AnchoredCustomText
             # Check if the AnchoredText object was removed. This happens when ax.clear() is called in `.on_jump_to_page(...)` before the callbacks part
             if should_enable_weighted_correlation_info:
                 if anchored_text.axes is None:
@@ -1490,7 +1479,16 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                     # Re-add the anchored text if necessary
                     curr_ax.add_artist(anchored_text)
                 # Update the text afterwards:
-                anchored_text.txt.set_text(final_text)
+                if use_AnchoredCustomText:
+                    # anchored_text.update_text(unformatted_text_block=final_text) ## Update is currently broken
+                    anchored_text.remove()
+                    anchored_text = None
+                    anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs)
+                    anchored_text.patch.set_ec("none")
+                    anchored_text.set_alpha(0.4)
+
+                else:
+                    anchored_text.txt.set_text(final_text)
             else:
                 ## Weighted Correlation info not wanted, clear/hide or remove the label
                 anchored_text.remove()
@@ -1500,14 +1498,16 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             ## No existing label:
             if should_enable_weighted_correlation_info:
                 ## Create a new one:
-                anchored_text: AnchoredText = add_inner_title(curr_ax, final_text, **text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
+                if debug_print:
+                    print(f'creating new anchored text label for {curr_ax}, final_text: {final_text}')
+                anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
                 anchored_text.patch.set_ec("none")
                 anchored_text.set_alpha(0.4)
             else:
                 anchored_text = None
 
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text':anchored_text}
+        plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text': anchored_text}
         
         if debug_print:
             print(f'\t success!')
