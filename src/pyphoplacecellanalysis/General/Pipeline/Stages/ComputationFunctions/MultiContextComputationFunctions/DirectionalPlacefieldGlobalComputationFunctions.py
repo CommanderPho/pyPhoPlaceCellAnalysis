@@ -2284,246 +2284,6 @@ def _workaround_validate_has_directional_decoded_epochs_evaluations(curr_active_
 
 
 
-import pandas as pd
-import plotly.express as px
-from pathlib import Path
-
-def plot_all_sessions(directory, save_figures=False, figure_save_extension='.png'):
-    """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
-    Produces and then saves figures out the the f'{directory}/figures/' subfolder
-
-    """
-    if not isinstance(directory, Path):
-        directory = Path(directory).resolve()
-    assert directory.exists()
-    print(f'plot_all_sessions(directory: {directory})')
-    if save_figures:
-        # Create a 'figures' subfolder if it doesn't exist
-        figures_folder = Path(directory, 'figures')
-        figures_folder.mkdir(parents=False, exist_ok=True)
-        assert figures_folder.exists()
-        print(f'\tfigures_folder: {figures_folder}')
-    
-    # Get all CSV files in the specified directory
-    # all_csv_files = Path(directory).glob('*-(laps|ripple)_marginals_df).csv')
-    all_csv_files = sorted(Path(directory).glob('*_marginals_df).csv'))
-
-    # Separate the CSV files into laps and ripple lists
-    laps_files = [file for file in all_csv_files if 'laps' in file.stem]
-    ripple_files = [file for file in all_csv_files if 'ripple' in file.stem]
-
-    # Create an empty list to store the figures
-    all_figures = []
-
-    # Iterate through the pairs and create figures
-    for laps_file, ripple_file in zip(laps_files, ripple_files):
-        session_name = laps_file.stem.split('-')[3]  # Extract session name from the filename
-        print(f'processing session_name: {session_name}')
-        
-        laps_df = pd.read_csv(laps_file)
-        ripple_df = pd.read_csv(ripple_file)
-
-        # SEPERATELY _________________________________________________________________________________________________________ #
-        # Create a bubble chart for laps
-        fig_laps = px.scatter(laps_df, x='lap_start_t', y='P_Long', title=f"Laps - Session: {session_name}")
-
-        # Create a bubble chart for ripples
-        fig_ripples = px.scatter(ripple_df, x='ripple_start_t', y='P_Long', title=f"Ripples - Session: {session_name}")
-
-        if save_figures:
-            # Save the figures to the 'figures' subfolder
-            print(f'\tsaving figures...')
-            fig_laps_name = Path(figures_folder, f"{session_name}_laps_marginal{figure_save_extension}").resolve()
-            print(f'\tsaving "{fig_laps_name}"...')
-            fig_laps.write_image(fig_laps_name)
-            fig_ripple_name = Path(figures_folder, f"{session_name}_ripples_marginal{figure_save_extension}").resolve()
-            print(f'\tsaving "{fig_ripple_name}"...')
-            fig_ripples.write_image(fig_ripple_name)
-        
-        # Append both figures to the list
-        all_figures.append((fig_laps, fig_ripples))
-        
-        # # COMBINED ___________________________________________________________________________________________________________ #
-        # # Create a subplot with laps and ripples stacked vertically
-        # fig_combined = px.subplots.make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05,
-        #                                         subplot_titles=[f"Laps - Session: {session_name}", f"Ripples - Session: {session_name}"])
-
-        # # Add scatter traces to the subplots
-        # fig_combined.add_trace(px.scatter(laps_df, x='lap_start_t', y='P_Long').data[0], row=1, col=1)
-        # fig_combined.add_trace(px.scatter(ripple_df, x='ripple_start_t', y='P_Long').data[0], row=2, col=1)
-
-        # # Update layout for better visualization
-        # fig_combined.update_layout(height=600, width=800, title_text=f"Combined Plot - Session: {session_name}")
-
-        # # Save the figure to the 'figures' subfolder
-        # figure_filename = Path(figures_folder, f"{session_name}_marginal.png")
-        # fig_combined.write_image(figure_filename)
-        
-        # all_figures.append(fig_combined)
-        
-    return all_figures
-
-# # Example usage:
-# # directory = '/home/halechr/FastData/collected_outputs/'
-# # directory = r'C:\Users\pho\Desktop\collected_outputs'
-# directory = r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs'
-
-# all_session_figures = plot_all_sessions(directory, save_figures=True)
-
-# # Show figures for all sessions
-# for fig_laps, fig_ripples in all_session_figures:
-#     fig_laps.show()
-#     fig_ripples.show()
-
-
-
-def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=None, t_split=1000.0, t_end=None, active_context=None, perform_write_to_file_callback=None):
-    """ Plots three Matplotlib figures displaying the quantile differences
-    
-    
-    Usage:
-    
-    ripple_all_epoch_bins_marginals_df
-    laps_all_epoch_bins_marginals_df
-    
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_all_epoch_bins_marginal_predictions
-
-    _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-    global_epoch = curr_active_pipeline.filtered_epochs[global_epoch_name]
-    t_start, t_end = global_epoch.start_end_times
-    short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
-    split_time_t: float = short_epoch.t_start
-    active_context = curr_active_pipeline.sess.get_context()
-
-    ## Get the result after computation:
-    directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
-    
-    collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context, perform_write_to_file_callback=None)
-
-    """
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    from flexitext import flexitext ## flexitext for formatted matplotlib text
-
-    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-    from neuropy.utils.matplotlib_helpers import FormattedFigureText
-    
-    laps_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)
-    ripple_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)
-
-    if active_context is not None:
-        display_context = active_context.adding_context('display_fn', display_fn_name='plot_all_epoch_bins_marginal_predictions')
-        
-    # These subset contexts are used to filter out lap/ripple only keys.
-    # e.g. active_context=curr_active_pipeline.build_display_context_for_session('directional_merged_pf_decoded_epochs', laps_t_bin=laps_decoding_time_bin_size, ripple_t_bin=ripple_decoding_time_bin_size)
-        # only want laps_t_bin on the laps plot and ripple_t_bin on the ripples plot
-    laps_only_keys = [item for item in display_context.keys() if 'lap' in item] # items exclusive to laps: ['laps_t_bin']
-    ripple_only_keys = [item for item in display_context.keys() if 'ripple' in item]
-    laps_display_context = display_context.get_subset(subset_excludelist=ripple_only_keys) # laps specific context filtering out the ripple keys
-    ripple_display_context = display_context.get_subset(subset_excludelist=laps_only_keys) # ripple specific context filtering out the laps keys
-
-
-    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42,
-                          "axes.spines.left": False, "axes.spines.right": False, "axes.spines.bottom": False, "axes.spines.top": False,
-                          "axes.edgecolor": "none", "xtick.bottom": False, "xtick.top": False, "ytick.left": False, "ytick.right": False}):
-        # Create a FigureCollector instance
-        with FigureCollector(name='plot_all_epoch_bins_marginal_predictions', base_context=display_context) as collector:
-
-            ## Define common operations to do after making the figure:
-            def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>'):
-                """ Captures:
-
-                t_split, t_start, t_end)
-                """
-                a_collector.contexts.append(sub_context)
-                
-                for ax in (axes if isinstance(axes, Iterable) else [axes]):
-                    # Update the xlimits with the new bounds
-                    ax.set_ylim(0.0, 1.0)
-                    # Add epoch indicators
-                    _tmp_output_dict = PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split, t_start=t_start, t_end=t_end)
-                    # Update the xlimits with the new bounds
-                    ax.set_xlim(t_start, t_end)
-                    # Draw a horizontal line at y=0.5
-                    ax.axhline(y=0.5, color=(0,0,0,1)) # , linestyle='--'
-                    ## This is figure level stuff and only needs to be done once:
-                    # `flexitext` version:
-                    text_formatter = FormattedFigureText()
-                    ax.set_title('')
-                    fig.suptitle('')
-                    # top=0.84, bottom=0.125, left=0.07, right=0.97,
-                    # text_formatter.setup_margins(fig, top_margin=1.0, left_margin=0.0, right_margin=1.0, bottom_margin=0.05)
-                    text_formatter.setup_margins(fig, top_margin=0.84, left_margin=0.07, right_margin=0.97, bottom_margin=0.125)
-                    # fig.subplots_adjust(top=top_margin, left=left_margin, right=right_margin, bottom=bottom_margin)
-                    # title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
-                    title_text_obj = flexitext(text_formatter.left_margin, 0.98, title, va="top", xycoords="figure fraction") # 0.98, va="top" means the top edge of the title will be aligned to the fig_y=0.98 mark of the figure.
-                    # footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
-                    #                             text_formatter._build_footer_string(active_context=sub_context),
-                    #                             va="top", xycoords="figure fraction")
-
-                    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (0.0025), ## (va="bottom", (0.0025)) - this means that the bottom edge of the footer text is aligned with the fig_y=0.0025 in figure space
-                                                text_formatter._build_footer_string(active_context=sub_context),
-                                                va="bottom", xycoords="figure fraction")
-            
-                if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
-                    perform_write_to_file_callback(sub_context, fig)
-                
-            # Plot for BestDir
-            fig, ax = collector.subplots(num='Laps_Marginal', clear=True)
-            _out_Laps = sns.scatterplot(
-                ax=ax,
-                data=laps_all_epoch_bins_marginals_df,
-                x='lap_start_t',
-                y='P_Long',
-                # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-            )
-            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=laps_display_context.adding_context('subplot', subplot_name='Laps all_epoch_binned Marginals'), 
-                                        title=f'<size:22> Laps <weight:bold>all_epoch_binned</> Marginals</>')
-            
-            fig, ax = collector.subplots(num='Ripple_Marginal', clear=True)
-            _out_Ripple = sns.scatterplot(
-                ax=ax,
-                data=ripple_all_epoch_bins_marginals_df,
-                x='ripple_start_t',
-                y='P_Long',
-                # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-            )
-            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=ripple_display_context.adding_context('subplot', subplot_name='Ripple all_epoch_binned Marginals'), 
-                            title=f'<size:22> Ripple <weight:bold>all_epoch_binned</> Marginals</>')
-
-
-            # # Plot for Both Laps/Ripple on the same figure using subplots:
-            # fig, axs = collector.subplots(num='all_epoch_binned_Marginals', nrows = 2, ncols = 1, sharex=True, sharey=True, clear=True)
-            # _out_Laps = sns.scatterplot(
-            #     ax=axs[0],
-            #     data=laps_all_epoch_bins_marginals_df,
-            #     x='lap_start_t',
-            #     y='P_Long',
-            #     # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-            # )
-            
-            # # Ripple_Marginal
-            # _out_Ripple = sns.scatterplot(
-            #     ax=axs[1],
-            #     data=ripple_all_epoch_bins_marginals_df,
-            #     x='ripple_start_t',
-            #     y='P_Long',
-            #     # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
-            # )
-            # setup_common_after_creation(collector, fig=fig, axes=axs, sub_context=display_context.adding_context('subplot', subplot_name='Laps and Ripple all_epoch_binned Marginals'), 
-            #                             title=f'<size:22> Laps+Ripple <weight:bold>all_epoch_binned</> Marginals</>')
-
-
-
-
-    
-    # Access the collected figures outside the context manager
-    # result = tuple(collector.created_figures)
-
-    return collector
-
 
 def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame, debug_print=True):
     """ 2024-01-17 - Validates the performance of the pseudo2D decoder posteriors using the laps data.
@@ -3518,6 +3278,239 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons, paired_incremental_sort_neurons # _display_directional_template_debugger
 from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
+import plotly.express as px
+
+def plot_all_sessions(directory, save_figures=False, figure_save_extension='.png'):
+    """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
+    Produces and then saves figures out the the f'{directory}/figures/' subfolder
+
+    # # Example usage:
+    directory = '/home/halechr/FastData/collected_outputs/'
+
+    all_session_figures = plot_all_sessions(directory, save_figures=True)
+
+    # Show figures for all sessions
+    for fig_laps, fig_ripples in all_session_figures:
+        fig_laps.show()
+        fig_ripples.show()
+
+    """
+    if not isinstance(directory, Path):
+        directory = Path(directory).resolve()
+    assert directory.exists()
+    print(f'plot_all_sessions(directory: {directory})')
+    if save_figures:
+        # Create a 'figures' subfolder if it doesn't exist
+        figures_folder = Path(directory, 'figures')
+        figures_folder.mkdir(parents=False, exist_ok=True)
+        assert figures_folder.exists()
+        print(f'\tfigures_folder: {figures_folder}')
+    
+    # Get all CSV files in the specified directory
+    # all_csv_files = Path(directory).glob('*-(laps|ripple)_marginals_df).csv')
+    all_csv_files = sorted(Path(directory).glob('*_marginals_df).csv'))
+
+    # Separate the CSV files into laps and ripple lists
+    laps_files = [file for file in all_csv_files if 'laps' in file.stem]
+    ripple_files = [file for file in all_csv_files if 'ripple' in file.stem]
+
+    # Create an empty list to store the figures
+    all_figures = []
+
+    # Iterate through the pairs and create figures
+    for laps_file, ripple_file in zip(laps_files, ripple_files):
+        session_name = laps_file.stem.split('-')[3]  # Extract session name from the filename
+        print(f'processing session_name: {session_name}')
+        
+        laps_df = pd.read_csv(laps_file)
+        ripple_df = pd.read_csv(ripple_file)
+
+        # SEPERATELY _________________________________________________________________________________________________________ #
+        # Create a bubble chart for laps
+        fig_laps = px.scatter(laps_df, x='lap_start_t', y='P_Long', title=f"Laps - Session: {session_name}")
+
+        # Create a bubble chart for ripples
+        fig_ripples = px.scatter(ripple_df, x='ripple_start_t', y='P_Long', title=f"Ripples - Session: {session_name}")
+
+        if save_figures:
+            # Save the figures to the 'figures' subfolder
+            print(f'\tsaving figures...')
+            fig_laps_name = Path(figures_folder, f"{session_name}_laps_marginal{figure_save_extension}").resolve()
+            print(f'\tsaving "{fig_laps_name}"...')
+            fig_laps.write_image(fig_laps_name)
+            fig_ripple_name = Path(figures_folder, f"{session_name}_ripples_marginal{figure_save_extension}").resolve()
+            print(f'\tsaving "{fig_ripple_name}"...')
+            fig_ripples.write_image(fig_ripple_name)
+        
+        # Append both figures to the list
+        all_figures.append((fig_laps, fig_ripples))
+        
+        # # COMBINED ___________________________________________________________________________________________________________ #
+        # # Create a subplot with laps and ripples stacked vertically
+        # fig_combined = px.subplots.make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05,
+        #                                         subplot_titles=[f"Laps - Session: {session_name}", f"Ripples - Session: {session_name}"])
+
+        # # Add scatter traces to the subplots
+        # fig_combined.add_trace(px.scatter(laps_df, x='lap_start_t', y='P_Long').data[0], row=1, col=1)
+        # fig_combined.add_trace(px.scatter(ripple_df, x='ripple_start_t', y='P_Long').data[0], row=2, col=1)
+
+        # # Update layout for better visualization
+        # fig_combined.update_layout(height=600, width=800, title_text=f"Combined Plot - Session: {session_name}")
+
+        # # Save the figure to the 'figures' subfolder
+        # figure_filename = Path(figures_folder, f"{session_name}_marginal.png")
+        # fig_combined.write_image(figure_filename)
+        
+        # all_figures.append(fig_combined)
+        
+    return all_figures
+
+def plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=None, t_split=1000.0, t_end=None, active_context=None, perform_write_to_file_callback=None):
+    """ Plots three Matplotlib figures displaying the quantile differences
+    
+    
+    Usage:
+    
+    ripple_all_epoch_bins_marginals_df
+    laps_all_epoch_bins_marginals_df
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import plot_all_epoch_bins_marginal_predictions
+
+    _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+    global_epoch = curr_active_pipeline.filtered_epochs[global_epoch_name]
+    t_start, t_end = global_epoch.start_end_times
+    short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
+    split_time_t: float = short_epoch.t_start
+    active_context = curr_active_pipeline.sess.get_context()
+
+    ## Get the result after computation:
+    directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+    
+    collector = plot_all_epoch_bins_marginal_predictions(directional_merged_decoders_result, t_start=t_start, t_split=split_time_t, t_end=t_end, active_context=active_context, perform_write_to_file_callback=None)
+
+    """
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    
+    laps_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)
+    ripple_all_epoch_bins_marginals_df = deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)
+
+    if active_context is not None:
+        display_context = active_context.adding_context('display_fn', display_fn_name='plot_all_epoch_bins_marginal_predictions')
+        
+    # These subset contexts are used to filter out lap/ripple only keys.
+    # e.g. active_context=curr_active_pipeline.build_display_context_for_session('directional_merged_pf_decoded_epochs', laps_t_bin=laps_decoding_time_bin_size, ripple_t_bin=ripple_decoding_time_bin_size)
+        # only want laps_t_bin on the laps plot and ripple_t_bin on the ripples plot
+    laps_only_keys = [item for item in display_context.keys() if 'lap' in item] # items exclusive to laps: ['laps_t_bin']
+    ripple_only_keys = [item for item in display_context.keys() if 'ripple' in item]
+    laps_display_context = display_context.get_subset(subset_excludelist=ripple_only_keys) # laps specific context filtering out the ripple keys
+    ripple_display_context = display_context.get_subset(subset_excludelist=laps_only_keys) # ripple specific context filtering out the laps keys
+
+
+    with mpl.rc_context({'figure.figsize': (12.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42,
+                          "axes.spines.left": False, "axes.spines.right": False, "axes.spines.bottom": False, "axes.spines.top": False,
+                          "axes.edgecolor": "none", "xtick.bottom": False, "xtick.top": False, "ytick.left": False, "ytick.right": False}):
+        # Create a FigureCollector instance
+        with FigureCollector(name='plot_all_epoch_bins_marginal_predictions', base_context=display_context) as collector:
+
+            ## Define common operations to do after making the figure:
+            def setup_common_after_creation(a_collector, fig, axes, sub_context, title=f'<size:22> Sig. (>0.95) <weight:bold>Best</> <weight:bold>Quantile Diff</></>'):
+                """ Captures:
+
+                t_split, t_start, t_end)
+                """
+                a_collector.contexts.append(sub_context)
+                
+                for ax in (axes if isinstance(axes, Iterable) else [axes]):
+                    # Update the xlimits with the new bounds
+                    ax.set_ylim(0.0, 1.0)
+                    # Add epoch indicators
+                    _tmp_output_dict = PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split, t_start=t_start, t_end=t_end)
+                    # Update the xlimits with the new bounds
+                    ax.set_xlim(t_start, t_end)
+                    # Draw a horizontal line at y=0.5
+                    ax.axhline(y=0.5, color=(0,0,0,1)) # , linestyle='--'
+                    ## This is figure level stuff and only needs to be done once:
+                    # `flexitext` version:
+                    text_formatter = FormattedFigureText()
+                    ax.set_title('')
+                    fig.suptitle('')
+                    # top=0.84, bottom=0.125, left=0.07, right=0.97,
+                    # text_formatter.setup_margins(fig, top_margin=1.0, left_margin=0.0, right_margin=1.0, bottom_margin=0.05)
+                    text_formatter.setup_margins(fig, top_margin=0.84, left_margin=0.07, right_margin=0.97, bottom_margin=0.125)
+                    # fig.subplots_adjust(top=top_margin, left=left_margin, right=right_margin, bottom=bottom_margin)
+                    # title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
+                    title_text_obj = flexitext(text_formatter.left_margin, 0.98, title, va="top", xycoords="figure fraction") # 0.98, va="top" means the top edge of the title will be aligned to the fig_y=0.98 mark of the figure.
+                    # footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                    #                             text_formatter._build_footer_string(active_context=sub_context),
+                    #                             va="top", xycoords="figure fraction")
+
+                    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (0.0025), ## (va="bottom", (0.0025)) - this means that the bottom edge of the footer text is aligned with the fig_y=0.0025 in figure space
+                                                text_formatter._build_footer_string(active_context=sub_context),
+                                                va="bottom", xycoords="figure fraction")
+            
+                if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
+                    perform_write_to_file_callback(sub_context, fig)
+                
+            # Plot for BestDir
+            fig, ax = collector.subplots(num='Laps_Marginal', clear=True)
+            _out_Laps = sns.scatterplot(
+                ax=ax,
+                data=laps_all_epoch_bins_marginals_df,
+                x='lap_start_t',
+                y='P_Long',
+                # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+            )
+            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=laps_display_context.adding_context('subplot', subplot_name='Laps all_epoch_binned Marginals'), 
+                                        title=f'<size:22> Laps <weight:bold>all_epoch_binned</> Marginals</>')
+            
+            fig, ax = collector.subplots(num='Ripple_Marginal', clear=True)
+            _out_Ripple = sns.scatterplot(
+                ax=ax,
+                data=ripple_all_epoch_bins_marginals_df,
+                x='ripple_start_t',
+                y='P_Long',
+                # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+            )
+            setup_common_after_creation(collector, fig=fig, axes=ax, sub_context=ripple_display_context.adding_context('subplot', subplot_name='Ripple all_epoch_binned Marginals'), 
+                            title=f'<size:22> Ripple <weight:bold>all_epoch_binned</> Marginals</>')
+
+
+            # # Plot for Both Laps/Ripple on the same figure using subplots:
+            # fig, axs = collector.subplots(num='all_epoch_binned_Marginals', nrows = 2, ncols = 1, sharex=True, sharey=True, clear=True)
+            # _out_Laps = sns.scatterplot(
+            #     ax=axs[0],
+            #     data=laps_all_epoch_bins_marginals_df,
+            #     x='lap_start_t',
+            #     y='P_Long',
+            #     # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+            # )
+            
+            # # Ripple_Marginal
+            # _out_Ripple = sns.scatterplot(
+            #     ax=axs[1],
+            #     data=ripple_all_epoch_bins_marginals_df,
+            #     x='ripple_start_t',
+            #     y='P_Long',
+            #     # size='LR_Long_rel_num_cells',  # Use the 'size' parameter for variable marker sizes
+            # )
+            # setup_common_after_creation(collector, fig=fig, axes=axs, sub_context=display_context.adding_context('subplot', subplot_name='Laps and Ripple all_epoch_binned Marginals'), 
+            #                             title=f'<size:22> Laps+Ripple <weight:bold>all_epoch_binned</> Marginals</>')
+
+
+
+
+    
+    # Access the collected figures outside the context manager
+    # result = tuple(collector.created_figures)
+
+    return collector
 
 
 class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -4274,7 +4267,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
 
-## Build Dock Widgets:
+# ==================================================================================================================== #
+# Menu Plotting Commands                                                                                               #
+# ==================================================================================================================== #
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand
 
 

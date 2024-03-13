@@ -1066,6 +1066,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         
         """
         from neuropy.utils.matplotlib_helpers import add_inner_title
+        from neuropy.utils.matplotlib_helpers import ValueFormatter
         from neuropy.utils.matplotlib_helpers import AnchoredCustomText
 
         def _subfn_build_kwargs(curr_ax):
@@ -1111,6 +1112,11 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         ## Extract the visibility:
         should_enable_radon_transform_info: bool = params.enable_radon_transform_info
         use_AnchoredCustomText: bool = params.setdefault('use_AnchoredCustomText', True)
+        if use_AnchoredCustomText:
+            custom_value_formatter = ValueFormatter()
+        else:
+            custom_value_formatter = None
+
 
         if debug_print:
             print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
@@ -1175,7 +1181,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                     # anchored_text.update_text(unformatted_text_block=final_text) ## Update is currently broken
                     anchored_text.remove()
                     anchored_text = None
-                    anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs)
+                    anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs)
                     anchored_text.patch.set_ec("none")
                     anchored_text.set_alpha(0.4)
                 else:
@@ -1192,7 +1198,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             ## Create a new one:
             if should_enable_radon_transform_info:
                 # if we want to see the radon transform info:
-                anchored_text: Union[AnchoredText, AnchoredCustomText] = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs)
+                anchored_text: Union[AnchoredText, AnchoredCustomText] = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs)
                 anchored_text.patch.set_ec("none")
                 anchored_text.set_alpha(0.4)
             else:
@@ -1358,7 +1364,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         from matplotlib import font_manager
         from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
         from matplotlib.offsetbox import AnchoredText
-        from neuropy.utils.matplotlib_helpers import AnchoredCustomText
+        from neuropy.utils.matplotlib_helpers import AnchoredCustomText, ValueFormatter
 
         debug_print = kwargs.pop('debug_print', True)
         if debug_print:
@@ -1382,6 +1388,12 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         ## Extract the visibility:
         should_enable_weighted_correlation_info: bool = params.enable_weighted_correlation_info
         use_AnchoredCustomText: bool = params.setdefault('use_AnchoredCustomText', True)
+        if use_AnchoredCustomText:
+            custom_value_formatter = ValueFormatter()
+            custom_value_formatter.coloring_function = custom_value_formatter.blue_grey_red_custom_value_to_color_fn
+
+        else:
+            custom_value_formatter = None
 
         def _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax):
             """ captures nothing. """
@@ -1489,7 +1501,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                     # anchored_text.update_text(unformatted_text_block=final_text) ## Update is currently broken
                     anchored_text.remove()
                     anchored_text = None
-                    anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs)
+                    anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs)
                     anchored_text.patch.set_ec("none")
                     anchored_text.set_alpha(0.4)
                 else:
@@ -1505,7 +1517,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                 ## Create a new one:
                 if debug_print:
                     print(f'creating new anchored text label for {curr_ax}, final_text: {final_text}')
-                anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, **text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
+                anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
                 anchored_text.patch.set_ec("none")
                 anchored_text.set_alpha(0.4)
             else:
