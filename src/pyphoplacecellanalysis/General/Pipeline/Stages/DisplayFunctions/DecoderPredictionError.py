@@ -1184,7 +1184,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
             else:
                 ## Otherwise we need to hide the existing text or remove it:
-                if curr_ax.axes it not None:
+                if curr_ax.axes is not None:
                     anchored_text.remove() # remove it
                 anchored_text = None
 
