@@ -2283,7 +2283,33 @@ def _workaround_validate_has_directional_decoded_epochs_evaluations(curr_active_
     return True
 
 
+def _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline, computation_filter_name='maze') -> bool:
+    from neuropy.core.epoch import ensure_dataframe
 
+    directional_decoders_decode_epochs_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+    if directional_decoders_decode_epochs_result is None:
+        return False
+
+    decoder_laps_filter_epochs_decoder_result_dict = directional_decoders_decode_epochs_result.decoder_laps_filter_epochs_decoder_result_dict
+    if decoder_laps_filter_epochs_decoder_result_dict is None:
+        return False
+
+    decoder_ripple_filter_epochs_decoder_result_dict = directional_decoders_decode_epochs_result.decoder_ripple_filter_epochs_decoder_result_dict
+    if decoder_ripple_filter_epochs_decoder_result_dict is None:
+        return False
+    
+    
+    ripple_has_required_columns = PandasHelpers.require_columns({a_name:ensure_dataframe(a_result.filter_epochs) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()},
+        required_columns=['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel'])
+    if ripple_has_required_columns is None:
+        return False
+
+    laps_has_required_columns = PandasHelpers.require_columns({a_name:ensure_dataframe(a_result.filter_epochs) for a_name, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()},
+        required_columns=['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel'])
+    if laps_has_required_columns is None:
+        return False
+
+    return True
 
 def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame, debug_print=True):
     """ 2024-01-17 - Validates the performance of the pseudo2D decoder posteriors using the laps data.
@@ -3200,9 +3226,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         return global_computation_results
 
     @function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
-        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
-        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=True)
-    def __decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
+        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
+        validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, is_global=True)
+    def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
@@ -3218,17 +3244,53 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         _perform_compute_custom_epoch_decoding
 
 
+        
+
         """
         from neuropy.core.epoch import TimeColumnAliasesProtocol
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
         from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
 
-        # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
-        filtered_decoder_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
+        # spikes_df = curr_active_pipeline.sess.spikes_df
+        rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
+        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        # print(f'included_qclu_values: {included_qclu_values}')
+
+        # DirectionalMergedDecoders: Get the result after computation:
+        directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
+        ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
+        laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
+
+        # DirectionalDecodersEpochsEvaluations
+        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+        pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
+        ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+        laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
+        decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
+        decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
 
 
-        raise NotImplementedError("2024-03-09- TODO!")
+        #TODO 2024-02-16 13:46: - [ ] Currently always replace
+        ## Create or update the global directional_merged_decoders_result:
+        # directional_decoders_epochs_decode_result: DirectionalMergedDecodersResult = global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+        # if directional_decoders_epochs_decode_result is not None:
+        # directional_decoders_epochs_decode_result.__dict__.update(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
+        #                                               long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
+        #                                               short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder)
+        
 
+        for a_filter_epochs_decoder_result_dict in (decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_filter_epochs_decoder_result_dict):
+       
+            # filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
+
+            # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
+            a_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_filter_epochs_decoder_result_dict)
+            ## make sure it updates the results
+        
         return global_computation_results
 
 
