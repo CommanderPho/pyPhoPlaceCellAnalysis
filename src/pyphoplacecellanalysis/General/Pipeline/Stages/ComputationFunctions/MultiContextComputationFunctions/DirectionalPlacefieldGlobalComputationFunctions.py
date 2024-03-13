@@ -27,7 +27,7 @@ from neuropy.core.epoch import find_data_indicies_from_epoch_times
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
-
+from neuropy.utils.indexing_helpers import PandasHelpers
  
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalMergedDecodersResult
@@ -2793,7 +2793,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             """
             ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
             laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
-            pos_bin_size = _recover_position_bin_size(track_templates.get_decoders()[0]) # 3.793023081021702
+            pos_bin_size: float = track_templates.get_decoders()[0].pos_bin_size # 3.793023081021702
             print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
 
             ## Decode epochs for all four decoders:
@@ -2870,25 +2870,14 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             a_marginals_df['most_likely_decoder_index'] = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].apply(lambda row: np.argmax(row.values), axis=1)
             return a_marginals_df
 
-        def _recover_position_bin_size(a_directional_pf1D_Decoder) -> float:
-            """ extracts pos_bin_size: the size of the x_bin in [cm], from the decoder. """
-                # pos_bin_size: the size of the x_bin in [cm]
-            if a_directional_pf1D_Decoder.pf.bin_info is not None:
-                pos_bin_size = float(a_directional_pf1D_Decoder.pf.bin_info['xstep'])
-            else:
-                ## if the bin_info is for some reason not accessible, just average the distance between the bin centers.
-                pos_bin_size = np.diff(a_directional_pf1D_Decoder.pf.xbin_centers).mean()
-            
-            print(f'pos_bin_size: {pos_bin_size}')
-            return pos_bin_size
-
         def _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result, a_directional_ripple_filter_epochs_decoder_result, nlines=4192, margin=16, n_jobs=4):
             """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder.
             ~12.2s per decoder.
 
             """
             a_directional_pf1D_Decoder = deepcopy(a_directional_pf1D_Decoder)
-            pos_bin_size = _recover_position_bin_size(a_directional_pf1D_Decoder)
+            pos_bin_size: float = a_directional_pf1D_Decoder.pos_bin_size # 3.793023081021702
+
             laps_radon_transform_extras = []
             laps_radon_transform_df, *laps_radon_transform_extras = a_directional_laps_filter_epochs_decoder_result.compute_radon_transforms(pos_bin_size=pos_bin_size, nlines=nlines, margin=margin, n_jobs=n_jobs)
 
@@ -3114,7 +3103,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
         ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
         laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
-        pos_bin_size = _recover_position_bin_size(track_templates.get_decoders()[0]) # 3.793023081021702
+        pos_bin_size: float = track_templates.get_decoders()[0].pos_bin_size
+
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
         
         decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(owning_pipeline_reference, directional_merged_decoders_result, track_templates)

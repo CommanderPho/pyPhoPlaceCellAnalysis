@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, Union
 from attrs import define, field, Factory
 from nptyping import NDArray # for DecodedFilterEpochsResult
 # import pathlib
@@ -681,7 +681,14 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     @property
     def ybin_centers(self):
         return self.ratemap.ybin_centers
-
+    
+    @property
+    def pos_bin_size(self) -> Union[float, Tuple[float, float]]:
+        """ extracts pos_bin_size: the size of the x_bin in [cm], from the decoder. 
+        returns a tuple if 2D or a single float if 1D
+        """
+        return self.pf.pos_bin_size
+    
     @property
     def original_position_data_shape(self):
         """The original_position_data_shape property."""
