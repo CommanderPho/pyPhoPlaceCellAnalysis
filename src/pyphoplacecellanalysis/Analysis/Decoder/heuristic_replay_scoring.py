@@ -175,7 +175,8 @@ class HeuristicReplayScoring:
         # assert n_time_bins > 1, f"n_time_bins must be greater than 1 for the first_order_diff to make any sense, but it it isn't. n_time_bins: {n_time_bins}"
 
         if n_time_bins <= 1:
-            print(f"WARN: n_time_bins must be greater than 1 for the first_order_diff to make any sense, but it it isn't. n_time_bins: {n_time_bins}")
+            if debug_print:
+                print(f"WARN: n_time_bins must be greater than 1 for the first_order_diff to make any sense, but it it isn't. n_time_bins: {n_time_bins}")
             return HeuristicScoresTuple(1, None, None, None, None, None)
         else:
 

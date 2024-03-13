@@ -25,7 +25,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 # 2024-03-09 - Filtering                                                                                               #
 # ==================================================================================================================== #
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, filter_and_update_epochs_and_spikes
 # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import HeuristicReplayScoring
 from neuropy.core.epoch import find_data_indicies_from_epoch_times
 
@@ -170,37 +170,6 @@ def export_numpy_testing_filtered_epochs(curr_active_pipeline, global_epoch_name
     # test_df: pd.DataFrame = deepcopy(ripple_simple_pf_pearson_merged_df[basic_epoch_column_names])
     # test_df.to_hdf(finalized_output_cache_file, key=f'{sess_identifier_key}/test_df', format='table')
     return finalized_output_cache_file
-
-
-
-# ==================================================================================================================== #
-# 2024-02-29 - Pho Replay Heuristic Metric                                                                             #
-# ==================================================================================================================== #
-from nptyping import NDArray
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
-
-def compute_local_peak_probabilities(probs, n_adjacent: int):
-    n_positions, n_time_bins = probs.shape
-    local_peak_probabilities = np.zeros(n_time_bins)
-    peak_position_indices = np.zeros(n_time_bins, dtype=int)
-
-    for t in range(n_time_bins):
-        time_slice = probs[:, t]
-        for pos in range(n_positions):
-            # The lower and upper bounds ensuring we don't go beyond the array bounds
-            lower_bound = max(pos - n_adjacent, 0)
-            upper_bound = min(pos + n_adjacent + 1, n_positions)  # The upper index is exclusive
-
-            # Summing the local probabilities, including the adjacent bins
-            local_sum = np.nansum(time_slice[lower_bound:upper_bound])
-
-            # If this local sum is higher than a previous local peak, we record it
-            if local_sum > local_peak_probabilities[t]:
-                local_peak_probabilities[t] = local_sum
-                peak_position_indices[t] = pos  # Save the position index
-
-    return local_peak_probabilities, peak_position_indices
 
 
 
