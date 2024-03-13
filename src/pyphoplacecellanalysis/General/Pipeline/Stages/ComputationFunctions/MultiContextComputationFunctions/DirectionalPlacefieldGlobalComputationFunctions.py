@@ -3447,6 +3447,63 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         return global_computation_results
 
 
+    # @function_attributes(short_name='directional_decoders_filter_epochs', tags=['directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
+    #     requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
+    #     validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=True)
+    # def _filter_decoded_epochs_by_user_annotations(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
+    #     """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
+        
+    #     Requires:
+    #         ['sess']
+
+    #     Provides:
+    #         global_computation_results.computed_data['pf1D_Decoder_dict']
+    #             ['DirectionalDecodersEpochsEvaluations']['directional_lap_specific_configs']
+    #             ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
+
+
+    #             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+
+    #             directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+    #             pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
+    #             ripple_decoding_time_bin_size = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+    #             laps_decoding_time_bin_size = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
+    #             decoder_laps_filter_epochs_decoder_result_dict = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
+    #             decoder_ripple_filter_epochs_decoder_result_dict = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
+    #             decoder_laps_radon_transform_df_dict = directional_decoders_epochs_decode_result.decoder_laps_radon_transform_df_dict
+    #             decoder_ripple_radon_transform_df_dict = directional_decoders_epochs_decode_result.decoder_ripple_radon_transform_df_dict
+
+    #             # New items:
+    #             decoder_laps_radon_transform_extras_dict = directional_decoders_epochs_decode_result.decoder_laps_radon_transform_extras_dict
+    #             decoder_ripple_radon_transform_extras_dict = directional_decoders_epochs_decode_result.decoder_ripple_radon_transform_extras_dict
+
+    #             # Weighted correlations:
+    #             laps_weighted_corr_merged_df = directional_decoders_epochs_decode_result.laps_weighted_corr_merged_df
+    #             ripple_weighted_corr_merged_df = directional_decoders_epochs_decode_result.ripple_weighted_corr_merged_df
+    #             decoder_laps_weighted_corr_df_dict = directional_decoders_epochs_decode_result.decoder_laps_weighted_corr_df_dict
+    #             decoder_ripple_weighted_corr_df_dict = directional_decoders_epochs_decode_result.decoder_ripple_weighted_corr_df_dict
+
+    #             # Pearson's correlations:
+    #             laps_simple_pf_pearson_merged_df = directional_decoders_epochs_decode_result.laps_simple_pf_pearson_merged_df
+    #             ripple_simple_pf_pearson_merged_df = directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df
+
+                
+    #     Should call:
+        
+    #     _perform_compute_custom_epoch_decoding
+
+
+    #     """
+    #     from neuropy.core.epoch import TimeColumnAliasesProtocol
+    #     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+    #     # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import HeuristicReplayScoring
+    #     from neuropy.core.epoch import find_data_indicies_from_epoch_times
+
+    #     raise NotImplementedError("2024-03-09- TODO!")
+
+    #     return global_computation_results
+
+
 
 
 # ==================================================================================================================== #
