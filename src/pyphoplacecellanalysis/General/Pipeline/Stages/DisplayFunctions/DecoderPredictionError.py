@@ -1268,8 +1268,8 @@ class WeightedCorrelationPlotData:
                 'wcorr': (lambda v:f"wcorr: {default_float_formatting_fn(v)}"),
                 'P_decoder':(lambda v:f"$P_i$: {default_float_formatting_fn(v)}"),
                 'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
-                # 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
-                # 'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
+                'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
+                'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
                 # 'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
                 # 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
             }
