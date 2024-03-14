@@ -605,7 +605,12 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     # df
 
     ## run 'directional_decoders_epoch_heuristic_scoring',
-    
+    directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
+
+    # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
+    directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+
+
 
     print(f'\tComputation complete. Exporting .CSVs...')
 
