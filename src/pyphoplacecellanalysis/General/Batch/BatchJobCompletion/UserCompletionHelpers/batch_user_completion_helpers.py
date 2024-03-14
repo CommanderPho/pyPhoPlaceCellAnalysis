@@ -510,7 +510,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     """
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(global_data_root_parent_path: "{global_data_root_parent_path}", curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)') # ,across_session_results_extended_dict: {across_session_results_extended_dict}
-    
+    from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
@@ -617,7 +617,9 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     
 
     print(f'\t\tsuccessfully exported directional_decoders_epochs_decode_result to {collected_outputs_path}!')
-    print(f'\t\t\tCSV Paths: {_output_csv_paths}\n')
+    _output_csv_paths_info_str: str = '\n'.join([f'{a_name}: "{file_uri_from_path(a_path)}"' for a_name, a_path in _output_csv_paths.items()])
+    # print(f'\t\t\tCSV Paths: {_output_csv_paths}\n')
+    print(f'\t\t\tCSV Paths: {_output_csv_paths_info_str}\n')
 
     # add to output dict
     # across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'] = _out
