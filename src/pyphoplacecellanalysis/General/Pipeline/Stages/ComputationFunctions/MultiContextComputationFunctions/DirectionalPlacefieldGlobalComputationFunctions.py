@@ -2211,6 +2211,11 @@ class DecoderDecodedEpochsResult(ComputedResult):
         ## 2024-03-13 - Filtering for only good ripples via exclusion critera (num active cells, duration, etc):
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
 
+
+        ## basic filter_epochs:
+        # self.directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
+        # extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
+
         ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
         export_files_dict = {}
@@ -2221,7 +2226,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
             a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
             a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
             ## Add t_bin column method
-            a_df = self.add_session_df_columns(a_df, session_name=session_name, time_bin_size=a_tbin_size, curr_session_t_delta=curr_session_t_delta, time_col=a_time_col_name)            
+            a_df = self.add_session_df_columns(a_df, session_name=session_name, time_bin_size=a_tbin_size, curr_session_t_delta=curr_session_t_delta, time_col=a_time_col_name)
             a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
             a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier 
             
