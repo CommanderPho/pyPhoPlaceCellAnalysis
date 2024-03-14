@@ -2001,7 +2001,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         *dfs_list: a series of dataframes to join
         should_drop_directional_columns:bool - if True, the direction (LR/RL) columns are dropped and only the _best_ columns are left.
         """   
-        filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df = dfs_list
+        filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df = dfs_list # , additional_columns_merged_df
 
         df: pd.DataFrame = filtered_ripple_simple_pf_pearson_merged_df.copy()
         direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
@@ -2019,10 +2019,12 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         ## Perfrom a 1D matching of the epoch start times:
         ## ORDER MATTERS:
-        elements =  df[start_t_idx_name].to_numpy()
-        test_elements = ripple_weighted_corr_merged_df[start_t_idx_name].to_numpy()
-        valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0]
-        hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True) ## NOTE .iloc used here!
+        # elements =  df[start_t_idx_name].to_numpy()
+        # test_elements = ripple_weighted_corr_merged_df[start_t_idx_name].to_numpy()
+        # valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0] #TODO 2024-03-14 09:34: - [ ] ERROR HERE?!?!
+        # hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True) ## NOTE .iloc used here!
+        valid_found_indicies = find_data_indicies_from_epoch_times(ripple_weighted_corr_merged_df, epoch_times=df[start_t_idx_name].to_numpy(), t_column_names=[start_t_idx_name,], atol=1e-3)
+        hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.loc[valid_found_indicies].reset_index(drop=True) ## Switched to .loc
 
         ## Add the wcorr columns to `df`:
         wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
@@ -2069,9 +2071,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-04 00:00', related_items=[])
     def try_add_is_epoch_boolean_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times: NDArray, new_column_name:str='is_valid_epoch', t_column_names=None, atol:float=0.01, not_found_action='skip_index', debug_print=False) -> bool:
-        """ tries to add a 'is_valid_epoch' column to the dataframe. 
+        """ tries to add a 'new_column_name' column to the dataframe. 
         
         t_column_names = ['ripple_start_t',]
         """
@@ -2093,34 +2095,19 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_user_annotated_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_user_annotated_epoch'], input_requires=[], output_provides=[], uses=['cls.try_add_is_epoch_boolean_column'], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
     def try_add_is_user_annotated_epoch_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times, t_column_names=['ripple_start_t',]) -> bool:
         """ tries to add a 'is_user_annotated_epoch' column to the dataframe. """
-        # if (any_good_selected_epoch_times is None):
-        #     return False
-        # any_good_selected_epoch_indicies = None
-        # try:
-        #     any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)    
-        # except BaseException as e:
-        #     print(f'ERROR: failed with error {e}. Out of options.')
-
-        # if any_good_selected_epoch_indicies is None:
-        #     return False
-
-        # # print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
-        # a_df['is_user_annotated_epoch'] = False
-        # a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
-        # return True
         return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_user_annotated_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
     
 
     @classmethod
-    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=['cls.try_add_is_epoch_boolean_column'], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
     def try_add_is_valid_epoch_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times, t_column_names=['ripple_start_t',]) -> bool:
         """ tries to add a 'is_valid_epoch' column to the dataframe. """
         return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_valid_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
 
-    
+    @function_attributes(short_name=None, tags=['columns', 'epochs', 'IMPORTANT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-14 09:22', related_items=[])
     def add_all_extra_epoch_columns(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333, debug_print=False) -> None:
         """ instead of filtering by the good/user-selected ripple epochs, it adds two columns: ['is_user_annotated_epoch', 'is_user_annotated_epoch'] so they can be later identified and filtered to `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs`
         Updates `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs` in-place 
