@@ -2182,6 +2182,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
             
         """
+        ## 2024-03-13 - Filtering for only good ripples via exclusion critera (num active cells, duration, etc):
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+
+
         assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
         output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
 
@@ -2208,13 +2212,13 @@ class DecoderDecodedEpochsResult(ComputedResult):
         
 
 
-        ## 2024-03-13 - Filtering for only good ripples via exclusion critera (num active cells, duration, etc):
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
 
 
-        ## basic filter_epochs:
-        self.directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
-        extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
+        # ## basic filter_epochs:
+        # directional_decoders_epochs_decode_result = self.decoder_ripple_filter_epochs_decoder_result_dict
+
+        # directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
+        # extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
         # Merge them into a single df:
         
 
@@ -2411,13 +2415,21 @@ def _update_decoder_result_active_filter_epoch_columns(a_result_obj, a_score_res
     return a_result_obj
 
 ## INPUTS: decoder_laps_radon_transform_df_dict
-def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict, columns=['score', 'velocity', 'intercept', 'speed']) ->  pd.DataFrame:
+def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str, pd.DataFrame], columns=['score', 'velocity', 'intercept', 'speed'], best_decoder_index_column_name:str='best_decoder_index') ->  pd.DataFrame:
     """Build a single merged dataframe from the cpomputed score metric results for all four decoders.
+
     Works with radon transform, wcorr, etc
 
     Creates columns like: score_long_LR, score_short_LR, ...
 
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df, _update_decoder_result_active_filter_epoch_columns
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df, _update_decoder_result_active_filter_epoch_columns
+        ## Extract the concrete dataframes from the results:
+        extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict.items()}
+        ## Merge the dict of four dataframes, one for each decoder, with column names like ['wcorr', 'travel', 'speed'] to a single merged df with suffixed of the dict keys like ['wcorr_long_LR', 'wcorr_long_RL',  ...., 'travel_long_LR', 'travel_long_RL', 'travel_short_LR', 'travel_short_RL', ...]
+        extracted_merged_scores_df: pd.DataFrame = _build_merged_score_metric_df(extracted_filter_epochs_dfs_dict, columns=['travel'], best_decoder_index_column_name=None)
+        extracted_merged_scores_df
+
     """
     score_metric_merged_df: pd.DataFrame = None
     # filter_columns_fn = lambda df: df[['score']]
@@ -2432,8 +2444,9 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict, columns=[
             score_metric_merged_df = score_metric_merged_df.join(filter_columns_fn(deepcopy(a_df)).add_suffix(f"_{a_name}"), lsuffix=None, rsuffix=None)
 
     # Get the column name with the maximum value for each row
-    # initial_df['best_decoder_index'] = initial_df.idxmax(axis=1)
-    score_metric_merged_df['best_decoder_index'] = score_metric_merged_df.apply(lambda row: np.argmax(np.abs(row.values)), axis=1)
+    if best_decoder_index_column_name is not None:
+        # initial_df['best_decoder_index'] = initial_df.idxmax(axis=1)
+        score_metric_merged_df[best_decoder_index_column_name] = score_metric_merged_df.apply(lambda row: np.argmax(np.abs(row.values)), axis=1)
 
     ## OUTPUTS: radon_transform_merged_df, decoder_laps_radon_transform_df_dict
     return score_metric_merged_df
@@ -3032,6 +3045,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             laps_metric_merged_df = _build_merged_score_metric_df(decoder_laps_df_dict, columns=active_df_columns)
             ripple_metric_merged_df = _build_merged_score_metric_df(decoder_ripple_df_dict, columns=active_df_columns)
             ## OUTPUTS: laps_metric_merged_df, ripple_metric_merged_df
+
+            # The output CSVs have the base columns from the `ripple_all_epoch_bins_marginals_df`, which is a bit surprising
 
             ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs:
             _laps_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df))
