@@ -22,7 +22,7 @@ from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer, override_dict # used to build config
 from neuropy.analyses.placefields import PlacefieldComputationParameters
-from neuropy.core.epoch import NamedTimerange, Epoch
+from neuropy.core.epoch import NamedTimerange, Epoch, ensure_dataframe
 from neuropy.core.epoch import find_data_indicies_from_epoch_times
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
@@ -2066,51 +2066,98 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         return df
 
+
+
     @classmethod
-    @function_attributes(short_name=None, tags=['NOT-FINISHED', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
-    def try_add_in_user_annotation_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times):
-        """ tries to add a 'is_user_annotated_epoch' column to the dataframe. """
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    def try_add_is_epoch_boolean_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times: NDArray, new_column_name:str='is_valid_epoch', t_column_names=None, atol:float=0.01, not_found_action='skip_index', debug_print=False) -> bool:
+        """ tries to add a 'is_valid_epoch' column to the dataframe. 
+        
+        t_column_names = ['ripple_start_t',]
+        """
         if (any_good_selected_epoch_times is None):
             return False
-
         any_good_selected_epoch_indicies = None
         try:
-            # print(f'adding user annotation column!')
-            any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(any_good_selected_epoch_times)
+            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=atol, not_found_action=not_found_action, debug_print=debug_print)    
         except BaseException as e:
-            # print(f'failed for {a_df_name}. Going to try method 2.')
-            pass
-
-        if any_good_selected_epoch_indicies is None:
-            ## try method 2
-            try:
-                # print(f'trying method 2 for {a_df_name}!')
-                any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',])
-            except AttributeError as e:
-                # print(f'failed method 2 for {a_df_name}.')
-                pass
-            except BaseException as e:
-                # print(f'failed for {a_df_name}. Going to try method 2.')
-                pass            
+            print(f'ERROR: failed with error {e} while trying to add column "{new_column_name}". Out of options.')
 
         if any_good_selected_epoch_indicies is None:
             return False
 
         # print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
-        a_df['is_user_annotated_epoch'] = False
-        a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
+        a_df[new_column_name] = False
+        a_df[new_column_name].iloc[any_good_selected_epoch_indicies] = True
         return True
 
-    def get_filtered_decoded_epochs_results(self, curr_active_pipeline, global_epoch_name: str, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333):
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_user_annotated_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    def try_add_is_user_annotated_epoch_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times, t_column_names=['ripple_start_t',]) -> bool:
+        """ tries to add a 'is_user_annotated_epoch' column to the dataframe. """
+        # if (any_good_selected_epoch_times is None):
+        #     return False
+        # any_good_selected_epoch_indicies = None
+        # try:
+        #     any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)    
+        # except BaseException as e:
+        #     print(f'ERROR: failed with error {e}. Out of options.')
+
+        # if any_good_selected_epoch_indicies is None:
+        #     return False
+
+        # # print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+        # a_df['is_user_annotated_epoch'] = False
+        # a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
+        # return True
+        return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_user_annotated_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
+    
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    def try_add_is_valid_epoch_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times, t_column_names=['ripple_start_t',]) -> bool:
+        """ tries to add a 'is_valid_epoch' column to the dataframe. """
+        return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_valid_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
+
+    
+    def add_all_extra_epoch_columns(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333, debug_print=False) -> None:
+        """ instead of filtering by the good/user-selected ripple epochs, it adds two columns: ['is_user_annotated_epoch', 'is_user_annotated_epoch'] so they can be later identified and filtered to `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs`
+        Updates `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs` in-place 
+        """
         ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
         # 2024-03-04 - Filter out the epochs based on the criteria:
+        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline=curr_active_pipeline, global_epoch_name=global_epoch_name, track_templates=track_templates, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+        filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
         ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
-        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
-        # print(f"any_good_selected_epoch_times.shape: {any_good_selected_epoch_times.shape}") # (142, 2)
+        decoder_user_selected_epoch_times_dict, any_user_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
 
+        a_result_dict = self.decoder_ripple_filter_epochs_decoder_result_dict ## Only operates on `self.decoder_ripple_filter_epochs_decoder_result_dict` (ripples)
+
+        for a_name, a_result in a_result_dict.items():
+            did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(ensure_dataframe(a_result.filter_epochs), any_good_selected_epoch_times=any_user_selected_epoch_times, t_column_names=None)
+            if debug_print:
+                print(f'did_update_user_annotation_col["{a_name}"]: {did_update_user_annotation_col}')
+            did_update_is_valid = DecoderDecodedEpochsResult.try_add_is_valid_epoch_column(ensure_dataframe(a_result.filter_epochs), any_good_selected_epoch_times=filtered_valid_epoch_times, t_column_names=None)
+            if debug_print:
+                print(f'did_update_is_valid["{a_name}"]: {did_update_is_valid}')
+        if debug_print:
+            print(f'\tdone.')
+
+
+    def get_filtered_decoded_epochs_results(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333):
+        ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
+
+        # 2024-03-04 - Filter out the epochs based on the criteria:
+        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline=curr_active_pipeline, global_epoch_name=global_epoch_name, track_templates=track_templates, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+        filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
+
+        ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
+        decoder_user_selected_epoch_times_dict, any_user_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
 
         decoder_ripple_filter_epochs_decoder_result_dict = self.decoder_ripple_filter_epochs_decoder_result_dict
 
@@ -2120,10 +2167,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
         ## Update the `decoder_ripple_filter_epochs_decoder_result_dict` with the included epochs:
         filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
         ## Constrain again now by the user selections:
-        filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(any_good_selected_epoch_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
+        filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(any_user_selected_epoch_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
         # filtered_decoder_filter_epochs_decoder_result_dict
 
-        return filtered_decoder_filter_epochs_decoder_result_dict, any_good_selected_epoch_times
+        return filtered_decoder_filter_epochs_decoder_result_dict, any_user_selected_epoch_times
 
 
     # @classmethod
@@ -2211,19 +2258,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
                     any_good_selected_epoch_indicies = None
                     print(f'adding user annotation column!')
 
-                    # try:
-                    #     any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(any_good_selected_epoch_times)
-                    # except AttributeError as e:
-                    #     print(f'failed for {a_df_name}. Going to try method 2.')
-                    # except BaseException as e:
-                    #     print(f'failed for {a_df_name}. Going to try method 2.')
-
                     if any_good_selected_epoch_indicies is None:
-                        ## try method 2
                         try:
-                            # print(f'trying method 2 for {a_df_name}!')
                             any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
-                            # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, any_good_selected_epoch_times, t_column_names=['ripple_start_t',])
                         except AttributeError as e:
                             print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
                         except BaseException as e:
@@ -2249,7 +2286,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
                     if any_good_selected_epoch_indicies is None:
                         try:
                             any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
-                            # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, any_good_selected_epoch_times, t_column_names=['ripple_start_t',])
                         except AttributeError as e:
                             print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
                         except BaseException as e:
