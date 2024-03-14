@@ -514,6 +514,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
 
     assert collected_outputs_path.exists()
     active_context = curr_active_pipeline.get_session_context()
