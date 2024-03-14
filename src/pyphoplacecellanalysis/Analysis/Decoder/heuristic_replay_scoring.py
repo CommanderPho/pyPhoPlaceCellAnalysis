@@ -626,3 +626,36 @@ def compute_local_peak_probabilities(probs, n_adjacent: int):
     return local_peak_probabilities, peak_position_indices
 
 
+# For a decoded posterior probability matrix t `a_p_x_given_n` where `np.shape(a_p_x_given_n): (62, 9) = (n_pos_bins, n_time_bins)`, how do I get a boolean matrix with zeros everywhere except at the location of the position bin with the peak value for each time bin? How would I expand this peaks_mask_matrix to include the elements adjacent to the peaks?
+import numpy as np
+from scipy.ndimage import convolve
+
+def get_peaks_mask(a_p_x_given_n):
+    """
+    Returns a boolean mask matrix with True values at the position bins
+    with the peak value for each time bin.
+    """
+    peaks_mask = np.zeros_like(a_p_x_given_n, dtype=bool)
+    for t in range(a_p_x_given_n.shape[1]):  # iterate over time bins
+        peaks_mask[np.argmax(a_p_x_given_n[:, t]), t] = True
+    return peaks_mask
+
+def expand_peaks_mask(peaks_mask, kernel=np.ones((3, 3))):
+    """
+    Expands the peaks_mask to include adjacent elements using a convolution kernel.
+
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import get_peaks_mask, expand_peaks_mask
+        
+        a_p_x_given_n = np.random.rand(62, 9)  # dummy data
+        peaks_mask = get_peaks_mask(a_p_x_given_n)
+        expanded_mask = expand_peaks_mask(peaks_mask) # expand in both position and time
+        expanded_mask = expand_peaks_mask(peaks_mask, kernel=np.ones((3, 1))) # expand only in position
+
+        expanded_mask
+
+    """
+    expanded_mask = convolve(peaks_mask.astype(int), kernel, mode='constant') >= 1
+    return expanded_mask
+
+
