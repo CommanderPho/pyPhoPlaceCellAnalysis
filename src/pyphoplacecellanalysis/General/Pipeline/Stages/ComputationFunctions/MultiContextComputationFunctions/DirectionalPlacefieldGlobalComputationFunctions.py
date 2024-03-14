@@ -2213,8 +2213,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
         ## basic filter_epochs:
-        # self.directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
-        # extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
+        self.directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
+        extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
+        # Merge them into a single df:
+        
 
         ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
@@ -2387,6 +2389,57 @@ def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
 
     return (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
+
+
+
+def _update_decoder_result_active_filter_epoch_columns(a_result_obj, a_score_result_df, columns=['score', 'velocity', 'intercept', 'speed']):
+    """ Joins the radon-transform result into the `a_result_obj.filter_epochs` dataframe.
+    
+    decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_radon_transform_df=decoder_laps_radon_transform_df_dict[a_name])
+    decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_radon_transform_df=decoder_ripple_radon_transform_df_dict[a_name])
+    
+    """
+    # assert a_result_obj.active_filter_epochs.n_epochs == np.shape(a_radon_transform_df)[0]
+    assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0]
+    if isinstance(a_result_obj.filter_epochs, pd.DataFrame):
+        a_result_obj.filter_epochs.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
+        a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df) # add the newly computed columns to the Epochs object
+    else:
+        # Otherwise it's an Epoch object
+        a_result_obj.filter_epochs._df.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
+        a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().join(a_score_result_df) # add the newly computed columns to the Epochs object
+    return a_result_obj
+
+## INPUTS: decoder_laps_radon_transform_df_dict
+def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict, columns=['score', 'velocity', 'intercept', 'speed']) ->  pd.DataFrame:
+    """Build a single merged dataframe from the cpomputed score metric results for all four decoders.
+    Works with radon transform, wcorr, etc
+
+    Creates columns like: score_long_LR, score_short_LR, ...
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df, _update_decoder_result_active_filter_epoch_columns
+    """
+    score_metric_merged_df: pd.DataFrame = None
+    # filter_columns_fn = lambda df: df[['score']]
+    filter_columns_fn = lambda df: df[columns]
+    for a_name, a_df in decoder_epochs_score_metric_df_dict.items():
+        # a_name: str = a_name.capitalize()
+        if score_metric_merged_df is None:
+            score_metric_merged_df = filter_columns_fn(deepcopy(a_df))
+            score_metric_merged_df = score_metric_merged_df.add_suffix(f"_{a_name}") # suffix the columns so they're unique
+        else:
+            ## append to the initial_df
+            score_metric_merged_df = score_metric_merged_df.join(filter_columns_fn(deepcopy(a_df)).add_suffix(f"_{a_name}"), lsuffix=None, rsuffix=None)
+
+    # Get the column name with the maximum value for each row
+    # initial_df['best_decoder_index'] = initial_df.idxmax(axis=1)
+    score_metric_merged_df['best_decoder_index'] = score_metric_merged_df.apply(lambda row: np.argmax(np.abs(row.values)), axis=1)
+
+    ## OUTPUTS: radon_transform_merged_df, decoder_laps_radon_transform_df_dict
+    return score_metric_merged_df
+
+
+
 
 # ==================================================================================================================== #
 #MARK ComputationFunctions                                                                                               
@@ -2886,49 +2939,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         # Radon Transform / Weighted Correlation _____________________________________________________________________________ #
 
-        def _update_decoder_result_active_filter_epoch_columns(a_result_obj, a_score_result_df, columns=['score', 'velocity', 'intercept', 'speed']):
-            """ Joins the radon-transform result into the `a_result_obj.filter_epochs` dataframe.
-            
-            decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_radon_transform_df=decoder_laps_radon_transform_df_dict[a_name])
-            decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_radon_transform_df=decoder_ripple_radon_transform_df_dict[a_name])
-            
-            """
-            # assert a_result_obj.active_filter_epochs.n_epochs == np.shape(a_radon_transform_df)[0]
-            assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0]
-            if isinstance(a_result_obj.filter_epochs, pd.DataFrame):
-                a_result_obj.filter_epochs.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
-                a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df) # add the newly computed columns to the Epochs object
-            else:
-                # Otherwise it's an Epoch object
-                a_result_obj.filter_epochs._df.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
-                a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().join(a_score_result_df) # add the newly computed columns to the Epochs object
-            return a_result_obj
 
-        ## INPUTS: decoder_laps_radon_transform_df_dict
-        def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict, columns=['score', 'velocity', 'intercept', 'speed']) ->  pd.DataFrame:
-            """Build a single merged dataframe from the cpomputed score metric results for all four decoders.
-            Works with radon transform, wcorr, etc
-
-            Creates columns like: score_long_LR, score_short_LR, ...
-            """
-            score_metric_merged_df: pd.DataFrame = None
-            # filter_columns_fn = lambda df: df[['score']]
-            filter_columns_fn = lambda df: df[columns]
-            for a_name, a_df in decoder_epochs_score_metric_df_dict.items():
-                # a_name: str = a_name.capitalize()
-                if score_metric_merged_df is None:
-                    score_metric_merged_df = filter_columns_fn(deepcopy(a_df))
-                    score_metric_merged_df = score_metric_merged_df.add_suffix(f"_{a_name}") # suffix the columns so they're unique
-                else:
-                    ## append to the initial_df
-                    score_metric_merged_df = score_metric_merged_df.join(filter_columns_fn(deepcopy(a_df)).add_suffix(f"_{a_name}"), lsuffix=None, rsuffix=None)
-
-            # Get the column name with the maximum value for each row
-            # initial_df['best_decoder_index'] = initial_df.idxmax(axis=1)
-            score_metric_merged_df['best_decoder_index'] = score_metric_merged_df.apply(lambda row: np.argmax(np.abs(row.values)), axis=1)
-
-            ## OUTPUTS: radon_transform_merged_df, decoder_laps_radon_transform_df_dict
-            return score_metric_merged_df
 
         ## INPUTS: laps_all_epoch_bins_marginals_df, radon_transform_merged_df
         def _compute_nonmarginalized_decoder_prob(an_all_epoch_bins_marginals_df: pd.DataFrame) ->  pd.DataFrame:
