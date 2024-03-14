@@ -119,3 +119,12 @@ This project has been set up using [PyScaffold] 4.1.1 and the [dsproject extensi
 [Google style]: http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
 [PyScaffold]: https://pyscaffold.org/
 [dsproject extension]: https://github.com/pyscaffold/pyscaffoldext-dsproject
+
+
+## Typestub generation
+
+### Build using `pyright` from command line. Type stubs are placed in `typings/*` folders
+pyright --createstub neuropy
+pyright --createstub pyphocorehelpers
+pyright --createstub pyphoplacecellanalysis
+
