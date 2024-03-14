@@ -513,6 +513,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
 
     assert collected_outputs_path.exists()
     active_context = curr_active_pipeline.get_session_context()
@@ -556,7 +557,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     ripple_simple_pf_pearson_merged_df: pd.DataFrame = directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df
 
     ## FILTERING FOR GOOD ROWS:
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+    
 
     ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
