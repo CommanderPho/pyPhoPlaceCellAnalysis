@@ -2160,7 +2160,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
     #     return filtered_decoder_filter_epochs_decoder_result_dict, any_user_selected_epoch_times
 
 
-    def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
+    def perform_export_dfs_dict_to_csvs(self, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
         """ export as separate .csv files. 
         active_context = curr_active_pipeline.get_session_context()
         curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
@@ -2180,11 +2180,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
         df
 
 
-            
-        """
-        ## 2024-03-13 - Filtering for only good ripples via exclusion critera (num active cells, duration, etc):
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
 
+
+        """
 
         assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
         output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
@@ -2205,14 +2203,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
         
 
         #TODO 2024-03-02 12:12: - [ ] Could add weighted correlation if there is a dataframe for that and it's computed:
-        _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
-        
         tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
         time_col_name_dict = {'laps': 'lap_start_t', 'ripple': 'ripple_start_t'} ## default should be 't_bin_center'
         
-
-
-
 
         # ## basic filter_epochs:
         # directional_decoders_epochs_decode_result = self.decoder_ripple_filter_epochs_decoder_result_dict
@@ -2220,12 +2213,13 @@ class DecoderDecodedEpochsResult(ComputedResult):
         # directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
         # extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
         # Merge them into a single df:
-        
+
+
 
         ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
         export_files_dict = {}
-        extracted_dfs_dict = {a_df_name:getattr(self, a_df_name) for a_df_name in _df_variables_names}
+        
         for a_df_name, a_df in extracted_dfs_dict.items():
             an_epochs_source_name: str = a_df_name.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
 
@@ -2291,6 +2285,36 @@ class DecoderDecodedEpochsResult(ComputedResult):
             export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str)
             
         return export_files_dict
+
+
+
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
+        """ export as separate .csv files. 
+        active_context = curr_active_pipeline.get_session_context()
+        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+        active_context = curr_active_pipeline.get_session_context()
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+        session_name: str = curr_active_pipeline.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+        histogram_bins = 25
+        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
+        any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
+        df
+
+
+            
+        """
+        _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
+        extracted_dfs_dict = {a_df_name:getattr(self, a_df_name) for a_df_name in _df_variables_names}
+        return self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections)
+
+
     
     # ## For serialization/pickling:
     # def __getstate__(self):
@@ -2446,7 +2470,7 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str,
     # Get the column name with the maximum value for each row
     if best_decoder_index_column_name is not None:
         # initial_df['best_decoder_index'] = initial_df.idxmax(axis=1)
-        score_metric_merged_df[best_decoder_index_column_name] = score_metric_merged_df.apply(lambda row: np.argmax(np.abs(row.values)), axis=1)
+        score_metric_merged_df[best_decoder_index_column_name] = score_metric_merged_df.apply(lambda row: np.argmax(np.abs(row.values)), axis=1) #TODO 2024-03-14 18:09: - [ ] This needs to be changed so that it works with multiple columns. Previously it was hardcoded to just find the best index of a single column.
 
     ## OUTPUTS: radon_transform_merged_df, decoder_laps_radon_transform_df_dict
     return score_metric_merged_df
