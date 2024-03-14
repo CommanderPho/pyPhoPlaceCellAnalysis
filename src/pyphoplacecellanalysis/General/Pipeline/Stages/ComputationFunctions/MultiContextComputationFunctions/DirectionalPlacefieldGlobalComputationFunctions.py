@@ -2135,7 +2135,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
     #         return cls.try_add_in_user_annotation_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times)
 
 
-    def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None):
+    def export_csvs(self, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
         """ export as separate .csv files. 
         active_context = curr_active_pipeline.get_session_context()
         curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
@@ -2181,8 +2181,12 @@ class DecoderDecodedEpochsResult(ComputedResult):
         tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
         time_col_name_dict = {'laps': 'lap_start_t', 'ripple': 'ripple_start_t'} ## default should be 't_bin_center'
         
-        # a_df_name.startswith(
-        # an_epochs_source_names
+
+
+        ## 2024-03-13 - Filtering for only good ripples via exclusion critera (num active cells, duration, etc):
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+
+        ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
         export_files_dict = {}
         extracted_dfs_dict = {a_df_name:getattr(self, a_df_name) for a_df_name in _df_variables_names}
@@ -2202,8 +2206,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
             if (user_annotation_selections is not None):
                 any_good_selected_epoch_times = user_annotation_selections.get(an_epochs_source_name, None) # like ripple
                 if any_good_selected_epoch_times is not None:
-                    num_user_selected_times: int = len(any_good_selected_epoch_times)
-                    print(f'num_user_selected_times: {num_user_selected_times}')
+                    num_valid_epoch_times: int = len(any_good_selected_epoch_times)
+                    print(f'num_user_selected_times: {num_valid_epoch_times}')
                     any_good_selected_epoch_indicies = None
                     print(f'adding user annotation column!')
 
@@ -2218,7 +2222,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
                         ## try method 2
                         try:
                             # print(f'trying method 2 for {a_df_name}!')
-                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=True)
+                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
                             # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, any_good_selected_epoch_times, t_column_names=['ripple_start_t',])
                         except AttributeError as e:
                             print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
@@ -2226,11 +2230,37 @@ class DecoderDecodedEpochsResult(ComputedResult):
                             print(f'ERROR: failed for {a_df_name}. Out of options.')
                         
                     if any_good_selected_epoch_indicies is not None:
-                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_user_selected_times} user selections) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} user selections) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
                         a_df['is_user_annotated_epoch'] = False
                         a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
                     else:
                         print(f'\t failed all methods for annotations')
+
+            # adds in column 'is_valid_epoch'
+            if (valid_epochs_selections is not None):
+                # 2024-03-04 - Filter out the epochs based on the criteria:
+                any_good_selected_epoch_times = valid_epochs_selections.get(an_epochs_source_name, None) # like ripple
+                if any_good_selected_epoch_times is not None:
+                    num_valid_epoch_times: int = len(any_good_selected_epoch_times)
+                    print(f'num_valid_epoch_times: {num_valid_epoch_times}')
+                    any_good_selected_epoch_indicies = None
+                    print(f'adding valid filtered epochs column!')
+
+                    if any_good_selected_epoch_indicies is None:
+                        try:
+                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
+                            # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, any_good_selected_epoch_times, t_column_names=['ripple_start_t',])
+                        except AttributeError as e:
+                            print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
+                        except BaseException as e:
+                            print(f'ERROR: failed for {a_df_name}. Out of options.')
+                        
+                    if any_good_selected_epoch_indicies is not None:
+                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} valid filter epoch times) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+                        a_df['is_valid_epoch'] = False
+                        a_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                    else:
+                        print(f'\t failed all methods for selection filter')
 
             export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str)
             

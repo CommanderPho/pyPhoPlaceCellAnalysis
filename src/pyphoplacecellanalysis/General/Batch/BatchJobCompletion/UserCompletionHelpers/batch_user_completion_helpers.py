@@ -556,6 +556,24 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     ripple_simple_pf_pearson_merged_df: pd.DataFrame = directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df
 
     ## FILTERING FOR GOOD ROWS:
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+
+    ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
+
+    # 2024-03-04 - Filter out the epochs based on the criteria:
+    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+    filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
+
+    ## filter the epochs by something and only show those:
+    # INPUTS: filtered_epochs_df
+    # filtered_ripple_simple_pf_pearson_merged_df = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(active_epochs_df[['start', 'stop']].to_numpy())
+
+    ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
+    decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
+    # ## Constrain again now by the user selections
+    # filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(any_good_selected_epoch_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
+    # filtered_decoder_filter_epochs_decoder_result_dict
 
     # ## Drop rows where all are missing
     # corr_column_names = ['long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']
@@ -572,7 +590,6 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     # earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
     # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
     # delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
-    decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
 
     # # Add user-selection columns to df
     # a_df = deepcopy(filtered_ripple_simple_pf_pearson_merged_df)
@@ -594,7 +611,8 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     ## Export CSVs:
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     _output_csv_paths = directional_decoders_epochs_decode_result.export_csvs(parent_output_path=collected_outputs_path.resolve(), active_context=active_context, session_name=curr_session_name, curr_session_t_delta=t_delta,
-                                                                              user_annotation_selections={'ripple': any_good_selected_epoch_times})
+                                                                              user_annotation_selections={'ripple': any_good_selected_epoch_times},
+                                                                              valid_epochs_selections={'ripple': filtered_valid_epoch_times})
     
 
     print(f'\t\tsuccessfully exported directional_decoders_epochs_decode_result to {collected_outputs_path}!')
