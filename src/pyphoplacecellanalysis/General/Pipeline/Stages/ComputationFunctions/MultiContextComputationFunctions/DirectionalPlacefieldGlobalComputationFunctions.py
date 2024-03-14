@@ -2247,7 +2247,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
             a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
             a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier 
             
-            # TODO: add in custom columns
+            # add in custom columns
+            #TODO 2024-03-14 06:48: - [ ] I could use my newly implemented `directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)` function, but since this looks at decoder-specific info it's better just to duplicate implementation and do it again here.
             # ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
             # ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
             if (user_annotation_selections is not None):
