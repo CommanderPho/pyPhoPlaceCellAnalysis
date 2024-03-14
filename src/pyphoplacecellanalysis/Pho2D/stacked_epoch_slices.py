@@ -1322,7 +1322,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
 
     def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None, defer_render:bool=False):
-        """ Restures the user's selections to this pagination controller
+        """ Restores the user's selections to this pagination controller
 
         Uses: self.params.active_identifying_figure_ctx
 
@@ -1343,7 +1343,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         loaded_selections = user_annotations.get(a_selections_ctx, None)
         new_selections = loaded_selections
         if loaded_selections is not None:
-            a_start_stop_arr = self.selected_epoch_times
+            # a_start_stop_arr = self.selected_epoch_times # NOPE, these are the current selections
+            a_start_stop_arr = deepcopy(new_selections) # 
             if (a_start_stop_arr is not None) and (len(a_start_stop_arr) > 0):
                 assert np.shape(a_start_stop_arr)[1] == 2, f"input should be start, stop times as a numpy array"
                 new_selections = self.restore_selections_from_epoch_times(a_start_stop_arr, defer_render=defer_render) # TODO: only accepts epoch_times specifications
@@ -1715,6 +1716,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return new_connections_dict
 
 
+    ## ==================================================================================================================== #
+    #region Selections/Annotations                                                                                               
+    # ==================================================================================================================== #
+        
     # User Selections/Annotations ________________________________________________________________________________________ #
     def save_selections(self) -> Dict[str, EpochSelectionsObject]:
         """ Capture current user selections for each child controller 
@@ -1900,8 +1905,13 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         any_good_epoch_idxs: NDArray = any_good_epoch_idxs_list[0]
         return any_good_epoch_idxs
 
+    #endregion Selections/Annotations ______________________________________________________________________________________________________ #
 
 
+    ## ==================================================================================================================== #
+    #region Export/Output                                                                                              
+    # ==================================================================================================================== #
+    
     # Export/Output ______________________________________________________________________________________________________ #
     def export_decoder_pagination_controller_figure_page(self, curr_active_pipeline, **kwargs):
         """ exports each pages single-decoder figures separately
@@ -1934,8 +1944,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 figs = a_plots.fig
                 # axs = a_plots.axs
                 curr_active_pipeline.output_figure(final_context=page_context, fig=figs, **output_figure_kwargs)
-
-
 
     def export_all_pages(self, curr_active_pipeline, **kwargs):
         """ exports each pages single-decoder figures separately
@@ -2000,6 +2008,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         print(f'\tdone.')
 
+    #endregion Export/Output ______________________________________________________________________________________________________ #
 
     # ==================================================================================================================== #
     # MatplotlibTimeSynchronizedWidget Wrappers                                                                            #
