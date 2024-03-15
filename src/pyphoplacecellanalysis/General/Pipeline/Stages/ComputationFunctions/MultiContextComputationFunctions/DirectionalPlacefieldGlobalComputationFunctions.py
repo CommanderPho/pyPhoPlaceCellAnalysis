@@ -2136,20 +2136,35 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
     @classmethod
-    def add_score_best_dir_columns(cls, df: pd.DataFrame, col_name: str = 'pf_peak_x_pearsonr', should_drop_directional_columns:bool=False) -> pd.DataFrame:
+    def add_score_best_dir_columns(cls, df: pd.DataFrame, col_name: str = 'pf_peak_x_pearsonr', should_drop_directional_columns:bool=False, is_col_name_suffix_mode: bool = False) -> pd.DataFrame:
         """ adds in a single "*_diff" and the 'long_best_*', 'short_best_*' columns
         Generalized from `merge_decoded_epochs_result_dfs`
+
+        is_col_name_suffix_mode: bool - if True, the variable name (specified by `col_name`)
+
         """
         direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
         track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
         # Get only the best direction long/short values for each metric:
         long_best_col_name: str = f'long_best_{col_name}'
         short_best_col_name: str = f'short_best_{col_name}'
+
         
-        df[long_best_col_name] = np.where(direction_max_indices, df[f'long_LR_{col_name}'], df[f'long_RL_{col_name}'])
-        df[short_best_col_name] = np.where(direction_max_indices, df[f'short_LR_{col_name}'], df[f'short_RL_{col_name}'])
+        if is_col_name_suffix_mode:
+            long_LR_string = f'long_LR_{col_name}'
+            long_RL_string = f'long_RL_{col_name}'
+            short_LR_string = f'short_LR_{col_name}'
+            short_RL_string = f'short_RL_{col_name}'
+        else:
+            long_LR_string = f'{col_name}_long_LR'
+            long_RL_string = f'{col_name}_long_RL'
+            short_LR_string = f'{col_name}_short_LR'
+            short_RL_string = f'{col_name}_short_RL'
+        
+        df[long_best_col_name] = np.where(direction_max_indices, df[long_LR_string], df[long_RL_string])
+        df[short_best_col_name] = np.where(direction_max_indices, df[short_LR_string], df[short_RL_string])
         if should_drop_directional_columns:
-            df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', 'long_LR_{col_name}', 'long_RL_{col_name}', 'short_LR_{col_name}', 'short_RL_{col_name}']) # drop the directional column names
+            df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', long_LR_string, long_RL_string, short_LR_string, short_RL_string]) # drop the directional column names
 
         ## Add differences:
         LS_diff_col_name: str = f'{col_name}_diff'
@@ -2198,9 +2213,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         # `common_shared_portion_df` the columns of the dataframe that is the same for all four decoders
         common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][all_df_shared_column_names]) # copy it from the first dataframe
-
         ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
-        conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df['P_LR', 'P_RL', 'P_Long', 'P_Short']) ## just use the columns from this
+        conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[['P_LR', 'P_RL', 'P_Long', 'P_Short']]) ## just use the columns from this
         # (k, v) = self.decoder_ripple_filter_epochs_decoder_result_dict.items()[0]
         assert np.shape(conditional_prob_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of columns"
 
@@ -2210,9 +2224,12 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         ## add in the "_diff" columns and the 'best_dir_*' columns
 
+        added_column_names = []
         for a_score_col in heuristic_score_col_names:
-            extracted_merged_scores_df = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False)
-
+            extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
+            added_column_names.extend(curr_added_column_name_tuple)
+            # (long_best_col_name, short_best_col_name, LS_diff_col_name)
+            
         extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)
 
         return extracted_merged_scores_df
