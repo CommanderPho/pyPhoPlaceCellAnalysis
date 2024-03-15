@@ -2135,6 +2135,30 @@ class DecoderDecodedEpochsResult(ComputedResult):
             print(f'\tdone.')
 
 
+    @classmethod
+    def add_score_best_dir_columns(cls, df: pd.DataFrame, col_name: str = 'pf_peak_x_pearsonr', should_drop_directional_columns:bool=False) -> pd.DataFrame:
+        """ adds in a single "*_diff" and the 'long_best_*', 'short_best_*' columns
+        Generalized from `merge_decoded_epochs_result_dfs`
+        """
+        direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
+        track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+        # Get only the best direction long/short values for each metric:
+        long_best_col_name: str = f'long_best_{col_name}'
+        short_best_col_name: str = f'short_best_{col_name}'
+        
+        df[long_best_col_name] = np.where(direction_max_indices, df[f'long_LR_{col_name}'], df[f'long_RL_{col_name}'])
+        df[short_best_col_name] = np.where(direction_max_indices, df[f'short_LR_{col_name}'], df[f'short_RL_{col_name}'])
+        if should_drop_directional_columns:
+            df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', 'long_LR_{col_name}', 'long_RL_{col_name}', 'short_LR_{col_name}', 'short_RL_{col_name}']) # drop the directional column names
+
+        ## Add differences:
+        LS_diff_col_name: str = f'{col_name}_diff'
+        df[LS_diff_col_name] = df[long_best_col_name].abs() - df[short_best_col_name].abs()
+
+
+        return df, (long_best_col_name, short_best_col_name, LS_diff_col_name)
+        
+
     @function_attributes(short_name=None, tags=['merged', 'all_scores', 'df', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-14 19:10', related_items=[])
     def build_complete_all_scores_merged_df(self) -> pd.DataFrame:
         """ Builds a single merged dataframe from the four separate .filter_epochs dataframes from the result for each decoder, merging them into a single dataframe with ['_long_LR','_long_RL','_short_LR','_short_RL'] suffixes for the combined columns.
@@ -2173,13 +2197,24 @@ class DecoderDecodedEpochsResult(ComputedResult):
         # extracted_merged_scores_df
 
         # `common_shared_portion_df` the columns of the dataframe that is the same for all four decoders
-        common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][all_df_shared_column_names])
+        common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][all_df_shared_column_names]) # copy it from the first dataframe
+
+        ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
+        conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df['P_LR', 'P_RL', 'P_Long', 'P_Short']) ## just use the columns from this
+        # (k, v) = self.decoder_ripple_filter_epochs_decoder_result_dict.items()[0]
+        assert np.shape(conditional_prob_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of columns"
 
         # Build the final merged dataframe with the score columns for each of the four decoders but only one copy of the common columns.
-        extracted_merged_scores_df: pd.DataFrame = pd.concat((common_shared_portion_df, extracted_merged_scores_df), axis='columns')
+        extracted_merged_scores_df: pd.DataFrame = pd.concat((common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df), axis='columns')
         extracted_merged_scores_df['ripple_start_t'] = extracted_merged_scores_df['start']
 
+        ## add in the "_diff" columns and the 'best_dir_*' columns
+
+        for a_score_col in heuristic_score_col_names:
+            extracted_merged_scores_df = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False)
+
         extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)
+
         return extracted_merged_scores_df
 
 
@@ -2335,7 +2370,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         return export_files_dict
 
 
-
+    @function_attributes(short_name=None, tags=['export', 'CSV'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-15 10:13', related_items=[])
     def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
         """ export as separate .csv files. 
         active_context = curr_active_pipeline.get_session_context()
