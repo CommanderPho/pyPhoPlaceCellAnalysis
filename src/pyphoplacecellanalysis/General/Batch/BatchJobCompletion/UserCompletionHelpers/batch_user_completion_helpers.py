@@ -233,7 +233,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         marginals_df.to_csv(out_path)
         return out_path 
 
-
     def _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context):
         """ After the sweeps are complete and multiple (one for each time_bin_size swept) indepdnent dfs are had with the four results types this function concatenates each of the four into a single dataframe for all time_bin_size values with a column 'time_bin_size'. 
         It also saves them out to CSVs in a manner similar to what `compute_and_export_marginals_dfs_completion_function` did to be compatible with `2024-01-23 - Across Session Point and YellowBlue Marginal CSV Exports.ipynb`
@@ -297,15 +296,12 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         return (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path)
         # (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path)
         
-
-
     def add_session_df_columns(df: pd.DataFrame, session_name: str, curr_session_t_delta: Optional[float], time_col: str) -> pd.DataFrame:
         """ adds session-specific information to the marginal dataframes """
         df['session_name'] = session_name 
         if curr_session_t_delta is not None:
             df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
         return df
-
 
     ## Single decode:
     def _try_single_decode(owning_pipeline_reference, directional_merged_decoders_result, use_single_time_bin_per_epoch: bool, desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None):
@@ -367,7 +363,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         directional_merged_decoders_result.perform_compute_marginals()
         return directional_merged_decoders_result
         
-
     def _update_result_laps(a_result: DecodedFilterEpochsResult, laps_df: pd.DataFrame) -> pd.DataFrame:
         """ captures nothing. Can reusing the same laps_df as it makes no modifications to it. 
         
