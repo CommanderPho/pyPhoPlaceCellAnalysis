@@ -1395,6 +1395,61 @@ def process_csv_file(file: str, session_name: str, curr_session_t_delta: Optiona
     return df
 
 
+def export_across_session_CSVs(final_output_path: Path, TODAY_DAY_DATE:str, all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_all_scores_ripple_df, all_sessions_all_scores_laps_df=None):
+    """ Exports the multi-session single CSVs after loading the CSVs for the individual sessions. Useful for plotting with RawGraphs/Orange, etc.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import export_across_session_CSVs
+
+        # TODAY_DAY_DATE: str = f"2024-03-18_Apogee"
+        final_output_path = Path("../output/").resolve()
+
+        final_csv_export_paths = export_across_session_CSVs(final_output_path=final_output_path, TODAY_DAY_DATE=TODAY_DAY_DATE,
+                                                            all_sessions_laps_df=all_sessions_laps_df,  all_sessions_ripple_df=all_sessions_ripple_df,  all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,  all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df, 
+                                                            all_sessions_simple_pearson_laps_df=all_sessions_simple_pearson_laps_df,  all_sessions_simple_pearson_ripple_df=all_sessions_simple_pearson_ripple_df,
+                                                            all_sessions_all_scores_ripple_df=all_sessions_all_scores_ripple_df,  all_sessions_all_scores_laps_df=None,
+                                                            )
+        final_csv_export_paths
+
+    
+    """
+    # INPUTS: TODAY_DAY_DATE, final_output_path
+
+    # final_sessions
+    # {'kdiba_gor01_one_2006-6-08_14-26-15': {'ripple_marginals_df': WindowsPath('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-17_0540PM-kdiba_gor01_one_2006-6-08_14-26-15-(ripple_marginals_df).csv'),
+    #   'laps_marginals_df': WindowsPath('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-17_0540PM-kdiba_gor01_one_2006-6-08_14-26-15-(laps_marginals_df).csv')},
+    #  'kdiba_gor01_one_2006-6-09_1-22-43': {'ripple_marginals_df': WindowsPath('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-12_0838PM-kdiba_gor01_one_2006-6-09_1-22-43-(ripple_marginals_df).csv'),
+    #   'laps_marginals_df': WindowsPath('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-12_0838PM-kdiba_gor01_one_2006-6-09_1-22-43-(laps_marginals_df).csv')},
+    #  'kdiba_pin01_one_fet11-01_12-58-54': {'ripple_marginals_df': WindowsPath('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-12_0828PM-kdiba_pin01_one_fet11-01_12-58-54-(ripple_marginals_df).csv'),
+    #   'laps_marginals_df': WindowsPath('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-12_0828PM-kdiba_pin01_one_fet11-01_12-58-54-(laps_marginals_df).csv')}}
+
+    # Save out the five dataframes to CSVs:
+    across_session_output_df_prefix: str = f'AcrossSession'
+    final_dfs_dict = {f"{across_session_output_df_prefix}_Laps_per-Epoch": all_sessions_laps_df, f"{across_session_output_df_prefix}_Ripple_per-Epoch": all_sessions_ripple_df,
+                        f"{across_session_output_df_prefix}_Laps_per-TimeBin": all_sessions_laps_time_bin_df, f"{across_session_output_df_prefix}_Ripple_per-TimeBin": all_sessions_ripple_time_bin_df,
+                        f"{across_session_output_df_prefix}_SimplePearson_Laps_per-Epoch": all_sessions_simple_pearson_laps_df, f"{across_session_output_df_prefix}_SimplePearson_Ripple_per-Epoch": all_sessions_simple_pearson_ripple_df,
+                        f"{across_session_output_df_prefix}_AllScores_Ripple_per-Epoch": all_sessions_all_scores_ripple_df, #,
+                        }
+    
+    if all_sessions_all_scores_laps_df is not None:
+        final_dfs_dict.update({f"{across_session_output_df_prefix}_AllScores_Laps_per-Epoch": all_sessions_all_scores_laps_df})
+
+    final_csv_export_paths = {}
+    for a_name, a_final_df in final_dfs_dict.items():
+        # save out one final DF to csv.
+        out_csv_filename: str = f"{TODAY_DAY_DATE}_{a_name}.csv"
+
+        if a_final_df is not None:    
+            a_final_csv_export_path = final_output_path.joinpath(out_csv_filename).resolve()
+            a_final_df.to_csv(a_final_csv_export_path) # save to CSV.
+            final_csv_export_paths[a_name] = a_final_csv_export_path
+        else:
+            print(f'WARN: dataframe a_name: {a_name} is None, so it will not be exported to {out_csv_filename}')
+            
+    return final_csv_export_paths
+
+
+
 @define(slots=False)
 class AcrossSessionCSVOutputFormat:
     data_description = ["AcrossSession"]
