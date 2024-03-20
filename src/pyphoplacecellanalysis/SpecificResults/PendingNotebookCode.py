@@ -649,12 +649,10 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bi
 # ==================================================================================================================== #
 
 
-
 # ==================================================================================================================== #
 # 2024-02-08 - Plot Single ACLU Heatmaps for Each Decoder                                                              #
 # ==================================================================================================================== #
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-
 
 def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None, ax_dict=None, extra_decoder_values_dict=None, tuning_curves_dict=None, include_tuning_curves=False):
     """ 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
@@ -887,11 +885,9 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
     return fig, ax_dict
 
 
-
 # ==================================================================================================================== #
 # Usability/Conveninece Helpers                                                                                        #
 # ==================================================================================================================== #
-
 
 def pho_jointplot(*args, **kwargs):
     """ wraps sns.jointplot to allow adding titles/axis labels/etc."""
@@ -1105,7 +1101,6 @@ def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_tr
 
     # outputs: viewer, image_layer_dict
     return viewer, image_layer_dict
-
 
 
 def napari_export_image_sequence(viewer: napari.viewer.Viewer, imageseries_output_directory='output/videos/imageseries/', slider_axis_IDX: int = 0, build_filename_from_viewer_callback_fn=None):
