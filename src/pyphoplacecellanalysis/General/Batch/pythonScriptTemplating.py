@@ -272,92 +272,82 @@ def build_vscode_workspace(script_paths):
     return vscode_workspace_path
 
 
-
 def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int = 3,
-                                         activate_path = 'c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/activate.bat', 
-                                         python_executable = 'c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe'):
-    """ builds a Powershell script to allow running in parallel on Windows since the normal subprocessing approach doesn't work.
-
-
-    max_concurrent_jobs (int):  Maximum number of concurrent jobs, limited by your system's memory. Estimate 20GB per worker.
-    activate_path (str): path to the activate script and Python executable within the virtual environment
-
-
-        from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import build_windows_powershell_run_script
-
-        powershell_script_path = build_windows_powershell_run_script(script_paths)
-        powershell_script_path
-
+                                        activate_path='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/activate.bat', 
+                                        python_executable='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe'):
     """
-    import os
-    # script_paths = [
-    #     'l:/Scratch/gen_scripts/run_kdiba_vvp01_one_2006-4-10_12-25-50/run_kdiba_vvp01_one_2006-4-10_12-25-50.py'
-    #     # ... other script paths
-    # ]
-    assert len(script_paths) > 0, f"script_paths is empty!"
-    top_level_script_folders_path: Path = Path(script_paths[0]).resolve().parent.parent # parent of the parents
-    # script_folders: List[Path] = [Path(a_path).parent.resolve() for a_path in script_paths]
+    Builds a Powershell script to run Python scripts in parallel on Windows.
 
+    max_concurrent_jobs (int): Maximum number of concurrent jobs, limited by your system's memory.
+    activate_path (str): Path to the activate script of the Python virtual environment.
+    python_executable (str): Path to the Python executable within the virtual environment.
+
+    Returns:
+        Path: The path to the generated Powershell script.
+    """
+
+    # Ensure that there are script paths provided
+    assert script_paths, "script_paths list cannot be empty!"
+
+    # Get the top-level directory to save the Powershell script
+    top_level_script_folders_path = Path(script_paths[0]).resolve().parent.parent
     ps_script_path = top_level_script_folders_path.joinpath('run_scripts.ps1').resolve()
     print(f'ps_script_path: {ps_script_path}')
 
+    # PowerShell script preamble
     powershell_script = f"""
-    # Start jobs and limit the number of concurrent jobs to {max_concurrent_jobs}
+    # Define a ScriptBlock to activate the virtual environment, change directory, and execute the Python script
+    $scriptBlock = {{
+        param([string]$activatePath, [string]$pythonExec, [string]$scriptPath, [string]$parentDir)
+        & $activatePath | Out-Null
+        Set-Location -Path $parentDir
+        & $pythonExec $scriptPath | Out-Null
+    }}
+
+    # Initialize job queue and set the job limit
     $jobQueue = @()
     $jobLimit = {max_concurrent_jobs}
     """
 
+    # Job creation and queuing
     for script in script_paths:
-        parent_directory = os.path.abspath(os.path.join(script, os.pardir))  # Get the parent directory of the script
+        parent_directory = Path(script).resolve().parent  # Get the parent directory of the script
         powershell_script += f"""
     # Wait until there is a free slot to run a new job
     while ($jobQueue.Count -ge $jobLimit) {{
         $completedJobs = @($jobQueue | Where-Object {{ $_.State -eq 'Completed' }})
         if ($completedJobs) {{
-            # If there are completed jobs, clean them up
+            # Remove completed jobs from the queue
             $completedJobs | Remove-Job
-            $jobQueue = $jobQueue | Where-Object {{ $_.State -ne 'Completed' }}
+            $jobQueue = @($jobQueue | Where-Object {{ $_.State -ne 'Completed' }})
         }} else {{
-            # If no jobs are completed, wait for a while
+            # Wait for some time before checking again
             Start-Sleep -Seconds 5
         }}
     }}
 
     # Add a new job to the queue
-    $jobQueue += Start-Job -ScriptBlock {{
-        # Activate the Python virtual environment
-        & '{activate_path}' | Out-Null
-
-        # Change to the script's directory
-        Set-Location -Path '{parent_directory}'
-
-        # Run the Python script using the specific Python executable
-        & '{python_executable}' '{script}' | Out-Null
-    }}
+    $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList '{activate_path}', '{python_executable}', '{script}', '{parent_directory}'
+    $jobQueue += , $job  # Append job to the queue as an array element
     """
 
-    # Add the code to wait for the remaining jobs to finish after the loop has ended
+    # Finish the script with job monitoring and cleanup
     powershell_script += """
-    # Wait for the remaining jobs to finish
+    # Wait for all queued jobs to complete
     $jobQueue | Wait-Job
 
-    # Output the results of each job (optional)
+    # Gather the results of each job (optional)
     $jobQueue | ForEach-Object {
-    $_ | Receive-Job
+        $_ | Receive-Job
     }
 
-    # Clean up the jobs
+    # Clean up the job queue
     $jobQueue | Remove-Job
     """
 
-    ## Save to file:
+    # Save the generated PowerShell script to a file
     with open(ps_script_path, 'w') as file:
         file.write(powershell_script)
 
-    # Now you would execute the PowerShell script from the command line.
-    # Make sure to run this in a cmd where PowerShell execution policy allows it
-    # or use `powershell -ExecutionPolicy Bypass -File run_scripts.ps1`.
-
     return ps_script_path
-
 
