@@ -2213,8 +2213,13 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         # `common_shared_portion_df` the columns of the dataframe that is the same for all four decoders
         common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][all_df_shared_column_names]) # copy it from the first dataframe
+
+        ## Add in the 'wcorr' metrics:
+        merged_conditional_prob_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
+        merged_wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
+
         ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
-        conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[['P_LR', 'P_RL', 'P_Long', 'P_Short']]) ## just use the columns from this
+        conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_conditional_prob_column_names]) ## just use the columns from this
         # (k, v) = self.decoder_ripple_filter_epochs_decoder_result_dict.items()[0]
         assert np.shape(conditional_prob_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of columns"
 
@@ -2222,14 +2227,27 @@ class DecoderDecodedEpochsResult(ComputedResult):
         extracted_merged_scores_df: pd.DataFrame = pd.concat((common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df), axis='columns')
         extracted_merged_scores_df['ripple_start_t'] = extracted_merged_scores_df['start']
 
-        ## add in the "_diff" columns and the 'best_dir_*' columns
+        if np.any([(a_col not in extracted_merged_scores_df) for a_col in merged_wcorr_column_names]):
+            # needs wcorr columns
+            print(f'needs wcorr columns. adding.')
+            wcorr_columns_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_wcorr_column_names]) ## just use the columns from this
+            assert np.shape(wcorr_columns_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of columns"
+            extracted_merged_scores_df: pd.DataFrame = pd.concat((extracted_merged_scores_df, wcorr_columns_df), axis='columns')
 
+        ## Add in the wcorr and pearsonr columns:
+        # self.ripple_simple_pf_pearson_merged_df ## ?? where is it getting "pearsonr_long_LR"?
+
+        ## add in the "_diff" columns and the 'best_dir_*' columns
         added_column_names = []
-        for a_score_col in heuristic_score_col_names:
+        # for a_score_col in heuristic_score_col_names:
+        #     extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
+        #     added_column_names.extend(curr_added_column_name_tuple)
+        #     # (long_best_col_name, short_best_col_name, LS_diff_col_name)
+        for a_score_col in all_df_score_column_names:
             extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
             added_column_names.extend(curr_added_column_name_tuple)
-            # (long_best_col_name, short_best_col_name, LS_diff_col_name)
-            
+
+
         extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)
 
         return extracted_merged_scores_df
@@ -2765,7 +2783,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             pass
         
         # Set the global result:
-        global_computation_results.computed_data['DirectionalMergedDecoders'] = directional_merged_decoders_result        
+        global_computation_results.computed_data['DirectionalMergedDecoders'] = directional_merged_decoders_result
         """ Usage:
         
         directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
