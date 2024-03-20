@@ -203,3 +203,71 @@ def symlink_output_files():
         os.symlink(src_path, dst_path)
     except Exception as e:
         raise e
+
+
+def build_vscode_workspace(script_paths):
+    """ builds a VSCode workspace for the batch python scripts
+    
+        from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import build_vscode_workspace
+
+        vscode_workspace_path = build_vscode_workspace(script_paths)
+        vscode_workspace_path
+
+    """
+    from jinja2 import Template
+
+    assert len(script_paths) > 0, f"script_paths is empty!"
+    top_level_script_folders_path: Path = Path(script_paths[0]).resolve().parent.parent # parent of the parents
+    script_folders: List[Path] = [Path(a_path).parent.resolve() for a_path in script_paths]
+
+    vscode_workspace_path = top_level_script_folders_path.joinpath('run_workspace.code-workspace').resolve()
+    print(f'vscode_workspace_path: {vscode_workspace_path}')
+
+    # Define your VSCode workspace template
+    vscode_workspace_template = """
+    {
+        "folders": [
+            {% for folder in folders %}
+            {
+                "path": "{{ folder.path }}",
+                "name": "{{ folder.name }}"
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        "settings": {
+            "python.testing.autoTestDiscoverOnSaveEnabled": false,
+            "python.terminal.executeInFileDir": true,
+            "python.terminal.focusAfterLaunch": true,
+            "python.terminal.launchArgs": [
+            ],
+        }
+    }
+    """
+
+    # Create Jinja template object
+    template = Template(vscode_workspace_template)
+
+    # Define folders as a list of dictionaries
+    # folders = [
+    #     {'path': '/path/to/your/project1', 'name': 'Project1'},
+    #     {'path': '/path/to/your/project2', 'name': 'Project2'},
+    # ]
+    folders = [
+        {'path': f'{a_folder.as_posix()}', 'name': f'{a_folder.name}'}
+        for a_folder in script_folders
+    ]
+
+    # Define variables
+    variables = {
+        'folders': folders
+    }
+
+    # Render the template with variables
+    workspace_file_content = template.render(variables)
+
+    # Write the generated content to a workspace file
+    with open(vscode_workspace_path, 'w') as f:
+        f.write(workspace_file_content)
+
+    return vscode_workspace_path
+

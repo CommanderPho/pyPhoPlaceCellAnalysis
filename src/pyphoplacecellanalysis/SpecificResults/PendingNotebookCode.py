@@ -2095,7 +2095,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         # print(f'single-session mode')
         main_title: str = f"Session {px_scatter_kwargs.get('title', 'UNKNOWN')}"
     else:
-        main_title: str = f"Across Sessions ({num_unique_sessions} Sessions)"
+        main_title: str = f"Across Sessions {px_scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
 
 
     if num_unique_time_bins > 1:
@@ -2146,18 +2146,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         fig.add_trace(a_trace, row=1, col=1)
 
 
-    # fig.update_layout(yaxis=dict(range=forced_range_y))
-
-    # Calculate the histogram data
-    # hist1, bins1 = np.histogram(X_pre_delta, bins=histogram_bins)
-
-    # # Adding the first histogram as a bar graph and making x negative
-    # fig.add_trace(
-    #     # go.Bar(x=bins1[:-1], y=hist1, marker_color='#EB89B5', name='first half', orientation='h', ),
-    # 	go.Histogram(y=Y_pre_delta, name='pre-delta', marker_color='#EB89B5'),
-    #     row=1, col=1
-    # )
-    # fig.update_layout(yaxis=dict(range=forced_range_y))
 
     # Scatter Plot _______________________________________________________________________________________________________ #
     # adding scatter plot
@@ -2216,17 +2204,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     if forced_range_y is not None:
         fig.update_layout(yaxis=dict(range=forced_range_y))
 
-
-    # Calculate the histogram data for second half
-    # hist2, bins2 = np.histogram(X_post_delta, bins=histogram_bins)
-    # Adding the second histogram
-    # fig.add_trace(
-    # 	go.Histogram(y=Y_post_delta, name='post-delta', marker_color='#EB89B5',),
-    #     # go.Bar(x=bins2[:-1], y=hist2, marker_color='#330C73', name='second half', orientation='h', ),
-    #     row=1, col=3
-    # )
-
-    # fig.update_layout(layout_yaxis_range=forced_range_y)
     fig.update_layout(yaxis=dict(range=forced_range_y), barmode='overlay')
 
 
@@ -2237,7 +2214,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
         delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
         _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=2, t_start=delta_relative_t_start, t_split=delta_relative_t_delta, t_end=delta_relative_t_end)
-
+    else:
+        _extras_output_dict = {}
 
     return fig
 
