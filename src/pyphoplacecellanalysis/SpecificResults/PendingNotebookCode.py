@@ -2769,12 +2769,13 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, s
     return export_datetime, session_str, export_file_type, decoding_time_bin_size_str
 
 
-def find_most_recent_files(found_session_export_paths: List[Path], debug_print: bool = False) -> Dict[str, Dict[str, Tuple[Path, datetime]]]:
+def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False) -> Dict[str, Dict[str, Tuple[Path, datetime]]]:
     """
     Returns a dictionary representing the most recent files for each session type among a list of provided file paths.
 
     Parameters:
     found_session_export_paths (List[Path]): A list of Paths representing files to be checked.
+    cuttoff_date (datetime): a date which all files must be newer than to be considered for inclusion. If not provided, the most recent files will be included regardless of their date.
     debug_print (bool): A flag to trigger debugging print statements within the function. Default is False.
 
     Returns:
@@ -2799,8 +2800,17 @@ def find_most_recent_files(found_session_export_paths: List[Path], debug_print: 
         if session_str not in sessions:
             sessions[session_str] = {}
 
+        should_add: bool = False
         if (file_type not in sessions[session_str]) or (sessions[session_str][file_type][-1] < export_datetime):
-            sessions[session_str][file_type] = (path, decoding_time_bin_size_str, export_datetime)
+            if cuttoff_date is not None:
+                if (cuttoff_date <= export_datetime):
+                    should_add = True
+            else:
+                # if there is no cutoff date, add
+                should_add = True
+
+            if should_add:
+                sessions[session_str][file_type] = (path, decoding_time_bin_size_str, export_datetime)
     
     return sessions
     
