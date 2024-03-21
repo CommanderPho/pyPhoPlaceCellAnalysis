@@ -1471,6 +1471,65 @@ class AcrossSessionCSVOutputFormat:
     
 
 
+def _split_user_annotated_ripple_df(all_sessions_user_annotated_ripple_df):
+    """ prints info about exported data sessions, such as the breakdown of user-annotated epochs, etc. 
+    
+    
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _split_user_annotated_ripple_df
+
+
+
+    """
+    from pyphocorehelpers.indexing_helpers import partition, partition_df, partition_df_dict
+
+    
+    all_unique_session_names = all_sessions_user_annotated_ripple_df['session_name'].unique()
+
+    all_sessions_user_annotated_ripple_df: pd.DataFrame = all_sessions_user_annotated_ripple_df.dropna(axis='index', subset=['is_user_annotated_epoch', 'is_valid_epoch'], inplace=False) ## Drop those missing the columns: ['is_user_annotated_epoch', 'is_valid_epoch']
+    user_annotated_epoch_unique_session_names = all_sessions_user_annotated_ripple_df['session_name'].unique()
+    print(f'user_annotated_epoch_unique_session_names: {user_annotated_epoch_unique_session_names}')
+
+    unannotated_session_names = set(all_unique_session_names) - set(user_annotated_epoch_unique_session_names)
+    print(f'unannotated_session_names: {unannotated_session_names}')
+
+    ## Add 'pre_post_delta_category' helper column:
+    all_sessions_user_annotated_ripple_df['pre_post_delta_category'] = 'post-delta'
+    all_sessions_user_annotated_ripple_df.loc[(all_sessions_user_annotated_ripple_df['delta_aligned_start_t'] <= 0.0), 'pre_post_delta_category'] = 'pre-delta'
+
+    _validity_partitioned_dfs = dict(zip(*partition_df(all_sessions_user_annotated_ripple_df, partitionColumn='is_valid_epoch')))
+    valid_ripple_df: pd.DataFrame = _validity_partitioned_dfs[True].drop(columns=['is_valid_epoch']).reset_index(drop=True)
+    invalid_ripple_df: pd.DataFrame = _validity_partitioned_dfs[False].drop(columns=['is_valid_epoch']).reset_index(drop=True)
+
+    n_input_df_rows = np.shape(all_sessions_user_annotated_ripple_df)[0]
+    n_valid_df_rows = np.shape(valid_ripple_df)[0]
+    n_invalid_df_rows = np.shape(invalid_ripple_df)[0]
+    n_unlabeled_df_rows = n_input_df_rows - (n_valid_df_rows + n_invalid_df_rows)
+
+    print(f'n_input_df_rows: {n_input_df_rows}')
+    print(f'\t n_valid_df_rows: {n_valid_df_rows}')
+    print(f'\t n_invalid_df_rows: {n_invalid_df_rows}')
+    if n_unlabeled_df_rows > 0:
+        print(f'\t n_unlabeled_df_rows: {n_unlabeled_df_rows}')
+
+    _partitioned_dfs = dict(zip(*partition_df(valid_ripple_df, partitionColumn='is_user_annotated_epoch'))) # use `valid_ripple_df` instead of the original dataframe to only get those which are valid.
+    user_approved_ripple_df: pd.DataFrame = _partitioned_dfs[True].drop(columns=['is_user_annotated_epoch']).reset_index(drop=True)
+    user_rejected_ripple_df: pd.DataFrame = _partitioned_dfs[False].drop(columns=['is_user_annotated_epoch']).reset_index(drop=True)
+
+    ## Print info about user selections:
+    # input_df = valid_ripple_df
+    n_input_df_rows = np.shape(valid_ripple_df)[0]
+    n_user_approved_df_rows = np.shape(user_approved_ripple_df)[0]
+    n_user_rejected_df_rows = np.shape(user_rejected_ripple_df)[0]
+    n_unlabeled_df_rows = n_input_df_rows - (n_user_approved_df_rows + n_user_rejected_df_rows)
+
+    print(f'n_input_df_rows: {n_input_df_rows}')
+    print(f'\t n_user_approved_df_rows: {n_user_approved_df_rows}')
+    print(f'\t n_user_rejected_df_rows: {n_user_rejected_df_rows}')
+    if n_unlabeled_df_rows > 0:
+        print(f'\t n_unlabeled_df_rows: {n_unlabeled_df_rows}')
+
+    return all_sessions_user_annotated_ripple_df, (valid_ripple_df, invalid_ripple_df), (user_approved_ripple_df, user_approved_ripple_df)
+
 
 
 
