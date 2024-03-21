@@ -1474,15 +1474,18 @@ class AcrossSessionCSVOutputFormat:
 def _split_user_annotated_ripple_df(all_sessions_user_annotated_ripple_df):
     """ prints info about exported data sessions, such as the breakdown of user-annotated epochs, etc. 
     
-    
-    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _split_user_annotated_ripple_df
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _split_user_annotated_ripple_df
+
+        all_sessions_all_scores_ripple_df, (valid_ripple_df, invalid_ripple_df), (user_approved_ripple_df, user_approved_ripple_df) = _split_user_annotated_ripple_df(all_sessions_all_scores_ripple_df)
 
 
 
     """
     from pyphocorehelpers.indexing_helpers import partition, partition_df, partition_df_dict
 
-    
+
     all_unique_session_names = all_sessions_user_annotated_ripple_df['session_name'].unique()
 
     all_sessions_user_annotated_ripple_df: pd.DataFrame = all_sessions_user_annotated_ripple_df.dropna(axis='index', subset=['is_user_annotated_epoch', 'is_valid_epoch'], inplace=False) ## Drop those missing the columns: ['is_user_annotated_epoch', 'is_valid_epoch']
