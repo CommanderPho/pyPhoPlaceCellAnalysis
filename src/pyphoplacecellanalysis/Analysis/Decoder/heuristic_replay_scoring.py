@@ -120,6 +120,123 @@ class HeuristicReplayScoring:
         return ratio_bins_higher_than_diffusion_across_time
 
     @classmethod
+    @function_attributes(short_name='continuous_seq_sort', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
+    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+        """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
+
+        - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
+                Intrusions!
+        - Do something with the start/end periods
+        - 
+
+        """
+        ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
+        a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+        a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+        n_time_bins: int = a_result.nbins[an_epoch_idx]
+        n_pos_bins: int = np.shape(a_p_x_given_n)[0]
+        time_window_centers = a_result.time_window_centers[an_epoch_idx]
+
+        ## Begin computations:
+        a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+        total_first_order_change: float = np.nansum(a_first_order_diff[1:])
+        epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
+
+        position = deepcopy(a_most_likely_positions_list)
+        velocity = a_first_order_diff / float(a_result.decoding_time_bin_size) # velocity with real world units of cm/sec
+        acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
+
+        position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
+
+        position_derivative_column_names = ['x', 'vel_x', 'accel_x']
+        position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
+        position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
+        # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
+
+        # Now split the array at each point where a direction change occurs
+        # Calculate the signs of the differences
+        a_first_order_diff_sign = np.sign(a_first_order_diff)
+        # Calculate where the sign changes occur (non-zero after taking diff of signs)
+        sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
+        # num_direction_changes: int = len(sign_change_indices)
+        # direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
+
+        # Split the array at each index where a sign change occurs
+        split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, sign_change_indices)
+        split_first_order_diff_arrays = np.split(a_first_order_diff, sign_change_indices)
+
+        continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays])
+        longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
+        longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
+        longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
+
+        longest_sequence
+
+        ## disolve sequences shorter than 2 bins if the sequences on each side are in the same direction
+        max_ignore_bins: int = 2
+
+        ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
+
+        left_congruent_flanking_index = None
+        left_congruent_flanking_sequence = None
+
+        right_congruent_flanking_index = None
+        right_congruent_flanking_sequence = None
+        
+
+        ## from the location of the longest sequence, check for flanking sequences <= `max_ignore_bins` in each direction.
+        if (longest_sequence_start_idx-1) >= 0:
+            left_flanking_index = (longest_sequence_start_idx-1)
+            left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
+            if (left_flanking_seq_length <= max_ignore_bins):
+                ## left flanking sequence can be considered
+                ## TODO: Handle the sequence and contiguity check
+                ### Need to look even FURTHER to the left to see the prev sequence:
+                if (longest_sequence_start_idx-2) >= 0:
+                    left_congruent_flanking_index = (longest_sequence_start_idx-2)
+                    ## Have a sequence to concatenate with
+                    left_congruent_flanking_sequence = split_first_order_diff_arrays[left_congruent_flanking_index]
+
+                
+        if ((longest_sequence_start_idx+1) < len(continuous_sequence_lengths)):
+            right_flanking_index = (longest_sequence_start_idx+1)
+            right_flanking_seq_length = continuous_sequence_lengths[right_flanking_index]
+            if (right_flanking_seq_length <= max_ignore_bins):
+                ## left flanking sequence can be considered
+                pass ## TODO: Handle the sequence and contiguity check
+
+
+
+        ## alternatively can determine the direction of momentum by building an array of direction vectors between each bin.
+        # change in position over change in time. Applied at point t.
+
+
+
+        longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+
+
+        # cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per time bin.
+        
+        # # Determine baseline (uniform) value for equally distributed bins
+        # uniform_diffusion_prob = (1.0 / float(n_pos_bins)) # equally diffuse everywhere on the track
+        # uniform_diffusion_cumprob_all_bins = float(uniform_diffusion_prob) * float(n_time_bins)
+
+        # is_higher_than_diffusion = (cum_pos_bin_probs > uniform_diffusion_cumprob_all_bins)
+
+        # num_bins_higher_than_diffusion_across_time: int = np.nansum(is_higher_than_diffusion, axis=0)
+        # ratio_bins_higher_than_diffusion_across_time: float = (float(num_bins_higher_than_diffusion_across_time) / float(n_pos_bins))
+
+        ## convert to a score
+        # track_portion_covered: float = (ratio_bins_higher_than_diffusion_across_time * float(a_decoder_track_length))
+        # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
+        # total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
+        ## RETURNS: ratio_bins_higher_than_diffusion_across_time
+        return ratio_bins_higher_than_diffusion_across_time
+
+
+
+
+    @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 08:00', related_items=[])
     def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, **kwargs) -> HeuristicScoresTuple:
         """ 2024-02-29 - New smart replay heuristic scoring
