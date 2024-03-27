@@ -1,5 +1,6 @@
 from matplotlib.offsetbox import AnchoredText
 import numpy as np
+from nptyping import NDArray
 import pandas as pd
 from typing import List, Dict, Tuple, Optional, Any, Callable, Union
 from copy import deepcopy
@@ -233,7 +234,52 @@ def _cached_epoch_computation_if_needed(computation_result, active_config, activ
 # ==================================================================================================================== #
 # Private Implementations                                                                                              #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['matplotlib', 'most-likely-position', 'line', '1D','helper'], input_requires=[], output_provides=[], uses=[], used_by=['plot_1D_most_likely_position_comparsions'], creation_date='2024-03-27 13:55', related_items=[])
+def perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers, active_most_likely_positions_1D, enable_flat_line_drawing: bool, debug_print:bool=False, **plot_line_kwargs):
+    """ no-nonsense performs the plotting of a single most-likely position curve with default kwargs and returns the Line2D object produced
+
+    Usage:
+        # Most-likely Estimated Position Plots (grey line):
+        if ((not skip_plotting_most_likely_positions) and (active_most_likely_positions_1D is not None)):
+            # Most likely position plots:
+            line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers, active_most_likely_positions_1D, enable_flat_line_drawing=enable_flat_line_drawing, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True)
+        else:
+            line_most_likely_position = None
+
+    """
+    # Most-likely Estimated Position Plots (grey line):
+    assert len(time_window_centers) == len(active_most_likely_positions_1D)
+
+    if enable_flat_line_drawing:
+        # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
+        #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
+        time_bin_size = (time_window_centers[1]-time_window_centers[0])
+        active_half_time_bin_seconds = time_bin_size / 2.0
+        active_time_window_start_points = np.expand_dims(time_window_centers - active_half_time_bin_seconds, axis=1)
+        active_time_window_end_points = np.expand_dims(time_window_centers + active_half_time_bin_seconds, axis=1)
+        active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
+        
+        if debug_print:
+            print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
+            # np.shape(active_time_window_end_points): (5783, 1)
+            # np.shape(active_time_window_start_end_points): (11566, 1)
+
+        active_time_window_variable = active_time_window_start_end_points
+        active_most_likely_positions_1D = np.repeat(active_most_likely_positions_1D, 2, axis=0) # repeat each element twice
+    else:
+        active_time_window_variable = time_window_centers
+
+    line_width_value = plot_line_kwargs.pop('lw', None)
+    plot_line_kwargs['linewidth'] = line_width_value # set as 'linewidth' instead of 'lw'
+
+    plot_kwargs = dict(linewidth=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'most likely positions', animated=False) | plot_line_kwargs
+    
+    line_most_likely_position = ax.plot(active_time_window_variable, active_most_likely_positions_1D, **plot_kwargs) # (Num windows x 2)
+
+    return line_most_likely_position
+
+
+@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['perform_plot_1D_single_most_likely_position_curve'], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=[])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
                                              skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
@@ -342,6 +388,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             
             line_most_likely_position = ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True) # (Num windows x 2)
             # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
+            line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers, active_most_likely_positions_1D, enable_flat_line_drawing=enable_flat_line_drawing, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False)
         else:
             line_most_likely_position = None
 
@@ -478,7 +525,7 @@ def _batch_update_posterior_image(long_results_obj, xbin, ax): # time_window_cen
 
 ## END
 
-@function_attributes(short_name=None, tags=['decoder', 'plot', 'position'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 12:29', related_items=[])
+@function_attributes(short_name=None, tags=['decoder', 'plot', 'position', 'matplotlib', '2D'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 12:29', related_items=[])
 def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=None, show_posterior=True, show_one_step_most_likely_positions_plots=True, enable_flat_line_drawing=True, debug_print=False, **kwargs):
     """ renders a 2D plot in MATPLOTLIB with separate subplots for the (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     Usage:
@@ -667,7 +714,8 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     
     Optional:
         params.skip_plotting_measured_positions: controls whether the red measured positions line is plotted
-    
+        params.skip_plotting_most_likely_positions: controls whether the grey most-likely positions line is plotted
+
     
     """    
     
