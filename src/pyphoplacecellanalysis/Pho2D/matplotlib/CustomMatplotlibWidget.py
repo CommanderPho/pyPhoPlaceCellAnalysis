@@ -96,6 +96,31 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         else:
             self._buildUI_buildNonScrollableWidget()
 
+        self.ui.statusBar = None
+        # self._buildUI_setup_statusbar()
+
+
+    def _buildUI_setup_statusbar(self):
+        """ builds a status bar added to the bottom of the non-scrollable view.
+        """
+        
+        # Only works on QMainWindow subclasses
+        # self.ui.statusBar = QtWidgets.QStatusBar()
+        # self.window().setStatusBar(self.ui.statusBar)
+
+
+        # Add the status label to the layout
+        assert self.ui.root_vbox is not None, f"Must be called after proper _buildUI_* function so self.ui.root_vbox exists!"
+        
+        self.params.statusBarBottom_MinimumHeight = 24
+        # Create a status bar-like widget
+        self.ui.statusBar = QtWidgets.QLabel("Ready")
+        self.ui.statusBar.setFrameStyle(QtWidgets.QFrame.Sunken | QtWidgets.QFrame.Panel)
+        self.ui.statusBar.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.ui.statusBar.setMinimumHeight(self.params.statusBarBottom_MinimumHeight)
+
+        self.ui.root_vbox.addWidget(self.ui.statusBar)
+        return self.ui.statusBar
 
 
     def _buildUI_default_toolbar(self) -> NavigationToolbar:
@@ -107,6 +132,7 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.ui.toolbar = NavigationToolbar(self.ui.canvas, self)
         return self.ui.toolbar
             
+
     def _buildUI_buildNonScrollableWidget(self):
         """ sets up the widget to contain a basic layout with no scrollability """
         self.ui.root_vbox = QtWidgets.QVBoxLayout()
@@ -251,6 +277,16 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         clipboard = QtWidgets.QApplication.clipboard()
         clipboard.setPixmap(qpixmap)
 
+
+
+    def update_status(self, message: str):
+        """ Update the text displayed in the fake status bar. """
+        assert self.ui.statusBar is not None
+        self.ui.statusBar.setText(message)
+
+    def clear_status(self):
+        """ Update the text displayed in the fake status bar. """
+        self.update_status("")
 
     # ==================================================================================================================== #
     # QT Slots                                                                                                             #
