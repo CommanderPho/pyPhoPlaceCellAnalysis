@@ -356,7 +356,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])           
             x_first_extent = (xmin, xmax, ymin, ymax)
             active_extent = x_first_extent
-            im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=True, **main_plot_kwargs)
+            im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=False, **main_plot_kwargs)
             # assert xmin < xmax
             ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
             ax.set_ylim((ymin, ymax))
@@ -1358,9 +1358,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPlotter
     """
-    callback_identifier_string: str = 'plot_wcorr_data'
     plots_group_identifier_key: str = 'weighted_corr' # _out_pagination_controller.plots['weighted_corr']
-    plots_group_data_identifier_key: str = 'weighted_corr_data'
 
     # text_color: str = '#ff886a' # an orange
     # text_color: str = '#42D142' # a light green
@@ -1596,6 +1594,10 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             anchored_text = None
 
 
+
+# ==================================================================================================================== #
+# Visualization: Decoded and Actual Positions                                                                          #
+# ==================================================================================================================== #
 
 
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController', 'add_inner_title', 'RadonTransformPlotData'], used_by=[], creation_date='2023-06-02 13:36')

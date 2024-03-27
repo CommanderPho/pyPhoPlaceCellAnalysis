@@ -114,6 +114,20 @@ class PaginatedPlotDataProvider:
 
     from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedPlotDataProvider
 
+    Implmentors must provide:
+
+        plots_group_identifier_key: str = 'weighted_corr'
+
+        @classmethod
+        def get_provided_callbacks(cls) -> Dict[str, Dict]:
+            return {'on_render_page_callbacks': 
+                    {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
+            }
+
+
+        @classmethod
+        def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs):
+            pass
     
     
     """
