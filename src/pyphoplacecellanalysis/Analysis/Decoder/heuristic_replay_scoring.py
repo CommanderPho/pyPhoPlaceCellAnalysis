@@ -24,6 +24,74 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", "position_derivatives_df")})
 
 
+def is_valid_sequence_index(sequence, test_index: int) -> bool:
+    """ checks if the passed index is a valid index without wrapping.        
+    Usage:
+
+    """
+    min_sequence_index: int = 0
+    max_sequence_index: int = len(sequence)-1
+    return ((test_index >= min_sequence_index) and (test_index <= max_sequence_index))
+
+
+
+
+def _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, continuous_sequence_lengths, longest_sequence_start_idx: int, max_ignore_bins: int = 2):
+    """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
+
+    The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
+
+    iNPUTS:
+        split_first_order_diff_arrays: a list of split arrays of 1st order differences.
+        continuous_sequence_lengths: a list of integer sequence lengths
+        longest_sequence_start_idx: int - the sequence start index to start the scan in each direction
+        max_ignore_bins: int = 2 - this means to disolve sequences shorter than 2 time bins if the sequences on each side are in the same direction
+
+        
+    Usage:
+
+    
+    TODO: convert to use `is_valid_sequence_index(...)` and `max_ignore_bins`
+
+    """
+    ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
+
+    left_congruent_flanking_index = None
+    left_congruent_flanking_sequence = None
+
+    right_congruent_flanking_index = None
+    right_congruent_flanking_sequence = None        
+
+    ## from the location of the longest sequence, check for flanking sequences <= `max_ignore_bins` in each direction.
+    # Scan left:
+    if (longest_sequence_start_idx-1) >= 0:
+        left_flanking_index = (longest_sequence_start_idx-1)
+        left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
+        if (left_flanking_seq_length <= max_ignore_bins):
+            ## left flanking sequence can be considered
+            ### Need to look even FURTHER to the left to see the prev sequence:
+            if (longest_sequence_start_idx-2) >= 0:
+                left_congruent_flanking_index = (longest_sequence_start_idx-2)
+                ## Have a sequence to concatenate with
+                left_congruent_flanking_sequence = split_first_order_diff_arrays[left_congruent_flanking_index]
+
+            
+    # Scan right:
+    if ((longest_sequence_start_idx+1) < len(continuous_sequence_lengths)):
+        right_flanking_index = (longest_sequence_start_idx+1)
+        right_flanking_seq_length = continuous_sequence_lengths[right_flanking_index]
+        if (right_flanking_seq_length <= max_ignore_bins):
+            ### Need to look even FURTHER to the left to see the prev sequence:
+            if (longest_sequence_start_idx+2) >= 0:
+                right_congruent_flanking_index = (longest_sequence_start_idx+2)
+                ## Have a sequence to concatenate with
+                right_congruent_flanking_sequence = split_first_order_diff_arrays[right_congruent_flanking_index]
+
+
+    return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
+
+
+
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
 class HeuristicReplayScoring:
     """ Measures of replay quality ("scores") that are better aligned with my (human-rated) intuition. Mostly based on the decoded posteriors.
@@ -139,6 +207,7 @@ class HeuristicReplayScoring:
 
         ## Begin computations:
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+        assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
         total_first_order_change: float = np.nansum(a_first_order_diff[1:])
         epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
 
@@ -157,7 +226,8 @@ class HeuristicReplayScoring:
         # Calculate the signs of the differences
         a_first_order_diff_sign = np.sign(a_first_order_diff)
         # Calculate where the sign changes occur (non-zero after taking diff of signs)
-        sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
+        sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1 -- Oh no, is this right when I preserve length?
+
         # num_direction_changes: int = len(sign_change_indices)
         # direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
 
@@ -172,41 +242,13 @@ class HeuristicReplayScoring:
 
         longest_sequence
 
-        ## disolve sequences shorter than 2 bins if the sequences on each side are in the same direction
-        max_ignore_bins: int = 2
 
-        ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
-
-        left_congruent_flanking_index = None
-        left_congruent_flanking_sequence = None
-
-        right_congruent_flanking_index = None
-        right_congruent_flanking_sequence = None
         
-
-        ## from the location of the longest sequence, check for flanking sequences <= `max_ignore_bins` in each direction.
-        if (longest_sequence_start_idx-1) >= 0:
-            left_flanking_index = (longest_sequence_start_idx-1)
-            left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
-            if (left_flanking_seq_length <= max_ignore_bins):
-                ## left flanking sequence can be considered
-                ## TODO: Handle the sequence and contiguity check
-                ### Need to look even FURTHER to the left to see the prev sequence:
-                if (longest_sequence_start_idx-2) >= 0:
-                    left_congruent_flanking_index = (longest_sequence_start_idx-2)
-                    ## Have a sequence to concatenate with
-                    left_congruent_flanking_sequence = split_first_order_diff_arrays[left_congruent_flanking_index]
-
-                
-        if ((longest_sequence_start_idx+1) < len(continuous_sequence_lengths)):
-            right_flanking_index = (longest_sequence_start_idx+1)
-            right_flanking_seq_length = continuous_sequence_lengths[right_flanking_index]
-            if (right_flanking_seq_length <= max_ignore_bins):
-                ## left flanking sequence can be considered
-                pass ## TODO: Handle the sequence and contiguity check
-
-
-
+        
+        ## 
+        max_ignore_bins: int = 2
+        (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, continuous_sequence_lengths, longest_sequence_start_idx=longest_sequence_start_idx, max_ignore_bins=max_ignore_bins)
+        
         ## alternatively can determine the direction of momentum by building an array of direction vectors between each bin.
         # change in position over change in time. Applied at point t.
 
@@ -231,7 +273,7 @@ class HeuristicReplayScoring:
         # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
         # total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
         ## RETURNS: ratio_bins_higher_than_diffusion_across_time
-        return ratio_bins_higher_than_diffusion_across_time
+        # return ratio_bins_higher_than_diffusion_across_time
 
 
 
@@ -249,12 +291,12 @@ class HeuristicReplayScoring:
         Want to minimize: num_direction_changes
 
         Usage:
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_pho_heuristic_replay_scores
+            from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
             _out_new_scores = {}
             an_epoch_idx: int = 4 # 7
             for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
                 print(f'\na_name: {a_name}')
-                _out_new_scores[a_name] = compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx)
+                _out_new_scores[a_name] = HeuristicReplayScoring.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx)
 
             _out_new_scores
 
