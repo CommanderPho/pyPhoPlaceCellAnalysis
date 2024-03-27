@@ -367,28 +367,6 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         # Most-likely Estimated Position Plots (grey line):
         if ((not skip_plotting_most_likely_positions) and (active_most_likely_positions_1D is not None)):
             # Most likely position plots:
-
-            if enable_flat_line_drawing:
-                # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
-                #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
-                time_bin_size = (time_window_centers[1]-time_window_centers[0])
-                active_half_time_bin_seconds = time_bin_size / 2.0
-                active_time_window_start_points = np.expand_dims(time_window_centers - active_half_time_bin_seconds, axis=1)
-                active_time_window_end_points = np.expand_dims(time_window_centers + active_half_time_bin_seconds, axis=1)
-                active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
-                
-                if debug_print:
-                    print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
-                    # np.shape(active_time_window_end_points): (5783, 1)
-                    # np.shape(active_time_window_start_end_points): (11566, 1)
-
-                active_time_window_variable = active_time_window_start_end_points
-                active_most_likely_positions_1D = np.repeat(active_most_likely_positions_1D, 2, axis=0) # repeat each element twice
-            else:
-                active_time_window_variable = time_window_centers
-            
-            line_most_likely_position = ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True) # (Num windows x 2)
-            # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
             line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers, active_most_likely_positions_1D, enable_flat_line_drawing=enable_flat_line_drawing, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False)
         else:
             line_most_likely_position = None
