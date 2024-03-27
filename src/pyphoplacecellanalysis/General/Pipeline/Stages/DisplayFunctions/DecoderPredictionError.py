@@ -311,6 +311,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             
         
     NOTES: `, animated=True` allows blitting to speed up updates in the future with only minor overhead if blitting isn't fully implemented.
+        WARNING: it also make the plot not update on calls to .draw() and not appear at all on non-interactive backends!
             
     """
     with plt.ion():
@@ -322,7 +323,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         
         if ((not skip_plotting_measured_positions) and (measured_position_df is not None)):
             # Actual Position Plots (red line):
-            line_measured_position = ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+            line_measured_position = ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=False) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
         else:
             line_measured_position = None
 
@@ -426,7 +427,7 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             
         
     NOTES: `, animated=True` allows blitting to speed up updates in the future with only minor overhead if blitting isn't fully implemented.
-            
+        !! WARNING: it also make the plot not update on calls to .draw() and not appear at all on non-interactive backends!
     """
     # Get the colormap to use and set the bad color
     cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
@@ -442,14 +443,14 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             fig = None # Calling plt.gcf() creates an empty figure and returns the wrong value 
         
         # Actual Position Plots (red line):
-        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=True) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=False) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
         ax.set_title(variable_name)
     
         # Posterior distribution heatmap:
         # if long_results_obj is not None:
         if slices_posteriors is not None:
             extents_list = [(a_centers[0], a_centers[-1], ymin, ymax) for a_centers in slices_time_window_centers]
-            out_img_list = [ax.imshow(a_posterior, extent=an_extent, animated=True, **main_plot_kwargs) for an_extent, a_posterior in zip(extents_list, slices_posteriors)]
+            out_img_list = [ax.imshow(a_posterior, extent=an_extent, animated=False, **main_plot_kwargs) for an_extent, a_posterior in zip(extents_list, slices_posteriors)]
             ax.set_ylim((ymin, ymax))
     
 
@@ -480,7 +481,7 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             else:
                 active_time_window_variable = slices_time_window_centers
             
-            ax.plot(active_time_window_variable, slices_active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=True) # (Num windows x 2)
+            ax.plot(active_time_window_variable, slices_active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2)
             # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
         
         return fig, ax, out_img_list
@@ -509,7 +510,7 @@ def _batch_update_posterior_image(long_results_obj, xbin, ax): # time_window_cen
                 x_first_extent = (xmin, xmax, ymin, ymax)
                 active_extent = x_first_extent
                 # Posterior distribution heatmaps at each point.
-                im_posterior_x = ax.imshow(a_posterior, extent=active_extent, animated=True, **main_plot_kwargs)
+                im_posterior_x = ax.imshow(a_posterior, extent=active_extent, animated=False, **main_plot_kwargs)
                 out_img_list.append(im_posterior_x)
             
             # ax.set_xlim((xmin, xmax))
