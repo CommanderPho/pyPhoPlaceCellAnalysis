@@ -1279,9 +1279,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     def add_data_overlays(self, decoder_decoded_epochs_result, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
         
+        I think decoder_decoded_epochs_result:DecodedFilterEpochsResult
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider
 
         # self: PaginatedFigureController
 
@@ -1296,11 +1298,16 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if radon_transform_epochs_data is not None:
             RadonTransformPlotDataProvider.add_data_to_pagination_controller(self, radon_transform_epochs_data, update_controller_on_apply=False)
     
-
         # Build Weighted Correlation Data Info and add them:    
         wcorr_epochs_data = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_single_weighted_correlation_data(deepcopy(decoder_decoded_epochs_result))
         if wcorr_epochs_data is not None:
             WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(self, wcorr_epochs_data, update_controller_on_apply=False)
+
+
+        # Build Decoded Positions Data and add them:    
+        decoded_position_curves_epochs_data = DecodedPositionsPlotDataProvider.decoder_build_single_decoded_position_curves_data(deepcopy(decoder_decoded_epochs_result))
+        if decoded_position_curves_epochs_data is not None:
+            DecodedPositionsPlotDataProvider.add_data_to_pagination_controller(self, decoded_position_curves_epochs_data, update_controller_on_apply=False)
 
         if not defer_refresh:
             self.refresh_current_page()
@@ -1311,9 +1318,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
- 
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider
+
         RadonTransformPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
         WeightedCorrelationPaginatedPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
+        DecodedPositionsPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
 
         if not defer_refresh:
             self.refresh_current_page()

@@ -1578,6 +1578,156 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 # ==================================================================================================================== #
 
 
+
+@define
+class DecodedAndActualPositionsPlotData:
+    time_bin_centers: NDArray = field()
+    line_y_most_likely: NDArray = field()
+    line_y_actual: NDArray = field()
+
+class DecodedPositionsPlotDataProvider(PaginatedPlotDataProvider):
+    """ Adds the most-likely and actual position points/lines to the posterior heatmap.
+
+    `.add_data_to_pagination_controller(...)` adds the result to the pagination controller
+
+    Data:
+        plots_data.decoded_position_curves_data
+    Plots:
+        plots['decoded_position_curves']
+        
+            _out_pagination_controller.plots_data.decoded_position_curves_data = decoded_position_curves_data
+        _out_pagination_controller.plots['radon_transform'] = {}
+
+
+    Usage:
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
+
+
+    """
+    plots_group_identifier_key: str = 'decoded_position_curves' # _out_pagination_controller.plots['weighted_corr']
+    
+    provided_params: Dict[str, Any] = dict(enable_decoded_most_likely_position_curve = True) # , enable_actual_position_curve = False
+    provided_plots_data: Dict[str, Any] = {'decoded_position_curves_data': None}
+    provided_plots: Dict[str, Any] = {'decoded_position_curves': {}}
+
+    @classmethod
+    def get_provided_callbacks(cls) -> Dict[str, Dict]:
+        return {'on_render_page_callbacks': 
+                {'plot_decoded_and_actual_positions_line_data': cls._callback_update_curr_single_epoch_slice_plot}
+        }
+
+    
+    @classmethod
+    def decoder_build_single_decoded_position_curves_data(cls, curr_results_obj):
+        """ builds for a single decoder. """
+        
+        num_filter_epochs:int = curr_results_obj.num_filter_epochs
+        time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
+        # active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
+        # if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
+        #     active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
+        out_position_curves_data = {}
+        for an_epoch_idx in np.arange(num_filter_epochs):
+            # build the discrete line over the centered time bins:
+            a_most_likely_positions_list =  deepcopy(curr_results_obj.most_likely_positions_list[an_epoch_idx])
+            time_window_centers = deepcopy(curr_results_obj.time_window_centers[an_epoch_idx])
+            assert len(a_most_likely_positions_list) == len(time_window_centers)
+            ## Build the result
+            out_position_curves_data[an_epoch_idx] = DecodedAndActualPositionsPlotData(time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
+
+        return out_position_curves_data
+
+
+    @classmethod
+    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+
+        Needs only: curr_time_bins, plots_data, i
+        Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+
+        Called with:
+
+        self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
+
+        
+        """        
+        line_alpha = 0.8  # Faint line
+        marker_alpha = 0.8  # More opaque markers
+        # plot_kwargs = dict(enable_flat_line_drawing=True, scalex=False, scaley=False, label=f'most-likely pos', linewidth=1, color='grey', alpha=line_alpha, # , linestyle='none', markerfacecolor='#e5ff00', markeredgecolor='#e5ff00'
+        #                         marker='+', markersize=3, animated=False) # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
+        plot_kwargs = dict(enable_flat_line_drawing=False, scalex=False, scaley=False, label=f'most-likely pos', linestyle='none', linewidth=1, color='#a6a6a6', alpha=line_alpha, # , linestyle='none', markerfacecolor='#e5ff00', markeredgecolor='#e5ff00'
+                                marker="_", markersize=9, animated=False)
+
+        debug_print = kwargs.pop('debug_print', True)
+
+        ## Extract the visibility:
+        should_enable_plot: bool = params.enable_decoded_most_likely_position_curve
+        
+        if debug_print:
+            print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
+        
+        extant_plots = plots[cls.plots_group_identifier_key].get(data_idx, {})
+        extant_line = extant_plots.get('line', None)
+        # plot the radon transform line on the epoch:    
+        if (extant_line is not None):
+            # already exists, clear the existing ones. 
+            # Let's assume we want to remove the 'Quadratic' line (line2)
+            if extant_line is not None:
+                extant_line.remove()
+            extant_line = None
+            # Is .clear() needed? Why doesn't it remove the heatmap as well?
+            # curr_ax.clear()
+            pass
+
+
+        ## Plot the line plot. Could update this like I did for the text?        
+        if should_enable_plot:
+            # Most-likely Estimated Position Plots (grey line):
+            # time_window_centers = plots_data.decoded_position_curves_data[data_idx].time_bin_centers
+            time_window_centers = deepcopy(curr_time_bin_container.centers)
+            active_most_likely_positions_1D = plots_data.decoded_position_curves_data[data_idx].line_y_most_likely
+            
+            if extant_line is not None:
+                # extant_line.remove()
+                if extant_line.axes is None:
+                    # Re-add the line to the axis if necessary
+                    curr_ax.add_artist(extant_line)
+            
+                extant_line.set_data(time_window_centers, active_most_likely_positions_1D)
+                most_likely_decoded_position_plot = extant_line
+            else:
+                # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
+
+                if (active_most_likely_positions_1D is not None):
+                    # Most likely position plots:
+                    most_likely_decoded_position_plot, = perform_plot_1D_single_most_likely_position_curve(curr_ax, time_window_centers, active_most_likely_positions_1D, **plot_kwargs)                
+                else:
+                    most_likely_decoded_position_plot = None
+                                
+        else:
+            ## Remove the existing one
+            if extant_line is not None:
+                extant_line.remove()
+            most_likely_decoded_position_plot = None
+
+        # Store the plot objects for future updates:
+        plots[cls.plots_group_identifier_key][data_idx] = {'line':most_likely_decoded_position_plot}
+        
+        if debug_print:
+            print(f'\t success!')
+
+        # If you are in an interactive environment, you might need to refresh the figure.
+        # curr_ax.figure.canvas.draw()
+
+        return params, plots_data, plots, ui
+
+
+
+# ==================================================================================================================== #
+# Resume Top-level Functions                                                                                           #
+# ==================================================================================================================== #
+
 @function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','paginated','output'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController', 'add_inner_title', 'RadonTransformPlotData'], used_by=[], creation_date='2023-06-02 13:36')
 def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, display_context, included_epoch_indicies=None, save_figure=True, enable_radon_transform_info:bool=True, **kwargs):
     """ Plots a `DecodedEpochSlicesPaginatedFigureController`
