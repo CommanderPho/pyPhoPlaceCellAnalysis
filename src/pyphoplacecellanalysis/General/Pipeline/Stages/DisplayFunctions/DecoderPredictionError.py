@@ -352,8 +352,13 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
                 'aspect':'auto',
             } | posterior_heatmap_imshow_kwargs # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
             # Posterior distribution heatmaps at each point.
-            # X
-            xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])           
+
+            ## Determine the actual start/end times:
+            approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
+            approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
+            # xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1]) # TODO 2024-03-27 - This is actually incorrect, the extents should be the actual start/stop of the bins, not the time_window_centers
+            xmin, xmax, ymin, ymax = ((time_window_centers[0]-approximated_recovered_half_delta_t), (time_window_centers[-1]+approximated_recovered_half_delta_t), xbin[0], xbin[-1]) # 2024-03-27 - Corrected extents computed by adding a half-bin width to the first/last time_window_centers to recover the proper edges.
+
             x_first_extent = (xmin, xmax, ymin, ymax)
             active_extent = x_first_extent
             im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=False, **main_plot_kwargs)
