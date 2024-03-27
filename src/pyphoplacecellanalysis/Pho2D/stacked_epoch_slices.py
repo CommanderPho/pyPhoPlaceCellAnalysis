@@ -691,6 +691,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             # convert to native epoch object.
             active_filter_epochs = Epoch(epochs=deepcopy(active_filter_epochs)) # convert to native Epoch object
 
+        ## Pop Window-level params:
+        disable_toolbar = params_kwargs.pop('disable_toolbar', True)
+        kwargs['disable_toolbar'] = disable_toolbar
+
+
         params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, params_kwargs=params_kwargs, **kwargs)
 

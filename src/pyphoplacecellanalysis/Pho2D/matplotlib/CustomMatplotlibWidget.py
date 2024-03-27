@@ -85,16 +85,28 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
         self.plots.fig = Figure(**self.params.figure_kwargs)
         self.ui.canvas = FigureCanvas(self.plots.fig)
         self.ui.canvas.setParent(self)
+
+        # Default matplotlib toolbar:
+        self.ui.toolbar = None
         if not self.params.disable_toolbar:
-            self.ui.toolbar = NavigationToolbar(self.ui.canvas, self)
-        else:
-            self.ui.toolbar = None
-            
+            self._buildUI_default_toolbar()
+        
         if self.params.scrollable_figure:
             self._buildUI_buildScrollableWidget()
         else:
             self._buildUI_buildNonScrollableWidget()
 
+
+
+    def _buildUI_default_toolbar(self) -> NavigationToolbar:
+        """ actually builds and adds a toolbar for the figure
+        
+        """
+        assert self.ui.toolbar is None
+        assert self.ui.canvas is not None, f"Requires functional canvas object"
+        self.ui.toolbar = NavigationToolbar(self.ui.canvas, self)
+        return self.ui.toolbar
+            
     def _buildUI_buildNonScrollableWidget(self):
         """ sets up the widget to contain a basic layout with no scrollability """
         self.ui.root_vbox = QtWidgets.QVBoxLayout()
