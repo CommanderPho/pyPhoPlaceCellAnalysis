@@ -208,7 +208,9 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             ## Proper global-computations based way:
             sess = owning_pipeline_reference.sess
             active_identifying_session_ctx = sess.get_context()
-            t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
+            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+            # t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
+            t_split = t_delta
 
             aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.aclu_to_idx
             rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.rdf
