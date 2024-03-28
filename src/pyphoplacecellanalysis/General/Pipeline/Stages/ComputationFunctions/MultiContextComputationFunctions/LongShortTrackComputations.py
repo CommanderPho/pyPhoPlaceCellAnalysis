@@ -675,7 +675,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
     
 
-    @function_attributes(short_name='long_short_rate_remapping', tags=['long_short', 'short_long','replay', 'rate_remapping', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=['global_computation_results.computed_data.long_short_rate_remapping'], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57',
+    @function_attributes(short_name='long_short_rate_remapping', tags=['long_short', 'short_long','replay', 'rate_remapping', 'computation', '?BROKEN?'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=['global_computation_results.computed_data.long_short_rate_remapping'], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57',
                         requires_global_keys=['long_short_fr_indicies_analysis'], provides_global_keys=['long_short_rate_remapping'], is_global=True)
     def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
         """ Computes rate remapping statistics
@@ -700,20 +700,23 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         active_analyses_result = long_short_fr_indicies_analysis_results
 
         ## Extract variables from results object:
-        long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
+        # long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         
-        
         ## Compute Rate Remapping Dataframe:
-        
-        rate_remapping_df: RateRemappingResult = compute_rate_remapping_stats(active_analyses_result, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
-        high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
+        rate_remapping_result: RateRemappingResult = compute_rate_remapping_stats(active_analyses_result, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
+
+        rate_remapping_df: pd.DataFrame = rate_remapping_result.rr_df
+        # high_remapping_cells_only = deepcopy(rate_remapping_df.high_remapping_cells_only)
+        # high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
 
         # Add to computed results:
-        global_computation_results.computed_data['long_short_rate_remapping'] = ComputedResult(is_global=True, rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
-        
+        # global_computation_results.computed_data['long_short_rate_remapping'] = ComputedResult(is_global=True, rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
+        global_computation_results.computed_data['long_short_rate_remapping'] = rate_remapping_result
+
+
         """ Getting outputs:
         
             ## long_short_rate_remapping:
