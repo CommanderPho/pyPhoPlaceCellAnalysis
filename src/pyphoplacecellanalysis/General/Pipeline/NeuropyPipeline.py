@@ -769,7 +769,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
             # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
             inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
-        except KeyError:
+        except (KeyError, AttributeError):
             print(f'long_short_inst_spike_rate_groups is missing and will be skipped')
         except BaseException:
             raise
