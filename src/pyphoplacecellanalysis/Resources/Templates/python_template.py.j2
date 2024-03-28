@@ -123,6 +123,10 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=False,
 # custom_user_completion_functions = {{custom_user_completion_functions|default('[]')}}
 {{custom_user_completion_function_template_code|default('custom_user_completion_functions = []')}}
 
+## Set the user_completion_function properties
+result_handler.BATCH_DATE_TO_USE = BATCH_DATE_TO_USE
+result_handler.collected_outputs_path = collected_outputs_path
+
 for a_custom_custom_user_completion_function in custom_user_completion_functions:
     result_handler.completion_functions.append(a_custom_custom_user_completion_function)
 

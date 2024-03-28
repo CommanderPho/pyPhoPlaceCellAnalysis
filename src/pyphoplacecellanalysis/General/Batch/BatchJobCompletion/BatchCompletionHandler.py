@@ -155,7 +155,8 @@ class BatchSessionCompletionHandler:
     # a list of functions to be called upon completion, will be called sequentially. 
     completion_functions: List[Callable] = field(default=Factory(list))
     # override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
-
+    BATCH_DATE_TO_USE: str = field(default='0000-00-00_Fake') # BATCH_DATE_TO_USE = '2024-03-27_Apogee'
+    collected_outputs_path: Path = field(default=None) # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve()
 
     ## Computation Options:
     session_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))

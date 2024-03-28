@@ -42,9 +42,9 @@ and can be extracted from batch output by:
 """
 
 ## These are temporary captured references that should never appear in generated code or runtime, they're just here to prevent typechecking errors in the editor
-BATCH_DATE_TO_USE: str = '0000-00-00_Fake' # TODO: Change this as needed, templating isn't actually doing anything rn.
+# self.BATCH_DATE_TO_USE: str = '0000-00-00_Fake' # TODO: Change this as needed, templating isn't actually doing anything rn.
 # collected_outputs_path = Path('/nfs/turbo/umms-kdiba/Data/Output/collected_outputs').resolve() # Linux
-collected_outputs_path: Path = Path('/home/halechr/cloud/turbo/Data/Output/collected_outputs').resolve() # GreatLakes
+# self.collected_outputs_path: Path = Path('/home/halechr/cloud/turbo/Data/Output/collected_outputs').resolve() # GreatLakes
 # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve() # Apogee
 
 
@@ -54,13 +54,13 @@ def export_rank_order_results_completion_function(self, global_data_root_parent_
     print(f'export_rank_order_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-    assert collected_outputs_path.exists()
+    assert self.collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import save_rank_order_results, SaveStringGenerator
-    save_rank_order_results(curr_active_pipeline, day_date=f"{CURR_BATCH_OUTPUT_PREFIX}", override_output_parent_path=collected_outputs_path) # "2024-01-02_301pm" "2024-01-02_734pm""
+    save_rank_order_results(curr_active_pipeline, day_date=f"{CURR_BATCH_OUTPUT_PREFIX}", override_output_parent_path=self.collected_outputs_path) # "2024-01-02_301pm" "2024-01-02_734pm""
 
     ## 2023-12-21 - Export to CSV:
     spikes_df = curr_active_pipeline.sess.spikes_df
@@ -75,7 +75,7 @@ def export_rank_order_results_completion_function(self, global_data_root_parent_
 
     print(f'\t try saving to CSV...')
     # active_csv_parent_output_path = curr_active_pipeline.get_output_path().resolve()
-    active_csv_parent_output_path = collected_outputs_path.resolve()
+    active_csv_parent_output_path = self.collected_outputs_path.resolve()
     merged_complete_epoch_stats_df = rank_order_results.ripple_merged_complete_epoch_stats_df ## New method
     merged_complete_ripple_epoch_stats_df_output_path = active_csv_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_merged_complete_epoch_stats_df.csv').resolve()
     merged_complete_epoch_stats_df.to_csv(merged_complete_ripple_epoch_stats_df_output_path)
@@ -97,9 +97,9 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
     print(f'figures_rank_order_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-    assert collected_outputs_path.exists()
+    assert self.collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
     curr_active_pipeline.reload_default_display_functions()
@@ -118,9 +118,9 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     
-    assert collected_outputs_path.exists()
+    assert self.collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
@@ -129,8 +129,8 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
     directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
 
     active_context = curr_active_pipeline.get_session_context()
-    _out = directional_merged_decoders_result.compute_and_export_marginals_df_csvs(parent_output_path=collected_outputs_path, active_context=active_context)
-    print(f'successfully exported marginals_df_csvs to {collected_outputs_path}!')
+    _out = directional_merged_decoders_result.compute_and_export_marginals_df_csvs(parent_output_path=self.collected_outputs_path, active_context=active_context)
+    print(f'successfully exported marginals_df_csvs to {self.collected_outputs_path}!')
     # (laps_marginals_df, laps_out_path), (ripple_marginals_df, ripple_out_path) = _out
     (laps_marginals_df, laps_out_path, laps_time_bin_marginals_df, laps_time_bin_marginals_out_path), (ripple_marginals_df, ripple_out_path, ripple_time_bin_marginals_df, ripple_time_bin_marginals_out_path) = _out
     print(f'\tlaps_out_path: {laps_out_path}\n\tripple_out_path: {ripple_out_path}\n\tdone.')
@@ -284,12 +284,12 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
         # Export time_bin_swept results to CSVs:
         if save_csvs:
-            assert collected_outputs_path.exists()
+            assert self.collected_outputs_path.exists()
             assert active_context is not None
-            laps_time_bin_marginals_out_path = export_marginals_df_csv(several_time_bin_sizes_time_bin_laps_df, data_identifier_str=f'(laps_time_bin_marginals_df)', parent_output_path=collected_outputs_path, active_context=active_context)
-            laps_out_path = export_marginals_df_csv(several_time_bin_sizes_laps_df, data_identifier_str=f'(laps_marginals_df)', parent_output_path=collected_outputs_path, active_context=active_context)
-            ripple_time_bin_marginals_out_path = export_marginals_df_csv(several_time_bin_sizes_time_bin_ripple_df, data_identifier_str=f'(ripple_time_bin_marginals_df)', parent_output_path=collected_outputs_path, active_context=active_context)
-            ripple_out_path = export_marginals_df_csv(several_time_bin_sizes_ripple_df, data_identifier_str=f'(ripple_marginals_df)', parent_output_path=collected_outputs_path, active_context=active_context)
+            laps_time_bin_marginals_out_path = export_marginals_df_csv(several_time_bin_sizes_time_bin_laps_df, data_identifier_str=f'(laps_time_bin_marginals_df)', parent_output_path=self.collected_outputs_path, active_context=active_context)
+            laps_out_path = export_marginals_df_csv(several_time_bin_sizes_laps_df, data_identifier_str=f'(laps_marginals_df)', parent_output_path=self.collected_outputs_path, active_context=active_context)
+            ripple_time_bin_marginals_out_path = export_marginals_df_csv(several_time_bin_sizes_time_bin_ripple_df, data_identifier_str=f'(ripple_time_bin_marginals_df)', parent_output_path=self.collected_outputs_path, active_context=active_context)
+            ripple_out_path = export_marginals_df_csv(several_time_bin_sizes_ripple_df, data_identifier_str=f'(ripple_marginals_df)', parent_output_path=self.collected_outputs_path, active_context=active_context)
         else:
             laps_time_bin_marginals_out_path, laps_out_path, ripple_time_bin_marginals_out_path, ripple_out_path = None, None, None, None
             
@@ -382,9 +382,9 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         return result_laps_epochs_df
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-    assert collected_outputs_path.exists()
+    assert self.collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
     active_context = curr_active_pipeline.get_session_context()
@@ -409,7 +409,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     # out_path_filenname_str: str = f"{out_path_basename_str}.csv"
 
     out_path_filenname_str: str = f"{out_path_basename_str}.h5"
-    out_path: Path = collected_outputs_path.resolve().joinpath(out_path_filenname_str).resolve()
+    out_path: Path = self.collected_outputs_path.resolve().joinpath(out_path_filenname_str).resolve()
     print(f'\out_path_str: "{out_path_filenname_str}"')
     print(f'\tout_path: "{out_path}"')
     
@@ -511,10 +511,10 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
 
-    assert collected_outputs_path.exists()
+    assert self.collected_outputs_path.exists()
     active_context = curr_active_pipeline.get_session_context()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
     ## Doesn't force recompute! Assumes that the DirectionalDecodersEpochsEvaluations result is new
@@ -610,12 +610,12 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 
     ## Export CSVs:
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    _output_csv_paths = directional_decoders_epochs_decode_result.export_csvs(parent_output_path=collected_outputs_path.resolve(), active_context=active_context, session_name=curr_session_name, curr_session_t_delta=t_delta,
+    _output_csv_paths = directional_decoders_epochs_decode_result.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=curr_session_name, curr_session_t_delta=t_delta,
                                                                               user_annotation_selections={'ripple': any_good_selected_epoch_times},
                                                                               valid_epochs_selections={'ripple': filtered_valid_epoch_times})
     
 
-    print(f'\t\tsuccessfully exported directional_decoders_epochs_decode_result to {collected_outputs_path}!')
+    print(f'\t\tsuccessfully exported directional_decoders_epochs_decode_result to {self.collected_outputs_path}!')
     _output_csv_paths_info_str: str = '\n'.join([f'{a_name}: "{file_uri_from_path(a_path)}"' for a_name, a_path in _output_csv_paths.items()])
     # print(f'\t\t\tCSV Paths: {_output_csv_paths}\n')
     print(f'\t\t\tCSV Paths: {_output_csv_paths_info_str}\n')
