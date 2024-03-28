@@ -813,7 +813,7 @@ class H5FileAggregator:
                         df = pd.DataFrame.from_records(a_table.read()) 
                         data_frames.append(df)
             # except NoSuchNodeError:
-            except Exception as e:
+            except BaseException as e:
                 if fail_on_exception:
                     raise
                 else:
@@ -1273,12 +1273,162 @@ def find_csv_files(directory: str, recurrsive: bool=False):
         return list(directory_path.glob('*.csv')) # Return a list of all .csv files in the directory and its subdirectories
     
 
-def find_HDF5_files(directory: str):
+def find_HDF5_files(directory: str, recurrsive: bool=False):
     directory_path = Path(directory) # Convert string path to a Path object
-    return list(directory_path.glob('**/*.h5')) # Return a list of all .h5 files in the directory and its subdirectories
+    if recurrsive:
+        return list(directory_path.glob('**/*.h5')) # Return a list of all .csv files in the directory and its subdirectories
+    else:
+        return list(directory_path.glob('*.h5')) # Return a list of all .h5 files in the directory and its subdirectories
 
 
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+from attrs import define, field, Factory
+
+@define(slots=False)
+class BaseMatchParser:
+    """ 
+    ## Sequential Parser:
+    ### Tries a series of methods to parse a filename into a variety of formats that doesn't require nested try/catch
+    ### Recieves: filename: str
+    """
+    def try_parse(self, filename: str) -> Optional[Dict]:
+        raise NotImplementedError
+
+@define(slots=False)
+class DayDateTimeParser(BaseMatchParser):
+    def try_parse(self, filename: str) -> Optional[Dict]:
+        pattern = r"(?P<export_datetime_str>.*_\d{2}\d{2}[APMF]{2})-(?P<session_str>.*)-(?P<export_file_type>\(?.+\)?)(?:_tbin-(?P<decoding_time_bin_size_str>[^)]+))"
+        match = re.match(pattern, filename)        
+        if match is None:
+            return None # failed
+        
+        parsed_output_dict = {}
+
+        output_dict_keys = ['session_str', 'export_file_type', 'decoding_time_bin_size_str']
+
+        # export_datetime_str, session_str, export_file_type = match.groups()
+        export_datetime_str, session_str, export_file_type, decoding_time_bin_size_str = match.group('export_datetime_str'), match.group('session_str'), match.group('export_file_type'), match.group('decoding_time_bin_size_str')
+        parsed_output_dict.update({k:match.group(k) for k in output_dict_keys})
+
+        # parse the datetime from the export_datetime_str and convert it to datetime object
+        export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d_%I%M%p")
+        parsed_output_dict['export_datetime'] = export_datetime
+
+        return parsed_output_dict
+    
+
+@define(slots=False)
+class DayDateOnlyParser(BaseMatchParser):
+    def try_parse(self, filename: str) -> Optional[Dict]:
+        # day_date_only_pattern = r"(.*(?:_\d{2}\d{2}[APMF]{2})?)-(.*)-(\(.+\))"
+        day_date_only_pattern = r"(\d{4}-\d{2}-\d{2})-(.*)-(\(?.+\)?)" # 
+        day_date_only_match = re.match(day_date_only_pattern, filename) # '2024-01-04-kdiba_gor01_one_2006-6-08_14-26'        
+        if day_date_only_match is not None:
+            export_datetime_str, session_str, export_file_type = day_date_only_match.groups()
+            # print(export_datetime_str, session_str, export_file_type)
+            # parse the datetime from the export_datetime_str and convert it to datetime object
+            export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
+
+        match = re.match(day_date_only_pattern, filename)        
+        if match is None:
+            return None # failed
+        
+        export_datetime_str, session_str, export_file_type = day_date_only_match.groups()
+        output_dict_keys = ['session_str', 'export_file_type']
+        parsed_output_dict = dict(zip(output_dict_keys, [session_str, export_file_type]))
+        # parse the datetime from the export_datetime_str and convert it to datetime object
+        export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
+        parsed_output_dict['export_datetime'] = export_datetime
+
+        return parsed_output_dict
+
+@define(slots=False)
+class DayDateWithVariantSuffixParser(BaseMatchParser):
+    def try_parse(self, filename: str) -> Optional[Dict]:
+        # matches '2024-01-04-kdiba_gor01_one_2006-6-08_14-26'
+        day_date_with_variant_suffix_pattern = r"(?P<export_datetime_str>\d{4}-\d{2}-\d{2})[-_]?(?P<variant_suffix>[^-_]*)[-_](?P<session_str>.+?)_(?P<export_file_type>[A-Za-z_]+)"
+        match = re.match(day_date_with_variant_suffix_pattern, filename) # '2024-01-04-kdiba_gor01_one_2006-6-08_14-26', 
+        if match is None:
+            return None # failed
+        
+        parsed_output_dict = {}
+        output_dict_keys = ['session_str', 'export_file_type'] # , 'variant_suffix'
+        export_datetime_str, session_str, export_file_type = match.group('export_datetime_str'), match.group('session_str'), match.group('export_file_type')
+        parsed_output_dict.update({k:match.group(k) for k in output_dict_keys})
+        # parse the datetime from the export_datetime_str and convert it to datetime object
+        try:
+            export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
+            parsed_output_dict['export_datetime'] = export_datetime
+        except ValueError as e:
+            print(f'ERR: Could not parse date "{export_datetime_str}" of filename: "{filename}"') # 2024-01-18_GL_t_split_df
+            return None # failed used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
+
+        return parsed_output_dict
+    
+## INPUTS: basename
+@function_attributes(short_name=None, tags=['parse', 'filename'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-28 10:10', related_items=[])
+def try_parse_chain(basename: str, debug_print:bool=False):
+    """ tries to parse the basename with the list of parsers. 
+    
+    Usage:
+    
+        basename: str = _test_h5_filename.stem
+        final_parsed_output_dict = try_parse_chain(basename=basename)
+        final_parsed_output_dict
+
+    """
+    # _filename_parsers_list = (DayDateTimeParser(), DayDateWithVariantSuffixParser(), DayDateOnlyParser())
+    _filename_parsers_list = (DayDateTimeParser(), DayDateOnlyParser(), DayDateWithVariantSuffixParser())
+    final_parsed_output_dict = None
+    for a_test_parser in _filename_parsers_list:
+        a_parsed_output_dict = a_test_parser.try_parse(basename)
+        if a_parsed_output_dict is not None:
+            ## best parser, stop here
+            if debug_print:
+                print(f'got parsed output {a_test_parser} - result: {a_parsed_output_dict}, basename: {basename}')
+            final_parsed_output_dict = a_parsed_output_dict
+            return final_parsed_output_dict
+        
+    return final_parsed_output_dict
+
+@function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-28 10:16', related_items=[])
 def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, str]:
+    """ 
+    A revised version built on 2024-03-28 that uses `try_parse_chain` instead of nested for loops.
+
+    # from the found_session_export_paths, get the most recently exported laps_csv, ripple_csv (by comparing `export_datetime`) for each session (`session_str`)
+    a_export_filename: str = "2024-01-12_0420PM-kdiba_pin01_one_fet11-01_12-58-54-(laps_marginals_df).csv"
+    export_datetime = "2024-01-12_0420PM"
+    session_str = "kdiba_pin01_one_fet11-01_12-58-54"
+    export_file_type = "(laps_marginals_df)" # .csv
+
+    # return laps_csv, ripple_csv
+    laps_csv = Path("C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-12_0828PM-kdiba_pin01_one_fet11-01_12-58-54-(laps_marginals_df).csv").resolve()
+    ripple_csv = Path("C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-12_0828PM-kdiba_pin01_one_fet11-01_12-58-54-(ripple_marginals_df).csv").resolve()
+
+    """
+    filename: str = path.stem   # Get filename without extension    
+    final_parsed_output_dict = try_parse_chain(basename=filename)
+
+    if final_parsed_output_dict is None:
+        print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
+        return None, None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
+
+    export_datetime, session_str, export_file_type = final_parsed_output_dict.get('export_datetime', None), final_parsed_output_dict.get('session_str', None), final_parsed_output_dict.get('export_file_type', None)
+    decoding_time_bin_size_str = final_parsed_output_dict.get('decoding_time_bin_size_str', None)
+
+    if export_file_type is not None:
+        if export_file_type[0] == '(' and export_file_type[-1] == ')':
+            # Trim the brackets from the file type if they're present:
+            export_file_type = export_file_type[1:-1]
+
+    return export_datetime, session_str, export_file_type, decoding_time_bin_size_str
+
+
+def _OLD_parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, str]:
     """ 
     # from the found_session_export_paths, get the most recently exported laps_csv, ripple_csv (by comparing `export_datetime`) for each session (`session_str`)
     a_export_filename: str = "2024-01-12_0420PM-kdiba_pin01_one_fet11-01_12-58-54-(laps_marginals_df).csv"
@@ -1338,6 +1488,7 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, s
     return export_datetime, session_str, export_file_type, decoding_time_bin_size_str
 
 
+
 def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False) -> Dict[str, Dict[str, Tuple[Path, datetime]]]:
     """
     Returns a dictionary representing the most recent files for each session type among a list of provided file paths.
@@ -1358,14 +1509,14 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
 
     """
     # Function 'parse_filename' should be defined in the global scope
-    parsed_paths = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)]
+    parsed_paths = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)] # note we append path p to the end of the tuple
     parsed_paths.sort(reverse=True)
 
     if debug_print:
         print(f'parsed_paths: {parsed_paths}')
 
     sessions = {}
-    for export_datetime, session_str, file_type, path, decoding_time_bin_size_str in parsed_paths:
+    for export_datetime, session_str, file_type, decoding_time_bin_size_str, path in parsed_paths:
         if session_str not in sessions:
             sessions[session_str] = {}
 
