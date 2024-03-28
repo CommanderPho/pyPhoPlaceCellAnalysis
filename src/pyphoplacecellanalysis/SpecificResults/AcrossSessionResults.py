@@ -1725,7 +1725,7 @@ class AcrossSessionsVisualizations:
 # ==================================================================================================================== #
 """ 
 
-from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_across_sessions_scatter_results, plot_histograms, plot_stacked_histograms
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import plot_across_sessions_scatter_results, plot_histograms, plot_stacked_histograms
 
 """
 
