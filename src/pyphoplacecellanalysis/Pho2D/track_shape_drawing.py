@@ -902,8 +902,6 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
     
     
     """
-    
-    
     # track_width: float = 6.0
     total_track_length: float = platform_length + track_length + platform_length
 

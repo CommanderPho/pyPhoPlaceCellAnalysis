@@ -531,7 +531,7 @@ import matplotlib.cm as cm
 
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _build_track_1D_verticies
 
-@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-22 11:12', related_items=[])
+@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=[], creation_date='2024-02-22 11:12', related_items=[])
 def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds, long_column_name:str='long_LR', short_column_name:str='short_LR'):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
@@ -547,7 +547,6 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bi
     from pyphocorehelpers.geometry_helpers import BoundsRect
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
-
 
     ## Extract the quantities needed from the DF passed
     active_aclus = LR_only_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
