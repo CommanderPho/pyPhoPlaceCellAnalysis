@@ -771,6 +771,10 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
         except (KeyError, AttributeError):
             print(f'long_short_inst_spike_rate_groups is missing and will be skipped')
+        
+        except TypeError as e:
+            # TypeError: Object dtype dtype('O') has no native HDF5 equivalent
+            print(f'long_short_inst_spike_rate_groups failed to save to HDF5 due to type issues and will be skipped. This is usually caused by Python None values. Error {e}')
         except BaseException:
             raise
 
