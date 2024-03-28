@@ -857,13 +857,16 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
         # Epoch dataframe stuff:
-        long_epoch_name = include_includelist[0] # 'maze1_PYR'
-        short_epoch_name = include_includelist[1] # 'maze2_PYR'
-        if len(include_includelist) > 2:
-            global_epoch_name = include_includelist[-1] # 'maze_PYR'
-        else:
-            print(f'WARNING: no global_epoch detected.')
-            global_epoch_name = '' # None
+        # long_epoch_name = include_includelist[0] # 'maze1_PYR'
+        # short_epoch_name = include_includelist[1] # 'maze2_PYR'
+        # if len(include_includelist) > 2:
+        #     global_epoch_name = include_includelist[-1] # 'maze_PYR'
+        # else:
+        #     print(f'WARNING: no global_epoch detected.')
+        #     global_epoch_name = '' # None
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+        # t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
 
         if debug_print:
             print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
@@ -906,7 +909,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         #     replays_df = replays_df.copy() # make a copy of the provided df
 
 
-        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
+        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df, t_start=t_start, t_delta=t_delta, t_end=t_end)
         rdf, neuron_replay_stats_df = _compute_neuron_replay_stats(rdf, aclu_to_idx) # neuron_replay_stats_df is joined with `final_jonathan_df` after that is built
 
         ## time_binned_unit_specific_binned_spike_rate mode:
@@ -1040,15 +1043,15 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         ## long_short_decoding_analyses:
         long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
         # x_frs_dict, y_frs_dict = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
-
         curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] 
+
+
         ## Extract variables from results object:
         long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         
-
         ## Common to both Long and Short:
         active_pos_df = global_session.position.to_dataframe()
         assert (long_results_obj.active_filter_epochs.as_array() == short_results_obj.active_filter_epochs.as_array()).all() # ensure that the active_filter_epochs for both are the same.
@@ -1970,7 +1973,7 @@ def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron
 # ==================================================================================================================== #
 # Jonathan's helper functions                                                                                          #
 # ==================================================================================================================== #
-def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=False):
+def _final_compute_jonathan_replay_fr_analyses(sess, replays_df: pd.DataFrame, t_start: float, t_delta: float, t_end: float, debug_print=False):
     """_summary_
 
     Args:
@@ -1998,7 +2001,7 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=Fal
         replays_df['end'] = replays_df['stop']
 
     ### Make `rdf` (replay dataframe)
-    rdf: pd.DataFrame = make_rdf(sess, replays_df) # this creates the replay dataframe variable
+    rdf: pd.DataFrame = make_rdf(sess, replays_df, t_start=t_start, t_delta=t_delta, t_end=t_end) # this creates the replay dataframe variable
     rdf = remove_repeated_replays(rdf)
     rdf, aclu_to_idx = add_spike_counts(sess, rdf)
 
@@ -2008,7 +2011,7 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=Fal
         print(f"RDF has {len(rdf)} rows.")
 
     ### Make `irdf` (inter-replay dataframe)
-    irdf: pd.DataFrame = make_irdf(sess, rdf)
+    irdf: pd.DataFrame = make_irdf(sess, rdf, t_start=t_start, t_delta=t_delta, t_end=t_end)
     irdf = remove_repeated_replays(irdf) # TODO: make the removal process more meaningful
     irdf, aclu_to_idx_irdf = add_spike_counts(sess, irdf)
     irdf['duration'] = irdf['end'] - irdf['start']
@@ -2114,10 +2117,10 @@ def add_spike_counts(sess, rdf):
     return rdf, aclu_to_idx
 
 # Make `rdf` (replay dataframe) ______________________________________________________________________________________ #
-def make_rdf(sess, replays_df):
+def make_rdf(sess, replays_df, t_start: float, t_delta: float, t_end: float):
     """ recieves `replays_df`, but uses `sess.paradigm[1][0,0]` """
     rdf = replays_df.copy()[["start", "end"]]
-    rdf["short_track"] = rdf["start"] > sess.paradigm[1][0,0]
+    rdf["short_track"] = rdf["start"] > t_delta
     return rdf
 
 def remove_nospike_replays(rdf):
@@ -2131,14 +2134,14 @@ def remove_low_p_replays(rdf):
     return rdf
 
 # Make `irdf` (inter-replay dataframe) _______________________________________________________________________________ #
-def make_irdf(sess, rdf):
-    starts = [sess.paradigm[0][0,0]]
+def make_irdf(sess, rdf, t_start: float, t_delta: float, t_end: float):
+    starts = [t_start]
     ends = []
     for i, row in rdf.iterrows():
         ends.append(row.start)
         starts.append(row.end)
-    ends.append(sess.paradigm[1][0,1])
-    short_track = [s > sess.paradigm[1][0,0] for s in starts]
+    ends.append(t_end)
+    short_track = [s > t_delta for s in starts]
     return pd.DataFrame(dict(start=starts, end=ends, short_track=short_track))
 
 def remove_repeated_replays(rdf):
