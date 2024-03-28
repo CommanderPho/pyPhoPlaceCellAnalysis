@@ -1192,11 +1192,12 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
 
 
     # Critical new code: Not used anyhwere
-    ratemap = long_pf1D.ratemap
+    # ratemap = long_pf1D.ratemap
     # included_unit_neuron_IDs = EITHER_subset.track_exclusive_aclus
-    included_unit_neuron_IDs = EITHER_subset.get_refined_track_exclusive_aclus() # 2023-09-28 - "Refined"
-    rediculous_final_sorted_all_included_neuron_ID, rediculous_final_sorted_all_included_pfmap = build_shared_sorted_neuronIDs(ratemap, included_unit_neuron_IDs, sort_ind=new_all_aclus_sort_indicies.copy())
-
+    # included_unit_neuron_IDs = EITHER_subset.get_refined_track_exclusive_aclus() # 2023-09-28 - "Refined"
+    # included_aclus_sort_indicies = deepcopy(new_all_aclus_sort_indicies[np.isin(new_all_aclus_sort_indicies, included_unit_neuron_IDs)])
+    # # rediculous_final_sorted_all_included_neuron_ID, rediculous_final_sorted_all_included_pfmap = build_shared_sorted_neuronIDs(ratemap, included_unit_neuron_IDs, sort_ind=new_all_aclus_sort_indicies.copy())
+    # rediculous_final_sorted_all_included_neuron_ID, rediculous_final_sorted_all_included_pfmap = build_shared_sorted_neuronIDs(ratemap, included_unit_neuron_IDs, sort_ind=included_aclus_sort_indicies.copy())
 
     # ==================================================================================================================== #
     # Figure 2) Firing Rate Bar Graphs                                                                                     #
