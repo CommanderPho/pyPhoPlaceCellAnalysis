@@ -1645,8 +1645,8 @@ class DecodedPositionsPlotDataProvider(PaginatedPlotDataProvider):
         out_position_curves_data = {}
         for an_epoch_idx in np.arange(num_filter_epochs):
             # build the discrete line over the centered time bins:
-            a_most_likely_positions_list =  deepcopy(curr_results_obj.most_likely_positions_list[an_epoch_idx])
-            time_window_centers = deepcopy(curr_results_obj.time_window_centers[an_epoch_idx])
+            a_most_likely_positions_list =  np.atleast_1d(deepcopy(curr_results_obj.most_likely_positions_list[an_epoch_idx]))
+            time_window_centers = np.atleast_1d(deepcopy(curr_results_obj.time_window_centers[an_epoch_idx]))
             assert len(a_most_likely_positions_list) == len(time_window_centers)
             ## Build the result
             out_position_curves_data[an_epoch_idx] = DecodedAndActualPositionsPlotData(time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
