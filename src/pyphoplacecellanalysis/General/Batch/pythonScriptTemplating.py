@@ -218,8 +218,12 @@ def build_vscode_workspace(script_paths):
 
     assert len(script_paths) > 0, f"script_paths is empty!"
     top_level_script_folders_path: Path = Path(script_paths[0]).resolve().parent.parent # parent of the parents
-    script_folders: List[Path] = [Path(a_path).parent.resolve() for a_path in script_paths]
-
+    script_folders: List[Path] = [top_level_script_folders_path] + [Path(a_path).parent.resolve() for a_path in script_paths]
+    print(f'script_folders: {script_folders}')
+    # {
+    #     "path": "L:/Scratch/gen_scripts",
+    #     "name": "gen_scripts_root"
+    # },
     vscode_workspace_path = top_level_script_folders_path.joinpath('run_workspace.code-workspace').resolve()
     print(f'vscode_workspace_path: {vscode_workspace_path}')
 
