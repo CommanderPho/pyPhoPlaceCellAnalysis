@@ -1231,36 +1231,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # inst_spike_rate_groups_result.Fig2_Laps_FR, inst_spike_rate_groups_result.Fig2_Replay_FR can only be done at the end probably
 
         # Find instantaneous firing rate for spikes outside of replays
-        # 2023-09-06 - Method Kamran and I dicusssed in his office last Thursday
-        #TODO 2023-09-08 10:53: - [ ] Refactored into `pipeline_complete_compute_long_short_fr_indicies`
-
-        # Uses instantaneous firing rates for each cell computed during any non-replay epoch. Kamran was concerned that some cells fire spikes on the end platforms during either short or long, but because we're only considering spikes that contribute to placefeields (of which the endcap spikes are omitted due to velocity requirements) these cells are said to be long/short exclusive despite firing frequently on the end caps.
-        #TODO 2023-09-06 00:56: - [ ] Add the results to the output structure somehow:
-
-        # long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
-        
-        # # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
-        # non_replay_periods: Epoch = Epoch(Epoch.from_PortionInterval(owning_pipeline_reference.sess.replay.epochs.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry
-        # long_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
-        # short_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
-
-        
-        # # custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-        # #                                                                                            filter_epochs=non_replay_periods,
-        # #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-        # #                                                                                            instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
-
-        # # ~20sec computation
-        # long_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-        #                                                                                         filter_epochs=long_only_non_replay_periods,
-        #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-        #                                                                                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
-
-        # short_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-        #                                                                                         filter_epochs=short_only_non_replay_periods,
-        #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-        #                                                                                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
-
 
         # Add to computed results:
         global_computation_results.computed_data['long_short_inst_spike_rate_groups'] = inst_spike_rate_groups_result
@@ -1399,7 +1369,7 @@ def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 
-
+@function_attributes(short_name=None, tags=['laps', 'constrain', 'placefields'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-07 00:00', related_items=[])
 def constrain_to_laps(curr_active_pipeline):
     """ 2023-04-07 - Constrains the placefields to just the laps, computing the laps if needed.
     Other laps-related things?
