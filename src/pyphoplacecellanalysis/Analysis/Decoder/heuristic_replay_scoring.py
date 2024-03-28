@@ -197,6 +197,8 @@ class HeuristicReplayScoring:
         - Do something with the start/end periods
         - 
 
+        TODO 2024-03-27 - Not yet working:  
+
         """
         ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
@@ -206,9 +208,27 @@ class HeuristicReplayScoring:
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
 
         ## Begin computations:
+
+        # Get confidence of each position
+        each_t_bin_max_confidence = np.nanmax(a_p_x_given_n, axis=0)
+
+        # the confidence in the differences depends on the confidence in the two bins that the differences are taken from
+        each_t_bin_max_confidence
+        # each_t_bin_max_confidence
+
+
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
-        total_first_order_change: float = np.nansum(a_first_order_diff[1:])
+        # Calculate the signs of the differences
+        a_first_order_diff_sign = np.sign(a_first_order_diff)
+        # Calculate where the sign changes occur (non-zero after taking diff of signs)
+        sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
+
+
+        # sign_change_indices = np.where(np.abs(np.diff(a_first_order_diff_sign.astype(float))) > 0.0)[0] + 1  # Add 1 because np.diff reduces the index by 1 -- Oh no, is this right when I preserve length?
+
+
+        total_first_order_change: float = np.nansum(a_first_order_diff[1:]) # this is very susceptable to misplaced bins
         epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
 
         position = deepcopy(a_most_likely_positions_list)
@@ -223,22 +243,24 @@ class HeuristicReplayScoring:
         # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
 
         # Now split the array at each point where a direction change occurs
-        # Calculate the signs of the differences
-        a_first_order_diff_sign = np.sign(a_first_order_diff)
-        # Calculate where the sign changes occur (non-zero after taking diff of signs)
-        sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1 -- Oh no, is this right when I preserve length?
-
+        
+        
         # num_direction_changes: int = len(sign_change_indices)
         # direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
 
         # Split the array at each index where a sign change occurs
+        relative_indicies_arr = np.arange(n_pos_bins)
+        split_relative_indicies = np.split(relative_indicies_arr, sign_change_indices)
         split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, sign_change_indices)
         split_first_order_diff_arrays = np.split(a_first_order_diff, sign_change_indices)
 
         continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays])
         longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
         longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-        longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
+
+        longest_sequence_indicies = split_relative_indicies[longest_sequence_start_idx]
+        longest_sequence = split_most_likely_positions_arrays[longest_sequence_start_idx]
+        longest_sequence_diff = split_first_order_diff_arrays[longest_sequence_start_idx]
 
         longest_sequence
 
