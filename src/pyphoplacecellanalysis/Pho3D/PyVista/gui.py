@@ -10,7 +10,6 @@ TODO: REORGANIZE_PLOTTER_SCRIPTS: PyVista
 import numpy as np
 import pyvista as pv
 
-from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
 
 def print_controls_helper_text():
     controls_helper_text_strings = ['[f] - Focus and zoom in on the last clicked point',
@@ -244,6 +243,8 @@ def add_placemap_toggle_checkboxes(p, active_idx_updated_callbacks, colors, widg
     Usage:
         checkboxWidgetActors, tuningCurvePlotActorVisibilityCallbacks = add_placemap_toggle_checkboxes(pActiveTuningCurvesPlotter, tuningCurvePlotActors, pf_colors, widget_check_states=True, is_debug=False)
     """
+    from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
+    
     num_checkboxes = len(active_idx_updated_callbacks)
     if type(widget_check_states)==bool:
         widget_check_states = np.full([num_checkboxes,], widget_check_states)
@@ -299,6 +300,8 @@ def add_placemap_toggle_mutually_exclusive_checkboxes(p, active_idx_updated_call
     Usage:
         checkboxWidgetActors, tuningCurvePlotActorVisibilityCallbacks, mutually_exclusive_radiobutton_group = add_placemap_toggle_mutually_exclusive_checkboxes(pActiveTuningCurvesPlotter, tuningCurvePlotActors, pf_colors, active_element_idx=4, require_active_selection=False, is_debug=False)
     """
+    from pyphocorehelpers.gui.PyVista.PhoCustomVtkWidgets import PhoWidgetHelper
+    
     num_checkboxes = len(active_idx_updated_callbacks)
     # start_positions = widget_start_pos + ((widget_size + (widget_size // 10)) * np.arange(num_checkboxes))
     start_positions = widget_start_pos + ((widget_size + (widget_size // 10)) * np.flip(np.arange(num_checkboxes)))
