@@ -490,7 +490,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             active_context = long_short_fr_indicies_analysis_results['active_context']
             
             final_context = active_context.adding_context('display_fn', display_fn_name='display_long_short_laps')
-            fig = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=debug_print)
+            fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=debug_print)
             
             if not defer_render:
                 fig.show()
@@ -1909,7 +1909,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # # Call the function above. All the magic happens there.
     # add_value_labels(ax, labels=x_labels) # 
 
-    return fig
+    return fig, ax, scatter_plot
 
 
 # ==================================================================================================================== #

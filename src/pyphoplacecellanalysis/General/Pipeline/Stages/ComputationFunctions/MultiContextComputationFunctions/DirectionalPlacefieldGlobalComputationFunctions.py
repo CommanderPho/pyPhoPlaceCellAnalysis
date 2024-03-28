@@ -33,7 +33,6 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalMergedDecodersResult
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 
-
 import scipy.stats
 from scipy import ndimage
 
