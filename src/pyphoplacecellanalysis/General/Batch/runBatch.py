@@ -149,7 +149,7 @@ class ConcreteSessionFolder:
         return moved_files_dict_files
 
     @classmethod
-    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, skip_non_extant_src_files:bool=True, only_include_file_types=['local_pkl', 'global_pkl','h5'], debug_print=False):
+    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, rename_backup_basename_fn: Optional[Callable]=None, skip_non_extant_src_files:bool=True, only_include_file_types=['local_pkl', 'global_pkl','h5'], debug_print=False):
         """ backs up the list of backup files to a specified target_dir. 
         
         ## Usage 1:
@@ -169,6 +169,18 @@ class ConcreteSessionFolder:
 
 
         """        
+        def _default_rename_basename_fn(session_context: Optional[IdentifyingContext], session_descr: Optional[str], basename: str, *args, separator_char: str = "_"):
+            _filename_list = []
+            if session_context is not None:
+                session_descr = session_context.session_name # '2006-6-07_16-40-19'
+            if session_descr is not None:
+                _filename_list.append(session_descr)
+            _filename_list.append(basename)
+            if len(args) > 0:
+                _filename_list.extend([str(a_part) for a_part in args if a_part is not None])
+            return separator_char.join(_filename_list)
+
+
         if rename_backup_suffix is not None:
             assert (backup_mode.name == BackupMethods.RenameInSourceDirectory.name), f"rename_backup_suffix: {rename_backup_suffix} is only used if (backup_mode.name == BackupMethods.RenameInSourceDirectory.name), but backup_mode: {backup_mode} and rename_backup_suffix is not None!"
         if backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
@@ -198,7 +210,11 @@ class ConcreteSessionFolder:
                         # src_file: Path = a_session_folder.pipeline_results_h5
                         basename: str = src_file.stem
                         if backup_mode.name == BackupMethods.CommonTargetDirectory.name:
-                            final_dest_basename:str = '_'.join([session_descr, basename])
+                            if rename_backup_basename_fn is not None:
+                                final_dest_basename:str = rename_backup_basename_fn(a_session_folder.context, session_descr, basename)
+                            else:
+                                final_dest_basename:str = '_'.join([session_descr, basename])
+
                             final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
                             if debug_print:
                                 print(f'\tfinal_dest_name: {final_dest_name}')
@@ -206,7 +222,11 @@ class ConcreteSessionFolder:
                         elif backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
                             assert rename_backup_suffix is not None
                             target_dir = src_file.parent
-                            final_dest_basename:str = '_'.join([basename, rename_backup_suffix])
+                            if rename_backup_basename_fn is not None:
+                                final_dest_basename:str = rename_backup_basename_fn(None, None, basename, rename_backup_suffix)
+                            else:
+                                final_dest_basename:str = '_'.join([basename, rename_backup_suffix])
+                            
                             final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
                             if debug_print:
                                 print(f'\tfinal_dest_name: {final_dest_name}')
