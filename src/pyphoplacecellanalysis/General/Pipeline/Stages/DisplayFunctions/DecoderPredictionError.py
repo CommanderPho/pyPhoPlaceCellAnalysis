@@ -999,12 +999,16 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 # duration: float = t_end - t_start
                 # time_bin_containers[epoch_idx].edge_info
                 # time_mid: float = nt * dt / 2
+                
+                
+                ## Hacky `epoch_time_bins` methods that might have been used to work around a bug in plotting the posterior
                 epoch_time_bins = time_bin_containers[epoch_idx].centers
                 epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
                 #TODO 2024-02-15 12:19: - [ ] MAYBE THE CENTER of the epoch, not the start!!
                 # epoch_time_bins = epoch_time_bins - time_mid
                 # Try subtracting another half o a time bin width just for fun:
-                epoch_time_bins = epoch_time_bins - (0.5 * dt)
+                # epoch_time_bins = epoch_time_bins - (0.5 * dt)
+
                 
                 epoch_line_fn = lambda t: (epoch_vel * (t - epoch_time_bins[0])) + epoch_intercept
                 epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
