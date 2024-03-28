@@ -41,10 +41,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability
 
-
-
 decoder_name_str: TypeAlias = str # an string name of a particular decoder, such as 'Long_LR' or 'Short_RL'
-
 
 # Assume a1 and a2 are your numpy arrays
 # def find_shift(a1, a2):
@@ -2967,12 +2964,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         """
         return global_computation_results
 
-
-
-
     @function_attributes(short_name='directional_decoders_evaluate_epochs', tags=['directional-decoders', 'epochs', 'decode', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-16 12:49', related_items=['DecoderDecodedEpochsResult'],
                          requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
-                        #  validate_computation_test=DecoderDecodedEpochsResult.validate_has_directional_decoded_epochs_evaluations,
                          validate_computation_test=_workaround_validate_has_directional_decoded_epochs_evaluations,
                          is_global=True)
     def _decode_and_evaluate_epochs_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
@@ -3019,11 +3012,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
         """
-        # from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
-        # from neuropy.core.epoch import Epoch
-        # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
         from neuropy.core.epoch import TimeColumnAliasesProtocol
-                
         
         # Custom Decoding of Epochs (Laps/Ripple) ____________________________________________________________________________ #
 
@@ -3334,11 +3323,10 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # BEGIN SUBFN                                                                                                          #
         # ==================================================================================================================== #
 
+        # Calls `_perform_compute_custom_epoch_decoding`, `_compute_all_df_score_metrics`
+
         # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
         
-        
-        
-
         # spikes_df = curr_active_pipeline.sess.spikes_df
         rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
         minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -3447,6 +3435,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         
         """
         return global_computation_results
+
 
     @function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
         requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
