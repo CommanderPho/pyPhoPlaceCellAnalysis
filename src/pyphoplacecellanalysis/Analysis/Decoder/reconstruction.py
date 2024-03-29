@@ -2,6 +2,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import List, Tuple, Union
 from attrs import define, field, Factory
+from neuropy.analyses import Epoch
+from neuropy.core.epoch import ensure_dataframe
 from nptyping import NDArray # for DecodedFilterEpochsResult
 # import pathlib
 
@@ -765,6 +767,21 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         ## apply the neuron_sliced_pf to the decoder:
         neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
         return neuron_sliced_decoder
+    
+    @function_attributes(short_name=None, tags=['epoch', 'slice', 'restrict'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 19:08', related_items=[])
+    def replacing_computation_epochs(self, epochs: Union[Epoch, pd.Dataframe]):
+        """Implementors return a copy of themselves with their computation epochs (contained in their placefields at `self.pf`) replaced by the provided ones. The existing epochs are unrelated and do not need to be related to the new ones.
+        """
+        new_epochs_obj: Epoch = Epoch(ensure_dataframe(deepcopy(epochs)).epochs.get_valid_df()).get_non_overlapping()
+
+        ## Restrict the PfNDs:
+        epoch_replaced_pf1D = deepcopy(self.pf)
+        epoch_replaced_pf1D = PfND(spikes_df=epoch_replaced_pf1D.spikes_df, position=epoch_replaced_pf1D.position, epochs=new_epochs_obj, config=deepcopy(epoch_replaced_pf1D.config), compute_on_init=True)
+
+        ## apply the neuron_sliced_pf to the decoder:
+        updated_decoder = BasePositionDecoder(epoch_replaced_pf1D, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        return updated_decoder
+
 
     def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
         """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
