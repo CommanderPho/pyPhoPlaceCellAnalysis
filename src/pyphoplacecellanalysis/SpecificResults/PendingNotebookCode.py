@@ -67,7 +67,7 @@ def sample_random_period_from_lap(lap_start, lap_stop, training_data_portion: fl
     else:
         return [(training_start_t, training_end_t, *additional_lap_columns)]
     
-
+@function_attributes(short_name=None, tags=['testing', 'split', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 15:37', related_items=[])
 def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: float=5.0/6.0, debug_print: bool = False):
     """
     Usage:
@@ -113,7 +113,6 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
         curr_lap_period = P.closed(lap_start, lap_stop)
 
         epoch_start_stop_tuple_list = sample_random_period_from_lap(lap_start, lap_stop, training_data_portion, *curr_additional_lap_column_values)
-        combined_intervals = P.empty()
 
         # _intermediate_portions_interval: P.Interval = _convert_start_end_tuples_list_to_PortionInterval(epoch_start_stop_tuple_list)
         # filtered_epochs_df = convert_PortionInterval_to_epochs_df(_intermediate_portions_interval)
@@ -124,7 +123,9 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
         
         # Calculate the difference between the period and the combined interval
         complement_intervals = curr_lap_period.difference(combined_intervals)
-        test_rows.append(convert_PortionInterval_to_epochs_df(complement_intervals))
+        _temp_test_epochs_df = convert_PortionInterval_to_epochs_df(complement_intervals)
+        _temp_test_epochs_df[additional_lap_identity_column_names] = curr_additional_lap_column_values ## add in the additional columns
+        test_rows.append(_temp_test_epochs_df)
 
     ## INPUTS: laps_df, laps_df
 
@@ -133,18 +134,18 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     laps_training_df = pd.DataFrame(train_rows, columns=['start', 'stop', *additional_lap_identity_column_names])
     laps_training_df['duration'] = laps_training_df['stop'] - laps_training_df['start']
 
-    ## Use Porition to find the test interval location:
-    laps_Portion_obj: P.Interval = laps_df.epochs.to_PortionInterval()
-    laps_training_Portion_obj: P.Interval = laps_training_df.epochs.to_PortionInterval()
-    laps_test_Portion_obj: P.Interval = laps_Portion_obj.difference(laps_training_Portion_obj) # does not seem to work
-    laps_test_df: pd.DataFrame = Epoch.from_PortionInterval(laps_test_Portion_obj).to_dataframe() 
-    # laps_training_Portion_obj.complement()
+    # ## Use Porition to find the test interval location:
+    # _laps_Portion_obj: P.Interval = laps_df.epochs.to_PortionInterval()
+    # _laps_training_Portion_obj: P.Interval = laps_training_df.epochs.to_PortionInterval()
+    # _laps_test_Portion_obj: P.Interval = _laps_Portion_obj.difference(_laps_training_Portion_obj)
+    # laps_test_df: pd.DataFrame = Epoch.from_PortionInterval(_laps_test_Portion_obj).to_dataframe() 
 
     # laps_test_df: Epoch = Epoch(Epoch.from_PortionInterval(laps_training_Portion_obj.complement()).time_slice(t_start=laps_df.epochs.t_start, t_stop=laps_df.epochs.t_stop).to_dataframe()[:-1]).to_dataframe() #[:-1] # any period except the replay ones, drop the infinite last entry
 
     # Convert to DataFrame and reset indices
     # laps_training_df = pd.DataFrame(train_rows)
     # laps_test_df = pd.DataFrame(test_rows)
+    laps_test_df = pd.concat(test_rows)
     laps_training_df.reset_index(drop=True, inplace=True)
     laps_test_df.reset_index(drop=True, inplace=True)
 
