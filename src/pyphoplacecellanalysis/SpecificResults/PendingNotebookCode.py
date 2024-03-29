@@ -48,23 +48,9 @@ def sample_random_period_from_lap(lap_start, lap_stop, training_data_portion: fl
     """
     total_lap_duration = lap_stop - lap_start
     training_duration = total_lap_duration * training_data_portion
-    test_duration = total_lap_duration - training_duration
-    # # Calculate the latest possible start time for our training period so that
-    # # it ends before or when the lap ends.
-    # latest_start_time_for_training = lap_stop - training_duration
-    
-    # # Randomly choose a start time for the training period.
-    # training_start = np.random.uniform(lap_start, latest_start_time_for_training)
-    
-    # # The end time for the training period.
-    # training_stop = training_start + training_duration
-    
-    # return training_start, training_stop
-    ## Above implementation biased to beginning/ends of the laps
 
     ## new method:
-    # I'd like to randomly choose a test_start_t period from any time during the interval. 
-
+    # I'd like to randomly choose a test_start_t period from any time during the interval.
     # TRAINING data split mode:
     training_start_t = np.random.uniform(lap_start, lap_stop)
     training_end_t = training_start_t + training_duration
@@ -80,22 +66,6 @@ def sample_random_period_from_lap(lap_start, lap_stop, training_data_portion: fl
 
     else:
         return [(training_start_t, training_end_t, *additional_lap_columns)]
-    
-    # ## Testing data split mode:
-    # test_start_t = np.random.uniform(lap_start, lap_stop)
-    # test_end_t = test_start_t + test_duration
-    # # Wrap around if test_end_t is beyond the period
-    # test_wrap_duration = lap_stop - test_end_t 
-
-    # if test_wrap_duration > 0.0:
-    #     test_end_t = lap_stop # first test period spans to the end of the lap
-    #     ## new period is crated for testing at start of lap
-    #     second_training_start_t = lap_start
-    #     second_training_stop_t = lap_start + test_wrap_duration
-    #     return [(test_start_t, test_end_t, *additional_lap_columns), (second_training_start_t, second_training_stop_t, *additional_lap_columns)]
-
-    # else:
-    #     return [(test_start_t, test_end_t, *additional_lap_columns)]
     
 
 def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: float=5.0/6.0, debug_print: bool = False):
@@ -119,7 +89,7 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
         laps_test_df 
 
     """
-
+    from neuropy.core.epoch import Epoch, ensure_dataframe
 
     additional_lap_identity_column_names = ['label', 'lap_id', 'lap_dir']
 
@@ -147,9 +117,6 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
 
         # _intermediate_portions_interval: P.Interval = _convert_start_end_tuples_list_to_PortionInterval(epoch_start_stop_tuple_list)
         # filtered_epochs_df = convert_PortionInterval_to_epochs_df(_intermediate_portions_interval)
-        interval1 = P.closed(1, 5)  # This is a closed interval from 1 to 5, including both endpoints.
-        interval2 = P.closed(3, 8)  # Another closed interval from 3 to 8.
-
         combined_intervals = P.empty()
         for an_epoch_start_stop_tuple in epoch_start_stop_tuple_list:
             combined_intervals = combined_intervals.union(P.closed(an_epoch_start_stop_tuple[0], an_epoch_start_stop_tuple[1]))
@@ -158,31 +125,6 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
         # Calculate the difference between the period and the combined interval
         complement_intervals = curr_lap_period.difference(combined_intervals)
         test_rows.append(convert_PortionInterval_to_epochs_df(complement_intervals))
-
-        # # Iterate through each epoch in the lap.
-        # for idx, row in group.iterrows():
-        #     epoch_start = row['start']
-        #     epoch_stop = row['stop']
-            
-        #     if epoch_stop <= training_start or epoch_start >= training_stop:
-        #         # The epoch doesn't intersect with the training period.
-        #         test_rows.append(row)
-        #     elif training_start <= epoch_start < training_stop and training_stop < epoch_stop:
-        #         # The epoch starts in the training period and ends outside of it.
-        #         train_rows.append({**row, 'stop': training_stop, 'duration': training_stop - epoch_start})
-        #         test_rows.append({**row, 'start': training_stop, 'duration': epoch_stop - training_stop})
-        #     elif epoch_start < training_start and training_start < epoch_stop <= training_stop:
-        #         # The epoch starts before the training period but ends within it.
-        #         test_rows.append({**row, 'stop': training_start, 'duration': training_start - epoch_start})
-        #         train_rows.append({**row, 'start': training_start, 'duration': epoch_stop - training_start})
-        #     elif training_start <= epoch_start and epoch_stop <= training_stop:
-        #         # The epoch is fully within the training period.
-        #         train_rows.append(row)
-        #     else:
-        #         # The epoch contains the entire training period.
-        #         test_rows.append({**row, 'stop': training_start, 'duration': training_start - epoch_start})
-        #         train_rows.append({**row, 'start': training_start, 'stop': training_stop, 'duration': training_stop - training_start})
-        #         test_rows.append({**row, 'start': training_stop, 'duration': epoch_stop - training_stop})
 
     ## INPUTS: laps_df, laps_df
 
@@ -199,7 +141,6 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     # laps_training_Portion_obj.complement()
 
     # laps_test_df: Epoch = Epoch(Epoch.from_PortionInterval(laps_training_Portion_obj.complement()).time_slice(t_start=laps_df.epochs.t_start, t_stop=laps_df.epochs.t_stop).to_dataframe()[:-1]).to_dataframe() #[:-1] # any period except the replay ones, drop the infinite last entry
-
 
     # Convert to DataFrame and reset indices
     # laps_training_df = pd.DataFrame(train_rows)
