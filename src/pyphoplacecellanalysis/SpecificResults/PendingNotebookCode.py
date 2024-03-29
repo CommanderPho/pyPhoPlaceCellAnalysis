@@ -41,32 +41,7 @@ from neuropy.utils.efficient_interval_search import convert_PortionInterval_to_e
 ## Split the lap epochs into training and test periods.
 ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/6 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
 
-def sample_random_period_from_lap(lap_start, lap_stop, training_data_portion: float, *additional_lap_columns):
-    """ 
-    randomly sample a portion of each lap. Draw a random period of duration (duration[i] * training_data_portion) from the lap.
 
-    """
-    total_lap_duration = lap_stop - lap_start
-    training_duration = total_lap_duration * training_data_portion
-
-    ## new method:
-    # I'd like to randomly choose a test_start_t period from any time during the interval.
-    # TRAINING data split mode:
-    training_start_t = np.random.uniform(lap_start, lap_stop)
-    training_end_t = training_start_t + training_duration
-    # Wrap around if training_end_t is beyond the period
-    training_wrap_duration = np.abs(lap_stop - training_end_t) 
-
-    if training_wrap_duration > 0.0:
-        training_end_t = lap_stop # training spans to the end of the lap
-        ## new period is crated for training at start of lap
-        second_training_start_t = lap_start
-        second_training_stop_t = lap_start + training_wrap_duration
-        return [(training_start_t, training_end_t, *additional_lap_columns), (second_training_start_t, second_training_stop_t, *additional_lap_columns)]
-
-    else:
-        return [(training_start_t, training_end_t, *additional_lap_columns)]
-    
 @function_attributes(short_name=None, tags=['testing', 'split', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 15:37', related_items=[])
 def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: float=5.0/6.0, debug_print: bool = False):
     """
@@ -91,6 +66,35 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     """
     from neuropy.core.epoch import Epoch, ensure_dataframe
 
+    def _subfn_sample_random_period_from_lap(lap_start, lap_stop, training_data_portion: float, *additional_lap_columns):
+        """ 
+        randomly sample a portion of each lap. Draw a random period of duration (duration[i] * training_data_portion) from the lap.
+
+        """
+        total_lap_duration = lap_stop - lap_start
+        training_duration = total_lap_duration * training_data_portion
+
+        ## new method:
+        # I'd like to randomly choose a test_start_t period from any time during the interval.
+        # TRAINING data split mode:
+        training_start_t = np.random.uniform(lap_start, lap_stop)
+        training_end_t = training_start_t + training_duration
+        # Wrap around if training_end_t is beyond the period
+        training_wrap_duration = np.abs(lap_stop - training_end_t) 
+
+        if training_wrap_duration > 0.0:
+            training_end_t = lap_stop # training spans to the end of the lap
+            ## new period is crated for training at start of lap
+            second_training_start_t = lap_start
+            second_training_stop_t = lap_start + training_wrap_duration
+            return [(training_start_t, training_end_t, *additional_lap_columns), (second_training_start_t, second_training_stop_t, *additional_lap_columns)]
+
+        else:
+            return [(training_start_t, training_end_t, *additional_lap_columns)]
+        
+
+    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
     additional_lap_identity_column_names = ['label', 'lap_id', 'lap_dir']
 
     # Randomly sample a portion of each lap. Draw a random period of duration (duration[i] * training_data_portion) from the lap.
@@ -112,7 +116,7 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
         # Define your period as an interval
         curr_lap_period = P.closed(lap_start, lap_stop)
 
-        epoch_start_stop_tuple_list = sample_random_period_from_lap(lap_start, lap_stop, training_data_portion, *curr_additional_lap_column_values)
+        epoch_start_stop_tuple_list = _subfn_sample_random_period_from_lap(lap_start, lap_stop, training_data_portion, *curr_additional_lap_column_values)
 
         # _intermediate_portions_interval: P.Interval = _convert_start_end_tuples_list_to_PortionInterval(epoch_start_stop_tuple_list)
         # filtered_epochs_df = convert_PortionInterval_to_epochs_df(_intermediate_portions_interval)
@@ -158,6 +162,76 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
 
     return laps_training_df, laps_test_df
 
+
+
+
+## INPUTS: laps_df, laps_training_df, laps_test_df
+@function_attributes(short_name=None, tags=['matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 15:46', related_items=[])
+def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test_df, fignum=1, fig=None, ax=None, active_context=None):
+    """ 
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import debug_draw_laps_train_test_split_epochs
+
+        fig, ax = debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test_df, fignum=0)
+        fig.show()
+    """
+    from neuropy.core.epoch import Epoch, ensure_dataframe
+    from matplotlib.gridspec import GridSpec
+    from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
+    from neuropy.utils.matplotlib_helpers import draw_epoch_regions
+
+
+    def _prepare_epochs_df(laps_test_df: pd.DataFrame) -> Epoch:
+        active_filter_epochs = deepcopy(laps_test_df)
+
+        if not 'stop' in active_filter_epochs.columns:
+            # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+            active_filter_epochs['stop'] = active_filter_epochs['end'].copy()
+            
+        if not 'label' in active_filter_epochs.columns:
+            # Make sure it has the 'stop' column which is expected as opposed to the 'end' column
+            active_filter_epochs['label'] = active_filter_epochs['flat_replay_idx'].copy()
+
+        active_filter_epoch_obj = Epoch(active_filter_epochs)
+        return active_filter_epoch_obj
+
+
+    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+
+    laps_Epoch_obj = _prepare_epochs_df(laps_df)
+    laps_training_df_Epoch_obj = _prepare_epochs_df(laps_training_df)
+    laps_test_df_Epoch_obj = _prepare_epochs_df(laps_test_df)
+
+    if fignum is None:
+        if f := plt.get_fignums():
+            fignum = f[-1] + 1
+        else:
+            fignum = 1
+
+    ## Figure Setup:
+    if ax is None:
+        fig = build_or_reuse_figure(fignum=fignum, fig=fig, fig_idx=0, figsize=(12, 4.2), dpi=None, clear=True, tight_layout=False)
+        gs = GridSpec(1, 1, figure=fig)
+        ax = plt.subplot(gs[0])
+
+    else:
+        # otherwise get the figure from the passed axis
+        fig = ax.get_figure()
+
+    # epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=('red','cyan'), alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
+    laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(laps_Epoch_obj, ax, facecolor='black', edgecolors=None, labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False, label='laps')
+    test_epochs_collection, test_epoch_labels = draw_epoch_regions(laps_test_df_Epoch_obj, ax, facecolor='orange', edgecolors='orange', labels_kwargs=None, defer_render=False, debug_print=True, label='test')
+    train_epochs_collection, train_epoch_labels = draw_epoch_regions(laps_training_df_Epoch_obj, ax, facecolor='green', edgecolors='green', labels_kwargs=None, defer_render=False, debug_print=True, label='train')
+    ax.autoscale()
+    fig.legend()
+    # plt.title('Lap epochs divided into separate training and test intervals')
+    plt.xlabel('time (sec)')
+    plt.ylabel('Lap Epochs')
+
+    # Set window title and plot title
+    perform_update_title_subtitle(fig=fig, ax=ax, title_string=f'Lap epochs divided into separate training and test intervals', subtitle_string=None, active_context=active_context, use_flexitext_titles=True)
+    0
+    return fig, ax
 
 
 # ==================================================================================================================== #

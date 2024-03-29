@@ -778,7 +778,7 @@ class DirectionalLapsHelpers:
 
     @classmethod
     def fix_computation_epochs_if_needed(cls, curr_active_pipeline, debug_print=False):
-        """2023-11-10 - WORKING NOW - decouples the configs and constrains the computation_epochs to the relevant long/short periods. Will need recomputations if was_modified """
+        """2023-11-10 - WORKING NOW - decouples (if they refer to shared memory locations, which was causing a bug) the configs and constrains the computation_epochs to the relevant long/short periods. Will need recomputations if was_modified """
         #TODO 2023-11-10 23:32: - [ ] WORKING NOW!
         # 2023-11-10 21:15: - [X] Not yet finished! Does not work due to shared memory issue. Changes to the first two affect the next two
 
