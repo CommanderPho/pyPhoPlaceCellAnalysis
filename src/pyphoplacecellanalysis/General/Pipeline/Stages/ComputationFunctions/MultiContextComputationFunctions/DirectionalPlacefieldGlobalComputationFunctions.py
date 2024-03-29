@@ -2634,31 +2634,10 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         if include_includelist is not None:
             print(f'WARN: _split_to_directional_laps(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
-        # if include_includelist is None:
-            # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-            # include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
-            # include_includelist = [global_epoch_name] # ['maze'] # only for maze
-            # include_includelist = [long_epoch_name, short_epoch_name] # ['maze1', 'maze2'] # only for maze
-
-        ## Adds ['*_even_laps', '*_odd_laps'] pseduofilters
-
-        # owning_pipeline_reference, directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names = DirectionalLapsHelpers.split_to_directional_laps(owning_pipeline_reference, include_includelist=include_includelist, add_created_configs_to_pipeline=True)
-        # curr_active_pipeline, directional_lap_specific_configs = constrain_to_laps(curr_active_pipeline)
-        # list(directional_lap_specific_configs.keys())
-
         # Set the global result:
         global_computation_results.computed_data['DirectionalLaps'] = DirectionalLapsHelpers.build_global_directional_result_from_natural_epochs(owning_pipeline_reference)
 
-
-        # global_computation_results.computed_data['DirectionalLaps'] = DynamicParameters.init_from_dict({
-        #     'directional_lap_specific_configs': directional_lap_specific_configs,
-        #     'split_directional_laps_dict': split_directional_laps_dict,
-        #     'split_directional_laps_contexts_dict': split_directional_laps_contexts_dict,
-        #     'split_directional_laps_names': split_directional_laps_config_names,
-        #     'computed_base_epoch_names': computed_base_epoch_names,
-        # })
-
-        ## Needs to call `owning_pipeline_reference.prepare_for_display()` before display functions can be used with new directional results
+        ## NOTE: Needs to call `owning_pipeline_reference.prepare_for_display()` before display functions can be used with new directional results
 
         """ Usage:
         
