@@ -2810,8 +2810,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         should_disable_cache: bool = True # when True, always recomputes and does not attempt to use the cache.
         
         # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
-
-        
         # Store all_directional_pf1D_Decoder_dict, all_directional_continuously_decoded_dict
         
         ## Create or update the global directional_decoders_decode_result:            

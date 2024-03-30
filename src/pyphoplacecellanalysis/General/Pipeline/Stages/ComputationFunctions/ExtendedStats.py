@@ -77,7 +77,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         time_binned_position_resampler = build_position_df_resampled_to_time_windows(computation_result.sess.position.to_dataframe(), time_bin_size=computation_result.computation_config.pf_params.time_bin_size) # TimedeltaIndexResampler
         time_binned_position_df = time_binned_position_resampler.nearest() # an actual dataframe
         computation_result.computed_data['extended_stats'] = DynamicParameters.init_from_dict({
-         'time_binned_positioned_resampler': time_binned_position_resampler,
+         'time_binned_positioned_resampler': time_binned_position_resampler, # this might be the unpicklable object? 
          'time_binned_position_df': time_binned_position_df,
          'time_binned_position_mean': time_binned_position_df.resample("1min").mean(), # 3 minutes
          'time_binned_position_covariance': time_binned_position_df.cov(min_periods=12)

@@ -563,6 +563,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             computation_result.computed_data['long_short_leave_one_out_decoding_analysis']
                 # ['long_short_leave_one_out_decoding_analysis']['short_long_neurons_diff']
                 # ['long_short_leave_one_out_decoding_analysis']['poly_overlap_df']
+
         
 
 
@@ -570,6 +571,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             - if not `is_certain_properly_constrained`, calls `compute_long_short_constrained_decoders` to build placefields and decoders constrained to the same position bins
 
 
+        #TODO 2024-03-29 20:16: - [ ] This doesn't seem to correctly validate after it has been computed, it keeps recomputing every time.
 
         """
         # # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
@@ -661,6 +663,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             print(f'WARN: overwriting existing result `_perform_long_short_decoding_analyses`.')
             global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] = leave_one_out_decoding_analysis_obj
         # TODO 2023-05-10 - Do I want long_one_step_decoder_2D, short_one_step_decoder_2D that I computed?
+
+        if not np.all([hasattr(global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'], 'long_results_obj'), hasattr(global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'], 'short_results_obj')]):
+            print(f'WARN: FIXME: `_perform_long_short_decoding_analyses` failed to validate its properties even after fresh computation! FIX THIS. 2024-03-29 20:21!')
 
         """ Getting outputs:
         
