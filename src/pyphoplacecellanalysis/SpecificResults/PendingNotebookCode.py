@@ -32,6 +32,8 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlace
 import portion as P # Required for interval search: portion~=2.3.0
 from neuropy.utils.efficient_interval_search import convert_PortionInterval_to_epochs_df, _convert_start_end_tuples_list_to_PortionInterval
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+from sklearn.metrics import mean_squared_error
 
 
 ## Get custom decoder that is only trained on a portion of the laps
@@ -166,17 +168,28 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
 
     return laps_training_df, laps_test_df
 
+def decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size: float):
+    test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False) for k,v in train_lap_specific_pf1D_Decoder_dict.items()}
+    return test_laps_decoder_results_dict
+
+
 @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=[], creation_date='2024-03-29 22:14', related_items=[])
 def compute_train_test_split_laps_decoders(directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=5.0/6.0, debug_print: bool = False):
     """ 
     ## Split the lap epochs into training and test periods.
     ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/6 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
 
-    
-    old_directional_lap_name: str = 'maze1_even'
-    a_modern_name: str = 'long_LR'
+    ## Get custom decoder that is only trained on a portion of the laps
+    ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
 
     
+    Hints/Ref:
+        old_directional_lap_name: str = 'maze1_even'
+        a_modern_name: str = 'long_LR'
+
+        decoders_dict['long_LR'] # BasePositionDecoder
+        decoders_dict['long_LR'].pf.config # PlacefieldComputationParameters
+
     Usage:
 
         training_data_portion: float = 5.0/6.0
@@ -206,6 +219,8 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     from neuropy.core.epoch import Epoch, ensure_dataframe
     from neuropy.analyses.placefields import PfND
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
 
     test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
 
@@ -243,7 +258,8 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     for a_modern_name in modern_names_list:
 
         old_directional_lap_name: str = decoder_name_to_session_context_name[a_modern_name] # e.g. 'maze1_even'
-        print(f'a_modern_name: {a_modern_name}, old_directional_lap_name: {old_directional_lap_name}')
+        if debug_print:
+            print(f'a_modern_name: {a_modern_name}, old_directional_lap_name: {old_directional_lap_name}')
         a_1D_decoder = deepcopy(decoders_dict[a_modern_name])
 
         # directional_laps_results # DirectionalLapsResult
@@ -271,50 +287,48 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
         # fig2.show()
 
         # uses `a_modern_name`
-        # for a_lap_period_description, a_lap_period_epoch_df in training_test_split_laps_df_dict.items():
-        # for a_lap_period_description, curr_lap_period_epoch_obj in training_test_split_laps_epoch_obj_dict.items():
         a_lap_period_description: str = a_train_epoch_name
         curr_lap_period_epoch_obj: Epoch = a_training_test_split_laps_epoch_obj_dict[a_train_epoch_name]
-            
-        # new_name = f'{a_modern_name}_{a_lap_period_description}'
-        # print(f'\tnew_name: {new_name}')
-        # curr_lap_period_epoch_obj: Epoch = Epoch(deepcopy(a_lap_period_epoch_df)).get_non_overlapping().filtered_by_duration(None, 30.0)
 
         a_config_copy = deepcopy(a_config)
         a_config_copy['pf_params'].computation_epochs = curr_lap_period_epoch_obj
-        # active_config_copy.computation_config.pf_params.computation_epochs = active_config_copy.computation_config.pf_params.computation_epochs.label_slice(odd_lap_specific_epochs.labels)
-        ## Just overwrite directly:
-        # active_config_copy.computation_config.pf_params.computation_epochs = lap_period_epochs
         split_train_test_lap_specific_configs[a_lap_period_description] = a_config_copy
-        # curr_active_pipeline.active_configs[new_name] = active_config_copy
-        # end loop over split_directional_lap types:
-
         curr_pf1D = a_1D_decoder.pf
-
         ## Restrict the PfNDs:
-        lap_filtered_curr_pf1D = deepcopy(curr_pf1D)
-        lap_filtered_curr_pf1D = PfND(spikes_df=lap_filtered_curr_pf1D.spikes_df, position=lap_filtered_curr_pf1D.position, epochs=deepcopy(curr_lap_period_epoch_obj),
-                                      config=deepcopy(lap_filtered_curr_pf1D.config), compute_on_init=True)
-        # lap_filtered_curr_pf2D = deepcopy(curr_pf2D)
-        # lap_filtered_curr_pf2D = PfND(spikes_df=lap_filtered_curr_pf2D.spikes_df, position=lap_filtered_curr_pf2D.position, epochs=deepcopy(curr_laps_obj), config=lap_filtered_curr_pf2D.config, compute_on_init=True)
-
         lap_filtered_curr_pf1D: PfND = curr_pf1D.replacing_computation_epochs(deepcopy(curr_lap_period_epoch_obj))
-        
         split_train_test_lap_specific_pf1D_dict[a_lap_period_description] = lap_filtered_curr_pf1D
 
-        ## apply the neuron_sliced_pf to the decoder:
+        ## apply the lap_filtered_curr_pf1D to the decoder:
         a_sliced_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(lap_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
         split_train_test_lap_specific_pf1D_Decoder_dict[a_lap_period_description] = a_sliced_pf1D_Decoder
 
         
-    # split_train_test_lap_specific_configs
-    # split_train_test_lap_specific_pf1D_dict
-    # split_train_test_lap_specific_pf1D_Decoder_dict
-
-    print(list(split_train_test_lap_specific_pf1D_Decoder_dict.keys())) # ['long_LR_train', 'long_RL_train', 'short_LR_train', 'short_RL_train']
+    if debug_print:
+        print(list(split_train_test_lap_specific_pf1D_Decoder_dict.keys())) # ['long_LR_train', 'long_RL_train', 'short_LR_train', 'short_RL_train']
+    
     ## OUTPUTS: (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs)
 
-    return (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs)
+
+    ## Get test epochs:
+    train_epoch_names: List[str] = [k for k in train_test_split_laps_df_dict.keys() if k.endswith('_train')]
+    test_epoch_names: List[str] = [k for k in train_test_split_laps_df_dict.keys() if k.endswith('_test')]
+
+    ## Only the decoders built with the training epochs make any sense:
+    train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = {k.split('_train', maxsplit=1)[0]:split_train_test_lap_specific_pf1D_Decoder_dict[k] for k in train_epoch_names} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+    test_epochs_dict: Dict[str,Epoch] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+    train_epochs_dict: Dict[str,Epoch] = {k.split('_train', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_train')} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+
+
+    ## Now decode the test epochs using the new decoders:
+    # ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
+    # global_spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
+    # test_laps_decoder_results_dict = decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size)
+    # test_laps_decoder_results_dict
+
+
+    # train_lap_specific_pf1D_Decoder_dict, (train_epochs_dict, test_epochs_dict)
+    # return (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs)
+    return (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs
 
 
 def interpolate_positions(df: pd.DataFrame, sample_times: NDArray, time_column_name: str = 't') -> pd.DataFrame:
@@ -361,7 +375,68 @@ def interpolate_positions(df: pd.DataFrame, sample_times: NDArray, time_column_n
 
     return interpolated_df
 
+def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult], global_measured_position_df: pd.DataFrame):
+    """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
+     
+    from sklearn.metrics import mean_squared_error
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_measured_decoded_position_comparison
 
+    """
+    from sklearn.metrics import mean_squared_error
+
+    test_measured_positions_dfs_dict = {}
+    test_decoded_positions_df_dict = {}
+    test_decoded_measured_diff_df_dict = {}
+
+    for k, a_decoder_decoding_result in test_laps_decoder_results_dict.items():
+        decoded_time_bin_centers_list = deepcopy([a_cont.centers for a_cont in a_decoder_decoding_result.time_bin_containers]) # this is NOT the same for all decoders because they could have different numbers of test laps because different directions/configs might have different numbers of general laps
+
+        test_measured_positions_dfs = []
+        test_decoded_positions_dict_list = [] # one per epoch
+        test_decoded_measured_diff_df_dict_list = [] # one per epoch
+
+        for epoch_idx, a_sample_times in enumerate(decoded_time_bin_centers_list):
+            interpolated_measured_df = interpolate_positions(global_measured_position_df, a_sample_times)
+            test_measured_positions_dfs.append(interpolated_measured_df)
+
+            decoded_positions = a_decoder_decoding_result.most_likely_positions_list[epoch_idx]
+
+            assert len(a_sample_times) == len(decoded_positions), f"len(a_sample_times): {len(a_sample_times)} == len(decoded_positions): {len(decoded_positions)}"
+            
+            ## one for each decoder:
+            test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions})
+
+            ## ERROR:
+            ## a_decoder.most_likely_positions_list[epoch_idx]
+            # array([217.354, 259.366, 259.366, 30.2099])
+            # a_decoder.time_bin_containers[epoch_idx].centers
+            # array([241.786])
+            # a_decoder.time_window_centers[epoch_idx]
+            # array([241.786])
+            # a_decoder.time_bin_containers[epoch_idx]
+            # # edges is right but centers is not??
+            # a_decoder.time_bin_containers[epoch_idx].edges
+            # array([241.785, 241.786, 241.787, 241.788, 241.789])
+            # a_decoder.time_bin_edges[epoch_idx]
+            # array([241.785, 241.786, 241.787, 241.788, 241.789])
+
+
+            test_decoded_positions_dict_list.append(test_decoded_positions_df)
+            # compute the diff error:
+            # mean_squared_error(y_true, y_pred)
+            # test_decoded_measured_diff_df = (interpolated_measured_df[['x']] - pd.DataFrame({'x':v.most_likely_positions_list[epoch_idx]})) ## error at each point
+            test_decoded_measured_diff_df: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
+            
+            test_decoded_measured_diff_df_dict_list.append(test_decoded_measured_diff_df)
+        # test_measured_positions_dfs
+        test_measured_positions_dfs_dict[k] = test_measured_positions_dfs
+        test_decoded_positions_df_dict[k] = test_decoded_positions_dict_list
+        test_decoded_measured_diff_df_dict[k] = test_decoded_measured_diff_df_dict_list
+
+    # test_decoded_measured_diff_df = test_decoded_measured_diff_df_dict
+    # test_decoded_measured_diff_df
+
+    return test_measured_positions_dfs_dict, test_decoded_positions_df_dict, test_decoded_measured_diff_df_dict
 
 
 
