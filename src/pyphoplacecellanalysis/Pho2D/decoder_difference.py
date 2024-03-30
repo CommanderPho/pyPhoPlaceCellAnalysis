@@ -12,7 +12,13 @@ from pyphocorehelpers.function_helpers import function_attributes
 def display_predicted_position_difference(active_one_step_decoder, active_two_step_decoder, active_resampled_measured_positions):
     """ Draw difference between predicted and measured position 
     
+    Draws an arrow from the measured position to the predicted position for each timestep
+
     NOT YET USED
+    Usage:
+
+    from pyphoplacecellanalysis.Pho2D.decoder_difference import display_predicted_position_difference
+
     
     """
     
