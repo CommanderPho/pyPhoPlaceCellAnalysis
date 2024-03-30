@@ -2595,6 +2595,23 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str,
     ## OUTPUTS: radon_transform_merged_df, decoder_laps_radon_transform_df_dict
     return score_metric_merged_df
 
+@function_attributes(short_name=None, tags=['spikes_df', 'global', 'global_spikes_df'], input_requires=[], output_provides=[], uses=[], used_by=['_decode_continuous_using_directional_decoders', 'compute_train_test_split_laps_decoders'], creation_date='2024-03-29 22:28', related_items=['decode_specific_epochs'])
+def get_proper_global_spikes_df(owning_pipeline_reference) -> pd.DataFrame:
+    """ Gets the global_spikes_df filtered to the correct cells, etc.
+
+    In the form needed by `decode_specific_epochs(global_spikes_df, ...)`
+     Get proper global_spikes_df, requires curr_active_pipeline
+    """
+    # Get proper global_spikes_df:
+    long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+    rank_order_results = owning_pipeline_reference.global_computation_results.computed_data['RankOrder'] # "RankOrderComputationsContainer"
+    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+    included_qclu_values: List[int] = rank_order_results.included_qclu_values
+    directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
+    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+    any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+    global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df).spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
+    return global_spikes_df
 
 
 
@@ -2864,17 +2881,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             print(f'\ttime_bin_size: {time_bin_size}')
 
             # Get proper global_spikes_df:
-            long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-            rank_order_results = owning_pipeline_reference.global_computation_results.computed_data['RankOrder'] # "RankOrderComputationsContainer"
-            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-            included_qclu_values: List[int] = rank_order_results.included_qclu_values
-            directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
-            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-            any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
-            global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df).spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
-            # alternatively if importing `RankOrderAnalyses` is okay, we can do:
-            # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
-            
+            global_spikes_df = get_proper_global_spikes_df(owning_pipeline_reference)
+
             spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
 
             # print(f'add_directional_decoder_decoded_epochs(...): decoding continuous epochs for each directional decoder.')

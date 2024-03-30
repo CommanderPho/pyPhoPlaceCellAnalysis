@@ -841,8 +841,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
-    @function_attributes(short_name='decode_specific_epochs', tags=['decode'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
-        uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'], used_by=[])
+    @function_attributes(short_name='decode_specific_epochs', tags=['decode', 'epochs', 'specific'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
+        uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'], used_by=['decode_using_new_decoders'], related_items=['get_proper_global_spikes_df'])
     def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
         """ 
         Uses:
