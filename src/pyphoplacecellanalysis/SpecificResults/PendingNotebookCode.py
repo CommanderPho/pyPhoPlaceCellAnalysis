@@ -22,6 +22,11 @@ from functools import wraps, partial
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+
+
+
+
 # ---------------------------------------------------------------------------- #
 #             2024-03-29 - Rigorous Decoder Performance assessment             #
 # ---------------------------------------------------------------------------- #
@@ -73,8 +78,7 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     from neuropy.core.epoch import Epoch, ensure_dataframe
 
     def _subfn_sample_random_period_from_lap(lap_start, lap_stop, training_data_portion: float, *additional_lap_columns):
-        """ 
-        randomly sample a portion of each lap. Draw a random period of duration (duration[i] * training_data_portion) from the lap.
+        """ randomly sample a portion of each lap. Draw a random period of duration (duration[i] * training_data_portion) from the lap.
 
         """
         total_lap_duration = lap_stop - lap_start
@@ -172,9 +176,9 @@ def decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_
     test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False) for k,v in train_lap_specific_pf1D_Decoder_dict.items()}
     return test_laps_decoder_results_dict
 
-
 @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=[], creation_date='2024-03-29 22:14', related_items=[])
-def compute_train_test_split_laps_decoders(directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=5.0/6.0, debug_print: bool = False):
+def compute_train_test_split_laps_decoders(directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=5.0/6.0,
+                                           debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False):
     """ 
     ## Split the lap epochs into training and test periods.
     ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/6 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
@@ -236,16 +240,17 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     # {'LR':'odd', 'RL':'even'}
     long_LR_name, short_LR_name, long_RL_name, short_RL_name = ['maze1_odd', 'maze2_odd', 'maze1_even', 'maze2_even']
     decoder_name_to_session_context_name: Dict[str,str] = dict(zip(track_templates.get_decoder_names(), (long_LR_name, long_RL_name, short_LR_name, short_RL_name))) # {'long_LR': 'maze1_odd', 'long_RL': 'maze1_even', 'short_LR': 'maze2_odd', 'short_RL': 'maze2_even'}
-    session_context_name_to_decoder_name: Dict[str,str] = dict(zip((long_LR_name, long_RL_name, short_LR_name, short_RL_name), track_templates.get_decoder_names())) # {'maze1_odd': 'long_LR', 'maze1_even': 'long_RL', 'maze2_odd': 'short_LR', 'maze2_even': 'short_RL'}
+    # session_context_name_to_decoder_name: Dict[str,str] = dict(zip((long_LR_name, long_RL_name, short_LR_name, short_RL_name), track_templates.get_decoder_names())) # {'maze1_odd': 'long_LR', 'maze1_even': 'long_RL', 'maze2_odd': 'short_LR', 'maze2_even': 'short_RL'}
 
     old_directional_names = list(directional_laps_results.directional_lap_specific_configs.keys()) #['maze1_odd', 'maze1_even', 'maze2_odd', 'maze2_even']
     modern_names_list = list(decoders_dict.keys()) # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
     assert len(old_directional_names) == len(modern_names_list), f"old_directional_names: {old_directional_names} length is not equal to modern_names_list: {modern_names_list}"
 
-    lap_dir_keys = ['LR', 'RL']
-    maze_id_keys = ['long', 'short']
+    # lap_dir_keys = ['LR', 'RL']
+    # maze_id_keys = ['long', 'short']
     training_test_suffixes = ['_train', '_test'] ## used in loop
 
+    _written_HDF5_manifest_keys = []
 
     train_test_split_laps_df_dict: Dict[str,pd.DataFrame] = {} # analagoues to `directional_laps_results.split_directional_laps_dict`
     train_test_split_laps_epoch_obj_dict: Dict[str,Epoch] = {}
@@ -256,7 +261,7 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     split_train_test_lap_specific_pf1D_Decoder_dict = {}
 
     for a_modern_name in modern_names_list:
-
+        ## Loop through each decoder:
         old_directional_lap_name: str = decoder_name_to_session_context_name[a_modern_name] # e.g. 'maze1_even'
         if debug_print:
             print(f'a_modern_name: {a_modern_name}, old_directional_lap_name: {old_directional_lap_name}')
@@ -269,22 +274,47 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
         # type(a_config['pf_params'].computation_epochs) # Epoch
         # a_config['pf_params'].computation_epochs
         a_laps_df: pd.DataFrame = ensure_dataframe(deepcopy(a_config['pf_params'].computation_epochs))
-        a_laps_training_df, a_laps_test_df = split_laps_training_and_test(laps_df=a_laps_df, training_data_portion=training_data_portion, debug_print=False)
+        a_laps_training_df, a_laps_test_df = split_laps_training_and_test(laps_df=a_laps_df, training_data_portion=training_data_portion, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
         
+        if debug_output_hdf5_file_path is not None:
+            # Write out to HDF5 file:
+            a_possible_hdf5_file_output_prefix: str = 'provided'
+            a_laps_df.to_hdf(debug_output_hdf5_file_path, f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/laps_df', format='table')
+            a_laps_training_df.to_hdf(debug_output_hdf5_file_path, f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/train_df', format='table')
+            a_laps_test_df.to_hdf(debug_output_hdf5_file_path, f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/test_df', format='table')
+
+            _written_HDF5_manifest_keys.extend([f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/laps_df', f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/train_df', f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/test_df'])
+
+
+
         a_training_test_names = [f"{a_modern_name}{a_suffix}" for a_suffix in training_test_suffixes] # ['long_LR_train', 'long_LR_test']
         a_train_epoch_name: str = a_training_test_names[0] # just the train epoch, like 'long_LR_train'
         a_training_test_split_laps_df_dict: Dict[str,pd.DataFrame] = dict(zip(a_training_test_names, (a_laps_training_df, a_laps_test_df))) # analagoues to `directional_laps_results.split_directional_laps_dict`
-        a_training_test_split_laps_epoch_obj_dict: Dict[str,Epoch] = {k:Epoch(deepcopy(v)).get_non_overlapping().filtered_by_duration(None, 30.0) for k, v in a_training_test_split_laps_df_dict.items()}
+
+        # _temp_a_training_test_split_laps_valid_epoch_df_dict: Dict[str,Epoch] = {k:deepcopy(v).get_non_overlapping() for k, v in a_training_test_split_laps_df_dict.items()} ## NOTE: these lose the associated extra columns like 'lap_id', 'lap_dir', etc.
+        a_training_test_split_laps_epoch_obj_dict: Dict[str,Epoch] = {k:Epoch(deepcopy(v)).get_non_overlapping() for k, v in a_training_test_split_laps_df_dict.items()} ## NOTE: these lose the associated extra columns like 'lap_id', 'lap_dir', etc.
 
         train_test_split_laps_df_dict.update(a_training_test_split_laps_df_dict)
         train_test_split_laps_epoch_obj_dict.update(a_training_test_split_laps_epoch_obj_dict)
 
+        a_valid_laps_training_df, a_valid_laps_test_df = ensure_dataframe(a_training_test_split_laps_epoch_obj_dict[a_training_test_names[0]]), ensure_dataframe(a_training_test_split_laps_epoch_obj_dict[a_training_test_names[1]])
+
         # ## Check Visually - look fine, barely altered
-        # a_valid_laps_training_df, a_valid_laps_test_df = ensure_dataframe(training_test_split_laps_epoch_obj_dict[a_training_test_names[0]]), ensure_dataframe(training_test_split_laps_epoch_obj_dict[a_training_test_names[1]])
-        # fig, ax = debug_draw_laps_train_test_split_epochs(a_laps_df, a_laps_training_df, a_laps_test_df, fignum=0)
-        # fig.show()
-        # fig2, ax = debug_draw_laps_train_test_split_epochs(a_laps_df, a_valid_laps_training_df, a_valid_laps_test_df, fignum=1)
-        # fig2.show()
+        if debug_plot:
+            # fig, ax = debug_draw_laps_train_test_split_epochs(a_laps_df, a_laps_training_df, a_laps_test_df, fignum=0)
+            # fig.show()
+            fig2, ax = debug_draw_laps_train_test_split_epochs(a_laps_df, a_valid_laps_training_df, a_valid_laps_test_df, fignum=f'Train/Test Split: {a_modern_name}')
+            fig2.show()
+
+        if debug_output_hdf5_file_path is not None:
+            # Write out to HDF5 file:
+            a_possible_hdf5_file_output_prefix: str = 'valid'
+            # a_laps_df.to_hdf(debug_output_hdf5_file_path, f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/laps_df', format='table')
+            a_valid_laps_training_df.to_hdf(debug_output_hdf5_file_path, f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/train_df', format='table')
+            a_valid_laps_test_df.to_hdf(debug_output_hdf5_file_path, f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/test_df', format='table')
+
+            _written_HDF5_manifest_keys.extend([f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/train_df', f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/test_df'])
+
 
         # uses `a_modern_name`
         a_lap_period_description: str = a_train_epoch_name
@@ -310,14 +340,20 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
 
 
     ## Get test epochs:
-    train_epoch_names: List[str] = [k for k in train_test_split_laps_df_dict.keys() if k.endswith('_train')]
-    test_epoch_names: List[str] = [k for k in train_test_split_laps_df_dict.keys() if k.endswith('_test')]
+    train_epoch_names: List[str] = [k for k in train_test_split_laps_df_dict.keys() if k.endswith('_train')] # ['long_LR_train', 'long_RL_train', 'short_LR_train', 'short_RL_train']
+    test_epoch_names: List[str] = [k for k in train_test_split_laps_df_dict.keys() if k.endswith('_test')] # ['long_LR_test', 'long_RL_test', 'short_LR_test', 'short_RL_test']
 
+    ## train_test_split_laps_df_dict['long_LR_test'] != train_test_split_laps_df_dict['long_LR_train'], which is correct
     ## Only the decoders built with the training epochs make any sense:
     train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = {k.split('_train', maxsplit=1)[0]:split_train_test_lap_specific_pf1D_Decoder_dict[k] for k in train_epoch_names} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
-    test_epochs_dict: Dict[str,Epoch] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
-    train_epochs_dict: Dict[str,Epoch] = {k.split('_train', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_train')} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
 
+    # Epoch obj mode (loses associated info)
+    test_epochs_obj_dict: Dict[str,Epoch] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+    train_epochs_obj_dict: Dict[str,Epoch] = {k.split('_train', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_train')} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+
+    # DF mode so they don't lose the associated info:
+    test_epochs_dict: Dict[str, pd.DataFrame] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_laps_df_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+    train_epochs_dict: Dict[str, pd.DataFrame] = {k.split('_train', maxsplit=1)[0]:v for k,v in train_test_split_laps_df_dict.items() if k.endswith('_train')} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
 
     ## Now decode the test epochs using the new decoders:
     # ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
@@ -326,6 +362,12 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     # test_laps_decoder_results_dict
 
 
+
+    if debug_output_hdf5_file_path is not None:
+        print(f'successfully wrote out to: "{debug_output_hdf5_file_path}"')
+        print(f'\t_written_HDF5_manifest_keys: {_written_HDF5_manifest_keys}\n')
+        # print(f'\t_written_HDF5_manifest_keys: {",\n".join(_written_HDF5_manifest_keys)}')
+        
     # train_lap_specific_pf1D_Decoder_dict, (train_epochs_dict, test_epochs_dict)
     # return (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs)
     return (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs
