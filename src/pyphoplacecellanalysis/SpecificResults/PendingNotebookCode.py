@@ -330,7 +330,6 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     # return (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs)
     return (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs
 
-
 def interpolate_positions(df: pd.DataFrame, sample_times: NDArray, time_column_name: str = 't') -> pd.DataFrame:
     """
     Interpolates position data to new sample times using SciPy's interp1d.
@@ -445,8 +444,9 @@ def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: D
 
 ## INPUTS: laps_df, laps_training_df, laps_test_df
 @function_attributes(short_name=None, tags=['matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 15:46', related_items=[])
-def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test_df, fignum=1, fig=None, ax=None, active_context=None):
-    """ 
+def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test_df, fignum=1, fig=None, ax=None, active_context=None, use_brokenaxes_method: bool = False):
+    """ Draws the division of the train/test epochs using a matplotlib figure.
+
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import debug_draw_laps_train_test_split_epochs
 
@@ -459,7 +459,7 @@ def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test
     from neuropy.utils.matplotlib_helpers import draw_epoch_regions
 
 
-    def _prepare_epochs_df(laps_test_df: pd.DataFrame) -> Epoch:
+    def _subfn_prepare_epochs_df(laps_test_df: pd.DataFrame) -> Epoch:
         active_filter_epochs = deepcopy(laps_test_df)
 
         if not 'stop' in active_filter_epochs.columns:
@@ -476,9 +476,9 @@ def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
-    laps_Epoch_obj = _prepare_epochs_df(laps_df)
-    laps_training_df_Epoch_obj = _prepare_epochs_df(laps_training_df)
-    laps_test_df_Epoch_obj = _prepare_epochs_df(laps_test_df)
+    laps_Epoch_obj = _subfn_prepare_epochs_df(laps_df)
+    laps_training_df_Epoch_obj = _subfn_prepare_epochs_df(laps_training_df)
+    laps_test_df_Epoch_obj = _subfn_prepare_epochs_df(laps_test_df)
 
     if fignum is None:
         if f := plt.get_fignums():
@@ -490,7 +490,17 @@ def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test
     if ax is None:
         fig = build_or_reuse_figure(fignum=fignum, fig=fig, fig_idx=0, figsize=(12, 4.2), dpi=None, clear=True, tight_layout=False)
         gs = GridSpec(1, 1, figure=fig)
-        ax = plt.subplot(gs[0])
+
+        if use_brokenaxes_method:
+            # `brokenaxes` method: DOES NOT YET WORK!
+            from brokenaxes import brokenaxes ## Main brokenaxes import 
+            pad_size: float = 0.1
+            # [(a_tuple.start, a_tuple.stop) for a_tuple in a_test_epoch_df.itertuples(index=False, name="EpochTuple")]
+            lap_start_stop_tuples_list = [((a_tuple.start - pad_size), (a_tuple.stop + pad_size)) for a_tuple in ensure_dataframe(laps_Epoch_obj).itertuples(index=False, name="EpochTuple")]
+            # ax = brokenaxes(xlims=((0, .1), (.4, .7)), ylims=((-1, .7), (.79, 1)), hspace=.05, subplot_spec=gs[0])
+            ax = brokenaxes(xlims=lap_start_stop_tuples_list, hspace=.05, subplot_spec=gs[0])
+        else:
+            ax = plt.subplot(gs[0])
 
     else:
         # otherwise get the figure from the passed axis
@@ -498,7 +508,7 @@ def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test
 
     # epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=('red','cyan'), alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
     laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(laps_Epoch_obj, ax, facecolor='black', edgecolors=None, labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False, label='laps')
-    test_epochs_collection, test_epoch_labels = draw_epoch_regions(laps_test_df_Epoch_obj, ax, facecolor='orange', edgecolors='orange', labels_kwargs=None, defer_render=False, debug_print=True, label='test')
+    test_epochs_collection, test_epoch_labels = draw_epoch_regions(laps_test_df_Epoch_obj, ax, facecolor='purple', edgecolors='purple', labels_kwargs=None, defer_render=True, debug_print=True, label='test')
     train_epochs_collection, train_epoch_labels = draw_epoch_regions(laps_training_df_Epoch_obj, ax, facecolor='green', edgecolors='green', labels_kwargs=None, defer_render=False, debug_print=True, label='train')
     ax.autoscale()
     fig.legend()
@@ -508,7 +518,7 @@ def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test
 
     # Set window title and plot title
     perform_update_title_subtitle(fig=fig, ax=ax, title_string=f'Lap epochs divided into separate training and test intervals', subtitle_string=None, active_context=active_context, use_flexitext_titles=True)
-    0
+    
     return fig, ax
 
 @function_attributes(short_name=None, tags=['matplotlib', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-01 11:00', related_items=[])
@@ -562,6 +572,7 @@ def _show_decoding_result(laps_decoder_results_dict: Dict[str, DecodedFilterEpoc
     #                                                 )
     # plt.title('Interp. v. Actual Measured Positions')
     return fig, curr_ax
+
 
 
 
