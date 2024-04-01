@@ -511,6 +511,58 @@ def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test
     0
     return fig, ax
 
+@function_attributes(short_name=None, tags=['matplotlib', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-01 11:00', related_items=[])
+def _show_decoding_result(laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult], measured_positions_dfs_dict, decoded_positions_df_dict, a_name: str = 'long_LR', epoch_IDX: int = 2, xbin=None):
+    """ Plots the decoding of a single lap epoch, with its most-likely positions and actual behavioral measured positions overlayed as lines.
+    Plot a single decoder, single epoch comparison of measured v. decoded position
+
+    Captures: `directional_laps_results` for purposes of xbin
+
+    Usage:
+
+        fig, curr_ax = _show_decoding_result(test_measured_positions_dfs_dict, test_decoded_positions_df_dict, a_name = 'long_LR', epoch_IDX = 2, xbin=xbin)
+
+    """
+    a_decoder = laps_decoder_results_dict[a_name] # depends only on a_name
+    active_posterior = a_decoder.p_x_given_n_list[epoch_IDX]
+
+    print(f'for a_name: {a_name}, epoch_IDX: {epoch_IDX}')
+    measured_positions_df: pd.DataFrame = measured_positions_dfs_dict[a_name][epoch_IDX]
+    decoded_positions_df: pd.DataFrame = decoded_positions_df_dict[a_name][epoch_IDX]
+
+    time_window_centers = decoded_positions_df['t'].to_numpy()
+    active_measured_positions = measured_positions_df['x'].to_numpy() # interpolated positions
+    active_most_likely_positions = decoded_positions_df['x'].to_numpy()
+
+    active_decoder_evaluation_df = pd.DataFrame({'t': time_window_centers, 'measured': active_measured_positions, 'decoded': active_most_likely_positions})
+
+    # OUTPUTS: active_decoder_evaluation_df, (time_window_centers, active_measured_positions, active_most_likely_positions), active_posterior
+
+    # active_decoder_evaluation_df = global_measured_position_df
+
+    # ## Get the previously created matplotlib_view_widget figure/ax:
+    fig, curr_ax = plot_1D_most_likely_position_comparsions(active_decoder_evaluation_df, time_window_centers=time_window_centers, xbin=xbin,
+                                                        posterior=active_posterior,
+                                                        active_most_likely_positions_1D=active_most_likely_positions,
+                                                        # variable_name='x',
+                                                        variable_name='measured',
+                                                        enable_flat_line_drawing=False,
+                                                        ax=None,
+                                                    )
+    plt.title('decoding performance')
+
+    # # test interpolated v. actual measured positions: ____________________________________________________________________ #
+    # fig, curr_ax = plot_1D_most_likely_position_comparsions(global_measured_position_df, time_window_centers=time_window_centers, xbin=xbin,
+    #                                                     posterior=active_posterior,
+    #                                                     active_most_likely_positions_1D=active_measured_positions, # interpolated are gray
+    #                                                     variable_name='x',
+    #                                                     # variable_name='measured',
+    #                                                     enable_flat_line_drawing=False,
+    #                                                     ax=None,
+    #                                                 )
+    # plt.title('Interp. v. Actual Measured Positions')
+    return fig, curr_ax
+
 
 
 # ==================================================================================================================== #
