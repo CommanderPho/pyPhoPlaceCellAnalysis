@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 
 from neuropy.core import Epoch
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
 
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import BaseDatasource, DataframeDatasource
@@ -41,6 +43,11 @@ class IntervalsDatasource(BaseDatasource):
     
     _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
     
+    _time_column_name_synonyms = {"t_start":{'begin','start','start_t'},
+        't_end':['end','stop','stop_t'],
+        "t_duration":['duration'],
+    }
+
     
     @property
     def time_column_names(self):
@@ -116,10 +123,16 @@ class IntervalsDatasource(BaseDatasource):
     def __init__(self, df, datasource_name='default_intervals_datasource'):
         # Initialize the datasource as a BaseDatasource
         BaseDatasource.__init__(self, datasource_name=datasource_name)
-        self._df = df
+        
+        if not np.isin(IntervalsDatasource._required_interval_time_columns, df.columns).all():
+            ## try to do the rename
+            df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=df, required_columns_synonym_dict=self.__class__._time_column_name_synonyms)
+
         ## Validate that it has all required columns:
         assert np.isin(IntervalsDatasource._required_interval_time_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {IntervalsDatasource._required_interval_time_columns}, current: {df.columns} "
-        
+        self._df = df
+
+
         
     def update_visualization_properties(self, dataframe_vis_columns_function):
         """ called to update the current visualization columns of the df by applying the provided function
