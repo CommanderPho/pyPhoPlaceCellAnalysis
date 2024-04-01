@@ -172,13 +172,13 @@ class EpochRenderingMixin:
     #######################################################################################################################################
     
     @QtCore.Slot(object)
-    def EpochRenderingMixin_on_interval_datasource_changed(self, datasource):
+    def EpochRenderingMixin_on_interval_datasource_changed(self, datasource: IntervalsDatasource):
         """ emit our own custom signal when the general datasource update method returns """
         # print(f'datasource: {datasource.custom_datasource_name}')
         self.add_rendered_intervals(datasource, name=datasource.custom_datasource_name, debug_print=False) # updates the rendered intervals on the change
         
         
-    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=False):
+    def add_rendered_intervals(self, interval_datasource: IntervalsDatasource, name=None, child_plots=None, debug_print=False):
         """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
