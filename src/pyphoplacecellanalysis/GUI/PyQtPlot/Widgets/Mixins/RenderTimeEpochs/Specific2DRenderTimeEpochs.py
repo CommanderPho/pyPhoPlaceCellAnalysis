@@ -82,7 +82,7 @@ class General2DRenderTimeEpochs(object):
             pen_color = pg.mkColor('red')
             brush_color = pg.mkColor('red')
 
-            ## parameters:            
+            ## parameters:
             ## Add the missing parameters to the dataframe:
             active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
             return active_df

@@ -895,7 +895,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def _build_or_update_time_curves_legend(self, parent_item):
         """ Build a legend for each of the curves 
     
-        parent_item=self.ui.main_time_curves_view_widget.graphicsItem()
+        parent_item = self.ui.main_time_curves_view_widget.graphicsItem()
 
         """
         # legend_size = (80,60) # fixed size legend
