@@ -5991,7 +5991,7 @@ description = "PyQt/PySide Source Code Editor Widget"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "current.whl", hash = "sha256:7bfc28d10f6cdc24ce5d9a283613dc4071552ca8a6e22b95bec54a32f67f3d48"},
+    {file = "pyqode_core-3.0.0-py2.py3-none-any.whl", hash = "sha256:7bfc28d10f6cdc24ce5d9a283613dc4071552ca8a6e22b95bec54a32f67f3d48"},
 ]
 
 [package.dependencies]
@@ -8985,4 +8985,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "486811716e89b0567f3d62eccf3df883c007b8ec5136cb86083bacf99cc123e2"
+content-hash = "67056438d8091b78f738077f559bbec0b3d9f911c4b14eaf65276becd5b257a4"
