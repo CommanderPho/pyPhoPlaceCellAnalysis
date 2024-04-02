@@ -35,6 +35,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 import portion as P # Required for interval search: portion~=2.3.0
+from neuropy.core.epoch import Epoch, ensure_dataframe
 from neuropy.utils.efficient_interval_search import convert_PortionInterval_to_epochs_df, _convert_start_end_tuples_list_to_PortionInterval
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
@@ -52,6 +53,63 @@ from sklearn.metrics import mean_squared_error
 ## Split the lap epochs into training and test periods.
 ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/6 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
 
+@function_attributes(short_name=None, tags=['sample', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-01 23:12', related_items=[])
+def _sample_random_period_from_lap(lap_start: float, lap_stop: float, training_data_portion: float, *additional_lap_columns, debug_print=False, debug_override_training_start_t=None):
+    """ randomly sample a portion of each lap. Draw a random period of duration (duration[i] * training_data_portion) from the lap.
+
+    Possible Outcomes:
+
+    [
+
+
+    """
+    total_lap_duration: float = (lap_stop - lap_start)
+    training_duration: float = total_lap_duration * training_data_portion
+    test_duration: float = total_lap_duration - training_duration
+
+    ## new method:
+    # I'd like to randomly choose a test_start_t period from any time during the interval.
+
+    # TRAINING data split mode:
+    if debug_override_training_start_t is not None:
+        print(f'debug_override_training_start_t: {debug_override_training_start_t} provided, so not generating random number.')
+        training_start_t = debug_override_training_start_t
+    else:
+        training_start_t = np.random.uniform(lap_start, lap_stop)
+    
+    training_end_t = (training_start_t + training_duration)
+    # Wrap around if training_end_t is beyond the period
+    # training_wrap_duration = np.abs(lap_stop - training_end_t) 
+
+    if debug_print:
+        print(f'training_start_t: {training_start_t}, training_end_t: {training_end_t}') # , training_wrap_duration: {training_wrap_duration}
+
+    if training_end_t > lap_stop:
+        # if training_wrap_duration > 0.0:
+        # wrap required:
+        # CASE: [train[0], test[0], train[1]] - train[1] = (train
+        # Calculate how much time should wrap to the beginning
+        wrap_duration = training_end_t - lap_stop
+        
+        # Define the training periods
+        train_period_1 = (training_start_t, lap_stop, *additional_lap_columns) # training spans to the end of the lap
+        train_period_2 = (lap_start, (lap_start + wrap_duration), *additional_lap_columns)
+        
+        # Return both training periods
+        train_outputs = [train_period_1, train_period_2]
+
+        # training_end_t = lap_stop # training spans to the end of the lap
+        ## new period is crated for training at start of lap
+        # second_training_start_t = lap_start
+        # second_training_stop_t = lap_start + training_wrap_duration
+        # train_outputs = [(training_start_t, training_end_t, *additional_lap_columns), (second_training_start_t, second_training_stop_t, *additional_lap_columns)]
+    else:
+        # all other cases have only one train interval (train[0])
+        train_outputs = [(training_start_t, training_end_t, *additional_lap_columns)]
+
+
+    train_outputs.sort(key=lambda i: (i[0], i[1])) # sort by low first, then by high if the low keys tie
+    return train_outputs
 
 @function_attributes(short_name=None, tags=['testing', 'split', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['compute_train_test_split_laps_decoders'], creation_date='2024-03-29 15:37', related_items=[])
 def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: float=5.0/6.0, debug_print: bool = False):
@@ -77,31 +135,27 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     """
     from neuropy.core.epoch import Epoch, ensure_dataframe
 
-    def _subfn_sample_random_period_from_lap(lap_start, lap_stop, training_data_portion: float, *additional_lap_columns):
-        """ randomly sample a portion of each lap. Draw a random period of duration (duration[i] * training_data_portion) from the lap.
 
-        """
-        total_lap_duration = lap_stop - lap_start
-        training_duration = total_lap_duration * training_data_portion
 
-        ## new method:
-        # I'd like to randomly choose a test_start_t period from any time during the interval.
-        # TRAINING data split mode:
-        training_start_t = np.random.uniform(lap_start, lap_stop)
-        training_end_t = training_start_t + training_duration
-        # Wrap around if training_end_t is beyond the period
-        training_wrap_duration = np.abs(lap_stop - training_end_t) 
 
-        if training_wrap_duration > 0.0:
-            training_end_t = lap_stop # training spans to the end of the lap
-            ## new period is crated for training at start of lap
-            second_training_start_t = lap_start
-            second_training_stop_t = lap_start + training_wrap_duration
-            return [(training_start_t, training_end_t, *additional_lap_columns), (second_training_start_t, second_training_stop_t, *additional_lap_columns)]
+        # ## Testing data split mode:
+        # test_start_t = np.random.uniform(lap_start, lap_stop)
+        # test_end_t = test_start_t + test_duration
+        # # Wrap around if test_end_t is beyond the period
+        # test_wrap_duration = lap_stop - test_end_t 
 
-        else:
-            return [(training_start_t, training_end_t, *additional_lap_columns)]
-        
+        # if test_wrap_duration > 0.0:
+        #     test_end_t = lap_stop # first test period spans to the end of the lap
+        #     ## new period is crated for testing at start of lap
+        #     second_training_start_t = lap_start
+        #     second_training_stop_t = lap_start + test_wrap_duration
+        #     return [(test_start_t, test_end_t, *additional_lap_columns), (second_training_start_t, second_training_stop_t, *additional_lap_columns)]
+
+        # else:
+        #     return [(test_start_t, test_end_t, *additional_lap_columns)]
+
+
+
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
@@ -117,29 +171,36 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
         if debug_print:
             print(f'lap_id: {lap_id} - group: {group}')
         curr_additional_lap_column_values = [group[a_col].to_numpy()[0] for a_col in additional_lap_identity_column_names]
-        # lap_stop = group['lap_id']
-        # lap_stop = group['stop']
         if debug_print:
             print(f'\tcurr_additional_lap_column_values: {curr_additional_lap_column_values}')
         # Get the random training start and stop times for the lap.
         # training_start, training_stop = sample_random_period_from_lap(lap_start, lap_stop, training_data_portion)
         # Define your period as an interval
         curr_lap_period = P.closed(lap_start, lap_stop)
+        epoch_start_stop_tuple_list = _sample_random_period_from_lap(lap_start, lap_stop, training_data_portion, *curr_additional_lap_column_values)
 
-        epoch_start_stop_tuple_list = _subfn_sample_random_period_from_lap(lap_start, lap_stop, training_data_portion, *curr_additional_lap_column_values)
+        ## Validate first
+        curr_lap_duration: float = lap_stop - lap_start
 
         # _intermediate_portions_interval: P.Interval = _convert_start_end_tuples_list_to_PortionInterval(epoch_start_stop_tuple_list)
         # filtered_epochs_df = convert_PortionInterval_to_epochs_df(_intermediate_portions_interval)
-        combined_intervals = P.empty()
+        a_combined_intervals = P.empty()
         for an_epoch_start_stop_tuple in epoch_start_stop_tuple_list:
-            combined_intervals = combined_intervals.union(P.closed(an_epoch_start_stop_tuple[0], an_epoch_start_stop_tuple[1]))
+            a_combined_intervals = a_combined_intervals.union(P.closed(an_epoch_start_stop_tuple[0], an_epoch_start_stop_tuple[1]))
             train_rows.append(an_epoch_start_stop_tuple)
         
         # Calculate the difference between the period and the combined interval
-        complement_intervals = curr_lap_period.difference(combined_intervals)
+        complement_intervals = curr_lap_period.difference(a_combined_intervals)
         _temp_test_epochs_df = convert_PortionInterval_to_epochs_df(complement_intervals)
         _temp_test_epochs_df[additional_lap_identity_column_names] = curr_additional_lap_column_values ## add in the additional columns
         test_rows.append(_temp_test_epochs_df)
+
+        ## VALIDATE:
+        a_train_durations = [(an_epoch_start_stop_tuple[1]-an_epoch_start_stop_tuple[0]) for an_epoch_start_stop_tuple in epoch_start_stop_tuple_list]
+        all_train_durations: float = np.sum(a_train_durations)
+        all_test_durations: float = _temp_test_epochs_df['duration'].sum()
+        assert np.isclose(curr_lap_duration, (all_train_durations+all_test_durations)), f"(all_train_durations: {all_train_durations} + all_test_durations: {all_test_durations}) should equal curr_lap_duration: {curr_lap_duration}, but instead it equals {(all_train_durations+all_test_durations)}"
+
 
     ## INPUTS: laps_df, laps_df
 
@@ -274,6 +335,8 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
         # type(a_config['pf_params'].computation_epochs) # Epoch
         # a_config['pf_params'].computation_epochs
         a_laps_df: pd.DataFrame = ensure_dataframe(deepcopy(a_config['pf_params'].computation_epochs))
+        # ensure non-overlapping first:
+        # a_laps_df = a_laps_df.epochs.get_non_overlapping_df(debug_print=True) # make sure we have non-overlapping global laps before trying to split them
         a_laps_training_df, a_laps_test_df = split_laps_training_and_test(laps_df=a_laps_df, training_data_portion=training_data_portion, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
         
         if debug_output_hdf5_file_path is not None:
@@ -284,7 +347,6 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
             a_laps_test_df.to_hdf(debug_output_hdf5_file_path, f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/test_df', format='table')
 
             _written_HDF5_manifest_keys.extend([f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/laps_df', f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/train_df', f'{a_possible_hdf5_file_output_prefix}/{a_modern_name}/test_df'])
-
 
 
         a_training_test_names = [f"{a_modern_name}{a_suffix}" for a_suffix in training_test_suffixes] # ['long_LR_train', 'long_LR_test']
@@ -559,7 +621,7 @@ def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test
     plt.ylabel('Lap Epochs')
 
     # Set window title and plot title
-    perform_update_title_subtitle(fig=fig, ax=ax, title_string=f'Lap epochs divided into separate training and test intervals', subtitle_string=None, active_context=active_context, use_flexitext_titles=True)
+    perform_update_title_subtitle(fig=fig, ax=ax, title_string=f'Lap epochs divided into separate training and test intervals', subtitle_string=f'{fignum}', active_context=active_context, use_flexitext_titles=True)
     
     return fig, ax
 
@@ -614,6 +676,64 @@ def _show_decoding_result(laps_decoder_results_dict: Dict[str, DecodedFilterEpoc
     #                                                 )
     # plt.title('Interp. v. Actual Measured Positions')
     return fig, curr_ax
+
+@function_attributes(short_name=None, tags=['UNUSED', 'matplotlib', 'helper', 'ChatGPT', 'UNVALIDATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-01 18:26', related_items=[])
+def wrap_xaxis_in_subplots(data_x, data_y, width, **kwargs):
+    """
+    Create a matplotlib figure with stacked subplots where the x-axis is wrapped at a given width.
+
+    Parameters:
+    data_x: array-like, the x coordinates of the data points.
+    data_y: array-like, the y coordinates of the data points, should be the same length as data_x.
+    width: int, the fixed width to wrap the x-axis.
+    kwargs: extra keyword arguments passed to the `plot` function.
+
+
+    Example Usage:
+
+        # Example usage:
+        # data_x might represent some periodic data
+        data_x = np.linspace(0, 30, 300)
+        data_y = np.sin(data_x) + 0.1*np.random.randn(data_x.size)
+
+        wrap_xaxis_in_subplots(data_x, data_y, 10)
+
+    """
+
+    # Calculate the number of subplots needed
+    max_x = np.max(data_x)
+    num_subplots = int(np.ceil(max_x / width))
+
+    # Create the figure and subplots
+    fig, axs = plt.subplots(num_subplots, 1, figsize=(10, num_subplots * 2), sharex=True)
+
+    # Check if we only have one subplot (matplotlib returns an Axes object directly instead of a list if so)
+    if num_subplots == 1:
+        axs = [axs]
+    
+    for i in range(num_subplots):
+        # Determine the start and end of the x-range for this subplot
+        start_x = i * width
+        end_x = start_x + width
+
+        # Extract the data for this range
+        mask = (data_x >= start_x) & (data_x < end_x)
+        sub_data_x = data_x[mask] - start_x  # Shift x data to start at 0
+        sub_data_y = data_y[mask]
+
+        # Plot on the appropriate subplot
+        axs[i].plot(sub_data_x, sub_data_y, **kwargs)
+        axs[i].set_xlim(0, width)
+        axs[i].set_ylim(min(data_y), max(data_y))
+        axs[i].set_title(f'Range: [{start_x}, {end_x})')
+
+    # Label the shared x-axis
+    fig.text(0.5, 0.04, 'X-axis wraped at width ' + str(width), ha='center')
+
+    # Adjust spacing between the plots
+    plt.tight_layout(rect=[0, 0.03, 1, 1])
+
+    plt.show()
 
 
 
