@@ -78,31 +78,22 @@ def _sample_random_period_from_lap(lap_start: float, lap_stop: float, training_d
         training_start_t = np.random.uniform(lap_start, lap_stop)
     
     training_end_t = (training_start_t + training_duration)
-    # Wrap around if training_end_t is beyond the period
-    # training_wrap_duration = np.abs(lap_stop - training_end_t) 
-
+    
     if debug_print:
         print(f'training_start_t: {training_start_t}, training_end_t: {training_end_t}') # , training_wrap_duration: {training_wrap_duration}
 
     if training_end_t > lap_stop:
-        # if training_wrap_duration > 0.0:
-        # wrap required:
+        # Wrap around if training_end_t is beyond the period (wrap required):
         # CASE: [train[0], test[0], train[1]] - train[1] = (train
         # Calculate how much time should wrap to the beginning
         wrap_duration = training_end_t - lap_stop
         
         # Define the training periods
         train_period_1 = (training_start_t, lap_stop, *additional_lap_columns) # training spans to the end of the lap
-        train_period_2 = (lap_start, (lap_start + wrap_duration), *additional_lap_columns)
+        train_period_2 = (lap_start, (lap_start + wrap_duration), *additional_lap_columns) ## new period is crated for training at start of lap
         
         # Return both training periods
         train_outputs = [train_period_1, train_period_2]
-
-        # training_end_t = lap_stop # training spans to the end of the lap
-        ## new period is crated for training at start of lap
-        # second_training_start_t = lap_start
-        # second_training_stop_t = lap_start + training_wrap_duration
-        # train_outputs = [(training_start_t, training_end_t, *additional_lap_columns), (second_training_start_t, second_training_stop_t, *additional_lap_columns)]
     else:
         # all other cases have only one train interval (train[0])
         train_outputs = [(training_start_t, training_end_t, *additional_lap_columns)]
