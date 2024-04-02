@@ -144,6 +144,10 @@ class SpecificComputationValidator:
 
 
     # Main Operation Functions ___________________________________________________________________________________________ #
+    def try_validate_computation(self, curr_active_pipeline, **kwargs) -> bool:
+        return self._perform_try_validate_computation(self, curr_active_pipeline, **kwargs)
+
+
     def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
         return self._perform_try_computation_if_needed(self, curr_active_pipeline, **kwargs)
 
@@ -197,6 +201,64 @@ class SpecificComputationValidator:
 
     # Implementations ____________________________________________________________________________________________________ #
     @classmethod
+    def _perform_try_validate_computation(cls, comp_specifier: "SpecificComputationValidator", curr_active_pipeline, computation_filter_name:str, on_already_computed_fn=None, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False) -> bool:
+        """ 2023-06-08 - tries to validate (but not perform) the computation to see if it needs to becomputed. 
+        
+        It can return False for several independent reasons:
+            - a critical result is missing
+            - force_recompute = True
+            - validation function failed or threw an error
+
+        Usage:
+            if _comp_name in include_includelist:
+                # newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=a_validate_computation_test), on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+        
+                needs_computation: bool = cls._perform_try_validate_computation(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
+                                                                    on_already_computed_fn=on_already_computed_fn,
+                                                                    fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                                                                    
+        #TODO 2023-08-31 11:08: - [ ] Made for global computations, but `computation_filter_name` was just added post-hoc. Needs to be updated to use computation_filter_name in perform_specific_computation for non-global functions
+                
+        """
+        def _subfn_try_validate(validate_fail_on_exception:bool=False, is_post_recompute:bool=False) -> bool:
+            """ captures: comp_specifier, curr_active_pipeline, computation_filter_name, debug_print """
+            try:
+                # try the validation again.
+                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
+                return True
+            except (AttributeError, KeyError, TypeError, ValueError, AssertionError) as validation_err:
+                # Handle the inner exception
+                if is_post_recompute:
+                    print(f'Exception occured while validating (`validate_computation_test(...)`) after recomputation:\n Validation exception: {validation_err}')
+                if validate_fail_on_exception:
+                    raise validation_err
+                if debug_print:
+                    import traceback # for stack trace formatting
+                    print(f'\t encountered error while validating (is_post_recompute: {is_post_recompute}):\n\tValidation exception: {validation_err}\n{traceback.format_exc()}\n.')
+            except BaseException:
+                raise # unhandled exception
+            return False
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        # comp_short_name: str = comp_specifier.short_name
+        did_successfully_validate: bool = False
+        
+        if force_recompute:
+            # if force_recompute is True, we always return that it is invalid. We'll need to remove the previous computations before running the new ones though.
+            return False
+
+        # Check for existing result:
+        is_known_missing_provided_keys: bool = comp_specifier.try_check_missing_provided_keys(curr_active_pipeline)
+        if (is_known_missing_provided_keys):
+            print(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
+            return False
+
+        did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)        
+        return did_successfully_validate
+    
+
+    @classmethod
     def _perform_try_computation_if_needed(cls, comp_specifier: "SpecificComputationValidator", curr_active_pipeline, computation_filter_name:str, on_already_computed_fn=None, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False):
         """ 2023-06-08 - tries to perform the computation if the results are missing and it's needed. 
         
@@ -231,7 +293,7 @@ class SpecificComputationValidator:
         comp_short_name: str = comp_specifier.short_name
         newly_computed_values = []
         did_successfully_validate: bool = False
-        
+
         if force_recompute:
             ## Remove any existing results:
             print(f'2024-01-02 - {comp_short_name} _perform_try_computation_if_needed, remove_provided_keys')
@@ -239,15 +301,19 @@ class SpecificComputationValidator:
             if (removed_results_dict is not None) and len(removed_results_dict) > 0:
                 print(f'removed results: {list(removed_results_dict.keys())} because force_recompute was True.')
 
-        # Check for existing result:
-        is_known_missing_provided_keys: bool = comp_specifier.try_check_missing_provided_keys(curr_active_pipeline)
 
-        if (is_known_missing_provided_keys):
-                print(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
+        # Check for existing result:
+        needs_computation: bool = cls._perform_try_validate_computation(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
+                                                                         on_already_computed_fn=on_already_computed_fn,
+                                                                         fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
         
-        did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)
+        # is_known_missing_provided_keys: bool = comp_specifier.try_check_missing_provided_keys(curr_active_pipeline)
+        # if (is_known_missing_provided_keys):
+        #         print(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
         
-        needs_computation: bool = ((not did_successfully_validate) or is_known_missing_provided_keys)
+        # did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)
+        
+        # needs_computation: bool = ((not did_successfully_validate) or is_known_missing_provided_keys)
         
         if needs_computation:
             ## validate_computation_test(...) failed, so we need to recompute.

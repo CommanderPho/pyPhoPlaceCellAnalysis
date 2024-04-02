@@ -274,6 +274,126 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     return curr_active_pipeline
 
 
+def batch_evaluate_required_computations(curr_active_pipeline, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False,
+                                force_recompute:bool=False, force_recompute_override_computations_includelist=None):
+    """ determines how many of the specified computations are already valid, vs. how many will need to be recomputed. 
+
+    force_recompute:bool=False
+    force_recompute_override_computations_includelist: Optional[List[str]] a list of computation function names to recompute regardless of their validator's status.
+    
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+    batch_extended_computations(include_includelist=['merged_directional_placefields'], include_global_functions=True)
+    
+    WARNING: `force_recompute_override_computations_includelist` must be a subset of the items in `include_includelist`
+    include_includelist = ['pf_computation', 'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis']
+    force_recompute_override_computations_includelist = ['pf_computation', 'split_to_directional_laps']
+    
+    The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true.
+    
+    """
+    #TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
+    #TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
+
+    def _subfn_on_already_computed(_comp_name, computation_filter_name):
+        """ captures: `progress_print`, `force_recompute`
+        raises AttributeError if force_recompute is true to trigger recomputation """
+        if progress_print:
+            print(f'{_comp_name}, {computation_filter_name} already computed.')
+        if force_recompute:
+            if progress_print:
+                print(f'\tforce_recompute is true so recomputing anyway')
+            raise AttributeError # just raise an AttributeError to trigger recomputation    
+
+    force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
+
+    ## Get the names of the global and non-global computations:
+    # all_validators_dict = curr_active_pipeline.get_merged_computation_function_validators()
+    # global_only_validators_dict = {k:v for k, v in all_validators_dict.items() if v.is_global}
+    # non_global_only_validators_dict = {k:v for k, v in all_validators_dict.items() if (not v.is_global)}
+    # non_global_comp_names: List[str] = [v.short_name for k, v in non_global_only_validators_dict.items() if (not v.short_name.startswith('_DEP'))] # ['firing_rate_trends', 'spike_burst_detection', 'pf_dt_sequential_surprise', 'extended_stats', 'placefield_overlap', 'ratemap_peaks_prominence2d', 'velocity_vs_pf_simplified_count_density', 'EloyAnalysis', '_perform_specific_epochs_decoding', 'recursive_latent_pf_decoding', 'position_decoding_two_step', 'position_decoding', 'lap_direction_determination', 'pfdt_computation', 'pf_computation']
+    # global_comp_names: List[str] = [v.short_name for k, v in global_only_validators_dict.items() if (not v.short_name.startswith('_DEP'))] # ['long_short_endcap_analysis', 'long_short_inst_spike_rate_groups', 'long_short_post_decoding', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_decoding_analyses', 'PBE_stats', 'rank_order_shuffle_analysis', 'directional_decoders_epoch_heuristic_scoring', 'directional_decoders_evaluate_epochs', 'directional_decoders_decode_continuous', 'merged_directional_placefields', 'split_to_directional_laps']
+
+    ## Hardcoded names of all possible global/non-global computation functions:
+    non_global_comp_names = ['lap_direction_determination', 'pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
+    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis',
+                         'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'] # , 'long_short_rate_remapping'
+
+    # 'firing_rate_trends', 'pf_dt_sequential_surprise'
+    # '_perform_firing_rate_trends_computation', '_perform_time_dependent_pf_sequential_surprise_computation'
+    
+    if include_includelist is None:
+        # include all:
+        include_includelist = non_global_comp_names + global_comp_names
+    else:
+        print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
+
+    #TODO 2024-01-09 21:41: - [ ] I don't enforce that every member of  `force_recompute_override_computations_includelist` is in `include_includelist` because one might be specified in a "_comp_specifier.short_name" format while the other a "_comp_specifier.computation_fn_name", so they wouldn't literally match.
+    # If the function is specified in `force_recompute_override_computations_includelist` it should NOT be omitted from `include_includelist`.
+    # #  The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true, so check.
+    # for a_name in force_recompute_override_computations_includelist:
+    #     assert (not (a_name not in ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)))), f'WARNING: function "{a_name}" specified in `force_recompute_override_computations_includelist` is missing from `include_includelist`: ({include_includelist})! If this is the case, the function will never be computed (forced or otherwise).\nIf the function is specified in `force_recompute_override_computations_includelist` it should not be omitted from `included_computation_filter_names`.'            
+    #     # print(f'WARNING: function "{a_name}" specified in `force_recompute_override_computations_includelist` is missing from `include_includelist`: ({include_includelist})! If this is the case, the function will never be computed (forced or otherwise).')
+    assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
+
+    ## Get computed relative entropy measures:
+    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+
+    if included_computation_filter_names is None:
+        included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
+        if progress_print:
+            print(f'Running batch_evaluate_required_computations(...) with global_epoch_name: "{global_epoch_name}"')
+    else:
+        if progress_print:
+            print(f'Running batch_evaluate_required_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
+
+
+
+    ## Specify the computations and the requirements to validate them.
+
+    ## Hardcoded comp_specifiers
+    _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
+    ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
+    _comp_specifiers = reversed(_comp_specifiers)
+
+    remaining_include_function_names = {k:False for k in include_includelist.copy()}
+
+    needs_computation_output_dict = {}
+
+    for _comp_specifier in _comp_specifiers:
+        if (not _comp_specifier.is_global) or include_global_functions:
+            if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
+                if (not _comp_specifier.is_global):
+                    # Not Global-only, need to compute for all `included_computation_filter_names`:
+                    for a_computation_filter_name in included_computation_filter_names:
+                        needs_compute: bool = _comp_specifier.try_validate_computation(curr_active_pipeline, computation_filter_name=a_computation_filter_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                        if needs_compute:
+                            if _comp_specifier.short_name not in needs_computation_output_dict:
+                                needs_computation_output_dict[_comp_specifier.short_name] = {}
+
+                            needs_computation_output_dict[_comp_specifier.short_name][a_computation_filter_name] = True
+
+                else:
+                    # Global-Only:
+                    _curr_force_recompute = force_recompute or _comp_specifier.is_name_in(force_recompute_override_computations_includelist) # force_recompute for this specific result if either of its name is included in `force_recompute_override_computations_includelist`
+                    needs_compute: bool = _comp_specifier.try_validate_computation(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=_curr_force_recompute)
+                    needs_computation_output_dict[_comp_specifier.short_name] = True
+                if (_comp_specifier.short_name in include_includelist):
+                    del remaining_include_function_names[_comp_specifier.short_name]
+                elif (_comp_specifier.computation_fn_name in include_includelist):
+                    del remaining_include_function_names[_comp_specifier.computation_fn_name]
+                else:
+                    raise NotImplementedError
+
+    if len(remaining_include_function_names) > 0:
+        print(f'WARNING: after checking all_comp_specifiers found the functions: {remaining_include_function_names} still remain! Are they correct and do they have proper validator decorators?')
+    if progress_print:
+        print('done with all batch_evaluate_required_computations(...).')
+
+    return needs_computation_output_dict
+
+
+
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_computations(curr_active_pipeline, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False,
