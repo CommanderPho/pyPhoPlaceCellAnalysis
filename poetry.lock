@@ -3780,13 +3780,13 @@ python-legacy = ["mkdocstrings-python-legacy (>=0.2.1)"]
 
 [[package]]
 name = "mkdocstrings-python"
-version = "1.9.0"
+version = "1.9.1"
 description = "A Python handler for mkdocstrings."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "mkdocstrings_python-1.9.0-py3-none-any.whl", hash = "sha256:fad27d7314b4ec9c0359a187b477fb94c65ef561fdae941dca1b717c59aae96f"},
-    {file = "mkdocstrings_python-1.9.0.tar.gz", hash = "sha256:6e1a442367cf75d30cf69774cbb1ad02aebec58bfff26087439df4955efecfde"},
+    {file = "mkdocstrings_python-1.9.1-py3-none-any.whl", hash = "sha256:bf2406ed37ff19c9f8e0acc9d72c41953fb789bfb4ae10eb00ee17e537eeb220"},
+    {file = "mkdocstrings_python-1.9.1.tar.gz", hash = "sha256:077188fa43eab3b689826b15da7da6753501224b2482e4eca3ce4412ce3b71cb"},
 ]
 
 [package.dependencies]
@@ -5978,7 +5978,7 @@ description = "PyQt/PySide Source Code Editor Widget"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "current.whl", hash = "sha256:89feb316406ea4381fc02264ef8c9e46f41be348e8fb8ce9d53b4d22415b32e2"},
+    {file = "current.whl", hash = "sha256:d78519b4b7b619f3ae0d39cd53a7f96f3e2e50595447b23f9836eafc4fe8e8b5"},
 ]
 
 [package.dependencies]
@@ -5996,7 +5996,7 @@ description = "Adds python support to pyqode.core"
 optional = false
 python-versions = "*"
 files = [
-    {file = "current.whl", hash = "sha256:97644094fd22540a3f12338f01b1dbc0b6367244012b633cfac9f2a6bdfa725c"},
+    {file = "current.whl", hash = "sha256:f8321f5332459ed5c628bd67372bb073f63cc60f8fe33096d70fba2eb84cc27d"},
 ]
 
 [package.dependencies]
