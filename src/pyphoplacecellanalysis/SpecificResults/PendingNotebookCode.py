@@ -54,7 +54,7 @@ from sklearn.metrics import mean_squared_error
 ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/6 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
 
 @function_attributes(short_name=None, tags=['sample', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-01 23:12', related_items=[])
-def _sample_random_period_from_lap(lap_start: float, lap_stop: float, training_data_portion: float, *additional_lap_columns, debug_print=False, debug_override_training_start_t=None):
+def sample_random_period_from_epoch(epoch_start: float, epoch_stop: float, training_data_portion: float, *additional_lap_columns, debug_print=False, debug_override_training_start_t=None):
     """ randomly sample a portion of each lap. Draw a random period of duration (duration[i] * training_data_portion) from the lap.
 
     Possible Outcomes:
@@ -63,7 +63,7 @@ def _sample_random_period_from_lap(lap_start: float, lap_stop: float, training_d
 
 
     """
-    total_lap_duration: float = (lap_stop - lap_start)
+    total_lap_duration: float = (epoch_stop - epoch_start)
     training_duration: float = total_lap_duration * training_data_portion
     test_duration: float = total_lap_duration - training_duration
 
@@ -75,22 +75,22 @@ def _sample_random_period_from_lap(lap_start: float, lap_stop: float, training_d
         print(f'debug_override_training_start_t: {debug_override_training_start_t} provided, so not generating random number.')
         training_start_t = debug_override_training_start_t
     else:
-        training_start_t = np.random.uniform(lap_start, lap_stop)
+        training_start_t = np.random.uniform(epoch_start, epoch_stop)
     
     training_end_t = (training_start_t + training_duration)
     
     if debug_print:
         print(f'training_start_t: {training_start_t}, training_end_t: {training_end_t}') # , training_wrap_duration: {training_wrap_duration}
 
-    if training_end_t > lap_stop:
+    if training_end_t > epoch_stop:
         # Wrap around if training_end_t is beyond the period (wrap required):
         # CASE: [train[0], test[0], train[1]] - train[1] = (train
         # Calculate how much time should wrap to the beginning
-        wrap_duration = training_end_t - lap_stop
+        wrap_duration = training_end_t - epoch_stop
         
         # Define the training periods
-        train_period_1 = (training_start_t, lap_stop, *additional_lap_columns) # training spans to the end of the lap
-        train_period_2 = (lap_start, (lap_start + wrap_duration), *additional_lap_columns) ## new period is crated for training at start of lap
+        train_period_1 = (training_start_t, epoch_stop, *additional_lap_columns) # training spans to the end of the lap
+        train_period_2 = (epoch_start, (epoch_start + wrap_duration), *additional_lap_columns) ## new period is crated for training at start of lap
         
         # Return both training periods
         train_outputs = [train_period_1, train_period_2]
@@ -126,28 +126,6 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     """
     from neuropy.core.epoch import Epoch, ensure_dataframe
 
-
-
-
-        # ## Testing data split mode:
-        # test_start_t = np.random.uniform(lap_start, lap_stop)
-        # test_end_t = test_start_t + test_duration
-        # # Wrap around if test_end_t is beyond the period
-        # test_wrap_duration = lap_stop - test_end_t 
-
-        # if test_wrap_duration > 0.0:
-        #     test_end_t = lap_stop # first test period spans to the end of the lap
-        #     ## new period is crated for testing at start of lap
-        #     second_training_start_t = lap_start
-        #     second_training_stop_t = lap_start + test_wrap_duration
-        #     return [(test_start_t, test_end_t, *additional_lap_columns), (second_training_start_t, second_training_stop_t, *additional_lap_columns)]
-
-        # else:
-        #     return [(test_start_t, test_end_t, *additional_lap_columns)]
-
-
-
-
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
     additional_lap_identity_column_names = ['label', 'lap_id', 'lap_dir']
@@ -159,22 +137,17 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     for lap_id, group in laps_df.groupby('lap_id'):
         lap_start = group['start'].min()
         lap_stop = group['stop'].max()
+        curr_lap_duration: float = lap_stop - lap_start
         if debug_print:
             print(f'lap_id: {lap_id} - group: {group}')
         curr_additional_lap_column_values = [group[a_col].to_numpy()[0] for a_col in additional_lap_identity_column_names]
         if debug_print:
             print(f'\tcurr_additional_lap_column_values: {curr_additional_lap_column_values}')
         # Get the random training start and stop times for the lap.
-        # training_start, training_stop = sample_random_period_from_lap(lap_start, lap_stop, training_data_portion)
         # Define your period as an interval
         curr_lap_period = P.closed(lap_start, lap_stop)
-        epoch_start_stop_tuple_list = _sample_random_period_from_lap(lap_start, lap_stop, training_data_portion, *curr_additional_lap_column_values)
+        epoch_start_stop_tuple_list = sample_random_period_from_epoch(lap_start, lap_stop, training_data_portion, *curr_additional_lap_column_values)
 
-        ## Validate first
-        curr_lap_duration: float = lap_stop - lap_start
-
-        # _intermediate_portions_interval: P.Interval = _convert_start_end_tuples_list_to_PortionInterval(epoch_start_stop_tuple_list)
-        # filtered_epochs_df = convert_PortionInterval_to_epochs_df(_intermediate_portions_interval)
         a_combined_intervals = P.empty()
         for an_epoch_start_stop_tuple in epoch_start_stop_tuple_list:
             a_combined_intervals = a_combined_intervals.union(P.closed(an_epoch_start_stop_tuple[0], an_epoch_start_stop_tuple[1]))
@@ -293,7 +266,6 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     long_LR_name, short_LR_name, long_RL_name, short_RL_name = ['maze1_odd', 'maze2_odd', 'maze1_even', 'maze2_even']
     decoder_name_to_session_context_name: Dict[str,str] = dict(zip(track_templates.get_decoder_names(), (long_LR_name, long_RL_name, short_LR_name, short_RL_name))) # {'long_LR': 'maze1_odd', 'long_RL': 'maze1_even', 'short_LR': 'maze2_odd', 'short_RL': 'maze2_even'}
     # session_context_name_to_decoder_name: Dict[str,str] = dict(zip((long_LR_name, long_RL_name, short_LR_name, short_RL_name), track_templates.get_decoder_names())) # {'maze1_odd': 'long_LR', 'maze1_even': 'long_RL', 'maze2_odd': 'short_LR', 'maze2_even': 'short_RL'}
-
     old_directional_names = list(directional_laps_results.directional_lap_specific_configs.keys()) #['maze1_odd', 'maze1_even', 'maze2_odd', 'maze2_even']
     modern_names_list = list(decoders_dict.keys()) # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
     assert len(old_directional_names) == len(modern_names_list), f"old_directional_names: {old_directional_names} length is not equal to modern_names_list: {modern_names_list}"
@@ -384,7 +356,7 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
         ## apply the lap_filtered_curr_pf1D to the decoder:
         a_sliced_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(lap_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
         split_train_test_lap_specific_pf1D_Decoder_dict[a_lap_period_description] = a_sliced_pf1D_Decoder
-
+    ## ENDFOR a_modern_name in modern_names_list
         
     if debug_print:
         print(list(split_train_test_lap_specific_pf1D_Decoder_dict.keys())) # ['long_LR_train', 'long_RL_train', 'short_LR_train', 'short_RL_train']
@@ -401,8 +373,8 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = {k.split('_train', maxsplit=1)[0]:split_train_test_lap_specific_pf1D_Decoder_dict[k] for k in train_epoch_names} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
 
     # Epoch obj mode (loses associated info)
-    test_epochs_obj_dict: Dict[str,Epoch] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
-    train_epochs_obj_dict: Dict[str,Epoch] = {k.split('_train', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_train')} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+    # test_epochs_obj_dict: Dict[str,Epoch] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+    # train_epochs_obj_dict: Dict[str,Epoch] = {k.split('_train', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_train')} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
 
     # DF mode so they don't lose the associated info:
     test_epochs_dict: Dict[str, pd.DataFrame] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_laps_df_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
