@@ -1937,8 +1937,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         import matplotlib as mpl
 
         output_figure_kwargs = dict(write_vector_format=True, write_png=True) | kwargs
-
         pagination_controller_dict = self.pagination_controllers
+
+        out_fig_paths_dict = {}
+
         for a_name, a_pagination_controller in pagination_controller_dict.items():
             display_context = a_pagination_controller.params.get('active_identifying_figure_ctx', IdentifyingContext())
 
@@ -1957,7 +1959,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             with mpl.rc_context({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', 'savefig.transparent': True, 'ps.fonttype': 42, }):
                 figs = a_plots.fig
                 # axs = a_plots.axs
-                curr_active_pipeline.output_figure(final_context=page_context, fig=figs, **output_figure_kwargs)
+                active_out_figure_paths, final_context = curr_active_pipeline.output_figure(final_context=page_context, fig=figs, **output_figure_kwargs)
+                out_fig_paths_dict[final_context] = active_out_figure_paths
+
+        # end for
+
+        return out_fig_paths_dict
 
     def export_all_pages(self, curr_active_pipeline, **kwargs):
         """ exports each pages single-decoder figures separately
@@ -1977,6 +1984,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # page_num_sweep
         print(f'export_all_pages(...): preparing to export {total_num_pages} pages from 4 decoders:')
 
+        out_fig_paths_dict_list = {}
+
         for a_page_idx, a_page_num in zip(page_idx_sweep, page_num_sweep):
             print(f'switching to page: a_page_idx: {a_page_idx}, a_page_num: {a_page_num} of total_num_pages: {total_num_pages}')
             # a_pagination_controller.on_paginator_control_widget_jump_to_page(page_idx=a_page_idx)
@@ -1985,7 +1994,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
             self.jump_to_page(page_idx=a_page_idx)
             self.draw()
-            self.export_decoder_pagination_controller_figure_page(curr_active_pipeline=curr_active_pipeline, **output_figure_kwargs)
+            out_fig_paths_dict_list[a_page_idx] = self.export_decoder_pagination_controller_figure_page(curr_active_pipeline=curr_active_pipeline, **output_figure_kwargs)
 
             # import matplotlib as mpl
 
@@ -2021,7 +2030,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             #         curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
 
         print(f'\tdone.')
-
+        return out_fig_paths_dict_list
+    
+    
     #endregion Export/Output ______________________________________________________________________________________________________ #
 
     # ==================================================================================================================== #
