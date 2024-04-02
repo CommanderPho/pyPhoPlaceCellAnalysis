@@ -270,13 +270,15 @@ class SpecificComputationValidator:
         
             # Re-validate after computation ______________________________________________________________________________________ #
             did_successfully_validate: bool = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=True)
-
+            if did_successfully_validate:
+                newly_computed_values.append((comp_short_name, computation_filter_name)) # append the new computation
+                
         else:
             if debug_print:
                 print(f'\t no recomputation needed! did_successfully_validate: {did_successfully_validate}.\t done.')
 
-        if did_successfully_validate:
-            newly_computed_values.append((comp_short_name, computation_filter_name))
+        # if did_successfully_validate:
+        #     newly_computed_values.append((comp_short_name, computation_filter_name))
 
         return newly_computed_values
 
