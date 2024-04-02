@@ -37,7 +37,7 @@ panel = "^1.2.3"
 params = "^0.9.0"
 jupyter-bokeh = "^3.0.7"
 pyqt-builder = "^1.15.3"
-pyqt5-qt5 = ">=5.12.3,<5.15.11 || >5.15.11"
+pyqt5-qt5 = "5.15.2"
 pycscope = "^1.2.1"
 
 [tool.poetry.group.dev.dependencies]
