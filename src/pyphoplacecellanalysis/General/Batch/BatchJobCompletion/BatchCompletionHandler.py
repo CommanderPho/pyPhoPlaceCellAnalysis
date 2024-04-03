@@ -11,7 +11,7 @@ from attr import define, field, Factory
 
 from neuropy.core import Epoch
 from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
-from pyphocorehelpers.exception_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
 from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
@@ -435,19 +435,19 @@ class BatchSessionCompletionHandler:
 
             try:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
-                curr_active_pipeline.reload_default_computation_functions()
-    
-                newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, 
-                                                                     force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
-                
-                #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
-                return newly_computed_values # return the list of newly computed values
+                with ExceptionPrintingContext(suppress=(not self.fail_on_exception)):
+                    curr_active_pipeline.reload_default_computation_functions()
+        
+                    newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, 
+                                                                        force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                    #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
+                    return newly_computed_values # return the list of newly computed values
 
-            except Exception as e:
+            except BaseException as e:
                 ## TODO: catch/log saving error and indicate that it isn't saved.
                 exception_info = sys.exc_info()
                 e = CapturedException(e, exception_info)
-                print(f'ERROR perform `batch_extended_computations` or saving GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
+                print(f'ERROR perform `batch_extended_computations` or saving GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: "{curr_session_context}". error: {e}')
                 if self.fail_on_exception:
                     raise e.exc
 
