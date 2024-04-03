@@ -298,16 +298,6 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
     #TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
     #TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
 
-    def _subfn_on_already_computed(_comp_name, computation_filter_name):
-        """ captures: `progress_print`, `force_recompute`
-        raises AttributeError if force_recompute is true to trigger recomputation """
-        if progress_print:
-            print(f'{_comp_name}, {computation_filter_name} already computed.')
-        if force_recompute:
-            if progress_print:
-                print(f'\tforce_recompute is true so recomputing anyway')
-            raise AttributeError # just raise an AttributeError to trigger recomputation    
-
     force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
 
     ## Get the names of the global and non-global computations:
@@ -352,7 +342,6 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
             print(f'Running batch_evaluate_required_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
 
 
-
     ## Specify the computations and the requirements to validate them.
 
     ## Hardcoded comp_specifiers
@@ -372,7 +361,7 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
                 if (not _comp_specifier.is_global):
                     # Not Global-only, need to compute for all `included_computation_filter_names`:
                     for a_computation_filter_name in included_computation_filter_names:
-                        has_valid_computation: bool = _comp_specifier.try_validate_computation(curr_active_pipeline, computation_filter_name=a_computation_filter_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                        has_valid_computation: bool = _comp_specifier.try_validate_is_computation_valid(curr_active_pipeline, computation_filter_name=a_computation_filter_name, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
                         if has_valid_computation:
                             valid_computed_results_output_list.append((a_computation_filter_name, _comp_specifier.short_name))
 
@@ -386,7 +375,7 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
                 else:
                     # Global-Only:
                     _curr_force_recompute = force_recompute or _comp_specifier.is_name_in(force_recompute_override_computations_includelist) # force_recompute for this specific result if either of its name is included in `force_recompute_override_computations_includelist`
-                    has_valid_computation: bool = _comp_specifier.try_validate_computation(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=_curr_force_recompute)
+                    has_valid_computation: bool = _comp_specifier.try_validate_is_computation_valid(curr_active_pipeline, computation_filter_name=global_epoch_name, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=_curr_force_recompute)
                     
                     if has_valid_computation:
                         valid_computed_results_output_list.append(_comp_specifier.short_name)
@@ -448,7 +437,6 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
     newly_computed_values = []
     force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
-
 
 
     ## Get the names of the global and non-global computations:
