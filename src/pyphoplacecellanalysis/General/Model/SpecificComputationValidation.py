@@ -144,8 +144,9 @@ class SpecificComputationValidator:
 
 
     # Main Operation Functions ___________________________________________________________________________________________ #
-    def try_validate_computation(self, curr_active_pipeline, **kwargs) -> bool:
-        return self._perform_try_validate_computation(self, curr_active_pipeline, **kwargs)
+    def try_validate_is_computation_valid(self, curr_active_pipeline, **kwargs) -> bool:
+        """ returns True if the existing computation result is present and valid. """
+        return self._perform_try_validate_is_computation_valid(self, curr_active_pipeline, **kwargs)
 
 
     def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
@@ -201,7 +202,7 @@ class SpecificComputationValidator:
 
     # Implementations ____________________________________________________________________________________________________ #
     @classmethod
-    def _perform_try_validate_computation(cls, comp_specifier: "SpecificComputationValidator", curr_active_pipeline, computation_filter_name:str, on_already_computed_fn=None, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False) -> bool:
+    def _perform_try_validate_is_computation_valid(cls, comp_specifier: "SpecificComputationValidator", curr_active_pipeline, computation_filter_name:str, on_already_computed_fn=None, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False) -> bool:
         """ 2023-06-08 - tries to validate (but not perform) the computation to see if it needs to becomputed. 
         
         It can return False for several independent reasons:
@@ -303,16 +304,9 @@ class SpecificComputationValidator:
 
 
         # Check for existing result:
-        did_successfully_validate: bool = cls._perform_try_validate_computation(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
+        did_successfully_validate: bool = cls._perform_try_validate_is_computation_valid(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
                                                                          on_already_computed_fn=on_already_computed_fn,
                                                                          fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
-        
-        # is_known_missing_provided_keys: bool = comp_specifier.try_check_missing_provided_keys(curr_active_pipeline)
-        # if (is_known_missing_provided_keys):
-        #         print(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
-        
-        # did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)
-        
         needs_computation: bool = (not did_successfully_validate)
         
         
@@ -343,9 +337,6 @@ class SpecificComputationValidator:
         else:
             if debug_print:
                 print(f'\t no recomputation needed! did_successfully_validate: {did_successfully_validate}.\t done.')
-
-        # if did_successfully_validate:
-        #     newly_computed_values.append((comp_short_name, computation_filter_name))
 
         return newly_computed_values
 
