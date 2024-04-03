@@ -59,8 +59,14 @@ def build_batch_processing_session_task_identifier(session_context: IdentifyingC
 
     return f"{hostname}.{session_component}"
 
+@function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
 def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), debug_print=False):
-    """ Builds a logger for a specific module that logs to console output and a file. 
+    """ Builds a logger for a specific module that logs to BOTH console output and a file. 
+    
+    Creates output files like: f'debug_com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.{batch_processing_session_task_identifier}.log'
+		e.g. 'debug_com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.Apogee.kdiba.gor01.two.2006-6-07_16-40-19.log'
+    
+    
     History:
         Built from `pyphocorehelpers.print_helpers.build_batch_task_logger` for task building
     

@@ -103,6 +103,9 @@ class ComputationResult(HDF_SerializationMixin):
     """
         The result of a single computation, on a filtered session with a specified config 
         The primary output data is stored in self.computed_data's dict
+
+        Known to be used for `curr_active_pipeline.global_computation_results`
+
     """
     sess: DataSession = serialized_field(repr=True)
     computation_config: Optional[DynamicParameters] = serialized_field(default=None, is_computable=False, repr=True)
