@@ -213,7 +213,7 @@ class SpecificComputationValidator:
             if _comp_name in include_includelist:
                 # newly_computed_values += _try_computation_if_needed(curr_active_pipeline, comp_specifier=SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=a_validate_computation_test), on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
         
-                needs_computation: bool = cls._perform_try_validate_computation(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
+                did_successfully_validate: bool = cls._perform_try_validate_computation(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
                                                                     on_already_computed_fn=on_already_computed_fn,
                                                                     fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
                                                                     
@@ -255,7 +255,7 @@ class SpecificComputationValidator:
             return False
 
         did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)        
-        return did_successfully_validate
+        return did_successfully_validate ## #TODO 2024-04-03 11:03: - [ ] this should NEVER be assigned to `needs_compute` 
     
 
     @classmethod
@@ -303,7 +303,7 @@ class SpecificComputationValidator:
 
 
         # Check for existing result:
-        needs_computation: bool = cls._perform_try_validate_computation(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
+        did_successfully_validate: bool = cls._perform_try_validate_computation(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
                                                                          on_already_computed_fn=on_already_computed_fn,
                                                                          fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
         
@@ -313,7 +313,8 @@ class SpecificComputationValidator:
         
         # did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)
         
-        # needs_computation: bool = ((not did_successfully_validate) or is_known_missing_provided_keys)
+        needs_computation: bool = (not did_successfully_validate)
+        
         
         if needs_computation:
             ## validate_computation_test(...) failed, so we need to recompute.
