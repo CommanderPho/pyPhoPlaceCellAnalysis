@@ -224,7 +224,7 @@ class SpecificComputationValidator:
             """ captures: comp_specifier, curr_active_pipeline, computation_filter_name, debug_print """
             try:
                 # try the validation again.
-                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name)
+                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name) # passed the validation
                 return True
             except (AttributeError, KeyError, TypeError, ValueError, AssertionError) as validation_err:
                 # Handle the inner exception
