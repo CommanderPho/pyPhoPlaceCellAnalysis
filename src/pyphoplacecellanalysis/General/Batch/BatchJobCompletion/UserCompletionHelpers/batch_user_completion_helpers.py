@@ -5,6 +5,7 @@ from pathlib import Path
 import inspect
 from jinja2 import Template
 from neuropy.utils.result_context import IdentifyingContext
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 
@@ -203,7 +204,11 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
 
     return across_session_results_extended_dict
 
-def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, save_hdf=True, save_csvs=True) -> dict:
+def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                                             save_hdf=True, save_csvs=True, return_full_decoding_results:bool=False, desired_shared_decoding_time_bin_sizes:Optional[NDArray]=None) -> dict:
+    """
+    if `return_full_decoding_results` == True, returns the full decoding results for debugging purposes. `output_alt_directional_merged_decoders_result`
+    """
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
     from copy import deepcopy
@@ -304,7 +309,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         return df
 
     ## Single decode:
-    def _try_single_decode(owning_pipeline_reference, directional_merged_decoders_result, use_single_time_bin_per_epoch: bool, desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None):
+    def _try_single_decode(owning_pipeline_reference, directional_merged_decoders_result: DirectionalMergedDecodersResult, use_single_time_bin_per_epoch: bool,
+                            desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None) -> DirectionalMergedDecodersResult:
         """ decodes laps and ripples for a single bin size. 
         
         minimum_event_duration: if provided, excludes all events shorter than minimum_event_duration
@@ -315,6 +321,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             desired_laps_decoding_time_bin_size = desired_shared_decoding_time_bin_size
             desired_ripple_decoding_time_bin_size = desired_shared_decoding_time_bin_size
             
+        # Separate the decoder first so they're all independent:
+        directional_merged_decoders_result = deepcopy(directional_merged_decoders_result)
 
         ## Decode Laps:
         laps_epochs_df = deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
@@ -391,10 +399,12 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
     
     ## INPUT PARAMETER: time_bin_size sweep paraemters
-    desired_shared_decoding_time_bin_size = np.linspace(start=0.030, stop=0.10, num=6)
+    if desired_shared_decoding_time_bin_sizes is None:
+        desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.10, num=6)
     
+
     # Shared time bin sizes
-    all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_shared_decoding_time_bin_size=desired_shared_decoding_time_bin_size, use_single_time_bin_per_epoch=[False], minimum_event_duration=[desired_shared_decoding_time_bin_size[-1]]) # with Ripples
+    all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_shared_decoding_time_bin_size=desired_shared_decoding_time_bin_sizes, use_single_time_bin_per_epoch=[False], minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]]) # with Ripples
     
     ## Perfrom the computations:
 
@@ -486,7 +496,36 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     # add to output dict
     # across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
-    across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = (out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple)
+    across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = [out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple]
+
+    if return_full_decoding_results:
+        # output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalMergedDecodersResult]
+        across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'].append(output_alt_directional_merged_decoders_result) # append the real full results
+        ## Save out the laps peformance result
+        if save_hdf:
+            ## figure out how to save the actual dict out to HDF
+            print(f'`return_full_decoding_results` is True and `save_hdf` is True, but I do not yet know how to propperly output the `output_alt_directional_merged_decoders_result`')
+            # for a_sweep_dict in all_param_sweep_options:
+            #     a_sweep_tuple = frozenset(a_sweep_dict.items())
+            #     print(f'a_sweep_dict: {a_sweep_dict}')
+            #     # Convert parameters to string because Parquet supports metadata as string
+            #     a_sweep_str_params = {key: str(value) for key, value in a_sweep_dict.items() if value is not None}
+            #     a_directional_merged_decoders_result: DirectionalMergedDecodersResult = output_alt_directional_merged_decoders_result[a_sweep_tuple]
+
+            #     # 2024-04-03 `DirectionalMergedDecodersResult` is actually missing a `to_hdf` implementation, so no dice.
+
+        #     output_alt_directional_merged_decoders_result.to_hdf(out_path, key=f'{session_ctxt_key}/alt_directional_merged_decoders_result')
+        across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = tuple(across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'])
+
+
+    ## UNPACKING
+    # # with `return_full_decoding_results == False`
+    # out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple = across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
+
+    # # with `return_full_decoding_results == True`
+    # out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple, output_full_directional_merged_decoders_result = across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
+
+
     # can unpack like:
     (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
 
