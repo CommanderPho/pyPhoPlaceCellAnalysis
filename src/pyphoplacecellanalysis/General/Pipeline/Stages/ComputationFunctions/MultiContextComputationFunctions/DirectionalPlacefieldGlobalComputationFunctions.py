@@ -980,7 +980,7 @@ class DirectionalLapsHelpers:
 
 @define(slots=False, repr=False)
 class DirectionalMergedDecodersResult(ComputedResult):
-    """ a container for holding information regarding the computation of merged directional placefields.
+    """ a container for holding information regarding the computation of merged (pseudo2D) directional placefields.
 
     ## Get the result after computation:
     directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
