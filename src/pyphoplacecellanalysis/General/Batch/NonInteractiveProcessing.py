@@ -281,8 +281,12 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
     force_recompute:bool=False
     force_recompute_override_computations_includelist: Optional[List[str]] a list of computation function names to recompute regardless of their validator's status.
     
-    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
-    batch_extended_computations(include_includelist=['merged_directional_placefields'], include_global_functions=True)
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations
+
+    needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=['lap_direction_determination'], include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                        force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+    needs_computation_output_dict
+    
     
     WARNING: `force_recompute_override_computations_includelist` must be a subset of the items in `include_includelist`
     include_includelist = ['pf_computation', 'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis']
