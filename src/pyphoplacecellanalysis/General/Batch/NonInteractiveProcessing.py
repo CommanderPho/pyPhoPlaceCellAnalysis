@@ -358,26 +358,39 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
 
     remaining_include_function_names = {k:False for k in include_includelist.copy()}
 
-    needs_computation_output_dict = {}
+    valid_computed_results_output_list = [] # items that have valid results (that pass the validator)
+    needs_computation_output_dict = {} # items that need to be computed
 
     for _comp_specifier in _comp_specifiers:
         if (not _comp_specifier.is_global) or include_global_functions:
-            if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
+            # if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
+            if _comp_specifier.is_name_in(include_includelist):
                 if (not _comp_specifier.is_global):
                     # Not Global-only, need to compute for all `included_computation_filter_names`:
                     for a_computation_filter_name in included_computation_filter_names:
-                        needs_compute: bool = _comp_specifier.try_validate_computation(curr_active_pipeline, computation_filter_name=a_computation_filter_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
-                        if needs_compute:
-                            if _comp_specifier.short_name not in needs_computation_output_dict:
-                                needs_computation_output_dict[_comp_specifier.short_name] = {}
+                        has_valid_computation: bool = _comp_specifier.try_validate_computation(curr_active_pipeline, computation_filter_name=a_computation_filter_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+                    if has_valid_computation:
+                        valid_computed_results_output_list.append((a_computation_filter_name, _comp_specifier.short_name))
 
-                            needs_computation_output_dict[_comp_specifier.short_name][a_computation_filter_name] = True
+                    needs_compute: bool = (not has_valid_computation)
+                    if needs_compute:
+                        if _comp_specifier.short_name not in needs_computation_output_dict:
+                            needs_computation_output_dict[_comp_specifier.short_name] = {}
+
+                        needs_computation_output_dict[_comp_specifier.short_name][a_computation_filter_name] = True
 
                 else:
                     # Global-Only:
                     _curr_force_recompute = force_recompute or _comp_specifier.is_name_in(force_recompute_override_computations_includelist) # force_recompute for this specific result if either of its name is included in `force_recompute_override_computations_includelist`
-                    needs_compute: bool = _comp_specifier.try_validate_computation(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=_curr_force_recompute)
+                    has_valid_computation: bool = _comp_specifier.try_validate_computation(curr_active_pipeline, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=_curr_force_recompute)
+                    
+                    if has_valid_computation:
+                        valid_computed_results_output_list.append(_comp_specifier.short_name)
+
+                    needs_compute: bool = (not has_valid_computation)
                     needs_computation_output_dict[_comp_specifier.short_name] = True
+
+
                 if (_comp_specifier.short_name in include_includelist):
                     del remaining_include_function_names[_comp_specifier.short_name]
                 elif (_comp_specifier.computation_fn_name in include_includelist):
@@ -390,7 +403,7 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
     if progress_print:
         print('done with all batch_evaluate_required_computations(...).')
 
-    return needs_computation_output_dict
+    return needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names
 
 
 
