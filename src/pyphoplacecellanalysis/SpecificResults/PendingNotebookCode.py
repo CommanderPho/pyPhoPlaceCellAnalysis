@@ -467,11 +467,16 @@ def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: D
             test_measured_positions_dfs.append(interpolated_measured_df)
 
             decoded_positions = a_decoder_decoding_result.most_likely_positions_list[epoch_idx]
-
+            if np.ndim(decoded_positions) > 1:
+                ## 2D positions, need to get only the x or get the marginals
+                decoded_positions = a_decoder_decoding_result.marginal_x_list[epoch_idx]['most_likely_positions_1D']
+                assert np.ndim(decoded_positions) < 2, f" the new decoded positions should now be 1D but instead: np.ndim(decoded_positions): {np.ndim(decoded_positions)}, and np.shape(decoded_positions): {np.shape(decoded_positions)}"
             assert len(a_sample_times) == len(decoded_positions), f"len(a_sample_times): {len(a_sample_times)} == len(decoded_positions): {len(decoded_positions)}"
             
             ## one for each decoder:
             test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions})
+
+
 
 
             center_epoch_time = np.mean(a_sample_times)

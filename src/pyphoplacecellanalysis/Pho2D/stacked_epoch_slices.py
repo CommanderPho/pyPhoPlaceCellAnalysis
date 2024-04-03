@@ -677,7 +677,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     Usage:
     
         from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController
-        _out_pagination_controller = DecodedEpochSlicesPaginationController.init_from_decoder_data(long_results_obj.active_filter_epochs, long_results_obj.all_included_filter_epochs_decoder_result, xbin=long_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', max_subplots_per_page=20)
+        _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(long_results_obj.active_filter_epochs, long_results_obj.all_included_filter_epochs_decoder_result, xbin=long_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', max_subplots_per_page=20)
         _out_pagination_controller
     """
 
@@ -690,6 +690,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if isinstance(active_filter_epochs, pd.DataFrame):
             # convert to native epoch object.
             active_filter_epochs = Epoch(epochs=deepcopy(active_filter_epochs)) # convert to native Epoch object
+
+        if params_kwargs is None:
+            params_kwargs = {} # empty dict
+
 
         ## Pop Window-level params:
         disable_toolbar = params_kwargs.pop('disable_toolbar', True)
