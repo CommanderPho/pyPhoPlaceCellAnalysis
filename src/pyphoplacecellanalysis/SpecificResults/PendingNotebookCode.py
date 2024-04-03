@@ -198,6 +198,7 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     return laps_training_df, laps_test_df
 
 def decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size: float):
+    ## NOTE: they currently only decode the correct test epochs, as in the test epochs corresponding to their train epochs and not others:
     test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False) for k,v in train_lap_specific_pf1D_Decoder_dict.items()}
     return test_laps_decoder_results_dict
 
@@ -472,6 +473,9 @@ def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: D
             ## one for each decoder:
             test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions})
 
+
+            center_epoch_time = np.mean(a_sample_times)
+
             ## ERROR:
             ## a_decoder.most_likely_positions_list[epoch_idx]
             # array([217.354, 259.366, 259.366, 30.2099])
@@ -493,7 +497,10 @@ def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: D
             # test_decoded_measured_diff_df = (interpolated_measured_df[['x']] - pd.DataFrame({'x':v.most_likely_positions_list[epoch_idx]})) ## error at each point
             test_decoded_measured_diff_df: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
             
-            test_decoded_measured_diff_df_dict_list.append(test_decoded_measured_diff_df)
+            # test_decoded_measured_diff_df_dict_list.append(test_decoded_measured_diff_df)
+            test_decoded_measured_diff_df_dict_list.append((center_epoch_time, test_decoded_measured_diff_df))
+
+            
         # test_measured_positions_dfs
         test_measured_positions_dfs_dict[k] = test_measured_positions_dfs
         test_decoded_positions_df_dict[k] = test_decoded_positions_dict_list
@@ -1569,7 +1576,20 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
 # ==================================================================================================================== #
 
 def pho_jointplot(*args, **kwargs):
-    """ wraps sns.jointplot to allow adding titles/axis labels/etc."""
+    """ wraps sns.jointplot to allow adding titles/axis labels/etc.
+    
+    Example:
+        import seaborn as sns
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import pho_jointplot
+        sns.set_theme(style="ticks")
+        common_kwargs = dict(ylim=(0,1), hue='time_bin_size') # , marginal_kws=dict(bins=25, fill=True)
+        # sns.jointplot(data=a_laps_all_epoch_bins_marginals_df, x='lap_start_t', y='P_Long', kind="scatter", color="#4CB391")
+        pho_jointplot(data=several_time_bin_sizes_laps_df, x='delta_aligned_start_t', y='P_Long', kind="scatter", **common_kwargs, title='Laps: per epoch') #color="#4CB391")
+        pho_jointplot(data=several_time_bin_sizes_ripple_df, x='delta_aligned_start_t', y='P_Long', kind="scatter", **common_kwargs, title='Ripple: per epoch')
+        pho_jointplot(data=several_time_bin_sizes_time_bin_ripple_df, x='delta_aligned_start_t', y='P_Long', kind="scatter", **common_kwargs, title='Ripple: per time bin')
+        pho_jointplot(data=several_time_bin_sizes_time_bin_laps_df, x='delta_aligned_start_t', y='P_Long', kind="scatter", **common_kwargs, title='Laps: per time bin')
+    
+    """
     import seaborn as sns
     title = kwargs.pop('title', None)
     _out = sns.jointplot(*args, **kwargs)
@@ -1579,7 +1599,16 @@ def pho_jointplot(*args, **kwargs):
 
 
 def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
-    """ plots a stacked histogram of the many time-bin sizes """
+    """ plots a stacked histogram of the many time-bin sizes 
+
+    Usage:    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_histograms
+
+        # You can use it like this:
+        plot_histograms('Laps', 'One Session', several_time_bin_sizes_time_bin_laps_df, "several")
+        plot_histograms('Ripples', 'One Session', several_time_bin_sizes_time_bin_ripple_df, "several")
+
+    """
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
