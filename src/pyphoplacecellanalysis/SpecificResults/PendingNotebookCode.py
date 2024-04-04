@@ -41,7 +41,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 from sklearn.metrics import mean_squared_error
 
-
 ## Get custom decoder that is only trained on a portion of the laps
 ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
 # long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D  = [BasePositionDecoder.init_from_stateful_decoder(deepcopy(results_data.get('pf1D_Decoder', None))) for results_data in (long_LR_results, long_RL_results, short_LR_results, short_RL_results)]
@@ -411,7 +410,6 @@ def interpolate_positions(df: pd.DataFrame, sample_times: NDArray, time_column_n
     pd.DataFrame: New DataFrame with interpolated positional data.
     """
     from scipy.interpolate import interp1d
-    from sklearn.metrics import mean_squared_error
 
     # Drop any NaNs in the DataFrame to avoid issues with interpolation
     df = df.dropna(subset=[time_column_name, 'x', 'y'])
@@ -475,9 +473,6 @@ def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: D
             
             ## one for each decoder:
             test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions})
-
-
-
 
             center_epoch_time = np.mean(a_sample_times)
 

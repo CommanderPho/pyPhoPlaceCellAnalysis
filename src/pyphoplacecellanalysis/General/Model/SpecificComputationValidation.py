@@ -251,7 +251,8 @@ class SpecificComputationValidator:
         # Check for existing result:
         is_known_missing_provided_keys: bool = comp_specifier.try_check_missing_provided_keys(curr_active_pipeline)
         if (is_known_missing_provided_keys):
-            print(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
+            if debug_print:
+                print(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
             return False
 
         did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)        
@@ -301,12 +302,10 @@ class SpecificComputationValidator:
             if (removed_results_dict is not None) and len(removed_results_dict) > 0:
                 print(f'removed results: {list(removed_results_dict.keys())} because force_recompute was True.')
 
-
         # Check for existing result:
         did_successfully_validate: bool = cls._perform_try_validate_is_computation_valid(comp_specifier=comp_specifier, curr_active_pipeline=curr_active_pipeline, computation_filter_name=computation_filter_name,
                                                                          fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
         needs_computation: bool = (not did_successfully_validate)
-        
         
         if needs_computation:
             ## validate_computation_test(...) failed, so we need to recompute.
