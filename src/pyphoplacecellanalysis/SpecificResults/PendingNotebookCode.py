@@ -245,7 +245,7 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
 
 
 @function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
-def _do_custom_decode_epochs_dict(curr_active_pipeline, pf1D_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float, decoder_and_epoch_keys_independent:bool=True) -> Union[Dict[decoder_name, CustomDecodeEpochsResult], Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]]]:
+def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, pf1D_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float, decoder_and_epoch_keys_independent:bool=True) -> Union[Dict[decoder_name, CustomDecodeEpochsResult], Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]]]:
     """
     Do a single position decoding for a set of epochs
 
@@ -253,8 +253,29 @@ def _do_custom_decode_epochs_dict(curr_active_pipeline, pf1D_Decoder_dict: Dict[
     decoder_and_epoch_keys_independent: bool - if False, it indicates that pf1D_Decoder_dict and epochs_to_decode_dict share the same keys, meaning they are paired. If True, they will be treated as independent and the epochs will be decoded by all provided decoders.
     Usage:
 
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _do_custom_decode_epochs_dict
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _do_custom_decode_epochs_dict
 
+        active_laps_decoding_time_bin_size: float = 0.75
+
+        global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe()
+
+
+        ## INPUTS: flat_epochs_to_decode_dict, active_laps_decoding_time_bin_size
+        train_decoder_results_dict: Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]] = _do_custom_decode_epochs_dict(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
+                                                                                                                                        pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict,
+                                                                                                                                        epochs_to_decode_dict=train_epochs_dict,
+                                                                                                                                        decoding_time_bin_size=active_laps_decoding_time_bin_size,
+                                                                                                                                        decoder_and_epoch_keys_independent=False)
+
+
+        test_decoder_results_dict: Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]] = _do_custom_decode_epochs_dict(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
+                                                                                                                                        pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict,
+                                                                                                                                        epochs_to_decode_dict=test_epochs_dict, 
+                                                                                                                                        decoding_time_bin_size=active_laps_decoding_time_bin_size,
+                                                                                                                                        decoder_and_epoch_keys_independent=False)
+
+                                                                                                                                        
 
     """
     if (not decoder_and_epoch_keys_independent):
@@ -262,8 +283,7 @@ def _do_custom_decode_epochs_dict(curr_active_pipeline, pf1D_Decoder_dict: Dict[
 
 
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
-    global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
-    global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe()
+
     decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {}
     measured_positions_dfs_dict, decoded_positions_df_dict, decoded_measured_diff_df_dict = {}, {}, {}
 
@@ -464,6 +484,20 @@ def split_laps_training_and_test(laps_df: pd.DataFrame, training_data_portion: f
     return laps_training_df, laps_test_df
 
 def decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size: float):
+    """ 
+
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import decode_using_new_decoders
+
+        active_laps_decoding_time_bin_size = 0.75
+        # AssertionError: Intervals in start_stop_times_arr must be non-overlapping
+
+        ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
+        global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+        test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
+
+    """
     ## NOTE: they currently only decode the correct test epochs, as in the test epochs corresponding to their train epochs and not others:
     test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False) for k,v in train_lap_specific_pf1D_Decoder_dict.items()}
     return test_laps_decoder_results_dict
@@ -653,8 +687,6 @@ def compute_train_test_split_laps_decoders(directional_laps_results: Directional
     # test_laps_decoder_results_dict = decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size)
     # test_laps_decoder_results_dict
 
-
-
     if debug_output_hdf5_file_path is not None:
         print(f'successfully wrote out to: "{debug_output_hdf5_file_path}"')
         print(f'\t_written_HDF5_manifest_keys: {_written_HDF5_manifest_keys}\n')
@@ -760,6 +792,12 @@ def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: D
      
     from sklearn.metrics import mean_squared_error
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_measured_decoded_position_comparison
+
+    # Interpolated measured position DataFrame - looks good
+    global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe()
+    test_measured_positions_dfs_dict, test_decoded_positions_df_dict, test_decoded_measured_diff_df_dict = build_measured_decoded_position_comparison(test_laps_decoder_results_dict, global_measured_position_df=global_measured_position_df)
+    train_measured_positions_dfs_dict, train_decoded_positions_df_dict, train_decoded_measured_diff_df_dict = build_measured_decoded_position_comparison(train_laps_decoder_results_dict, global_measured_position_df=global_measured_position_df)
+
 
     """
     test_measured_positions_dfs_dict = {}
