@@ -1176,8 +1176,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
         ripple_marginals_df
 
 
-
-
     @classmethod
     def validate_has_directional_merged_placefields(cls, curr_active_pipeline, computation_filter_name='maze'):
         """ 
@@ -1467,6 +1465,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         # most_likely_direction_from_decoder
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
 
+    @function_attributes(short_name=None, tags=['ground-truth', 'laps', 'validation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 19:23', related_items=['add_groundtruth_information()'])
     @classmethod
     def validate_lap_dir_estimations(cls, global_session, active_global_laps_df, laps_is_most_likely_direction_LR_dir):
         """ validates the lap direction and track estimations. 
@@ -1782,8 +1781,53 @@ class DirectionalMergedDecodersResult(ComputedResult):
         corr_df.index.name = 'epoch_id'
         return corr_df, corr_column_names
 
+    @function_attributes(short_name=None, tags=['ground-truth', 'laps', 'validation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 19:23', related_items=['cls.validate_lap_dir_estimations()'])
+    def add_groundtruth_information(self, curr_active_pipeline):
+        """    takes 'laps_df' and 'result_laps_epochs_df' to add the ground_truth and the decoded posteriors:
+
+            a_directional_merged_decoders_result: DirectionalMergedDecodersResult = alt_directional_merged_decoders_result
 
 
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_groundtruth_information
+
+            result_laps_epochs_df = add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result=a_directional_merged_decoders_result, result_laps_epochs_df=result_laps_epochs_df)
+
+
+        """
+        from neuropy.core import Laps
+
+        ## Inputs: a_directional_merged_decoders_result, laps_df
+        
+        ## Get the most likely direction/track from the decoded posteriors:
+        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = self.laps_directional_marginals_tuple
+        laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
+
+        # Ensure it has the 'lap_track' column
+        ## Compute the ground-truth information using the position information:
+        # adds columns: ['maze_id', 'is_LR_dir']
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        laps_obj: Laps = curr_active_pipeline.sess.laps
+        laps_df = laps_obj.to_dataframe()
+        laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
+        
+        result_laps_epochs_df: pd.DataFrame = self.laps_epochs_df
+
+
+        ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
+        result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
+        ## add the 'is_LR_dir' groud-truth column in:
+        result_laps_epochs_df['is_LR_dir'] = laps_df['is_LR_dir'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
+
+        ## Add the decoded results to the laps df:
+        result_laps_epochs_df['is_most_likely_track_identity_Long'] = laps_is_most_likely_track_identity_Long
+        result_laps_epochs_df['is_most_likely_direction_LR'] = laps_is_most_likely_direction_LR_dir
+
+        assert np.all([a_col in result_laps_epochs_df.columns for a_col in ('maze_id', 'is_LR_dir', 'is_most_likely_track_identity_Long', 'is_most_likely_direction_LR')]), f"result_laps_epochs_df.columns: {list(result_laps_epochs_df.columns)}"
+
+        ## Update the source:
+        self.laps_epochs_df = result_laps_epochs_df
+
+        return result_laps_epochs_df
 
 
 
@@ -2736,7 +2780,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         short_directional_pf1D_Decoder = BasePositionDecoder(short_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
         # takes 6.3 seconds
 
-        ## Great or update the global directional_merged_decoders_result:
+        ## Get or update the global directional_merged_decoders_result:
         directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data.get('DirectionalMergedDecoders', DirectionalMergedDecodersResult(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
                                                       long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
                                                       short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder))
@@ -2768,6 +2812,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         ## Post Compute Validations:
         directional_merged_decoders_result.perform_compute_marginals()
         
+        result_laps_epochs_df: pd.DataFrame = directional_merged_decoders_result.add_groundtruth_information(owning_pipeline_reference)
+
          # Validate Laps:
         try:
             laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = directional_merged_decoders_result.laps_directional_marginals_tuple
