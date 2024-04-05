@@ -1034,9 +1034,13 @@ class DirectionalMergedDecodersResult(ComputedResult):
     @property
     def laps_epochs_df(self) -> pd.DataFrame:
         a_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
-        if not isinstance(a_df, pd.DataFrame):
-            a_df = a_df.to_dataframe()
-        return a_df
+        # if not isinstance(a_df, pd.DataFrame):
+        #     a_df = a_df.to_dataframe()
+        return ensure_dataframe(a_df)
+    @laps_epochs_df.setter
+    def laps_epochs_df(self, value: pd.DataFrame):
+        self.all_directional_laps_filter_epochs_decoder_result.filter_epochs = ensure_dataframe(value)
+
 
     @property
     def ripple_epochs_df(self) -> pd.DataFrame:

@@ -415,6 +415,10 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         ## Add the decoded results to the laps df:
         result_laps_epochs_df['is_most_likely_track_identity_Long'] = laps_is_most_likely_track_identity_Long
         result_laps_epochs_df['is_most_likely_direction_LR'] = laps_is_most_likely_direction_LR_dir
+
+        ## re-apply the laps changes:
+        a_result.laps_epochs_df = result_laps_epochs_df # 2024-04-05 - think this is good so the result has the updated columns, but not exactly certain.
+
         return result_laps_epochs_df
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
