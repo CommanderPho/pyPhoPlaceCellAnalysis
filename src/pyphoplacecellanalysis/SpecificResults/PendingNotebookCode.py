@@ -14,7 +14,7 @@ from neuropy.core.epoch import Epoch, ensure_dataframe
 from neuropy.analyses.placefields import PfND
 import numpy as np
 import pandas as pd
-from attrs import asdict, define, field, Factory
+from attrs import asdict, astuple, define, field, Factory
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -36,28 +36,54 @@ epoch_split_key: TypeAlias = str # a string that describes a split epoch, such a
 # 2024-04-04 - Continued Decoder Error Assessment                                                                      #
 # ==================================================================================================================== #
 
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+
+MeasuredDecodedPositionComparison = attrs.make_class("MeasuredDecodedPositionComparison", {k:field() for k in ("measured_positions_dfs_list", "decoded_positions_df_list", "decoded_measured_diff_df")}, bases=(UnpackableMixin, object,))
+
+
+# CustomDecodeEpochsResult = attrs.make_class("CustomDecodeEpochsResult", {k:field() for k in ("measured_decoded_position_comparion", "decoder_result")}, bases=(UnpackableMixin, object,))
+
+@define(slots=False)
+class CustomDecodeEpochsResult(UnpackableMixin):
+    measured_decoded_position_comparion: MeasuredDecodedPositionComparison = field()
+    decoder_result: DecodedFilterEpochsResult = field()
+
+
+
+
+
 @function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
-def _do_thing(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pf1D_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float):
+def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pf1D_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
     """
-    Do a single position decoding for a set of epochs
-
-
+    Do a single position decoding using a single decoder for a single set of epochs
     """
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
     decoder_result: DecodedFilterEpochsResult = pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
     # Interpolated measured position DataFrame - looks good
-    measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df = build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
-    return (measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df), decoder_result
+    # measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df = build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
+    measured_decoded_position_comparion: MeasuredDecodedPositionComparison = build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
 
+    # return measured_decoded_position_comparion, decoder_result
+    return CustomDecodeEpochsResult(measured_decoded_position_comparion=measured_decoded_position_comparion, decoder_result=decoder_result)
 
 
 @function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
-def _do_thing_dict(curr_active_pipeline, pf1D_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float):
+def _do_custom_decode_epochs_dict(curr_active_pipeline, pf1D_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float, decoder_and_epoch_keys_independent:bool=True) -> Union[Dict[decoder_name, CustomDecodeEpochsResult], Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]]]:
     """
     Do a single position decoding for a set of epochs
 
+    
+    decoder_and_epoch_keys_independent: bool - if False, it indicates that pf1D_Decoder_dict and epochs_to_decode_dict share the same keys, meaning they are paired. If True, they will be treated as independent and the epochs will be decoded by all provided decoders.
+    Usage:
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _do_custom_decode_epochs_dict
+
 
     """
+    if (not decoder_and_epoch_keys_independent):
+        assert np.all(np.isin(pf1D_Decoder_dict.keys(), epochs_to_decode_dict.keys())), f"decoder_and_epoch_keys_independent == False but pf1D_Decoder_dict.keys(): {list(pf1D_Decoder_dict.keys())} != epochs_to_decode_dict.keys(): {list(epochs_to_decode_dict.keys())}"
+
+
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
     global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
     global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe()
@@ -65,36 +91,29 @@ def _do_thing_dict(curr_active_pipeline, pf1D_Decoder_dict: Dict[str, BasePositi
     measured_positions_dfs_dict, decoded_positions_df_dict, decoded_measured_diff_df_dict = {}, {}, {}
 
     ## Output should be {epoch_name, {decoder_name, RESULT}}
-    final_output: Dict[epoch_split_key, Dict[decoder_name, DecodedFilterEpochsResult]] = {str(an_epoch_name):{} for an_epoch_name in epochs_to_decode_dict.keys()}
+    # final_decoder_results_dict: Dict[epoch_split_key, Dict[decoder_name, DecodedFilterEpochsResult]] = {str(an_epoch_name):{} for an_epoch_name in epochs_to_decode_dict.keys()}
 
-    for k, a_pf1D_Decoder in pf1D_Decoder_dict.items():
+    final_decoder_results_dict: Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]] = {str(an_epoch_name):{} for an_epoch_name in epochs_to_decode_dict.keys()}
+
+    for a_decoder_name, a_pf1D_Decoder in pf1D_Decoder_dict.items():
         for epoch_name, an_epoch_to_decode_df in epochs_to_decode_dict.items():
-            (measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df), decoder_result = _do_thing(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
-                pf1D_Decoder=a_pf1D_Decoder, epochs_to_decode_df=an_epoch_to_decode_df,
-                decoding_time_bin_size=decoding_time_bin_size)
+            if ((not decoder_and_epoch_keys_independent) and (a_decoder_name != epoch_name)):
+                continue # skip the non-matching elements
+            else:
+                full_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
+                    pf1D_Decoder=a_pf1D_Decoder, epochs_to_decode_df=an_epoch_to_decode_df,
+                    decoding_time_bin_size=decoding_time_bin_size)
 
-            final_output[epoch_name][k] = 
-
-
-
-    decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = decode_using_new_decoders(global_spikes_df, pf1D_Decoder_dict, epochs_to_decode_dict, laps_decoding_time_bin_size=decoding_time_bin_size)
-    ## OUTPUTS: test_laps_decoder_results_dict
-    # got the `test_laps_decoder_results_dict` with the test epochs decoded using only the train data! Now compare the predicted difference to the actual!
-    # test_laps_decoder_results_dict
-
-    # Interpolated measured position DataFrame - looks good
-    
-    measured_positions_dfs_dict, decoded_positions_df_dict, decoded_measured_diff_df_dict = build_measured_decoded_position_comparison(decoder_results_dict, global_measured_position_df=global_measured_position_df)
-    decoded_measured_diff_df_dict = {k:pd.DataFrame(v, columns=['t', 'err']) for k, v in decoded_measured_diff_df_dict.items()}
-
-
-    ## OUTPUTS: test_measured_positions_dfs_dict, train_measured_positions_dfs_dict
-    # test_measured_positions_dfs_dict
-
-    return (measured_positions_dfs_dict, decoded_positions_df_dict, decoded_measured_diff_df_dict), decoder_results_dict
+                # measured_decoded_position_comparion, decoder_result = decoder_result
+                final_decoder_results_dict[epoch_name][a_decoder_name] = full_decoder_result
 
 
 
+    if (not decoder_and_epoch_keys_independent):
+        final_decoder_results_dict: Dict[decoder_name, CustomDecodeEpochsResult] = {k:v[k] for k, v in final_decoder_results_dict.items()} # flatten down
+
+    # return (measured_positions_dfs_dict, decoded_positions_df_dict, decoded_measured_diff_df_dict), decoder_results_dict
+    return final_decoder_results_dict
 
 
 
@@ -512,7 +531,7 @@ def interpolate_positions(df: pd.DataFrame, sample_times: NDArray, time_column_n
     return interpolated_df
 
 
-def build_single_measured_decoded_position_comparison(a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame):
+def build_single_measured_decoded_position_comparison(a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame) -> MeasuredDecodedPositionComparison:
     """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
      
     from sklearn.metrics import mean_squared_error
@@ -554,7 +573,8 @@ def build_single_measured_decoded_position_comparison(a_decoder_decoding_result:
         ## END FOR
     decoded_measured_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_diff_df, columns=['t', 'sq_err', 'err_cm']) # convert list of tuples to a single df
 
-    return measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df
+    # return measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df
+    return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df)
 
 
 
