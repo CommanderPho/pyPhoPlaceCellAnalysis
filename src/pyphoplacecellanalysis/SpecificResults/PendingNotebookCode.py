@@ -209,6 +209,70 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(curr_active_p
     return alt_directional_merged_decoders_result, result_laps_epochs_df
 
 
+
+
+
+# ==================================================================================================================== #
+# 2024-04-05 - Time-bin effect on lap decoding:                                                                        #
+# ==================================================================================================================== #
+from neuropy.utils.result_context import IdentifyingContext
+
+## INPUTS: output_full_directional_merged_decoders_result, sweep_params_idx: int = -1
+def _show_sweep_result(output_full_directional_merged_decoders_result=None, global_measured_position_df: pd.DataFrame=None, xbin=None, active_context: IdentifyingContext=None, sweep_params_idx: int = -1, sweep_key_name: str="desired_shared_decoding_time_bin_size", debug_print=False):
+    """2024-04-03 - Interactively show the lap decoding performance for a single time bin size:
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _show_sweep_result
+
+        global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe()
+        # sweep_key_name: str="desired_shared_decoding_time_bin_size"
+        sweep_key_name: str="desired_laps_decoding_time_bin_size"
+        _out_pagination_controller, (all_swept_measured_positions_dfs_dict, all_swept_decoded_positions_df_dict, all_swept_decoded_measured_diff_df_dict) = _show_sweep_result(output_full_directional_merged_decoders_result, global_measured_position_df=global_measured_position_df, sweep_params_idx=0, sweep_key_name=sweep_key_name)
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalMergedDecodersResult
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_measured_decoded_position_comparison
+    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import DecodedEpochSlicesPaginatedFigureController
+
+
+    a_sweep_params_tuple, a_result = tuple(output_full_directional_merged_decoders_result.items())[sweep_params_idx]
+    # convert frozenset back to dict
+    a_sweep_params_dict = {s[0]:s[1] for i, s in enumerate(a_sweep_params_tuple)} # {'minimum_event_duration': 0.1, 'desired_shared_decoding_time_bin_size': 0.044, 'use_single_time_bin_per_epoch': False}
+
+    # print_keys_if_possible('a_result', a_result, max_depth=1)
+
+    an_all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(a_result.all_directional_laps_filter_epochs_decoder_result)
+    # all_directional_decoder_dict: Dict[str, PfND] = deepcopy(a_result.all_directional_decoder_dict)
+
+
+    ## OUTPUTS: a_sweep_params_dict, an_all_directional_laps_filter_epochs_decoder_result
+
+    # an_all_directional_laps_filter_epochs_decoder_result
+    if debug_print:
+        print(f'sweep_params_idx: {sweep_params_idx}')
+        print(f'a_sweep_params_dict["desired_shared_decoding_time_bin_size"]: {a_sweep_params_dict[sweep_key_name]}')
+        print(f'decoding_time_bin_size: {an_all_directional_laps_filter_epochs_decoder_result.decoding_time_bin_size}')
+
+
+    # Interpolated measured position DataFrame - looks good
+    all_swept_measured_positions_dfs_dict, all_swept_decoded_positions_df_dict, all_swept_decoded_measured_diff_df_dict = build_measured_decoded_position_comparison({k:deepcopy(v.all_directional_laps_filter_epochs_decoder_result) for k, v in output_full_directional_merged_decoders_result.items()}, global_measured_position_df=global_measured_position_df)
+    
+
+    ## OUTPUTS: all_swept_measured_positions_dfs_dict, all_swept_decoded_positions_df_dict, all_swept_decoded_measured_diff_df_dict
+    final_context = active_context.adding_context_if_missing(**dict(t_bin=f"{a_sweep_params_dict[sweep_key_name]}s"))
+
+    #### 2024-04-03 - Interactively show the lap decoding performance for a single time bin size:
+    _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(an_all_directional_laps_filter_epochs_decoder_result.active_filter_epochs,
+                                                                                                an_all_directional_laps_filter_epochs_decoder_result,
+                                                                                                xbin=xbin, global_pos_df=global_measured_position_df,
+                                                                                                active_context=final_context,
+                                                                                                a_name='an_all_directional_laps_filter_epochs_decoder_result', max_subplots_per_page=20)
+    return _out_pagination_controller, (all_swept_measured_positions_dfs_dict, all_swept_decoded_positions_df_dict, all_swept_decoded_measured_diff_df_dict)
+
+
+
+
+
+
 # ==================================================================================================================== #
 # 2024-04-04 - Continued Decoder Error Assessment                                                                      #
 # ==================================================================================================================== #
