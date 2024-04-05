@@ -271,7 +271,8 @@ class ZhangReconstructionImplementation:
 
         Note: This means that the "Flat" implementation may be more susceptible to numerical underflow, as the intermediate products can become very small, whereas the "Full" implementation does not have this issue. However, the "Flat" implementation can be more efficient in terms of memory usage and computation time, as it avoids creating a large number of intermediate arrays.
 
-        2023-04-19 - I'm confused by the lack of use of P_x in the calculation. According to my written formula P_x was used as the occupancy and multiplied in the output equation. After talking to Kourosh and the lab, it seems that the typical modern approach is to use a uniform `P_x` as to not bias the decoded position.
+        2023-04-19 - I'm confused by the lack of use of P_x in the calculation. According to my written formula P_x was used as the occupancy and multiplied in the output equation. 
+            After talking to Kourosh and the lab, it seems that the typical modern approach is to use a uniform `P_x` as to not bias the decoded position.
             But when I went to change my code to try a uniform P_x, it seems that P_x isn't used in the computation at all, and instead only its size is used?
             TODO 2023-04-19 - Check agreement with written equations.
         """

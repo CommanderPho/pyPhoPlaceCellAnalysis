@@ -19,12 +19,42 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 
 from functools import wraps, partial
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
 
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 
 
+# ==================================================================================================================== #
+# 2024-04-04 - Continued Decoder Error Assessment                                                                      #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
+def _do_thing(curr_active_pipeline, train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder], active_laps_decoding_time_bin_size: float):
+    """
+    Do a single position decoding for a set of epochs
+
+
+    """
+    ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
+    global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+    test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
+    ## OUTPUTS: test_laps_decoder_results_dict
+    # got the `test_laps_decoder_results_dict` with the test epochs decoded using only the train data! Now compare the predicted difference to the actual!
+    # test_laps_decoder_results_dict
+
+    # Interpolated measured position DataFrame - looks good
+    global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe()
+    test_measured_positions_dfs_dict, test_decoded_positions_df_dict, test_decoded_measured_diff_df_dict = build_measured_decoded_position_comparison(test_laps_decoder_results_dict, global_measured_position_df=global_measured_position_df)
+    test_decoded_measured_diff_df_dict = {k:pd.DataFrame(v, columns=['t', 'err']) for k, v in test_decoded_measured_diff_df_dict.items()}
+
+
+
+    ## OUTPUTS: test_measured_positions_dfs_dict, train_measured_positions_dfs_dict
+    # test_measured_positions_dfs_dict
+
+
+    return test_measured_positions_dfs_dict, test_decoded_positions_df_dict, test_decoded_measured_diff_df_dict
 
 
 # ---------------------------------------------------------------------------- #
@@ -203,7 +233,7 @@ def decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_
 
 @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=[], creation_date='2024-03-29 22:14', related_items=[])
 def compute_train_test_split_laps_decoders(directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=5.0/6.0,
-                                           debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False):
+                                           debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> Tuple[Tuple[Dict, Dict], Dict[str, BasePositionDecoder], Dict]:
     """ 
     ## Split the lap epochs into training and test periods.
     ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/6 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
@@ -495,10 +525,12 @@ def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: D
             # compute the diff error:
             # mean_squared_error(y_true, y_pred)
             # test_decoded_measured_diff_df = (interpolated_measured_df[['x']] - pd.DataFrame({'x':v.most_likely_positions_list[epoch_idx]})) ## error at each point
-            test_decoded_measured_diff_df: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
-            
+            test_decoded_measured_diff: float = mean_squared_error(interpolated_measured_df['x'].to_numpy(), decoded_positions) # single float error
+            test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
+
+
             # test_decoded_measured_diff_df_dict_list.append(test_decoded_measured_diff_df)
-            test_decoded_measured_diff_df_dict_list.append((center_epoch_time, test_decoded_measured_diff_df))
+            test_decoded_measured_diff_df_dict_list.append((center_epoch_time, test_decoded_measured_diff, test_decoded_measured_diff_cm))
 
             
         # test_measured_positions_dfs
@@ -508,6 +540,10 @@ def build_measured_decoded_position_comparison(test_laps_decoder_results_dict: D
 
     # test_decoded_measured_diff_df = test_decoded_measured_diff_df_dict
     # test_decoded_measured_diff_df
+        
+    test_decoded_measured_diff_df_dict: Dict[Any, pd.DataFrame] = {k:pd.DataFrame(v, columns=['t', 'sq_err', 'err_cm']) for k, v in test_decoded_measured_diff_df_dict.items()}
+
+
 
     return test_measured_positions_dfs_dict, test_decoded_positions_df_dict, test_decoded_measured_diff_df_dict
 
