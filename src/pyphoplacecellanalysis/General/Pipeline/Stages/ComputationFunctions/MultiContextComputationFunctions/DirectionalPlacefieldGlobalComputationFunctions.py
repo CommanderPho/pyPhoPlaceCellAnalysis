@@ -2559,7 +2559,15 @@ def _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_a
 
     return True
 
-def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame, debug_print=True):
+
+import attrs
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+
+DecodedContextCorrectnessArraysTuple = attrs.make_class("DecodedContextCorrectnessArraysTuple", {k:field() for k in ("is_decoded_track_correct", "is_decoded_dir_correct", "are_both_decoded_properties_correct")}, bases=(UnpackableMixin, object,))
+PercentDecodedContextCorrectnessTuple = attrs.make_class("PercentDecodedContextCorrectnessTuple", {k:field() for k in ("percent_laps_track_identity_estimated_correctly", "percent_laps_direction_estimated_correctly", "percent_laps_estimated_correctly")}, bases=(UnpackableMixin, object,))
+CompleteDecodedContextCorrectness = attrs.make_class("CompleteDecodedContextCorrectness", {k:field() for k in ("correctness_arrays_tuple", "percent_correct_tuple")}, bases=(UnpackableMixin, object,))
+
+def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame, debug_print=True) -> CompleteDecodedContextCorrectness:
     """ 2024-01-17 - Validates the performance of the pseudo2D decoder posteriors using the laps data.
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
@@ -2584,7 +2592,8 @@ def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame
     if debug_print:
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
 
-    return (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
+    # return (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
+    return CompleteDecodedContextCorrectness(DecodedContextCorrectnessArraysTuple(is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), PercentDecodedContextCorrectnessTuple(percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly))
 
 
 

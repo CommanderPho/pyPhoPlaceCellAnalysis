@@ -100,7 +100,9 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
 def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeline_reference, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: Optional[float] = 0.1, use_single_time_bin_per_epoch: bool=False):
     """ 2024-01-17 - Pending refactor from ReviewOfWork_2024-01-17.ipynb 
 
-    Makes a copy of the 'DirectionalMergedDecoders' result
+    Makes a copy of the 'DirectionalMergedDecoders' result and does the complete process of re-calculation for the provided time bin sizes. Finally computes the statistics about correctly computed contexts from the laps.
+
+    
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_variable_time_bin_lap_groud_truth_performance_testing
 
     Pre-refactor
@@ -183,7 +185,10 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
     print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}')
 
     ## Uses only 'result_laps_epochs_df'
-    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
+    complete_decoded_context_correctness_tuple = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
+
+    # Unpack like:
+    # (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
 
     # laps_decoding_time_bin_size: 1.668
     # percent_laps_track_identity_estimated_correctly: 0.9875
@@ -200,7 +205,7 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
     # percent_laps_direction_estimated_correctly: 0.5
     # percent_laps_estimated_correctly: 0.5
 
-    return alt_directional_merged_decoders_result, result_laps_epochs_df
+    return alt_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple
 
 
 
