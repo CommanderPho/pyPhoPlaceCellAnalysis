@@ -66,7 +66,6 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
     ## Inputs: a_directional_merged_decoders_result, laps_df
     
     ## Get the most likely direction/track from the decoded posteriors:
-    all_directional_laps_filter_epochs_decoder_result_value: DecodedFilterEpochsResult = a_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
     laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = a_directional_merged_decoders_result.laps_directional_marginals_tuple
     laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = a_directional_merged_decoders_result.laps_track_identity_marginals_tuple
 
@@ -98,7 +97,7 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
 
 
 @function_attributes(short_name=None, tags=['laps', 'groundtruth'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 18:40', related_items=[])
-def _perform_variable_time_bin_lap_groud_truth_performance_testing(curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False):
+def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeline_reference, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: Optional[float] = 0.1, use_single_time_bin_per_epoch: bool=False):
     """ 2024-01-17 - Pending refactor from ReviewOfWork_2024-01-17.ipynb 
 
     Makes a copy of the 'DirectionalMergedDecoders' result
@@ -107,21 +106,16 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(curr_active_p
     Pre-refactor
     
     """
-    from neuropy.core.session.dataSession import Laps
-    
-
     ## Copy the default result:
-    directional_merged_decoders_result: DirectionalMergedDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+    directional_merged_decoders_result: DirectionalMergedDecodersResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalMergedDecoders']
     alt_directional_merged_decoders_result: DirectionalMergedDecodersResult = deepcopy(directional_merged_decoders_result)
-
-    owning_pipeline_reference = curr_active_pipeline
     all_directional_pf1D_Decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder
 
     # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
 
     # Modifies alt_directional_merged_decoders_result, a copy of the original result, with new timebins
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+    t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 
     if use_single_time_bin_per_epoch:
         print(f'WARNING: use_single_time_bin_per_epoch=True so time bin sizes will be ignored.')
@@ -165,7 +159,7 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(curr_active_p
     # either: result_laps_epochs_df: pd.DataFrame, (laps_is_most_likely_track_identity_Long, laps_is_most_likely_direction_LR_dir)
     # or 
     # result_laps_epochs_df = add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result=alt_directional_merged_decoders_result, result_laps_epochs_df=result_laps_epochs_df)
-    result_laps_epochs_df: pd.DataFrame = add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result=alt_directional_merged_decoders_result)
+    result_laps_epochs_df: pd.DataFrame = add_groundtruth_information(owning_pipeline_reference, a_directional_merged_decoders_result=alt_directional_merged_decoders_result)
 
     # # Ensure it has the 'lap_track' column
     # ## Compute the ground-truth information using the position information:
