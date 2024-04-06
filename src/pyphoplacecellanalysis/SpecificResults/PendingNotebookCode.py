@@ -47,7 +47,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalMergedDecodersResult, _check_result_laps_epochs_df_performance
-
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CompleteDecodedContextCorrectness
 
 def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result: DirectionalMergedDecodersResult):
     """    takes 'laps_df' and 'result_laps_epochs_df' to add the ground_truth and the decoded posteriors:
@@ -95,29 +95,59 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
     return result_laps_epochs_df
 
 
-
-@function_attributes(short_name=None, tags=['laps', 'groundtruth'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 18:40', related_items=[])
-def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeline_reference, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: Optional[float] = 0.1, use_single_time_bin_per_epoch: bool=False):
+@function_attributes(short_name=None, tags=['laps', 'groundtruth'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 18:40', related_items=['DirectionalMergedDecodersResult'])
+def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeline_reference,
+                                                                    desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: Optional[float] = None, use_single_time_bin_per_epoch: bool=False,
+                                                                    included_neuron_ids: Optional[NDArray]=None) -> Tuple[DirectionalMergedDecodersResult, pd.DataFrame, CompleteDecodedContextCorrectness]:
     """ 2024-01-17 - Pending refactor from ReviewOfWork_2024-01-17.ipynb 
 
     Makes a copy of the 'DirectionalMergedDecoders' result and does the complete process of re-calculation for the provided time bin sizes. Finally computes the statistics about correctly computed contexts from the laps.
 
-    
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_variable_time_bin_lap_groud_truth_performance_testing
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_variable_time_bin_lap_groud_truth_performance_testing
 
-    Pre-refactor
+        a_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple = _perform_variable_time_bin_lap_groud_truth_performance_testing(curr_active_pipeline, desired_laps_decoding_time_bin_size=1.5, desired_ripple_decoding_time_bin_size=None)
+        (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+
     
     """
+    from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays, find_desired_sort_indicies
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
+
     ## Copy the default result:
     directional_merged_decoders_result: DirectionalMergedDecodersResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalMergedDecoders']
     alt_directional_merged_decoders_result: DirectionalMergedDecodersResult = deepcopy(directional_merged_decoders_result)
-    all_directional_pf1D_Decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder
 
-    # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
+    if included_neuron_ids is not None:
+        # prune the decoder by the provided `included_neuron_ids`
+
+        ## Due to a limitation of the merged pseudo2D decoder (`alt_directional_merged_decoders_result.all_directional_pf1D_Decoder`) that prevents `.get_by_id(...)` from working, we have to rebuild the pseudo2D decoder from the four pf1D decoders:
+        restricted_all_directional_decoder_pf1D_dict = deepcopy(alt_directional_merged_decoders_result.all_directional_decoder_dict) # copy the dictionary
+        ## Filter the dictionary using .get_by_id(...)
+        restricted_all_directional_decoder_pf1D_dict = {k:v.get_by_id(included_neuron_ids) for k,v in restricted_all_directional_decoder_pf1D_dict.items()}
+
+        restricted_all_directional_pf1D = PfND.build_merged_directional_placefields(restricted_all_directional_decoder_pf1D_dict, debug_print=False)
+        restricted_all_directional_pf1D_Decoder = BasePositionDecoder(restricted_all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+        
+        # included_neuron_ids = intersection_of_arrays(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs, included_neuron_ids)
+        # is_aclu_included_list = np.isin(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.pf.ratemap.neuron_ids, included_neuron_ids)
+        # included_aclus = np.array(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.pf.ratemap.neuron_ids)[is_aclu_included_list
+        # modified_decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.get_by_id(included_aclus)
+
+        ## Set the result:
+        alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = restricted_all_directional_pf1D_Decoder
+
+        # ratemap method:
+        # modified_decoder_pf_ratemap = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.pf.ratemap.get_by_id(included_aclus)
+        # alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.pf.ratemap = modified_decoder_pf_ratemap
+
+        # alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.get_by_id(included_neuron_ids, defer_compute_all=True)
+        
+    all_directional_pf1D_Decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder
 
     # Modifies alt_directional_merged_decoders_result, a copy of the original result, with new timebins
     long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-    t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+    # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 
     if use_single_time_bin_per_epoch:
         print(f'WARNING: use_single_time_bin_per_epoch=True so time bin sizes will be ignored.')
@@ -143,44 +173,8 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
     ## Post Compute Validations:
     alt_directional_merged_decoders_result.perform_compute_marginals()
 
-    ## Inputs: a_directional_merged_decoders_result, laps_df
-
-    # a_directional_merged_decoders_result: DirectionalMergedDecodersResult = alt_directional_merged_decoders_result
-
-    # ## Get the most likely direction/track from the decoded posteriors:
-    # all_directional_laps_filter_epochs_decoder_result_value: DecodedFilterEpochsResult = a_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
-    # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = a_directional_merged_decoders_result.laps_directional_marginals_tuple
-    # laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = a_directional_merged_decoders_result.laps_track_identity_marginals_tuple
-
-    # a_directional_merged_decoders_result.ripple_epochs_df
-    # a_directional_merged_decoders_result.laps_epochs_df
-    # result_laps_epochs_df: pd.DataFrame = a_directional_merged_decoders_result.laps_epochs_df
-
-    # takes 'laps_df' and 'result_laps_epochs_df' to add the ground_truth and the decoded posteriors:
-
-    # either: result_laps_epochs_df: pd.DataFrame, (laps_is_most_likely_track_identity_Long, laps_is_most_likely_direction_LR_dir)
-    # or 
-    # result_laps_epochs_df = add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result=alt_directional_merged_decoders_result, result_laps_epochs_df=result_laps_epochs_df)
     result_laps_epochs_df: pd.DataFrame = add_groundtruth_information(owning_pipeline_reference, a_directional_merged_decoders_result=alt_directional_merged_decoders_result)
 
-    # # Ensure it has the 'lap_track' column
-    # ## Compute the ground-truth information using the position information:
-    # # adds columns: ['maze_id', 'is_LR_dir']
-    # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
-    # laps_obj: Laps = curr_active_pipeline.sess.laps
-    # laps_df = laps_obj.to_dataframe()
-    # laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
-    
-    # ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
-    # result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
-    # ## add the 'is_LR_dir' groud-truth column in:
-    # result_laps_epochs_df['is_LR_dir'] = laps_df['is_LR_dir'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
-
-    # ## Add the decoded results to the laps df:
-    # result_laps_epochs_df['is_most_likely_track_identity_Long'] = laps_is_most_likely_track_identity_Long
-    # result_laps_epochs_df['is_most_likely_direction_LR'] = laps_is_most_likely_direction_LR_dir
-    
-    # np.sum(result_laps_epochs_df['is_LR_dir'] == result_laps_epochs_df['is_most_likely_direction_LR'])/np.shape(result_laps_epochs_df)[0]
     laps_decoding_time_bin_size = alt_directional_merged_decoders_result.laps_decoding_time_bin_size
     print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}')
 
@@ -189,21 +183,6 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
 
     # Unpack like:
     # (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
-
-    # laps_decoding_time_bin_size: 1.668
-    # percent_laps_track_identity_estimated_correctly: 0.9875
-    # percent_laps_direction_estimated_correctly: 0.5125
-    # percent_laps_estimated_correctly: 0.5
-
-    # laps_decoding_time_bin_size: 0.1
-    # percent_laps_track_identity_estimated_correctly: 0.9875
-    # percent_laps_direction_estimated_correctly: 0.4875
-    # percent_laps_estimated_correctly: 0.4875
-
-    # laps_decoding_time_bin_size: 0.5
-    # percent_laps_track_identity_estimated_correctly: 1.0
-    # percent_laps_direction_estimated_correctly: 0.5
-    # percent_laps_estimated_correctly: 0.5
 
     return alt_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple
 
