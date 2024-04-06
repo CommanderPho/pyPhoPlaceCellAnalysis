@@ -95,7 +95,7 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
     return result_laps_epochs_df
 
 
-@function_attributes(short_name=None, tags=['laps', 'groundtruth'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 18:40', related_items=['DirectionalMergedDecodersResult'])
+@function_attributes(short_name=None, tags=['laps', 'groundtruth', 'context-decoding', 'context-discrimination'], input_requires=[], output_provides=[], uses=[], used_by=['perform_sweep_lap_groud_truth_performance_testing'], creation_date='2024-04-05 18:40', related_items=['DirectionalMergedDecodersResult'])
 def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeline_reference,
                                                                     desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: Optional[float] = None, use_single_time_bin_per_epoch: bool=False,
                                                                     included_neuron_ids: Optional[NDArray]=None) -> Tuple[DirectionalMergedDecodersResult, pd.DataFrame, CompleteDecodedContextCorrectness]:
@@ -187,7 +187,43 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
     return alt_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple
 
 
+@function_attributes(short_name=None, tags=['laps', 'groundtruith', 'sweep', 'context-decoding', 'context-discrimination'], input_requires=[], output_provides=[], uses=['_perform_variable_time_bin_lap_groud_truth_performance_testing'], used_by=[], creation_date='2024-04-05 22:47', related_items=[])
+def perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline, included_neuron_ids_list: List[NDArray], desired_laps_decoding_time_bin_size:float=1.5):
+    """ Sweeps through each `included_neuron_ids` in the provided `included_neuron_ids_list` and calls `_perform_variable_time_bin_lap_groud_truth_performance_testing(...)` to get its laps ground-truth performance.
+    Can be used to assess the contributes of each set of cells (exclusive, rate-remapping, etc) to the discrimination decoding performance.
+    
+    Usage:
 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import perform_sweep_lap_groud_truth_performance_testing
+
+        desired_laps_decoding_time_bin_size: float = 1.0
+        included_neuron_ids_list = [short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset]
+
+        _output_tuples_list = perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline, 
+                                                                                included_neuron_ids_list=included_neuron_ids_list,
+                                                                                desired_laps_decoding_time_bin_size=desired_laps_decoding_time_bin_size)
+
+        percent_laps_correctness_df: pd.DataFrame = pd.DataFrame.from_records([complete_decoded_context_correctness_tuple.percent_correct_tuple for (a_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple) in _output_tuples_list],
+                                columns=("track_ID_correct", "dir_correct", "complete_correct"))
+        percent_laps_correctness_df
+
+                                                                        
+    
+    Does not modifiy the curr_active_pipeline (pure)
+
+
+    """
+    _output_tuples_list = []
+    for included_neuron_ids in included_neuron_ids_list:
+        a_lap_ground_truth_performance_testing_tuple = _perform_variable_time_bin_lap_groud_truth_performance_testing(curr_active_pipeline, desired_laps_decoding_time_bin_size=desired_laps_decoding_time_bin_size, included_neuron_ids=included_neuron_ids)
+        _output_tuples_list.append(a_lap_ground_truth_performance_testing_tuple)
+
+        # ## Unpacking `a_lap_ground_truth_performance_testing_tuple`:
+        # a_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple = a_lap_ground_truth_performance_testing_tuple
+        # (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+
+        # a_directional_merged_decoders_result, result_laps_epochs_df, (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = a_lap_ground_truth_performance_testing_tuple
+    return _output_tuples_list
 
 
 # ==================================================================================================================== #
