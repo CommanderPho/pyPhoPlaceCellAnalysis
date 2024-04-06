@@ -1783,15 +1783,11 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['ground-truth', 'laps', 'validation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 19:23', related_items=['cls.validate_lap_dir_estimations()'])
     def add_groundtruth_information(self, curr_active_pipeline):
-        """    takes 'laps_df' and 'result_laps_epochs_df' to add the ground_truth and the decoded posteriors:
+        """ adds the ground_truth to `self.laps_epochs_df`:
 
-            a_directional_merged_decoders_result: DirectionalMergedDecodersResult = alt_directional_merged_decoders_result
-
-
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_groundtruth_information
-
-            result_laps_epochs_df = add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result=a_directional_merged_decoders_result, result_laps_epochs_df=result_laps_epochs_df)
-
+            a_directional_merged_decoders_result: DirectionalMergedDecodersResult = directional_merged_decoders_result
+            result_laps_epochs_df: pd.DataFrame = a_directional_merged_decoders_result.add_groundtruth_information(curr_active_pipeline)
+            result_laps_epochs_df
 
         """
         from neuropy.core import Laps
