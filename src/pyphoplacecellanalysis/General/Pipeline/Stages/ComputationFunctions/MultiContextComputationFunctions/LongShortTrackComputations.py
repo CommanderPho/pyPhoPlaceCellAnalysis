@@ -44,7 +44,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Default
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
 
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from scipy.special import factorial, logsumexp
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 from nptyping import NDArray, DataFrame, Shape, assert_isinstance, Int, Structure as S
@@ -119,7 +119,9 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
     time_binned_instantaneous_unit_specific_spike_rate: DynamicParameters = non_serialized_field(is_computable=False)
     neuron_replay_stats_df: pd.DataFrame = non_serialized_field() # serialized_field(is_hdf_handled_custom=True, metadata={'tags':['custom_hdf_implementation', 'is_hdf_handled_custom']})
     
-    def get_cell_track_partitions(self, frs_index_inclusion_magnitude:float=0.5):
+
+    @function_attributes(short_name=None, tags=['cell', 'partition', 'exclusivity'], input_requires=[], output_provides=[], uses=['TrackExclusivePartitionSubset'], used_by=[], creation_date='2023-06-20 00:00', related_items=[])
+    def get_cell_track_partitions(self, frs_index_inclusion_magnitude:float=0.5) -> Tuple[pd.DataFrame, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset]:
         """ 2023-06-20 - Partition the neuron_replay_stats_df into subsets by seeing whether each aclu has a placefield for the long/short track.
             # Four distinct subgroups are formed:  pf on neither, pf on both, pf on only long, pf on only short
             # L_only_aclus, S_only_aclus
@@ -127,13 +129,24 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
             #TODO 2023-05-23 - Can do more detailed peaks analysis with: long_results.RatemapPeaksAnalysis and short_results.RatemapPeaksAnalysis
 
             As a side-effect it also updates `self.neuron_replay_stats_df` with the 'is_refined_exclusive', 'is_refined_LxC', 'is_refined_SxC' column
+
+        Usage:
+            ## Refine the LxC/SxC designators using the firing rate index metric:
+            frs_index_inclusion_magnitude:float = 0.5
+
+            ## Get global `long_short_fr_indicies_analysis`:
+            long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
+            long_short_fr_indicies_df = long_short_fr_indicies_analysis_results['long_short_fr_indicies_df']
+            jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+
+            neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+            
         """
         # needs `neuron_replay_stats_df`
         neuron_replay_stats_df = self.neuron_replay_stats_df #.copy()
         # neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
         use_refined_aclus = True
 
-        
         if 'custom_frs_index' not in neuron_replay_stats_df.columns:
             print(f"WARNINGL: neuron_replay_stats_df must have refindments added")
             use_refined_aclus = False
@@ -216,7 +229,11 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         NEITHER_subset = TrackExclusivePartitionSubset(is_NEITHER_pf_only, NEITHER_pf_only_aclus, NEITHER_only_df)
         
         # Sort dataframe by 'long_pf_peak_x' now so the aclus aren't out of order.
-        return neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True), short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
+        neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
+        return neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
+
+    
+
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     
@@ -1293,7 +1310,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # adds ['LS_pf_peak_x_diff'] column
         neuron_replay_stats_df['LS_pf_peak_x_diff'] = neuron_replay_stats_df['long_pf_peak_x'] - neuron_replay_stats_df['short_pf_peak_x']
-
 
         cap_cells_df = neuron_replay_stats_df[np.logical_and(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['is_long_peak_either_cap'])]
         num_total_endcap_cells = len(cap_cells_df)

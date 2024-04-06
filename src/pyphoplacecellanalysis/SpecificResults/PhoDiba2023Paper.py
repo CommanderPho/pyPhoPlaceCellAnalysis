@@ -163,7 +163,6 @@ class TrackAssignmentDecision(KeyValueHashableObject):
 class AssigningEpochs:
     """ class responsible for iteratively applying various criteria to assign epochs to a particular track starting with the unassigned set of all epochs (in this analysis replay events) """
     filter_epochs_df: pd.DataFrame
-    
 
     @property
     def unassigned_epochs_df(self):
