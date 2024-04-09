@@ -346,10 +346,15 @@ class TrackTemplates(HDFMixin):
         """
         return DirectionalDecodersTuple(self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)
 
-    def get_decoder_names(self) -> Tuple[str]:
+    def get_decoder_names(self) -> Tuple[str, str, str, str]:
         return ('long_LR','long_RL','short_LR','short_RL')
-        
-
+    
+    def get_LR_decoder_names(self) -> Tuple[str, str]:
+        return ('long_LR', 'short_LR')
+    
+    def get_RL_decoder_names(self) -> Tuple[str, str]:
+        return ('long_RL', 'short_RL')
+    
     def get_decoders_dict(self) -> Dict[str, BasePositionDecoder]:
         return {'long_LR': self.long_LR_decoder,
             'long_RL': self.long_RL_decoder,
@@ -379,8 +384,7 @@ class TrackTemplates(HDFMixin):
         ## Compute the ranks:
         # decoder_pf_peak_ranks_list = [scipy.stats.rankdata(a_peaks_com, method='dense') for a_peaks_com in decoder_peak_coms_list]
 
-        #TODO 2023-11-21 13:06: - [ ] Note this are in order of the original entries, and do not reflect any sorts or ordering changes.
-
+        #TODO 2023-11-21 13:06: - [ ] Note these are in order of the original entries, and do not reflect any sorts or ordering changes.
 
         return cls(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, None, shared_RL_aclus_only_neuron_IDs, None,
                     decoder_LR_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_LR_decoder, short_LR_decoder)],
