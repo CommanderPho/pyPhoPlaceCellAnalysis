@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 from typing import List, Optional, Dict, Tuple, Any, Union
+from matplotlib.gridspec import GridSpec
 from neuropy.core import Laps
 from neuropy.utils.dynamic_container import DynamicContainer
 from nptyping import NDArray
@@ -1602,7 +1603,7 @@ import matplotlib.cm as cm
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _build_track_1D_verticies
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=[], creation_date='2024-02-22 11:12', related_items=[])
-def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR'):
+def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, **kwargs):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
     🔝🖼️🎨
@@ -1614,6 +1615,8 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
     from matplotlib.path import Path
 
+    from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
+
     from pyphocorehelpers.geometry_helpers import BoundsRect
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
@@ -1623,6 +1626,24 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     long_peak_x = LR_only_decoder_aclu_MAX_peak_maps_df[long_column_name].to_numpy()
     short_peak_x = LR_only_decoder_aclu_MAX_peak_maps_df[short_column_name].to_numpy()
     # peak_x_diff = LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'].to_numpy()
+
+    assert (len(long_peak_x) == len(short_peak_x)), f"len(long_peak_x): {len(long_peak_x)} != len(short_peak_x): {len(short_peak_x)}"
+    assert (len(long_peak_x) == len(active_aclus)), f"len(long_peak_x): {len(long_peak_x)} != len(active_aclus): {len(active_aclus)}"
+    
+    ## Find the points missing from long or short:
+    disappearing_long_to_short_indicies = np.where(np.isnan(short_peak_x))[0] # missing peak from short
+    appearing_long_to_short_indicies = np.where(np.isnan(long_peak_x))[0] # missing peak from long
+    disappearing_long_to_short_aclus = active_aclus[disappearing_long_to_short_indicies] # missing peak from short
+    appearing_long_to_short_aclus = active_aclus[appearing_long_to_short_indicies] # missing peak from long
+
+    is_aclu_in_both = np.logical_and(np.logical_not(np.isnan(short_peak_x)), np.logical_not(np.isnan(long_peak_x))) # both are non-NaN
+    assert (len(is_aclu_in_both) == len(active_aclus)), f"len(is_aclu_in_both): {len(is_aclu_in_both)} != len(active_aclus): {len(active_aclus)}"
+    both_aclus = active_aclus[is_aclu_in_both]
+
+    if len(disappearing_long_to_short_aclus) > 0:
+        print(f'disappearing_long_to_short_aclus: {disappearing_long_to_short_aclus}')
+    if len(appearing_long_to_short_aclus) > 0:
+        print(f'appearing_long_to_short_aclus: {appearing_long_to_short_aclus}')
 
     grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
     # display(grid_bin_bounds)
@@ -1645,15 +1666,32 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     long_track = LinearTrackInstance(long_track_dims, grid_bin_bounds=grid_bin_bounds)
     short_track = LinearTrackInstance(short_track_dims, grid_bin_bounds=grid_bin_bounds)
 
-    print(long_track_dims)
-    print(short_track_dims)
+    # print(long_track_dims)
+    # print(short_track_dims)
 
     # BEGIN PLOTTING _____________________________________________________________________________________________________ #
     long_path = _build_track_1D_verticies(platform_length=22.0, track_length=170.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
     short_path = _build_track_1D_verticies(platform_length=22.0, track_length=100.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=True)
 
     ## Create the remapping figure:
-    fig, ax = plt.subplots()
+    # fig, ax = plt.subplots()
+
+    ## Figure Setup:
+    if ax is None:
+        ## Build a new figure:
+        from matplotlib.gridspec import GridSpec
+        fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
+        gs = GridSpec(1, 1, figure=fig)
+        ax = plt.subplot(gs[0])
+
+    else:
+        # otherwise get the figure from the passed axis
+        fig = ax.get_figure()
+
+
+    ##########################
+
+
     long_patch = patches.PathPatch(long_path, facecolor='orange', alpha=0.5, lw=2)
     ax.add_patch(long_patch)
 
@@ -1677,15 +1715,25 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     _out_long_points = ax.scatter(long_peak_x, y=long_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='long_peak_x', picker=True)
     _out_short_points = ax.scatter(short_peak_x, y=short_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='short_peak_x', picker=True)
 
+    ## OUTPUT Variables:
     _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
-
     _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
+
+    
 
     # Add text labels to scatter points
     for i, aclu_val in enumerate(active_aclus):
         aclu_val: int = int(aclu_val)
-        a_long_text = ax.text(long_peak_x[i], long_y[i], str(aclu_val), color='black', fontsize=8)
-        a_short_text = ax.text(short_peak_x[i], short_y[i], str(aclu_val), color='black', fontsize=8)
+
+        if aclu_val not in appearing_long_to_short_aclus:
+            a_long_text = ax.text(long_peak_x[i], long_y[i], str(aclu_val), color='black', fontsize=8)
+        else:
+            a_long_text = None
+
+        if aclu_val not in disappearing_long_to_short_aclus:
+            a_short_text = ax.text(short_peak_x[i], short_y[i], str(aclu_val), color='black', fontsize=8)
+        else:
+            a_short_text = None
 
         if aclu_val not in _output_by_aclu_dict:
             _output_by_aclu_dict[aclu_val] = {}
@@ -1697,34 +1745,40 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     # for idx in range(len(long_peak_x)):
     for idx, aclu_val in enumerate(active_aclus):
         aclu_val: int = int(aclu_val)
-        # Starting point coordinates
-        start_x = long_peak_x[idx]
-        # start_y = 0.1 + random_y_jitter[idx]
-        start_y = long_y[idx]
-        # End point coordinates
-        end_x = short_peak_x[idx]
-        # end_y = 0.75 + random_y_jitter[idx]
-        end_y = short_y[idx]
-        # Calculate the change in x and y for the arrow
-        # dx = end_x - start_x
-        # dy = end_y - start_y
-
-        # Get the corresponding color for the current index using the colormap
-        arrow_color = scalar_map.to_rgba(active_aclus[idx])
-        
         if aclu_val not in _output_by_aclu_dict:
             _output_by_aclu_dict[aclu_val] = {}
 
-        # Annotate the plot with arrows; adjust the properties according to your needs
-        _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(arrowstyle="->", color=arrow_color, alpha=0.6))
-        # arrowprops: {'arrowstyle': '->', 'color': (0.267004, 0.004874, 0.329415, 1.0), 'alpha': 0.6}
-        # test.arrow_patch # mpl.patches.FancyArrowPatch
-        # test.arrow_patch.set_color('')
+        if aclu_val in both_aclus:
+            # Starting point coordinates
+            start_x = long_peak_x[idx]
+            # start_y = 0.1 + random_y_jitter[idx]
+            start_y = long_y[idx]
+            # End point coordinates
+            end_x = short_peak_x[idx]
+            # end_y = 0.75 + random_y_jitter[idx]
+            end_y = short_y[idx]
+            # Calculate the change in x and y for the arrow
+            # dx = end_x - start_x
+            # dy = end_y - start_y
+
+            # Get the corresponding color for the current index using the colormap
+            arrow_color = scalar_map.to_rgba(active_aclus[idx])
+            
+
+
+            # Annotate the plot with arrows; adjust the properties according to your needs
+            _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(arrowstyle="->", color=arrow_color, alpha=0.6))
+            # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrowprops: {'arrowstyle': '->', 'color': (0.267004, 0.004874, 0.329415, 1.0), 'alpha': 0.6}
+            # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrow_patch # mpl.patches.FancyArrowPatch
+            # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrow_patch.set_color('')
+        else:
+            _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = None
+
 
     ## Build the interactivity callbacks:
     previous_selected_indices = []
 
-    def onpick3(event):
+    def on_scatter_point_pick(event):
         """ 
         Captures: active_aclus, scalar_map, _out_long_points, _out_short_points, _output_by_aclu_dict, 
         """
@@ -1741,13 +1795,13 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
             print(f'\taclu_deselected: {aclu_deselected}')
             original_color = scalar_map.to_rgba(active_aclus[index])
 
-
             _out_long_points._facecolors[index] = original_color # scalar_map.to_rgba(active_aclus[index])
             _out_short_points._facecolors[index] = original_color # scalar_map.to_rgba(active_aclus[index])
             # restore arrow color:
             a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_deselected, {}).get('long_to_short_arrow', None)
-            a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
-            a_paired_arrow.set_color(original_color)  # Change arrow color to blue
+            if a_paired_arrow_container_Text_obj is not None:
+                a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
+                a_paired_arrow.set_color(original_color)  # Change arrow color to blue
         
         # Change color of currently selected points to red
         for index in ind:
@@ -1758,9 +1812,9 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
             _out_short_points._facecolors[index] = selection_color  # Red color in RGBA format
             # Change the arrow selection:
             a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_selected, {}).get('long_to_short_arrow', None)
-            a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
-            a_paired_arrow.set_color(selection_color)  # Change arrow color to blue
-
+            if a_paired_arrow_container_Text_obj is not None:
+                a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
+                a_paired_arrow.set_color(selection_color)  # Change arrow color to blue
 
         # Update the list of previously selected indices
         previous_selected_indices = ind
@@ -1768,9 +1822,9 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
 
 
 
-    _mpl_pick_event_handle_idx: int = fig.canvas.mpl_connect('pick_event', onpick3)
+    _mpl_pick_event_handle_idx: int = fig.canvas.mpl_connect('pick_event', on_scatter_point_pick)
 
-    _output_dict['scatter_select_function'] = onpick3
+    _output_dict['scatter_select_function'] = on_scatter_point_pick
     _output_dict['_scatter_select_mpl_pick_event_handle_idx'] = _mpl_pick_event_handle_idx
 
     # Show the plot
