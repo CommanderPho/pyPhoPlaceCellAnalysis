@@ -949,9 +949,17 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     ## INPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff
 
     # Define a colormap to map your unique integer indices to colors
-    colormap = plt.cm.viridis  # or any other colormap
+    # colormap = plt.cm.viridis  # or any other colormap
+
+    colormap = mcolors.ListedColormap(['white'])
     normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
     scalar_map = cm.ScalarMappable(norm=normalize, cmap=colormap)
+
+    # Create a constant colormap with only white color
+
+    color = scalar_map.to_rgba(active_aclus)
+    ## constant:
+    # color = 'white'
 
     random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
     # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
@@ -959,8 +967,8 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     long_y = (np.full_like(long_peak_x, 0.1)+random_y_jitter)
     short_y = (np.full_like(short_peak_x, 0.75)+random_y_jitter)
 
-    _out_long_points = ax.scatter(long_peak_x, y=long_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='long_peak_x', picker=True)
-    _out_short_points = ax.scatter(short_peak_x, y=short_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='short_peak_x', picker=True)
+    _out_long_points = ax.scatter(long_peak_x, y=long_y, c=color, alpha=0.9, label='long_peak_x', picker=True)
+    _out_short_points = ax.scatter(short_peak_x, y=short_y, c=color, alpha=0.9, label='short_peak_x', picker=True)
 
     ## OUTPUT Variables:
     _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
