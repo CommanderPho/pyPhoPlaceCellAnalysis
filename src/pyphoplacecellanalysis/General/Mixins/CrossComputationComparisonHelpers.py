@@ -2,6 +2,8 @@
 from typing import Dict, List, Optional, Tuple
 import numpy as np
 from functools import reduce # _find_any_context_neurons
+from enum import Enum, unique # used for `SplitPartitionMembership`
+from functools import total_ordering # used for `SplitPartitionMembership`
 from attrs import define, field, Factory
 
 from neuropy.utils.dynamic_container import DynamicContainer, override_dict, overriding_dict_with, get_dict_subset
@@ -18,9 +20,8 @@ from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, po
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
-from enum import Enum
-
-
+@total_ordering
+@unique
 class SplitPartitionMembership(HDFConvertableEnum, Enum):
     """ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership    
     """
@@ -29,6 +30,15 @@ class SplitPartitionMembership(HDFConvertableEnum, Enum):
     RIGHT_ONLY = 2
     # WHERE IS NEITHER!!?
 
+    def __eq__(self, other):
+        return self.value == other.value
+
+    def __le__(self, other):
+        return self.value < other.value
+
+    def __hash__(self):
+        return hash(self.value)
+    
     @classmethod
     def hdf_coding_ClassNames(cls):
         return [cls.LEFT_ONLY.name, cls.SHARED.name, cls.RIGHT_ONLY.name]
