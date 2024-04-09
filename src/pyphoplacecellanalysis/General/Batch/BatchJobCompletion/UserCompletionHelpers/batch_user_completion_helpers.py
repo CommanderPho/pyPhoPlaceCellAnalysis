@@ -730,13 +730,13 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'reload_exported_kdiba_session_position_info_mat_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
-    active_data_mode_name = curr_active_pipeline.session_data_type
+    active_data_mode_name: str = curr_active_pipeline.session_data_type
 
-    known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
+    # known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
 
     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
-    active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
+    # active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
     a_session = deepcopy(curr_active_pipeline.sess)
     # sess_config: SessionConfig = SessionConfig(**deepcopy(session.config.to_dict()))
@@ -747,7 +747,8 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
     a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
     # a_session
 
-    curr_active_pipeline.sess = a_session ## apply the session
+    curr_active_pipeline.stage.sess = a_session ## apply the session
+    # curr_active_pipeline.sess.config = a_session.config # apply the config only...
 
     loaded_track_limits = a_session.config.loaded_track_limits
     
