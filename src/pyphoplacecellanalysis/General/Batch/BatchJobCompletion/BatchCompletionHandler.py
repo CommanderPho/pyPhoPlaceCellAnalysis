@@ -172,9 +172,10 @@ class BatchSessionCompletionHandler:
                                         # 'spike_burst_detection',
                                         'split_to_directional_laps',
                                         'merged_directional_placefields',
-                                        # 'rank_order_shuffle_analysis',
+                                        'rank_order_shuffle_analysis',
+                                        'directional_train_test_split',
                                         'directional_decoders_evaluate_epochs',
-                                        'directional_decoders_epoch_heuristic_scoring',
+                                        # 'directional_decoders_epoch_heuristic_scoring',
                                     ]) # do only specified
 
     force_global_recompute: bool = field(default=False)
