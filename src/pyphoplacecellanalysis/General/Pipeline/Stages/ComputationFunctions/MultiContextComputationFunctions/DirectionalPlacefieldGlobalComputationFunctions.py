@@ -1038,8 +1038,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
     @property
     def laps_epochs_df(self) -> pd.DataFrame:
         a_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
-        # if not isinstance(a_df, pd.DataFrame):
-        #     a_df = a_df.to_dataframe()
         return ensure_dataframe(a_df)
     @laps_epochs_df.setter
     def laps_epochs_df(self, value: pd.DataFrame):
@@ -2755,6 +2753,69 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 
 # 2024-04-09 - TrainTestLapsSplitting ________________________________________________________________________________ #
+
+@define(slots=False, repr=False)
+class TrainTestSplitResult(ComputedResult):
+    """ 
+    Usage:
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult
+
+    """
+    _VersionedResultMixin_version: str = "2024.04.09_0" # to be updated in your IMPLEMENTOR to indicate its version
+
+    training_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
+    test_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=False)
+
+    test_epochs_dict: Dict[str, pd.DataFrame] = serialized_field(default=None)
+    train_epochs_dict: Dict[str, pd.DataFrame] = serialized_field(default=None)
+    train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+
+
+def _workaround_validate_has_directional_train_test_split_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
+    """
+
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult
+
+        directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
+        test_epochs_dict = directional_train_test_split_result.test_epochs_dict
+        train_epochs_dict = directional_train_test_split_result.train_epochs_dict
+        train_lap_specific_pf1D_Decoder_dict = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+
+
+    """
+    directional_train_test_split_result = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
+    if directional_train_test_split_result is None:
+        return False
+
+    test_epochs_dict = directional_train_test_split_result.test_epochs_dict
+    if (test_epochs_dict is None) or (len(test_epochs_dict) == 0):
+        return False
+
+    train_epochs_dict = directional_train_test_split_result.train_epochs_dict
+    if (train_epochs_dict is None) or (len(train_epochs_dict) == 0):
+        return False
+    
+    train_lap_specific_pf1D_Decoder_dict = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+    if (train_lap_specific_pf1D_Decoder_dict is None) or (len(train_lap_specific_pf1D_Decoder_dict) == 0):
+        return False
+    
+    # ripple_has_required_columns = PandasHelpers.require_columns({a_name:ensure_dataframe(a_result.filter_epochs) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()},
+    #     required_columns=['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel'])
+    # if ripple_has_required_columns is None:
+    #     return False
+
+    # laps_has_required_columns = PandasHelpers.require_columns({a_name:ensure_dataframe(a_result.filter_epochs) for a_name, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()},
+    #     required_columns=['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel'])
+    # if laps_has_required_columns is None:
+    #     return False
+
+    return True
+
+
+
 class TrainTestLapsSplitting:
     
     @function_attributes(short_name=None, tags=['sample', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-01 23:12', related_items=[])
@@ -2926,7 +2987,7 @@ class TrainTestLapsSplitting:
     @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=[], creation_date='2024-03-29 22:14', related_items=[])
     @classmethod
     def compute_train_test_split_laps_decoders(cls, directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=5.0/6.0,
-                                            debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
+                                            debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
         """ 
         ## Split the lap epochs into training and test periods.
         ##### Ideally we could test the lap decoding error by sampling randomly from the time bins and omitting 1/6 of time bins from the placefield building (effectively the training data). These missing bins will be used as the "test data" and the decoding error will be computed by decoding them and subtracting the actual measured position during these bins.
@@ -3114,7 +3175,13 @@ class TrainTestLapsSplitting:
             
         # train_lap_specific_pf1D_Decoder_dict, (train_epochs_dict, test_epochs_dict)
         # return (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs)
-        return (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs
+
+        return TrainTestSplitResult(is_global=True, training_data_portion=training_data_portion, test_data_portion=test_data_portion,
+                             test_epochs_dict=test_epochs_dict, train_epochs_dict=train_epochs_dict,
+                             train_lap_specific_pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict)
+        
+
+        # return (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs
 
     @classmethod
     def interpolate_positions(cls, df: pd.DataFrame, sample_times: NDArray, time_column_name: str = 't') -> pd.DataFrame:
@@ -4282,7 +4349,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
     @function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
-        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
+        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
         validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, is_global=True)
     def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
@@ -4346,6 +4413,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
             a_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_filter_epochs_decoder_result_dict)
             ## make sure it updates the results
+            # global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
+
         
         return global_computation_results
 
@@ -4406,29 +4475,23 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
     #     return global_computation_results
 
-    def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float = 9.0/10.0):
+
+    @function_attributes(short_name='directional_train_test_split', tags=['train-test-split', 'global_computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-09 06:09', related_items=[],
+                        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['TrainTestSplit'],
+                        validate_computation_test=_workaround_validate_has_directional_train_test_split_result, is_global=True)
+    def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
+                                    training_data_portion: float = 9.0/10.0, debug_output_hdf5_file_path = None):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
             ['sess']
 
         Provides:
-            global_computation_results.computed_data['pf1D_Decoder_dict']
+            global_computation_results.computed_data['TrainTestSplit']
                 ['DirectionalDecodersEpochsEvaluations']['directional_lap_specific_configs']
                 ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
-                
-        Should call:
-        
-        _perform_compute_custom_epoch_decoding
-
-
-        
-
+                a_train_test_result = global_computation_results.computed_data['TrainTestSplit']
         """
-        from neuropy.core.epoch import TimeColumnAliasesProtocol
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
-        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
-
         # spikes_df = curr_active_pipeline.sess.spikes_df
         rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
         minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -4438,37 +4501,29 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
         # print(f'included_qclu_values: {included_qclu_values}')
 
-        # DirectionalMergedDecoders: Get the result after computation:
-        directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
-        ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
-        laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
-
-        # DirectionalDecodersEpochsEvaluations
-        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
-        pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
-        ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
-        laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
-        decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
-        decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
-
-
 
         test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
         print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
 
-        decoders_dict = deepcopy(track_templates.get_decoders_dict())
+        # decoders_dict = deepcopy(track_templates.get_decoders_dict())
 
         # debug_output_hdf5_file_path = Path('output', 'laps_train_test_split.h5').resolve()
         debug_output_hdf5_file_path = None
 
         # (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs) = compute_train_test_split_laps_decoders(directional_laps_results, track_templates)
-        (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results, track_templates, training_data_portion=training_data_portion,
+        # (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results=directional_laps_results, track_templates=track_templates, training_data_portion=training_data_portion,
+        #                                                                                                                             debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
+        # train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = train_lap_specific_pf1D_Decoder_dict
+
+        a_train_test_result: TrainTestSplitResult = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results=directional_laps_results, track_templates=track_templates, training_data_portion=training_data_portion,
                                                                                                                                     debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
-        train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = train_lap_specific_pf1D_Decoder_dict
+        global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
 
-        
+
+
         return global_computation_results
+
 
 
 
