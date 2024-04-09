@@ -1289,7 +1289,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             global_computation_results.computed_data['long_short_endcap']
         
         """
-        occupancy_midpoint: float = 150.0
+        occupancy_midpoint: float = 142.7512402496278 # 150.0
         left_cap_x_bound: float = -72.0 # on long track
         right_cap_x_bound: float = 72.0 # on long track
         min_significant_remapping_x_distance: float = 40.0 # from long->short track
