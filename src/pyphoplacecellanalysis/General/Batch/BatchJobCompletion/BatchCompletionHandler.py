@@ -239,6 +239,10 @@ class BatchSessionCompletionHandler:
             was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
             was_updated
         """
+        from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
+        from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
+        from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
+
         def _subfn_update_session_missing_preprocessing_parameters(sess):
             """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
             preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
@@ -259,10 +263,36 @@ class BatchSessionCompletionHandler:
                     print(f'preprocessing parameters exist.')
                 # TODO: update them as needed?
                 return False
+            
+
+        def _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file:bool):
+            """ 2024-04-09 - Adds the previously missing `sess.config.loaded_track_limits` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
+            loaded_track_limits = getattr(curr_active_pipeline.sess.config, 'loaded_track_limits', None)
+            if (loaded_track_limits is None) or always_reload_from_file:
+                print(f'No existing loaded_track_limits parameters! Assigning them!')
+                active_data_mode_name: str = curr_active_pipeline.session_data_type
+                active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+                active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
+                a_session = deepcopy(curr_active_pipeline.sess)
+                sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+                a_session.config = sess_config
+                # a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=deepcopy(curr_active_pipeline.sess))
+                a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
+                # a_session
+                curr_active_pipeline.stage.sess = a_session ## apply the session
+                # curr_active_pipeline.sess.config = a_session.config # apply the config only...
+                return True
+            else:
+                if debug_print:
+                    print(f'loaded_track_limits parameters exist.')
+                # TODO: update them as needed?
+                return False
+            
 
         # BEGIN MAIN FUNCTION BODY
         was_updated = False
         was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
+        was_updated = was_updated | _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file=True)
 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
@@ -485,7 +515,6 @@ class BatchSessionCompletionHandler:
             print(f'WARNING: file {hdf5_output_path} is newer than the allowed overwrite date, so it will be skipped.')
             print(f'\t\tnewest_file_to_overwrite_date: {newest_file_to_overwrite_date}\t can_skip_if_allowed: {can_skip_if_allowed}\n')
             return (hdf5_output_path, None)
-
 
 
     def try_require_pipeline_has_refined_pfs(self, curr_active_pipeline):
