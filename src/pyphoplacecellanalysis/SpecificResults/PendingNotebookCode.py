@@ -1602,7 +1602,7 @@ import matplotlib.cm as cm
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _build_track_1D_verticies
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=[], creation_date='2024-02-22 11:12', related_items=[])
-def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds, long_column_name:str='long_LR', short_column_name:str='short_LR'):
+def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR'):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
     🔝🖼️🎨
@@ -1663,7 +1663,6 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bi
 
     ## INPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff
 
-    
     # Define a colormap to map your unique integer indices to colors
     colormap = plt.cm.viridis  # or any other colormap
     normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
@@ -1675,17 +1674,29 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bi
     long_y = (np.full_like(long_peak_x, 0.1)+random_y_jitter)
     short_y = (np.full_like(short_peak_x, 0.75)+random_y_jitter)
 
-    _out = ax.scatter(long_peak_x, y=long_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='LR long_peak_x')
-    _out2 = ax.scatter(short_peak_x, y=short_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='LR short_peak_x')
+    _out_long_points = ax.scatter(long_peak_x, y=long_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='long_peak_x', picker=True)
+    _out_short_points = ax.scatter(short_peak_x, y=short_y, c=scalar_map.to_rgba(active_aclus), alpha=0.9, label='short_peak_x', picker=True)
+
+    _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
+
+    _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
 
     # Add text labels to scatter points
     for i, aclu_val in enumerate(active_aclus):
-        ax.text(long_peak_x[i], long_y[i], str(aclu_val), color='black', fontsize=8)
-        ax.text(short_peak_x[i], short_y[i], str(aclu_val), color='black', fontsize=8)
+        aclu_val: int = int(aclu_val)
+        a_long_text = ax.text(long_peak_x[i], long_y[i], str(aclu_val), color='black', fontsize=8)
+        a_short_text = ax.text(short_peak_x[i], short_y[i], str(aclu_val), color='black', fontsize=8)
+
+        if aclu_val not in _output_by_aclu_dict:
+            _output_by_aclu_dict[aclu_val] = {}
+        _output_by_aclu_dict[aclu_val]['long_text'] = a_long_text
+        _output_by_aclu_dict[aclu_val]['short_text'] = a_short_text
+
 
     # Draw arrows from the first set of points to the second set
-    arrows_output = {}
-    for idx in range(len(long_peak_x)):
+    # for idx in range(len(long_peak_x)):
+    for idx, aclu_val in enumerate(active_aclus):
+        aclu_val: int = int(aclu_val)
         # Starting point coordinates
         start_x = long_peak_x[idx]
         # start_y = 0.1 + random_y_jitter[idx]
@@ -1701,13 +1712,70 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bi
         # Get the corresponding color for the current index using the colormap
         arrow_color = scalar_map.to_rgba(active_aclus[idx])
         
+        if aclu_val not in _output_by_aclu_dict:
+            _output_by_aclu_dict[aclu_val] = {}
+
         # Annotate the plot with arrows; adjust the properties according to your needs
-        arrows_output[idx] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(arrowstyle="->", color=arrow_color, alpha=0.6))
+        _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(arrowstyle="->", color=arrow_color, alpha=0.6))
+        # arrowprops: {'arrowstyle': '->', 'color': (0.267004, 0.004874, 0.329415, 1.0), 'alpha': 0.6}
+        # test.arrow_patch # mpl.patches.FancyArrowPatch
+        # test.arrow_patch.set_color('')
+
+    ## Build the interactivity callbacks:
+    previous_selected_indices = []
+
+    def onpick3(event):
+        """ 
+        Captures: active_aclus, scalar_map, _out_long_points, _out_short_points, _output_by_aclu_dict, 
+        """
+        nonlocal previous_selected_indices
+        ind = event.ind
+        print('onpick3 scatter:', ind, long_peak_x[ind], long_y[ind])
+        
+        selection_color = (1, 0, 0, 1)  # Red color in RGBA format
+
+        # Restore color of previously selected points
+        for index in previous_selected_indices:
+            # deselected aclus:
+            aclu_deselected: int = int(active_aclus[index])
+            print(f'\taclu_deselected: {aclu_deselected}')
+            original_color = scalar_map.to_rgba(active_aclus[index])
+
+
+            _out_long_points._facecolors[index] = original_color # scalar_map.to_rgba(active_aclus[index])
+            _out_short_points._facecolors[index] = original_color # scalar_map.to_rgba(active_aclus[index])
+            # restore arrow color:
+            a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_deselected, {}).get('long_to_short_arrow', None)
+            a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
+            a_paired_arrow.set_color(original_color)  # Change arrow color to blue
+        
+        # Change color of currently selected points to red
+        for index in ind:
+            # selected aclus:
+            aclu_selected: int = int(active_aclus[index])
+            print(f'\taclu_selected: {aclu_selected}')
+            _out_long_points._facecolors[index] = selection_color  # Red color in RGBA format
+            _out_short_points._facecolors[index] = selection_color  # Red color in RGBA format
+            # Change the arrow selection:
+            a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_selected, {}).get('long_to_short_arrow', None)
+            a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
+            a_paired_arrow.set_color(selection_color)  # Change arrow color to blue
+
+
+        # Update the list of previously selected indices
+        previous_selected_indices = ind
+        plt.draw()  # Update the plot
+
+
+
+    _mpl_pick_event_handle_idx: int = fig.canvas.mpl_connect('pick_event', onpick3)
+
+    _output_dict['scatter_select_function'] = onpick3
+    _output_dict['_scatter_select_mpl_pick_event_handle_idx'] = _mpl_pick_event_handle_idx
 
     # Show the plot
-    # plt.legend()
     plt.show()
-    return fig, ax, (arrows_output)
+    return fig, ax, (_output_dict, _output_by_aclu_dict)
 
 
 
