@@ -2580,11 +2580,7 @@ epoch_split_key: TypeAlias = str # a string that describes a split epoch, such a
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 
 from neuropy.core.epoch import Epoch, ensure_dataframe
-from neuropy.utils.efficient_interval_search import convert_PortionInterval_to_epochs_df, _convert_start_end_tuples_list_to_PortionInterval
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-from sklearn.metrics import mean_squared_error
-
+from neuropy.utils.efficient_interval_search import convert_PortionInterval_to_epochs_df
 
 DecodedContextCorrectnessArraysTuple = attrs.make_class("DecodedContextCorrectnessArraysTuple", {k:field() for k in ("is_decoded_track_correct", "is_decoded_dir_correct", "are_both_decoded_properties_correct")}, bases=(UnpackableMixin, object,))
 PercentDecodedContextCorrectnessTuple = attrs.make_class("PercentDecodedContextCorrectnessTuple", {k:field() for k in ("percent_laps_track_identity_estimated_correctly", "percent_laps_direction_estimated_correctly", "percent_laps_estimated_correctly")}, bases=(UnpackableMixin, object,))
@@ -2975,8 +2971,6 @@ class TrainTestLapsSplitting:
         from neuropy.core.epoch import Epoch, ensure_dataframe
         from neuropy.analyses.placefields import PfND
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-
 
         test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
 
@@ -3173,7 +3167,8 @@ class TrainTestLapsSplitting:
 
     ## INPUTS: laps_df, laps_training_df, laps_test_df
     @function_attributes(short_name=None, tags=['matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 15:46', related_items=[])
-    def debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test_df, fignum=1, fig=None, ax=None, active_context=None, use_brokenaxes_method: bool = False):
+    @classmethod
+    def debug_draw_laps_train_test_split_epochs(cls, laps_df, laps_training_df, laps_test_df, fignum=1, fig=None, ax=None, active_context=None, use_brokenaxes_method: bool = False):
         """ Draws the division of the train/test epochs using a matplotlib figure.
 
         Usage:
@@ -3183,6 +3178,7 @@ class TrainTestLapsSplitting:
             fig.show()
         """
         from neuropy.core.epoch import Epoch, ensure_dataframe
+        import matplotlib.pyplot as plt
         from matplotlib.gridspec import GridSpec
         from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
         from neuropy.utils.matplotlib_helpers import draw_epoch_regions
@@ -3251,7 +3247,8 @@ class TrainTestLapsSplitting:
         return fig, ax
 
     @function_attributes(short_name=None, tags=['matplotlib', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-01 11:00', related_items=[])
-    def _show_decoding_result(laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult], measured_positions_dfs_dict, decoded_positions_df_dict, a_name: str = 'long_LR', epoch_IDX: int = 2, xbin=None):
+    @classmethod
+    def _show_decoding_result(cls, laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult], measured_positions_dfs_dict, decoded_positions_df_dict, a_name: str = 'long_LR', epoch_IDX: int = 2, xbin=None):
         """ Plots the decoding of a single lap epoch, with its most-likely positions and actual behavioral measured positions overlayed as lines.
         Plot a single decoder, single epoch comparison of measured v. decoded position
 
@@ -3262,6 +3259,10 @@ class TrainTestLapsSplitting:
             fig, curr_ax = _show_decoding_result(test_measured_positions_dfs_dict, test_decoded_positions_df_dict, a_name = 'long_LR', epoch_IDX = 2, xbin=xbin)
 
         """
+        import matplotlib.pyplot as plt
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+
+
         a_decoder = laps_decoder_results_dict[a_name] # depends only on a_name
         active_posterior = a_decoder.p_x_given_n_list[epoch_IDX]
 
@@ -3303,7 +3304,8 @@ class TrainTestLapsSplitting:
         return fig, curr_ax
 
     @function_attributes(short_name=None, tags=['UNUSED', 'matplotlib', 'helper', 'ChatGPT', 'UNVALIDATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-01 18:26', related_items=[])
-    def wrap_xaxis_in_subplots(data_x, data_y, width, **kwargs):
+    @classmethod
+    def wrap_xaxis_in_subplots(cls, data_x, data_y, width, **kwargs):
         """
         Create a matplotlib figure with stacked subplots where the x-axis is wrapped at a given width.
 
@@ -3324,7 +3326,8 @@ class TrainTestLapsSplitting:
             wrap_xaxis_in_subplots(data_x, data_y, 10)
 
         """
-
+        import matplotlib.pyplot as plt
+        
         # Calculate the number of subplots needed
         max_x = np.max(data_x)
         num_subplots = int(np.ceil(max_x / width))
@@ -4459,8 +4462,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         debug_output_hdf5_file_path = None
 
         # (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs) = compute_train_test_split_laps_decoders(directional_laps_results, track_templates)
-        (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs = compute_train_test_split_laps_decoders(directional_laps_results, track_templates, training_data_portion=training_data_portion,
-                                                                                                                                                                    debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
+        (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results, track_templates, training_data_portion=training_data_portion,
+                                                                                                                                    debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
         train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = train_lap_specific_pf1D_Decoder_dict
 
