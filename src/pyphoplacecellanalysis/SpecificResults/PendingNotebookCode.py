@@ -1620,6 +1620,19 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     from pyphocorehelpers.geometry_helpers import BoundsRect
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackDimensions
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+
+    ## Get the track configs for the colors:
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+
+    long_track_color = dict(facecolor=long_epoch_config['facecolor'])
+    short_track_color = dict(facecolor=short_epoch_config['facecolor'])
+
+    # long_track_color = dict(facecolor='orange')
+    # short_track_color = dict(facecolor='green')
 
     ## Extract the quantities needed from the DF passed
     active_aclus = LR_only_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
@@ -1691,11 +1704,11 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
 
     ##########################
 
-
-    long_patch = patches.PathPatch(long_path, facecolor='orange', alpha=0.5, lw=2)
+    ## Plot the tracks:
+    long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
     ax.add_patch(long_patch)
 
-    short_patch = patches.PathPatch(short_path, facecolor='green', alpha=0.5, lw=2)
+    short_patch = patches.PathPatch(short_path, **short_track_color, alpha=0.5, lw=2)
     ax.add_patch(short_patch)
     ax.autoscale()
 
@@ -1784,7 +1797,7 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
         """
         nonlocal previous_selected_indices
         ind = event.ind
-        print('onpick3 scatter:', ind, long_peak_x[ind], long_y[ind])
+        print(f'onpick3 scatter(event: {event}):\n\t', ind, long_peak_x[ind], long_y[ind])
         
         selection_color = (1, 0, 0, 1)  # Red color in RGBA format
 
