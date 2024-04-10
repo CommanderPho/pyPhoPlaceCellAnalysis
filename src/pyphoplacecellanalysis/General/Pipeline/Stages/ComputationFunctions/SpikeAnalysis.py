@@ -80,6 +80,24 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
             else:
                 filter_epochs_df = filter_epochs.to_dataframe()
                 
+            minimum_event_duration: float = instantaneous_time_bin_size_seconds # allow direct use            
+            ## Drop those less than the time bin duration
+            print(f'DropShorterMode:')
+            pre_drop_n_epochs = len(filter_epochs_df)
+            if minimum_event_duration is not None:                
+                filter_epochs_df = filter_epochs_df[filter_epochs_df['duration'] > minimum_event_duration]
+                post_drop_n_epochs = len(filter_epochs_df)
+                n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+                print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
+            else:
+                filter_epochs_df = filter_epochs_df[filter_epochs_df['duration'] > instantaneous_time_bin_size_seconds]
+                post_drop_n_epochs = len(filter_epochs_df)
+                n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+                print(f'\tdropping {n_dropped_epochs} that are shorter than our instantaneous_time_bin_size_seconds of {instantaneous_time_bin_size_seconds}', end='\t') 
+
+            print(f'{post_drop_n_epochs} remain.')
+
+
             epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
             _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
