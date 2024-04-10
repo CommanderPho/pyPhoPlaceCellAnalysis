@@ -188,7 +188,7 @@ class HeuristicReplayScoring:
         return ratio_bins_higher_than_diffusion_across_time
 
     @classmethod
-    @function_attributes(short_name='continuous_seq_sort', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
+    @function_attributes(short_name='continuous_seq_sort', tags=['bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
     def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
@@ -198,6 +198,34 @@ class HeuristicReplayScoring:
         - 
 
         TODO 2024-03-27 - Not yet working:  
+
+        # 2024-03-27 - Finish `bin_wise_continuous_sequence_sort_score_fn`
+            from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, is_valid_sequence_index, _compute_sequences_spanning_ignored_intrusions
+
+            # track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
+
+            a_result: DecodedFilterEpochsResult = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict['short_RL'])
+            an_epoch_idx: int = 8
+            a_decoder_track_length = 144.0 # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+            HeuristicReplayScoring.bin_wise_continuous_sequence_sort_score_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
+            start_t: float = 105.4005
+
+            active_filter_epochs: pd.DataFrame = deepcopy(a_result.active_filter_epochs)
+            active_filter_epochs
+            active_filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=np.array([start_t])) # array([8], dtype=int64)
+            active_filter_epochs
+
+            an_epoch_idx: int = 8
+
+            a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+            a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+            n_time_bins: int = a_result.nbins[an_epoch_idx]
+            n_pos_bins: int = np.shape(a_p_x_given_n)[0]
+            time_window_centers = a_result.time_window_centers[an_epoch_idx]
+
+            a_most_likely_positions_list
+
+            # n_time_bins
 
         """
         ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
