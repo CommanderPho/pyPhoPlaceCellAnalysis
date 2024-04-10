@@ -22,6 +22,17 @@ from pyphoplacecellanalysis.External.pyqtgraph import PlotItem
 # Define the named tuple
 ScaleFactors = namedtuple("ScaleFactors", ["major", "minor"])
 
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing import NewType
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
+epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
+DecoderName = NewType('DecoderName', str)
+
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin # for NotableTrackPositions
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.axes
@@ -30,6 +41,54 @@ import matplotlib.patches as patches # for matplotlib version of the plot
 from matplotlib.collections import PatchCollection
 
 import pyvista as pv # for 3D support in `LinearTrackDimensions3D`
+
+
+
+@define(slots=False, repr=True)
+class NotableTrackPositions(UnpackableMixin):
+    """ 2024-04-10 - Just holds the outer/inner x-positions of the platforms which entirely describes one configuration (long/short) of the track. """
+    left_platform_outer: float = field()
+    left_platform_inner: float = field()
+    right_platform_inner: float = field()
+    right_platform_outer: float = field()
+
+    # Computed properties
+    @property
+    def outer_width(self) -> float:
+        """total track (including platform) width"""
+        return np.abs(self.right_platform_outer - self.left_platform_outer) # total track (including platform) width
+    
+    @property
+    def inner_width(self) -> float:
+        """track (non-platform) width"""
+        return np.abs(self.right_platform_inner - self.left_platform_inner) # track (non-platform) width
+    
+    @classmethod
+    def init_x_and_y_notable_positions(cls, long_xlim, long_ylim, short_xlim, short_ylim, platform_side_length: float = 22.0):
+        """
+
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_vertical_track_bounds_lines
+
+        LR_long_track_line_collection, LR_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions,
+                                                                                                            short_notable_x_platform_positions=short_notable_x_platform_positions,
+                                                                                                            ax=ax_LR)
+        RL_long_track_line_collection, RL_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions,
+                                                                                                            short_notable_x_platform_positions=short_notable_x_platform_positions,
+                                                                                                            ax=ax_RL)
+                                                                                                            
+        """
+        # XLIM:
+        long_notable_x_platform_positions: NotableTrackPositions = cls(left_platform_outer=(long_xlim[0]-platform_side_length), left_platform_inner=long_xlim[0], right_platform_inner=long_xlim[1], right_platform_outer=(long_xlim[1]+platform_side_length))
+        short_notable_x_platform_positions: NotableTrackPositions = cls(left_platform_outer=(short_xlim[0]-platform_side_length), left_platform_inner=short_xlim[0], right_platform_inner=short_xlim[1], right_platform_outer=(short_xlim[1]+platform_side_length))
+
+        # YLIM: NOTE: for y-axis the names of the `NotableTrackPositions` class doesn't make a ton of sense
+        # long_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=(long_ylim[0]-long_track_dims.platform_side_length), left_platform_inner=long_ylim[0], right_platform_inner=long_ylim[1], right_platform_outer=(long_ylim[1]+long_track_dims.platform_side_length))
+        # short_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=(short_ylim[0]-short_track_dims.platform_side_length), left_platform_inner=short_ylim[0], right_platform_inner=short_ylim[1], right_platform_outer=(short_ylim[1]+short_track_dims.platform_side_length))
+        long_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=long_ylim[0], left_platform_inner=long_ylim[0], right_platform_inner=long_ylim[1], right_platform_outer=long_ylim[1]) # NOTE: no track width
+        short_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=short_ylim[0], left_platform_inner=short_ylim[0], right_platform_inner=short_ylim[1], right_platform_outer=short_ylim[1])  # NOTE: no track width
+
+        return (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) 
+
 
 
 

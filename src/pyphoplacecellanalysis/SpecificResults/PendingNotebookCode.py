@@ -119,52 +119,6 @@ def _get_directional_pf_peaks_dfs(track_templates,  drop_aclu_if_missing_long_or
     return LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
 
 
-@define(slots=False, repr=True)
-class NotableTrackPositions(UnpackableMixin):
-    left_platform_outer: float = field()
-    left_platform_inner: float = field()
-    right_platform_inner: float = field()
-    right_platform_outer: float = field()
-
-    # Computed properties
-    @property
-    def outer_width(self) -> float:
-        """total track (including platform) width"""
-        return np.abs(self.right_platform_outer - self.left_platform_outer) # total track (including platform) width
-    
-    @property
-    def inner_width(self) -> float:
-        """track (non-platform) width"""
-        return np.abs(self.right_platform_inner - self.left_platform_inner) # track (non-platform) width
-    
-    @classmethod
-    def init_x_and_y_notable_positions(cls, long_xlim, long_ylim, short_xlim, short_ylim, platform_side_length: float = 22.0):
-        """
-
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_vertical_track_bounds_lines
-
-        LR_long_track_line_collection, LR_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions,
-                                                                                                            short_notable_x_platform_positions=short_notable_x_platform_positions,
-                                                                                                            ax=ax_LR)
-        RL_long_track_line_collection, RL_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions,
-                                                                                                            short_notable_x_platform_positions=short_notable_x_platform_positions,
-                                                                                                            ax=ax_RL)
-                                                                                                            
-        """
-        # XLIM:
-        long_notable_x_platform_positions: NotableTrackPositions = cls(left_platform_outer=(long_xlim[0]-platform_side_length), left_platform_inner=long_xlim[0], right_platform_inner=long_xlim[1], right_platform_outer=(long_xlim[1]+platform_side_length))
-        short_notable_x_platform_positions: NotableTrackPositions = cls(left_platform_outer=(short_xlim[0]-platform_side_length), left_platform_inner=short_xlim[0], right_platform_inner=short_xlim[1], right_platform_outer=(short_xlim[1]+platform_side_length))
-
-        # YLIM: NOTE: for y-axis the names of the `NotableTrackPositions` class doesn't make a ton of sense
-        # long_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=(long_ylim[0]-long_track_dims.platform_side_length), left_platform_inner=long_ylim[0], right_platform_inner=long_ylim[1], right_platform_outer=(long_ylim[1]+long_track_dims.platform_side_length))
-        # short_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=(short_ylim[0]-short_track_dims.platform_side_length), left_platform_inner=short_ylim[0], right_platform_inner=short_ylim[1], right_platform_outer=(short_ylim[1]+short_track_dims.platform_side_length))
-        long_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=long_ylim[0], left_platform_inner=long_ylim[0], right_platform_inner=long_ylim[1], right_platform_outer=long_ylim[1]) # NOTE: no track width
-        short_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=short_ylim[0], left_platform_inner=short_ylim[0], right_platform_inner=short_ylim[1], right_platform_outer=short_ylim[1])  # NOTE: no track width
-
-        return (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) 
-
-
-
 @function_attributes(short_name=None, tags=['batch', 'matlab_mat_file', 'multi-session', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-10 07:41', related_items=[])
 def batch_build_user_annotation_grid_bin_bounds_from_exported_position_info_mat_files(search_parent_path: Path, platform_side_length: float = 22.0):
     """ finds all *.position_info.mat files recurrsively in the search_parent_path, then try to load them and parse their parent directory as a session to build an IdentifyingContext that can be used as a key in UserAnnotations.
@@ -553,15 +507,10 @@ def _show_sweep_result(output_full_directional_merged_decoders_result=None, glob
     return _out_pagination_controller, (all_swept_measured_positions_dfs_dict, all_swept_decoded_positions_df_dict, all_swept_decoded_measured_diff_df_dict)
 
 
-
-
-
-
 # ==================================================================================================================== #
 # 2024-04-04 - Continued Decoder Error Assessment                                                                      #
 # ==================================================================================================================== #
 
-from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 
 
 
