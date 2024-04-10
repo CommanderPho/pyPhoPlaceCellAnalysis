@@ -1191,7 +1191,12 @@ class PipelineWithComputedPipelineStageMixin:
             if a_config_name in config_names_includelist:            
                 # remove the results from this config
                 for a_key_to_drop in global_not_found_keys_to_drop:
-                    a_result_to_drop = curr_computed_results.pop(a_key_to_drop, []) # AttributeError: 'ComputationResult' object has no attribute 'pop'
+                    try:
+                        a_result_to_drop = curr_computed_results.pop(a_key_to_drop, []) 
+                    except AttributeError as e:
+                        # this seems like it would always be the case because `# AttributeError: 'ComputationResult' object has no attribute 'pop'`
+                        a_result_to_drop = curr_computed_results.computed_data.pop(a_key_to_drop, [])
+
                     ## TODO: Should we drop from curr_computed_results.accumulated_errors in addition to curr_computed_results.computed_data? Probably fine not to.
                     if a_result_to_drop is not []:
                         # Successfully dropped
