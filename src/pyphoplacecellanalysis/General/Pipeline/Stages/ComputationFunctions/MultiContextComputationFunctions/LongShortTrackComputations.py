@@ -122,11 +122,11 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['cell', 'partition', 'exclusivity'], input_requires=[], output_provides=[], uses=['TrackExclusivePartitionSubset'], used_by=[], creation_date='2023-06-20 00:00', related_items=[])
     def get_cell_track_partitions(self, frs_index_inclusion_magnitude:float=0.5) -> Tuple[pd.DataFrame, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset]:
-        """ 2023-06-20 - Partition the neuron_replay_stats_df into subsets by seeing whether each aclu has a placefield for the long/short track.
+        """ 2023-06-20 - Partition the `neuron_replay_stats_df` into subsets by seeing whether each aclu has a placefield for the long/short track.
             # Four distinct subgroups are formed:  pf on neither, pf on both, pf on only long, pf on only short
             # L_only_aclus, S_only_aclus
 
-            #TODO 2023-05-23 - Can do more detailed peaks analysis with: long_results.RatemapPeaksAnalysis and short_results.RatemapPeaksAnalysis
+            #TODO 2023-05-23 - Can do more detailed peaks analysis with: `long_results.RatemapPeaksAnalysis` and `short_results.RatemapPeaksAnalysis`
 
             As a side-effect it also updates `self.neuron_replay_stats_df` with the 'is_refined_exclusive', 'is_refined_LxC', 'is_refined_SxC' column
 
@@ -553,7 +553,7 @@ class LongShortPipelineTests:
             raise # unhandled exception
 
     def __call__(self, override_long_epoch_name:Optional[str]=None, override_short_epoch_name:Optional[str]=None) -> bool:
-        return self.validate(override_long_epoch_name=long_epoch_name, override_short_epoch_name=short_epoch_name)
+        return self.validate(override_long_epoch_name=override_long_epoch_name, override_short_epoch_name=override_short_epoch_name)
 
 
 
@@ -567,7 +567,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     _computationPrecidence = 1003
     _is_global = True
 
-    @function_attributes(short_name='long_short_decoding_analyses', tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=[], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10',
+    @function_attributes(short_name='long_short_decoding_analyses', tags=['long_short', 'short_long', 'leave-one-out', 'replay', 'decoding', 'computation'], input_requires=[], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10',
                          requires_global_keys=[], provides_global_keys=['long_short_leave_one_out_decoding_analysis'],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True)
     def _perform_long_short_decoding_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False, override_long_epoch_name:Optional[str]=None, override_short_epoch_name:Optional[str]=None):
@@ -1037,7 +1037,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='long_short_post_decoding', tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=[],
+    @function_attributes(short_name='long_short_post_decoding', tags=['long_short', 'short_long','replay', 'decoding', 'computation', 'radon_transforms', 'expected_v_observed'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=[],
                           uses=['compute_rate_remapping_stats', 'compute_measured_vs_expected_firing_rates', 'simpler_compute_measured_vs_expected_firing_rates', 'compute_radon_transforms'], used_by=[], creation_date='2023-05-31 13:57',
                           requires_global_keys=['long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis'], provides_global_keys=['long_short_post_decoding'],
                           validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True)
@@ -1304,8 +1304,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # short_ylim = loaded_track_limits['short_ylim']
 
         occupancy_midpoint: float = x_midpoint # 142.7512402496278 # 150.0
-        left_cap_x_bound: float = long_xlim[0] #-72.0 # on long track
-        right_cap_x_bound: float = long_xlim[1] # 72.0 # on long track
+        left_cap_x_bound: float = (long_xlim[0] - x_midpoint) #-shift by midpoint - 72.0 # on long track
+        right_cap_x_bound: float = (long_xlim[1] - x_midpoint) # 72.0 # on long track
         min_significant_remapping_x_distance: float = 40.0 # from long->short track
 
 
