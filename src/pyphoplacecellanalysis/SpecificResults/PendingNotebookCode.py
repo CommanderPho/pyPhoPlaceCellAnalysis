@@ -27,13 +27,145 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing import NewType
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
 epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
+DecoderName = NewType('DecoderName', str)
+
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin # for NotableTrackPositions
 
 
+## INPUTS: track_templates, drop_aclu_if_missing_long_or_short: bool = True
+
+def _get_directional_pf_peaks_dfs(track_templates,  drop_aclu_if_missing_long_or_short: bool = True):
+    """ 
+    #TODO 2024-04-09 00:36: - [ ] Could be refactored into TrackTemplates
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_directional_pf_peaks_dfs
+
+        LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df = _get_directional_pf_peaks_dfs(track_templates, drop_aclu_if_missing_long_or_short=True)
+
+        LR_only_decoder_aclu_MAX_peak_maps_df
+        RL_only_decoder_aclu_MAX_peak_maps_df
+
+    """
+    # drop_aclu_if_missing_long_or_short: bool = True ## default=True; Drop entire row if either long/short is missing a value
+    # drop_aclu_if_missing_long_or_short: bool = False
+    from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
+    from neuropy.utils.indexing_helpers import unwrap_single_item
+
+    # decoder_aclu_peak_maps_dict = {a_name:deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_locations))) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+    # decoder_aclu_peak_maps_dict: Dict[DecoderName, Dict[types.aclu_index, NDArray]] = {DecoderName(a_name):deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.get_tuning_curve_peak_positions(peak_mode='peaks')))) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+    # decoder_aclu_peak_maps_dict
+    # {'long_LR': {4: array([155.045]),
+    #   9: array([166.462]),
+    #   11: array([158.851]),
+    #   12: array([109.38]),
+    #   13: array([231.154]),
+    #   14: array([143.629, 113.186, 78.937]),
+    #   15: array([52.2991]),
+    #   16: array([], dtype=float64),
+    #   ...
+
+    ## Split into LR/RL groups to get proper peak differences:
+    # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+    LR_decoder_names = track_templates.get_LR_decoder_names() # ['long_LR', 'short_LR']
+    RL_decoder_names = track_templates.get_RL_decoder_names() # ['long_RL', 'short_RL']
+
+    ## Only the maximums, guaranteed to be a single (or None) location:
+    decoder_aclu_MAX_peak_maps_dict: Dict[DecoderName, Dict[types.aclu_index, Optional[float]]] = {DecoderName(a_name):{k:unwrap_single_item(v) for k, v in deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.get_tuning_curve_peak_positions(peak_mode='peaks', height=1)))).items()} for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+    # decoder_aclu_MAX_peak_maps_dict
+
+    ## Splits by direction:
+    LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in LR_decoder_names})
+    RL_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in RL_decoder_names})
+
+    ## Drop entire row if either long/short is missing a value:
+    if drop_aclu_if_missing_long_or_short:
+        LR_only_decoder_aclu_MAX_peak_maps_df = LR_only_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any')
+        RL_only_decoder_aclu_MAX_peak_maps_df = RL_only_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any')
+
+    ## Compute the difference between the Long/Short peaks:
+    LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'] = LR_only_decoder_aclu_MAX_peak_maps_df.diff(axis='columns').to_numpy()[:, -1]
+    RL_only_decoder_aclu_MAX_peak_maps_df['peak_diff'] = RL_only_decoder_aclu_MAX_peak_maps_df.diff(axis='columns').to_numpy()[:, -1]
+
+
+    # ## UNUSED BLOCK:
+    # # maximal_peak_only_decoder_aclu_peak_location_df_merged = deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged['long_LR_peak_height'] == 1.0]
+
+    # LR_height_column_names = ['long_LR_peak_height', 'short_LR_peak_height']
+
+    # # [decoder_aclu_peak_location_df_merged[a_name] == 1.0 for a_name in LR_height_column_names]
+
+    # LR_max_peak_dfs = [deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged[a_name] == 1.0].drop(columns=['subpeak_idx', 'series_idx', 'LR_peak_diff', 'RL_peak_diff', a_name]) for a_name in LR_height_column_names]
+
+    # aclus_with_LR_peaks = intersection_of_arrays(*[a_df.aclu.unique() for a_df in LR_max_peak_dfs])
+    # aclus_with_LR_peaks
+
+    # ## Align them now:
+    # LR_max_peak_dfs = [a_df[a_df.aclu.isin(aclus_with_LR_peaks)] for a_df in LR_max_peak_dfs]
+    # LR_max_peak_dfs
+
+    # maximal_peak_only_decoder_aclu_peak_location_df_merged = deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged[LR_height_column_names] == 1.0]
+    # maximal_peak_only_decoder_aclu_peak_location_df_merged
+
+
+    # OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
+    return LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
+
+
+@define(slots=False, repr=True)
+class NotableTrackPositions(UnpackableMixin):
+    left_platform_outer: float = field()
+    left_platform_inner: float = field()
+    right_platform_inner: float = field()
+    right_platform_outer: float = field()
+
+    # Computed properties
+    @property
+    def outer_width(self) -> float:
+        """total track (including platform) width"""
+        return np.abs(self.right_platform_outer - self.left_platform_outer) # total track (including platform) width
+    
+    @property
+    def inner_width(self) -> float:
+        """track (non-platform) width"""
+        return np.abs(self.right_platform_inner - self.left_platform_inner) # track (non-platform) width
+    
+    @classmethod
+    def init_x_and_y_notable_positions(cls, long_xlim, long_ylim, short_xlim, short_ylim, platform_side_length: float = 22.0):
+        """
+
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_vertical_track_bounds_lines
+
+        LR_long_track_line_collection, LR_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions,
+                                                                                                            short_notable_x_platform_positions=short_notable_x_platform_positions,
+                                                                                                            ax=ax_LR)
+        RL_long_track_line_collection, RL_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions,
+                                                                                                            short_notable_x_platform_positions=short_notable_x_platform_positions,
+                                                                                                            ax=ax_RL)
+                                                                                                            
+        """
+        # XLIM:
+        long_notable_x_platform_positions: NotableTrackPositions = cls(left_platform_outer=(long_xlim[0]-platform_side_length), left_platform_inner=long_xlim[0], right_platform_inner=long_xlim[1], right_platform_outer=(long_xlim[1]+platform_side_length))
+        short_notable_x_platform_positions: NotableTrackPositions = cls(left_platform_outer=(short_xlim[0]-platform_side_length), left_platform_inner=short_xlim[0], right_platform_inner=short_xlim[1], right_platform_outer=(short_xlim[1]+platform_side_length))
+
+        # YLIM: NOTE: for y-axis the names of the `NotableTrackPositions` class doesn't make a ton of sense
+        # long_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=(long_ylim[0]-long_track_dims.platform_side_length), left_platform_inner=long_ylim[0], right_platform_inner=long_ylim[1], right_platform_outer=(long_ylim[1]+long_track_dims.platform_side_length))
+        # short_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=(short_ylim[0]-short_track_dims.platform_side_length), left_platform_inner=short_ylim[0], right_platform_inner=short_ylim[1], right_platform_outer=(short_ylim[1]+short_track_dims.platform_side_length))
+        long_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=long_ylim[0], left_platform_inner=long_ylim[0], right_platform_inner=long_ylim[1], right_platform_outer=long_ylim[1]) # NOTE: no track width
+        short_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=short_ylim[0], left_platform_inner=short_ylim[0], right_platform_inner=short_ylim[1], right_platform_outer=short_ylim[1])  # NOTE: no track width
+
+        return (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) 
+
+
+
+@function_attributes(short_name=None, tags=['batch', 'matlab_mat_file', 'multi-session', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-10 07:41', related_items=[])
 def batch_build_user_annotation_grid_bin_bounds_from_exported_position_info_mat_files(search_parent_path: Path, platform_side_length: float = 22.0):
     """ finds all *.position_info.mat files recurrsively in the search_parent_path, then try to load them and parse their parent directory as a session to build an IdentifyingContext that can be used as a key in UserAnnotations.
     
@@ -122,7 +254,7 @@ def batch_build_user_annotation_grid_bin_bounds_from_exported_position_info_mat_
 
 
 
-def _build_new_grid_bin_bounds_from_mat_exported_xlims(curr_active_pipeline, platform_side_length: float = 22.0):
+def _build_new_grid_bin_bounds_from_mat_exported_xlims(curr_active_pipeline, platform_side_length: float = 22.0, build_user_annotation_string:bool=False):
     """ 2024-04-10 -
      
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _build_new_grid_bin_bounds_from_mat_exported_xlims
@@ -150,21 +282,22 @@ def _build_new_grid_bin_bounds_from_mat_exported_xlims(curr_active_pipeline, pla
     # print(f'from_mat_lims_grid_bin_bounds: {from_mat_lims_grid_bin_bounds}')
     # from_mat_lims_grid_bin_bounds # BoundsRect(xmin=37.0773897438341, xmax=250.69004399129707, ymin=116.16397564990257, ymax=168.1197529956474)
 
-    ## Build Update:
-    user_annotations = UserAnnotationsManager.get_user_annotations()
+    if build_user_annotation_string:
+        ## Build Update:
+        user_annotations = UserAnnotationsManager.get_user_annotations()
 
-    # curr_active_pipeline.sess.config.computation_config['pf_params'].grid_bin_bounds = new_grid_bin_bounds
+        # curr_active_pipeline.sess.config.computation_config['pf_params'].grid_bin_bounds = new_grid_bin_bounds
 
-    active_context = curr_active_pipeline.get_session_context()
-    final_context = active_context.adding_context_if_missing(user_annotation='grid_bin_bounds')
-    user_annotations[final_context] = from_mat_lims_grid_bin_bounds.extents
-    # Updates the context. Needs to generate the code.
+        active_context = curr_active_pipeline.get_session_context()
+        final_context = active_context.adding_context_if_missing(user_annotation='grid_bin_bounds')
+        user_annotations[final_context] = from_mat_lims_grid_bin_bounds.extents
+        # Updates the context. Needs to generate the code.
 
-    ## Generate code to insert int user_annotations:
-    print('Add the following code to UserAnnotationsManager.get_user_annotations() function body:')
-    ## new style:
-    # print(f"user_annotations[{final_context.get_initialization_code_string()}] = {(from_mat_lims_grid_bin_bounds.xmin, from_mat_lims_grid_bin_bounds.xmax), (from_mat_lims_grid_bin_bounds.ymin, from_mat_lims_grid_bin_bounds.ymax)}")
-    print(f"user_annotations[{active_context.get_initialization_code_string()}] = dict(grid_bin_bounds=({(from_mat_lims_grid_bin_bounds.xmin, from_mat_lims_grid_bin_bounds.xmax), (from_mat_lims_grid_bin_bounds.ymin, from_mat_lims_grid_bin_bounds.ymax)}))")
+        ## Generate code to insert int user_annotations:
+        print('Add the following code to UserAnnotationsManager.get_user_annotations() function body:')
+        ## new style:
+        # print(f"user_annotations[{final_context.get_initialization_code_string()}] = {(from_mat_lims_grid_bin_bounds.xmin, from_mat_lims_grid_bin_bounds.xmax), (from_mat_lims_grid_bin_bounds.ymin, from_mat_lims_grid_bin_bounds.ymax)}")
+        print(f"user_annotations[{active_context.get_initialization_code_string()}] = dict(grid_bin_bounds=({(from_mat_lims_grid_bin_bounds.xmin, from_mat_lims_grid_bin_bounds.xmax), (from_mat_lims_grid_bin_bounds.ymin, from_mat_lims_grid_bin_bounds.ymax)}))")
 
     return from_mat_lims_grid_bin_bounds
 
