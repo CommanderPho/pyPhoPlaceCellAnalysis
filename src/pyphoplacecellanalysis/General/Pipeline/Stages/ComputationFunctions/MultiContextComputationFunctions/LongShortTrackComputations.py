@@ -1289,10 +1289,31 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             global_computation_results.computed_data['long_short_endcap']
         
         """
-        occupancy_midpoint: float = 142.7512402496278 # 150.0
-        left_cap_x_bound: float = -72.0 # on long track
-        right_cap_x_bound: float = 72.0 # on long track
+        
+        loaded_track_limits = deepcopy(owning_pipeline_reference.sess.config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
+        x_midpoint: float = owning_pipeline_reference.sess.config.x_midpoint
+        pix2cm: float = owning_pipeline_reference.sess.config.pix2cm
+
+        ## INPUTS: loaded_track_limits
+        print(f'loaded_track_limits: {loaded_track_limits}')
+
+
+        long_xlim = loaded_track_limits['long_xlim']
+        # long_ylim = loaded_track_limits['long_ylim']
+        short_xlim = loaded_track_limits['short_xlim']
+        # short_ylim = loaded_track_limits['short_ylim']
+
+        occupancy_midpoint: float = x_midpoint # 142.7512402496278 # 150.0
+        left_cap_x_bound: float = long_xlim[0] #-72.0 # on long track
+        right_cap_x_bound: float = long_xlim[1] # 72.0 # on long track
         min_significant_remapping_x_distance: float = 40.0 # from long->short track
+
+
+        ## STATIC:
+        # occupancy_midpoint: float = 142.7512402496278 # 150.0
+        # left_cap_x_bound: float = -72.0 # on long track
+        # right_cap_x_bound: float = 72.0 # on long track
+        # min_significant_remapping_x_distance: float = 40.0 # from long->short track
 
 
         jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = global_computation_results.computed_data.jonathan_firing_rate_analysis

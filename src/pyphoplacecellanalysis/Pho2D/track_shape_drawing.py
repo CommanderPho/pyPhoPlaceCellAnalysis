@@ -600,6 +600,8 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
             return merged_boxes_pdata
      
 
+from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
+
 
 @define(slots=False)
 class LinearTrackInstance:
