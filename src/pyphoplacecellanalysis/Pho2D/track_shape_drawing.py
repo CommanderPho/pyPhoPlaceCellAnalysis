@@ -32,6 +32,8 @@ epoch_split_key: TypeAlias = str # a string that describes a split epoch, such a
 DecoderName = NewType('DecoderName', str)
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin # for NotableTrackPositions
+from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
+
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -67,14 +69,18 @@ class NotableTrackPositions(UnpackableMixin):
     def init_x_and_y_notable_positions(cls, long_xlim, long_ylim, short_xlim, short_ylim, platform_side_length: float = 22.0):
         """
 
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_vertical_track_bounds_lines
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import NotableTrackPositions
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_vertical_track_bounds_lines
 
-        LR_long_track_line_collection, LR_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions,
-                                                                                                            short_notable_x_platform_positions=short_notable_x_platform_positions,
-                                                                                                            ax=ax_LR)
-        RL_long_track_line_collection, RL_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions,
-                                                                                                            short_notable_x_platform_positions=short_notable_x_platform_positions,
-                                                                                                            ax=ax_RL)
+            (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) = NotableTrackPositions.init_notable_track_points_from_session_config(curr_active_pipeline.sess.config)
+
+            LR_long_track_line_collection, LR_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=tuple(long_notable_x_platform_positions),
+                                                                                                                short_notable_x_platform_positions=tuple(short_notable_x_platform_positions),
+                                                                                                                ax=ax_LR)
+            RL_long_track_line_collection, RL_short_track_line_collection = perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=tuple(long_notable_x_platform_positions),
+                                                                                                                short_notable_x_platform_positions=tuple(short_notable_x_platform_positions),
+                                                                                                                ax=ax_RL)
                                                                                                             
         """
         # XLIM:
@@ -88,6 +94,25 @@ class NotableTrackPositions(UnpackableMixin):
         short_notable_y_platform_positions: NotableTrackPositions = cls(left_platform_outer=short_ylim[0], left_platform_inner=short_ylim[0], right_platform_inner=short_ylim[1], right_platform_outer=short_ylim[1])  # NOTE: no track width
 
         return (long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) 
+
+    @classmethod
+    def init_notable_track_points_from_session_config(cls, a_sess_config: Union[SessionConfig, Dict], platform_side_length:float=22.0) -> Tuple[Tuple["NotableTrackPositions", "NotableTrackPositions"], Tuple["NotableTrackPositions", "NotableTrackPositions"]]:
+        """ Builds the two tracks (long/short) objects from the session config provided.
+        
+        ## Usage:
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+
+            long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(curr_active_pipeline.sess.config)
+
+        """
+        loaded_track_limits = deepcopy(a_sess_config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
+        long_xlim = loaded_track_limits['long_xlim']
+        long_ylim = loaded_track_limits['long_ylim']
+        ## if we have short, build that one too:
+        short_xlim = loaded_track_limits['short_xlim']
+        short_ylim = loaded_track_limits['short_ylim']
+        return cls.init_x_and_y_notable_positions(long_xlim=long_xlim, long_ylim=long_ylim, short_xlim=short_xlim, short_ylim=short_ylim, platform_side_length=platform_side_length)
+    
 
 
 
@@ -659,7 +684,7 @@ class LinearTrackDimensions3D(LinearTrackDimensions):
             return merged_boxes_pdata
      
 
-from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
+
 
 
 @define(slots=False)
