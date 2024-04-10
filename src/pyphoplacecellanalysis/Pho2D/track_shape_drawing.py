@@ -636,6 +636,39 @@ class LinearTrackInstance:
 
         _obj = cls(LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds), grid_bin_bounds=grid_bin_bounds)
         return _obj
+    
+
+
+    @classmethod
+    def init_tracks_from_session_config(cls, a_sess_config: Union[SessionConfig, Dict], platform_side_length:float=22.0) -> Tuple["LinearTrackInstance", "LinearTrackInstance"]:
+        """ Builds the two tracks (long/short) objects from the session config provided.
+        
+        ## Usage:
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+
+            long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(curr_active_pipeline.sess.config)
+
+        """
+        loaded_track_limits = deepcopy(a_sess_config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
+        x_midpoint: float = a_sess_config.x_midpoint
+        pix2cm: float = a_sess_config.pix2cm
+
+        long_xlim = loaded_track_limits['long_xlim']
+        long_ylim = loaded_track_limits['long_ylim']
+
+        ## if we have short, build that one too:
+        short_xlim = loaded_track_limits['short_xlim']
+        short_ylim = loaded_track_limits['short_ylim']
+        
+        LONG_from_mat_lims_grid_bin_bounds = BoundsRect(xmin=(long_xlim[0]-platform_side_length), xmax=(long_xlim[1]+platform_side_length), ymin=long_ylim[0], ymax=long_ylim[1])
+        SHORT_from_mat_lims_grid_bin_bounds = BoundsRect(xmin=(short_xlim[0]-platform_side_length), xmax=(short_xlim[1]+platform_side_length), ymin=short_ylim[0], ymax=short_ylim[1])
+
+        LONG_obj = cls(LinearTrackDimensions.init_from_grid_bin_bounds(LONG_from_mat_lims_grid_bin_bounds), grid_bin_bounds=LONG_from_mat_lims_grid_bin_bounds)
+        SHORT_obj = cls(LinearTrackDimensions.init_from_grid_bin_bounds(SHORT_from_mat_lims_grid_bin_bounds), grid_bin_bounds=SHORT_from_mat_lims_grid_bin_bounds)
+
+        return LONG_obj, SHORT_obj
+    
+
 
     def classify_point(self, test_point) -> "TrackPositionClassification":
         return classify_test_point(test_point, self.rects)
