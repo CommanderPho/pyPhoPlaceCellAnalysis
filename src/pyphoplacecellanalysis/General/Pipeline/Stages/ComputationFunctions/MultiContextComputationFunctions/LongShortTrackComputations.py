@@ -495,7 +495,57 @@ class TruncationCheckingResults(ComputedResult):
     non_disappearing_endcap_aclus: pd.Index = serialized_field()
     significant_distant_remapping_endcap_aclus: pd.Index = serialized_field()
     minor_remapping_endcap_aclus: pd.Index = serialized_field()
+
+    # @property
+    # def truncation_checking_aclus_dict(self, neuron_replay_stats_df, assign_to_df_column=True) -> Dict:
+
+    def build_truncation_checking_aclus_dict(self, neuron_replay_stats_df, assign_to_df_column: bool=True) -> Dict:
+        """The truncation_checking_aclus_dict property.
+
+        Usage:    
+            ## long_short_endcap_analysis:
+            truncation_checking_result: TruncationCheckingResults = curr_active_pipeline.global_computation_results.computed_data.long_short_endcap
+            truncation_checking_aclus_dict, jonathan_firing_rate_analysis_result.neuron_replay_stats_df = truncation_checking_result.build_truncation_checking_aclus_dict(neuron_replay_stats_df=jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+
+        Integrate 'truncation_checking_aclus_dict' into `neuron_replay_stats_df` as a 'truncation_checking' column:
+
+        """
+        from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
+
+        truncation_checking_result = self
+        disappearing_endcap_aclus = truncation_checking_result.disappearing_endcap_aclus.to_numpy()
+        non_disappearing_endcap_aclus = truncation_checking_result.non_disappearing_endcap_aclus.to_numpy()
+        trivially_remapping_endcap_aclus = truncation_checking_result.minor_remapping_endcap_aclus.to_numpy()
+        significant_distant_remapping_endcap_aclus = truncation_checking_result.significant_distant_remapping_endcap_aclus.to_numpy()
+        # any_aclus = union_of_arrays(disappearing_endcap_aclus, non_disappearing_endcap_aclus, trivially_remapping_endcap_aclus, significant_distant_remapping_endcap_aclus, appearing_aclus)
+
+        truncation_checking_aclus_dict = {'disappearing': disappearing_endcap_aclus, 'non_disappearing_endcap_aclus': non_disappearing_endcap_aclus,
+                                   'significant_distant_remapping_endcap_aclus': significant_distant_remapping_endcap_aclus, 'trivially_remapping': trivially_remapping_endcap_aclus}
+        appearing_aclus = neuron_replay_stats_df[neuron_replay_stats_df['track_membership'] == SplitPartitionMembership.RIGHT_ONLY].index.to_numpy()
+        truncation_checking_aclus_dict.update({'appearing': appearing_aclus})
+
+        any_aclus = union_of_arrays(*[v for v in truncation_checking_aclus_dict.values() if len(v) > 0])
+        truncation_checking_aclus_dict.update({'any': any_aclus})
+
+        # return {'any': any_aclus, 'disappearing': disappearing_endcap_aclus, 'appearing': appearing_aclus, 'non_disappearing_endcap_aclus': non_disappearing_endcap_aclus,
+                                        # 'significant_distant_remapping_endcap_aclus': significant_distant_remapping_endcap_aclus, 'trivially_remapping': trivially_remapping_endcap_aclus}
+        
+        if assign_to_df_column:
+            ## Integrate 'truncation_checking_aclus_dict' into `neuron_replay_stats_df` as a 'truncation_checking' column:
+            neuron_replay_stats_df['truncation_checking'] = 'none'
+
+            for k, v in truncation_checking_aclus_dict.items():
+                if k != 'any':
+                    neuron_replay_stats_df.loc[np.isin(neuron_replay_stats_df['aclu'], truncation_checking_aclus_dict[k]), 'truncation_checking'] = k
+
+
+            neuron_replay_stats_df
+
+
+        return truncation_checking_aclus_dict, neuron_replay_stats_df
     
+
+
     
 
 
