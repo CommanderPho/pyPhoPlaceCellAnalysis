@@ -519,8 +519,13 @@ class TruncationCheckingResults(ComputedResult):
         significant_distant_remapping_endcap_aclus = truncation_checking_result.significant_distant_remapping_endcap_aclus.to_numpy()
         # any_aclus = union_of_arrays(disappearing_endcap_aclus, non_disappearing_endcap_aclus, trivially_remapping_endcap_aclus, significant_distant_remapping_endcap_aclus, appearing_aclus)
 
-        truncation_checking_aclus_dict = {'disappearing': disappearing_endcap_aclus, 'non_disappearing_endcap_aclus': non_disappearing_endcap_aclus,
-                                   'significant_distant_remapping_endcap_aclus': significant_distant_remapping_endcap_aclus, 'trivially_remapping': trivially_remapping_endcap_aclus}
+        # truncation_checking_aclus_dict = {'disappearing': disappearing_endcap_aclus, 'non_disappearing_endcap_aclus': non_disappearing_endcap_aclus,
+        #                            'significant_distant_remapping_endcap_aclus': significant_distant_remapping_endcap_aclus, 'trivially_remapping': trivially_remapping_endcap_aclus}
+
+        truncation_checking_aclus_dict = {'disappearing': disappearing_endcap_aclus, 'non_disappearing_endcap': non_disappearing_endcap_aclus,
+                                'significant_distant_remapping_endcap': significant_distant_remapping_endcap_aclus, 'trivially_remapping': trivially_remapping_endcap_aclus}
+        
+
         appearing_aclus = neuron_replay_stats_df[neuron_replay_stats_df['track_membership'] == SplitPartitionMembership.RIGHT_ONLY].index.to_numpy()
         truncation_checking_aclus_dict.update({'appearing': appearing_aclus})
 
