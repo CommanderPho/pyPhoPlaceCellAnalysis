@@ -321,7 +321,8 @@ def napari_add_aclu_slider(viewer, neuron_ids):
 def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts, include_trial_by_trial_correlation_matrix:bool = True):
     """ Plots the directional trial-by-trial activity visualization:
     Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import napari_plot_directional_trial_by_trial_activity_viz
+        from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_plot_directional_trial_by_trial_activity_viz
+        from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_plot_directional_trial_by_trial_activity_viz
         
         directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict = napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts)
     
@@ -329,10 +330,28 @@ def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_p
     from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_from_layers_dict
 
     custom_direction_split_layers_dict = {}
-    layers_list_sort_order = ['maze1_odd_z_scored_tuning_maps', 'maze1_odd_C_trial_by_trial_correlation_matrix', 
-    'maze1_even_z_scored_tuning_maps', 'maze1_even_C_trial_by_trial_correlation_matrix',
-    'maze2_odd_z_scored_tuning_maps', 'maze2_odd_C_trial_by_trial_correlation_matrix', 
-    'maze2_even_z_scored_tuning_maps', 'maze2_even_C_trial_by_trial_correlation_matrix']
+    # layers_list_sort_order = ['maze1_odd_z_scored_tuning_maps', 'maze1_odd_C_trial_by_trial_correlation_matrix', 
+    # 'maze1_even_z_scored_tuning_maps', 'maze1_even_C_trial_by_trial_correlation_matrix',
+    # 'maze2_odd_z_scored_tuning_maps', 'maze2_odd_C_trial_by_trial_correlation_matrix', 
+    # 'maze2_even_z_scored_tuning_maps', 'maze2_even_C_trial_by_trial_correlation_matrix']
+    layers_list_sort_order = ['long_LR_z_scored_tuning_maps', 'long_LR_C_trial_by_trial_correlation_matrix', 'long_RL_z_scored_tuning_maps', 'long_RL_C_trial_by_trial_correlation_matrix', 'short_LR_z_scored_tuning_maps', 'short_LR_C_trial_by_trial_correlation_matrix', 'short_RL_z_scored_tuning_maps', 'short_RL_C_trial_by_trial_correlation_matrix']
+
+    # # Converting between decoder names and filtered epoch names:
+    # # {'long':'maze1', 'short':'maze2'}
+    # # {'LR':'odd', 'RL':'even'}
+    # # old_to_new_names_rename_dict = {'maze1_odd': 'long_LR', 'maze1_even': 'long_RL', 'maze2_odd': 'short_LR', 'maze2_even': 'short_RL'}
+    # new_to_old_track_rename_dict: Dict[str,str] = {'long':'maze1', 'short':'maze2'}
+    # new_to_old_direction_rename_dict: Dict[str,str] = {'LR':'odd', 'RL':'even'}
+    # old_to_new_track_rename_dict: Dict[str,str] = {v:k for k,v in new_to_old_track_rename_dict.items()}
+    # old_to_new_direction_rename_dict: Dict[str,str] = {v:k for k,v in new_to_old_direction_rename_dict.items()}
+
+    # _complete_rename_dict = old_to_new_track_rename_dict | old_to_new_direction_rename_dict
+    # new_layers_list_sort_order = []
+    # for a_name in layers_list_sort_order:
+    #     for old, new in _complete_rename_dict.items():
+    #         a_name = a_name.replace(old, new)
+    #     new_layers_list_sort_order.append(a_name)
+    # new_layers_list_sort_order
 
     ## Build the image data layers for each
     # for an_epoch_name, (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) in directional_active_lap_pf_results_dicts.items():
@@ -434,7 +453,8 @@ def napari_export_image_sequence(viewer: napari.viewer.Viewer, imageseries_outpu
     Based off of `napari_export_video_frames`
     
     Usage:
-            
+        from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_export_image_sequence
+
         desired_save_parent_path = Path('/home/halechr/Desktop/test_napari_out').resolve()
         imageseries_output_directory = napari_export_image_sequence(viewer=viewer, imageseries_output_directory=desired_save_parent_path, slider_axis_IDX=0, build_filename_from_viewer_callback_fn=build_filename_from_viewer)
 
