@@ -124,7 +124,7 @@ def compute_and_export_marginals_dfs_completion_function(self, global_data_root_
 
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
     curr_active_pipeline.reload_default_computation_functions()
-    batch_extended_computations(curr_active_pipeline, include_includelist=['merged_directional_placefields'], include_global_functions=True, fail_on_exception=True, force_recompute=True)
+    batch_extended_computations(curr_active_pipeline, include_includelist=['merged_directional_placefields'], include_global_functions=True, fail_on_exception=True, force_recompute=False)
     directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
 
     active_context = curr_active_pipeline.get_session_context()
