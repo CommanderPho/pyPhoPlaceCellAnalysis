@@ -105,7 +105,7 @@ def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='
     elif (end_ind >= num_points):
         end_ind = num_points - 1
         start_ind = num_points - 2
-    line.axes.annotate('',
+    return line.axes.annotate('',
         xytext=(xdata[start_ind], ydata[start_ind]),
         xy=(xdata[end_ind], ydata[end_ind]),
         arrowprops=dict(arrowstyle="->", color=color),
