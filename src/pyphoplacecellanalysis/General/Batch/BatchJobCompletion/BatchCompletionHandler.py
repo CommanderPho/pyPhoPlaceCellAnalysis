@@ -292,7 +292,7 @@ class BatchSessionCompletionHandler:
         # BEGIN MAIN FUNCTION BODY
         was_updated = False
         was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
-        was_updated = was_updated | _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file=True)
+        was_updated = was_updated | _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file=False)
 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
