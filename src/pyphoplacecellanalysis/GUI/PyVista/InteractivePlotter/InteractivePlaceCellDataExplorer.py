@@ -405,8 +405,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             # debug_console_widget.add_line_to_buffer('test log 2')
 
         # Plot the flat arena
-        self.plots['maze_bg'], self.plots_data['maze_bg'] = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
-        
+        if not self.params.get('should_use_linear_track_geometry', False):
+            self.plots['maze_bg'], self.plots_data['maze_bg'] = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
+        else:
+            (self.plots['short_maze_bg'], self.plots_data['short_maze_bg']), (self.plots['long_maze_bg'], self.plots_data['long_maze_bg']) = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
     
         # Legend:
         
