@@ -246,7 +246,8 @@ def get_python_environment(active_venv_path: Path, debug_print:bool=True):
     # Check if the current operating system is Windows
     if os.name == 'nt':
         # Put your Windows-specific code here
-        python_executable = active_venv_path.joinpath('bin', 'python').resolve()
+        # python_executable = active_venv_path.joinpath('bin', 'python').resolve()
+        python_executable = active_venv_path.joinpath('Scripts', 'python.exe').resolve()
         # activate_path = Path('. /home/halechr/repos/Spike3D/.venv/bin/activate')
         # python_path = Path('/home/halechr/repos/Spike3D/.venv/bin/python')
         activate_script_path = active_venv_path.joinpath('Scripts', 'activate.ps1').resolve()
