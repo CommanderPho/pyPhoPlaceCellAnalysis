@@ -355,3 +355,64 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
 
     return ps_script_path
 
+
+def get_running_python(debug_print:bool=True):
+    """ gets the path to the currently running python and its environment info.
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import get_running_python
+
+        active_venv_path, python_executable, activate_script_path = get_running_python()
+        
+    """
+    current_python_executable = Path(sys.executable).resolve()
+    assert current_python_executable.exists(), f'current_python_executable: "{current_python_executable}" must exist.'
+    if debug_print:
+        print(f'current_python_executable: "{current_python_executable}"')
+    ## Get the environment from it:
+    active_venv_path: Path = current_python_executable.parent.parent.resolve()
+    active_venv_path, python_executable, activate_script_path = get_python_environment(active_venv_path=active_venv_path)
+    return active_venv_path, python_executable, activate_script_path
+
+
+def get_python_environment(active_venv_path: Path, debug_print:bool=True):
+    """
+    
+    from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import get_python_environment
+    
+    active_venv_path, python_executable, activate_script_path = get_python_environment(active_venv_path=active_venv_path)
+    
+    """
+    # INPUTS: active_venv_path, 
+    if isinstance(active_venv_path, str):
+        active_venv_path = Path(active_venv_path).resolve()
+    assert active_venv_path.exists(), f'active_venv_path: "{active_venv_path}" must exist.'
+    if debug_print:
+        print(f'active_venv_path: "{active_venv_path}"')
+
+    # Check if the current operating system is Windows
+    if os.name == 'nt':
+        # Put your Windows-specific code here
+        python_executable = active_venv_path.joinpath('bin', 'python').resolve()
+        # activate_path = Path('. /home/halechr/repos/Spike3D/.venv/bin/activate')
+        # python_path = Path('/home/halechr/repos/Spike3D/.venv/bin/python')
+        activate_script_path = active_venv_path.joinpath('Scripts', 'activate.ps1').resolve()
+
+    else:
+        # Put your non-Windows-specific code here
+        python_executable = active_venv_path.joinpath('bin', 'python').resolve()
+        # activate_path = Path('. /home/halechr/repos/Spike3D/.venv/bin/activate')
+        # python_path = Path('/home/halechr/repos/Spike3D/.venv/bin/python')
+        activate_script_path = active_venv_path.joinpath('bin', 'activate').resolve()
+
+    assert activate_script_path.exists(), f'activate_script_path: "{activate_script_path}" must exist.'
+    assert python_executable.exists(), f'python_executable: "{python_executable}" must exist.'
+    if debug_print:
+        print(f'activate_script_path: "{activate_script_path}"')
+        print(f'python_executable: "{python_executable}"')
+
+
+    # activate_path = Path('. /home/halechr/repos/Spike3D/.venv/bin/activate')
+    # python_path = Path('/home/halechr/repos/Spike3D/.venv/bin/python')
+    return active_venv_path, python_executable, activate_script_path
