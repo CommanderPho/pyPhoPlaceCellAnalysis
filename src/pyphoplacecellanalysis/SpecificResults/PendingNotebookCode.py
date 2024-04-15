@@ -1900,8 +1900,9 @@ def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataF
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_histograms
 
         # You can use it like this:
-        plot_histograms('Laps', 'One Session', several_time_bin_sizes_time_bin_laps_df, "several")
-        plot_histograms('Ripples', 'One Session', several_time_bin_sizes_time_bin_ripple_df, "several")
+        _out0: "MatplotlibRenderPlots" = plot_histograms(data_type='Laps', session_spec='All Sessions', data_results_df=all_sessions_laps_time_bin_df, time_bin_duration_str="75 ms")
+        _out1: "MatplotlibRenderPlots" = plot_histograms(data_type='Ripples', session_spec='All Sessions', data_results_df=all_sessions_ripple_time_bin_df, time_bin_duration_str="75 ms")
+
 
     """
     # get the pre-delta epochs

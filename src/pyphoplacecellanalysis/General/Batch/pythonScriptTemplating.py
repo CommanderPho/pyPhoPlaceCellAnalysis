@@ -346,6 +346,7 @@ def build_vscode_workspace(script_paths):
     return vscode_workspace_path
 
 
+@function_attributes(short_name=None, tags=['Windows-only', 'powershell', 'batch', 'script'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 11:00', related_items=[])
 def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int = 3,
                                         activate_path='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/activate.bat', 
                                         python_executable='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe'):
