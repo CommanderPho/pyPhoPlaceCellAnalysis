@@ -1550,7 +1550,7 @@ def _split_user_annotated_ripple_df(all_sessions_user_annotated_ripple_df):
 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _split_user_annotated_ripple_df
 
-        all_sessions_all_scores_ripple_df, (valid_ripple_df, invalid_ripple_df), (user_approved_ripple_df, user_approved_ripple_df) = _split_user_annotated_ripple_df(all_sessions_all_scores_ripple_df)
+        all_sessions_all_scores_ripple_df, (valid_ripple_df, invalid_ripple_df), (user_approved_ripple_df, user_rejected_ripple_df) = _split_user_annotated_ripple_df(all_sessions_all_scores_ripple_df)
 
 
 
@@ -1603,7 +1603,7 @@ def _split_user_annotated_ripple_df(all_sessions_user_annotated_ripple_df):
     if n_unlabeled_df_rows > 0:
         print(f'\t n_unlabeled_df_rows: {n_unlabeled_df_rows}')
 
-    return all_sessions_user_annotated_ripple_df, (valid_ripple_df, invalid_ripple_df), (user_approved_ripple_df, user_approved_ripple_df)
+    return all_sessions_user_annotated_ripple_df, (valid_ripple_df, invalid_ripple_df), (user_approved_ripple_df, user_rejected_ripple_df)
 
 
 
@@ -2032,35 +2032,60 @@ import plotly.graph_objs as go
 from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
 
 
-def plotly_helper_save_figures(figure_save_extension='.png'):
-    """ save figures
+def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_extension: Union[str, List[str], Tuple[str]]='.png'):
+    """ save figures to the 'figures' subfolder
     
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import plotly_helper_save_figures
+
+
     """
     # Create a 'figures' subfolder if it doesn't exist
-    figures_folder = Path(directory, 'figures')
+    if figures_folder is None:
+        figures_folder: Path = Path('figures').resolve()
     figures_folder.mkdir(parents=False, exist_ok=True)
     assert figures_folder.exists()
     print(f'\tfigures_folder: {file_uri_from_path(figures_folder)}')
 
-
     # Save the figures to the 'figures' subfolder
     assert figure_save_extension is not None
     if isinstance(figure_save_extension, str):
-            figure_save_extension = [figure_save_extension] # a list containing only this item
+        figure_save_extension = [figure_save_extension] # a list containing only this item
     
     print(f'\tsaving figures...')
+    save_fn_dict = {}
     for a_fig_save_extension in figure_save_extension:
         if a_fig_save_extension.lower() == '.html':
                 a_save_fn = lambda a_fig, a_save_name: a_fig.write_html(a_save_name)
         else:
                 a_save_fn = lambda a_fig, a_save_name: a_fig.write_image(a_save_name)
 
-        fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_{laps_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
-        print(f'\tsaving "{file_uri_from_path(fig_laps_name)}"...')
-        a_save_fn(fig_laps, fig_laps_name)
-        fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_{ripple_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
-        print(f'\tsaving "{file_uri_from_path(fig_ripple_name)}"...')
-        a_save_fn(fig_ripples, fig_ripple_name)
+        ## Add to save fn dict:
+        save_fn_dict[a_fig_save_extension.lower()] = a_save_fn
+
+        # fig_laps_name = Path(figures_folder, f"{laps_title_string_suffix.replace(' ', '-')}_{laps_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
+        # print(f'\tsaving "{file_uri_from_path(fig_laps_name)}"...')
+        # a_save_fn(fig_laps, fig_laps_name)
+        # fig_ripple_name = Path(figures_folder, f"{ripple_title_string_suffix.replace(' ', '-')}_{ripple_title_prefix.lower()}_marginal{a_fig_save_extension}").resolve()
+        # print(f'\tsaving "{file_uri_from_path(fig_ripple_name)}"...')
+        # a_save_fn(fig_ripples, fig_ripple_name)
+
+        # def _perform_save_with_extension(a_fig, a_save_name):
+        #     print(f'\tsaving "{file_uri_from_path(a_save_name)}"...')
+        #     a_save_fn(a_fig, a_save_name)
+
+    
+    def _perform_save_all_extensions(a_fig, a_save_name):
+        """ captures `save_fn_dict` """
+
+
+        for a_fig_save_extension, a_save_fn in save_fn_dict.items():
+            print(f'\tsaving "{file_uri_from_path(a_save_name)}"...')
+            a_save_fn(a_fig, a_save_name)
+        
+    return _perform_save_all_extensions, save_fn_dict
+
+
+
 
 
 
@@ -2091,6 +2116,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     import plotly.express as px
     import plotly.graph_objs as go
 
+    figure_context_dict = {'histogram_variable_name': histogram_variable_name}
+
     unique_sessions = data_results_df['session_name'].unique()
     num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
 
@@ -2109,26 +2136,24 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     if num_unique_time_bins > 1:
         main_title = main_title + f" - {num_unique_time_bins} Time Bin Sizes"
+        figure_context_dict['n_tbin'] = num_unique_time_bins
     else:
         time_bin_size = time_bin_sizes[0]
         main_title = main_title + f" - time bin size: {time_bin_size} sec"
-
-
     
+    figure_context_dict['title'] = main_title
     print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
-
 
     # common_plot_kwargs = dict(color="time_bin_size")
     common_plot_kwargs = dict() # color=None
     if hist_kwargs is None:
         hist_kwargs = {}
-    hist_kwargs = hist_kwargs | dict(opacity=0.5, range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay')
+    hist_kwargs = dict(opacity=0.5, range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay') | hist_kwargs
     # print(f'hist_kwargs: {hist_kwargs}')
 
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
-
 
     # ==================================================================================================================== #
     # Build Figure                                                                                                         #
@@ -2226,7 +2251,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     else:
         _extras_output_dict = {}
 
-    return fig
+
+    # figure_context_dict['n_tbin'] = num_unique_time_bins
+
+    figure_context = IdentifyingContext(**figure_context_dict)
+
+    return fig, figure_context
 
 
 @function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
@@ -2274,6 +2304,9 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     import plotly.express as px
     import plotly.graph_objects as go
     
+    figure_context_dict = {'main_plot_mode': main_plot_mode}
+
+    
     barmode='overlay'
     # barmode='stack'
     histogram_kwargs = dict(barmode=barmode)
@@ -2281,6 +2314,9 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     scatter_title = build_fig_kwargs.pop('title', None)
     debug_print: bool = build_fig_kwargs.pop('debug_print', False)
     
+    if scatter_title is not None:
+        figure_context_dict['title'] = scatter_title
+
     # Filter dataframe by chosen bin sizes
     if (enabled_time_bin_sizes is not None) and (len(enabled_time_bin_sizes) > 0):
         print(f'filtering data_results_df to enabled_time_bin_sizes: {enabled_time_bin_sizes}...')
@@ -2508,7 +2544,12 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         # ],
         # margin=dict(b=140), # increase bottom margin to show the footer
     )
-    return fig
+
+
+    ## would be nice to export context as well:
+    figure_context = IdentifyingContext(**figure_context_dict)
+
+    return fig, figure_context
 
 
 
@@ -2740,7 +2781,7 @@ def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, lates
         num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
         print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
         enabled_time_bin_sizes = chose_bin_sizes
-        fig = _helper_build_figure(data_results_df=data_results_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode='separate_row_per_session', title=f"{col_chosen}")        
+        fig, figure_context = _helper_build_figure(data_results_df=data_results_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode='separate_row_per_session', title=f"{col_chosen}")        
         # 'delta_aligned_start_t', 'session_name', 'time_bin_size'
         tuples_data = data_results_df[['session_name', 'time_bin_size', 'epoch_idx', 'delta_aligned_start_t']].to_dict(orient='records')
         print(f'tuples_data: {tuples_data}')
@@ -2886,14 +2927,14 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
     laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
     laps_title: str = f"{laps_title_prefix} - {laps_title_string_suffix}"
-    fig_laps = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title)
+    fig_laps, figure_laps_context = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title)
 
     # Create a bubble chart for ripples
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
     ripple_title: str = f"{ripple_title_prefix} - {ripple_title_string_suffix}"
-    fig_ripples = _helper_build_figure(data_results_df=concatenated_ripple_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=ripple_title)
+    fig_ripples, figure_ripples_context = _helper_build_figure(data_results_df=concatenated_ripple_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=ripple_title)
 
     if save_figures:
         # Save the figures to the 'figures' subfolder
