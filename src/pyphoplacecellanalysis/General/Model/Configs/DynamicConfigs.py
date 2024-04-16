@@ -33,7 +33,6 @@ class BaseConfig:
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
         if ('_mapping' in state) and ('_keys_at_init' in state):
             # unpickling from the old DynamicParameters-based ComputationResult
             print(f'unpickling from old DynamicParameters-based computationResult')
