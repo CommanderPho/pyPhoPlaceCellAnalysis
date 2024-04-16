@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 from typing import List, Optional, Dict, Tuple, Any, Union
+from matplotlib import cm
 from matplotlib.gridspec import GridSpec
 from neuropy.core import Laps
 from neuropy.utils.dynamic_container import DynamicContainer
@@ -49,9 +50,36 @@ from itertools import islice
 from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import LapsVisualizationMixin, LineCollection, _plot_helper_add_arrow # plot_lap_trajectories_2d
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+
+def adjust_saturation(rgb, saturation_factor: float):
+    """ adjusts the rgb colors by the saturation_factor by converting to HSV space.
+    
+    """
+    import matplotlib.colors as mcolors
+    import colorsys
+    # Convert RGB to HSV
+    hsv = mcolors.rgb_to_hsv(rgb)
+
+    if np.ndim(hsv) < 3:
+        # Multiply the saturation by the saturation factor
+        hsv[:, 1] *= saturation_factor
+        
+        # Clip the saturation value to stay between 0 and 1
+        hsv[:, 1] = np.clip(hsv[:, 1], 0, 1)
+        
+    else: 
+        # Multiply the saturation by the saturation factor
+        hsv[:, :, 1] *= saturation_factor
+        # Clip the saturation value to stay between 0 and 1
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1], 0, 1)
+    
+    # Convert back to RGB
+    return mcolors.hsv_to_rgb(hsv)
+
 
 # Define a function to create the colormap
-def make_red_cmap(time: float):
+def make_saturating_red_cmap(time: float, N_colors:int=256, debug_print:bool=False):
     """ time is between 0.0 and 1.0 
     
     Usage:
@@ -70,25 +98,62 @@ def make_red_cmap(time: float):
             axs[i].set_title(f'Timestep {i+1}')
         plt.show()
 
-    
-    
     """
-    # Create a greyscale colormap
-    # greys = plt.cm.Greys(np.linspace(0, 1, 256))
-    greys = plt.cm.gist_grey(np.linspace(0, 1, 256))
-    # Add red channel that increases with time
-    reds = np.linspace(0, time, 256)
+    colors = np.array([(0, 0, 0), (1, 0, 0)]) # np.shape(colors): (2, 3)
+    if debug_print:
+        print(f'np.shape(colors): {np.shape(colors)}')
+    # Apply a saturation change
+    saturation_factor = float(time) # 0.5  # Increase saturation by 1.5 times
+    adjusted_colors = adjust_saturation(colors, saturation_factor)
+    if debug_print:
+        print(f'np.shape(adjusted_colors): {np.shape(adjusted_colors)}')
+    adjusted_colors = adjusted_colors.tolist()
+    ## Set the alpha of the first color to 0.0 and of the final color to 0.82
+    adjusted_colors = [[*v, 0.82] for v in adjusted_colors]
+    adjusted_colors[0][-1] = 0.0
+
+    # n_bins = [2]  # Discretizes the interpolation into bins
+    return LinearSegmentedColormap.from_list('CustomMap', adjusted_colors, N=N_colors)
+
+
+# def make_red_cmap(time: float):
+#     """ time is between 0.0 and 1.0 
     
-    # Combine red channel with greyscale
-    red_greys = np.zeros((256, 4))
-    red_greys[:, 0] = reds       # Set red channel
-    red_greys[:, 1] = greys[:, 1] # Copy green channel from grey (will be ignored)
-    red_greys[:, 2] = greys[:, 2] # Copy blue channel from grey (will be ignored)
-    red_greys[:, 3] = greys[:, 3] # Copy alpha channel
+#     Usage:
+#         # Example usage
+#         # You would replace this with your actual data and timesteps
+#         data = np.random.rand(10, 10)  # Sample data
+#         n_timesteps = 5  # Number of timesteps
+
+#         # Plot data with increasing red for each timestep
+#         fig, axs = plt.subplots(1, n_timesteps, figsize=(15, 3))
+#         for i in range(n_timesteps):
+#             time = i / (n_timesteps - 1)  # Normalize time to be between 0 and 1
+#             # cmap = make_timestep_cmap(time)
+#             cmap = make_red_cmap(time)
+#             axs[i].imshow(data, cmap=cmap)
+#             axs[i].set_title(f'Timestep {i+1}')
+#         plt.show()
+
     
-    # Create colormap object
-    red_grey_cmap = plt.matplotlib.colors.ListedColormap(red_greys)
-    return red_grey_cmap
+    
+#     """
+#     # Create a greyscale colormap
+#     # greys = plt.cm.Greys(np.linspace(0, 1, 256))
+#     greys = plt.cm.gist_grey(np.linspace(0, 1, 256))
+#     # Add red channel that increases with time
+#     reds = np.linspace(0, time, 256)
+    
+#     # Combine red channel with greyscale
+#     red_greys = np.zeros((256, 4))
+#     red_greys[:, 0] = reds       # Set red channel
+#     red_greys[:, 1] = greys[:, 1] # Copy green channel from grey (will be ignored)
+#     red_greys[:, 2] = greys[:, 2] # Copy blue channel from grey (will be ignored)
+#     red_greys[:, 3] = greys[:, 3] # Copy alpha channel
+    
+#     # Create colormap object
+#     red_grey_cmap = plt.matplotlib.colors.ListedColormap(red_greys)
+#     return red_grey_cmap
 
 
 # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
