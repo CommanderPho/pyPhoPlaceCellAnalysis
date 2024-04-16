@@ -1106,6 +1106,50 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
 
 
 
+@function_attributes(short_name=None, tags=['matplotlib', 'track_plotting', '2D', 'ax'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-16 16:51', related_items=[])
+def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, short_track_inst: LinearTrackInstance, ax=None, perform_autoscale: bool = True):
+    """ Plots both the long and the short track on a single matplotlib axes.
+    
+    
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _perform_plot_matplotlib_2D_tracks
+    
+    # active_config = curr_active_pipeline.sess.config
+    active_config = global_session.config
+
+    long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(active_config)
+
+    _perform_plot_matplotlib_2D_tracks
+    
+    """
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_matplotlib_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+    long_kwargs = deepcopy(long_epoch_matplotlib_config)
+    long_kwargs = overriding_dict_with(lhs_dict=long_kwargs, **dict(linewidth=2, zorder=-99, alpha=0.5, facecolor='#0099ff07', edgecolor=long_kwargs['facecolor'], linestyle='dashed'))
+    short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+    short_kwargs = deepcopy(short_epoch_matplotlib_config)
+    short_kwargs = overriding_dict_with(lhs_dict=short_kwargs, **dict(linewidth=2, zorder=-98, alpha=0.5, facecolor='#f5161607', edgecolor=short_kwargs['facecolor'], linestyle='dashed'))
+    # BEGIN PLOTTING _____________________________________________________________________________________________________ #
+    long_out_tuple = long_track_inst.plot_rects(plot_item=ax, matplotlib_rect_kwargs_override=long_kwargs)
+    short_out_tuple = short_track_inst.plot_rects(plot_item=ax, matplotlib_rect_kwargs_override=short_kwargs)
+
+    # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=170.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
+    # short_path = _build_track_1D_verticies(platform_length=22.0, track_length=100.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=True)
+
+    # ## Plot the tracks:
+    # long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
+    # ax.add_patch(long_patch)
+
+    # short_patch = patches.PathPatch(short_path, **short_track_color, alpha=0.5, lw=2)
+    # ax.add_patch(short_patch)
+    if perform_autoscale:
+        ax.autoscale()
+    
+    return long_out_tuple, short_out_tuple
+
+
+
+
+
 # ==================================================================================================================== #
 # Napari                                                                                                               #
 # ==================================================================================================================== #

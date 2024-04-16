@@ -82,6 +82,14 @@ def adjust_saturation(rgb, saturation_factor: float):
 def make_saturating_red_cmap(time: float, N_colors:int=256, debug_print:bool=False):
     """ time is between 0.0 and 1.0 
     
+    Usage: Test Example:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import make_saturating_red_cmap
+
+        n_time_bins = 5
+        cmaps = [make_saturating_red_cmap(float(i) / float(n_time_bins - 1)) for i in np.arange(n_time_bins)]
+        for cmap in cmaps:
+            cmap
+            
     Usage:
         # Example usage
         # You would replace this with your actual data and timesteps
@@ -193,11 +201,13 @@ def _helper_add_gradient_line(ax, t, x, y, add_markers=False):
     else:
         return line
 
-def plot_decoded_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2):
+def plot_decoded_trajectories_2d(sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 1, use_theoretical_tracks_instead: bool = True ):
     """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
      
     Great plotting for laps.
     Plots in a paginated manner.
+    
+    use_theoretical_tracks_instead: bool = True - # if False, renders all positions the animal traversed over the entire session. Otherwise renders the theoretical (idaal) track.
 
     History: based off of plot_lap_trajectories_2d
 
@@ -208,6 +218,12 @@ def plot_decoded_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0,
 
     
     """
+
+    if use_theoretical_tracks_instead:
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
+        long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(deepcopy(sess.config))
+
+
     def _subfn_chunks(iterable, size=10):
         iterator = iter(iterable)
         for first in iterator:    # stops when iterator is depleted
@@ -218,20 +234,25 @@ def plot_decoded_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0,
             yield chunk()         # in outer generator, yield next chunk
         
     def _subfn_build_laps_multiplotter(nfields, linear_plot_data=None):
-        """ captures: fixed_columns, 
+        """ captures: fixed_columns, (long_track_inst, short_track_inst)
         
         """
         linear_plotter_indicies = np.arange(nfields)
         needed_rows = int(np.ceil(nfields / fixed_columns))
         row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
         mp, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True) #ndarray (5,2)
-        mp.set_size_inches(18.5, 26.5)
+        # mp.set_size_inches(18.5, 26.5)
 
         background_track_shadings = {}
         for a_linear_index in linear_plotter_indicies:
             curr_row = row_column_indicies[0][a_linear_index]
             curr_col = row_column_indicies[1][a_linear_index]
-            background_track_shadings[a_linear_index] = axs[curr_row][curr_col].plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=0.2)
+            if not use_theoretical_tracks_instead:
+                background_track_shadings[a_linear_index] = axs[curr_row][curr_col].plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=0.2)
+            else:
+                # active_config = curr_active_pipeline.sess.config
+                an_ax = axs[curr_row][curr_col]
+                background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax)
             
         return mp, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
     
@@ -287,7 +308,7 @@ def plot_decoded_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0,
     
     all_maze_positions = curr_position_df[['x','y']].to_numpy().T # (2, 59308)
     # np.shape(all_maze_positions)
-    all_maze_data = [all_maze_positions for i in  np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
+    all_maze_data = [all_maze_positions for i in np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
     p, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
     # generate the pages
     laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)]
@@ -295,8 +316,8 @@ def plot_decoded_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0,
     if plot_actual_lap_lines:
         active_page_laps_ids = laps_pages[active_page_index]
         _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True)
-    
-    plt.ylim((125, 152))
+        # plt.ylim((125, 152))
+        
     return p, axs, laps_pages
 
 def add_decoded_posterior_and_trajectory(an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, include_most_likely_pos_line: Optional[bool]=None):
@@ -329,9 +350,6 @@ def add_decoded_posterior_and_trajectory(an_ax, xbin_centers, a_p_x_given_n, a_t
         is_2D = True
         # masked_posterior = np.sum(masked_posterior, axis=0)
 
-
-    # Example data: replace with your actual posterior and axis values
-    # x_values = np.linspace(0, 10, 100)  # Replace with your x axis values
     x_values = deepcopy(xbin_centers)  # Replace with your x axis values
 
     if not is_2D: # 1D case
@@ -339,13 +357,24 @@ def add_decoded_posterior_and_trajectory(an_ax, xbin_centers, a_p_x_given_n, a_t
         if include_most_likely_pos_line is None:
             include_most_likely_pos_line = True # default to True for 2D
         # Build fake 2D data out of 1D posterior
-        fake_y_width: float = 2.5
-        fake_y_center: float = 140.0
+            
+        ## Build the fake y-values from the current axes ylims, which are set when the track graphic is plotted:
+        y_min, y_max = an_ax.get_ylim()
+        fake_y_width = (y_max - y_min)
+        fake_y_center: float = y_min + (fake_y_width / 2.0)
         fake_y_lower_bound: float = (fake_y_center - fake_y_width)
         fake_y_upper_bound: float = (fake_y_center + fake_y_width)
+
+        # ## Build the fake-y values from scratch using hardcoded values:
+        # fake_y_width: float = 2.5
+        # fake_y_center: float = 140.0
+        # fake_y_lower_bound: float = (fake_y_center - fake_y_width)
+        # fake_y_upper_bound: float = (fake_y_center + fake_y_width)
+
+
         fake_y_num_samples: int = 5
         # y_values = np.linspace(0, 5, 50)    # Replace with your y axis values
-        y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)    # Replace with your y axis value
+        y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples) # Replace with your y axis value
         # posterior = np.repeat(a_p_x_given_n, repeats=fake_y_num_samples, axis=0)
         fake_y_num_samples: int = len(a_time_bin_centers)
         fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
@@ -378,7 +407,7 @@ def add_decoded_posterior_and_trajectory(an_ax, xbin_centers, a_p_x_given_n, a_t
         print(f'time_step_opacity: {time_step_opacity}')
 
         for i in np.arange(n_time_bins):
-            time = i / (n_timesteps - 1)  # Normalize time to be between 0 and 1
+            # time = float(i) / (float(n_time_bins) - 1.0)  # Normalize time to be between 0 and 1
             # cmap = make_timestep_cmap(time)
             # cmap = make_red_cmap(time)
             # viridis_obj = mpl.colormaps['viridis'].resampled(8)
