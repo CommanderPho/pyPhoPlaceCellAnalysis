@@ -1849,7 +1849,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             point_colors = neurons_colors
             # point_colors = [f'{i}' for i in list(x_frs_index.keys())] 
     else:
-        point_colors = None
+        # point_colors = None
+        point_colors = '#33333333'
     
     fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
 
