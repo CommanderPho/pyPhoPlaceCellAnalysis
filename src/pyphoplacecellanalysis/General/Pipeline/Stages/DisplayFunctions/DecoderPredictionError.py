@@ -52,12 +52,15 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             # Get the decoders from the computation result:
             active_one_step_decoder = computation_result.computed_data['pf2D_Decoder']
             active_two_step_decoder = computation_result.computed_data.get('pf2D_TwoStepDecoder', None)
+
+            time_binned_position_df = computation_result.computed_data.get('extended_stats', {}).get('time_binned_position_df', None)
+
             active_measured_positions = computation_result.sess.position.to_dataframe()
 
         
             # Simple plot type 1:
             plotted_variable_name = kwargs.get('variable_name', 'p_x_given_n') # Tries to get the user-provided variable name, otherwise defaults to 'p_x_given_n'
-            _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name=plotted_variable_name) # Works
+            _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, time_binned_position_df=time_binned_position_df, variable_name=plotted_variable_name) # Works
             # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n') # Works
             # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev')
             return # end
