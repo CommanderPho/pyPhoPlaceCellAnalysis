@@ -768,6 +768,16 @@ class LinearTrackInstance:
         return np.array([self.classify_x_position(test_x).is_endcap for test_x in points])
 
 
+    def plot_rects(self, plot_item, matplotlib_rect_kwargs_override=None):
+        """ main function to plot 
+
+        
+        combined_item, rect_items, rects = item.plot_rect(ax, offset=None)
+        """
+        offset_point = self.grid_bin_bounds.center_point # (self.grid_bin_bounds.center_point[0], 0.75)
+        return self.track_dimensions.plot_rects(plot_item=plot_item, offset=offset_point, matplotlib_rect_kwargs_override=matplotlib_rect_kwargs_override)
+
+
 
 def get_track_length_dict(long_grid_bin_bounds, short_grid_bin_bounds) -> Tuple[Dict[str, float], Dict[str, float]]:
     """ Gets the actual track lengths from the grid_bin_bounds
