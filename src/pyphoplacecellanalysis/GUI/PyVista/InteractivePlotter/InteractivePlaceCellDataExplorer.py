@@ -234,7 +234,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     # recent_spikes_window
     # z_fixed,
     # active_trail_opacity_values, active_trail_size_values
-    def on_active_window_update_mesh(self, t_start, t_stop, enable_position_mesh_updates=False, render=True, debug_print=False):
+    def on_active_window_update_mesh(self, t_start, t_stop, enable_historical_spikes=True, enable_recent_spikes=True, enable_position_mesh_updates=False, render=True, debug_print=False):
         """ The main update function - called to update the meshs with t_start, t_stop times representing the start and end of the new active window:
         This function is called from both slider-based updating (with an integer window index) and pyqt signal-style (update_window_start_end(new_start, new_end)) updating
         """
@@ -245,47 +245,49 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         self.p.add_text(curr_text_rendering_string, name='lblCurrent_spike_range', position='lower_right', color='white', shadow=True, font_size=10)
         
         ## Historical Spikes:
-        # active_included_all_historical_indicies = (flattened_spikes.flattened_spike_times < t_stop) # Accumulate Spikes mode. All spikes occuring prior to the end of the frame (meaning the current time) are plotted
-        historical_t_start = (t_stop - self.params.longer_spikes_window.duration_seconds) # Get the earliest time that will be included in the search
+        if enable_historical_spikes:
+            # active_included_all_historical_indicies = (flattened_spikes.flattened_spike_times < t_stop) # Accumulate Spikes mode. All spikes occuring prior to the end of the frame (meaning the current time) are plotted
+            historical_t_start = (t_stop - self.params.longer_spikes_window.duration_seconds) # Get the earliest time that will be included in the search
 
-        # TODO: replace with properties that I implemented
-        flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
-        # flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.spikes_df['fragile_linear_neuron_IDX'].values()
-        flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
-        # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
-        flattened_spike_positions_list = self.params.flattened_spike_positions_list
+            # TODO: replace with properties that I implemented
+            flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
+            # flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.spikes_df['fragile_linear_neuron_IDX'].values()
+            flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
+            # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
+            flattened_spike_positions_list = self.params.flattened_spike_positions_list
 
-        # evaluated as column names
-        active_included_all_historical_indicies = ((flattened_spike_times > historical_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
-        historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_all_historical_indicies],
-                                                                                        flattened_spike_positions_list[:, active_included_all_historical_indicies],
-                                                                                        spike_geom=spike_geom_box.copy())
+            # evaluated as column names
+            active_included_all_historical_indicies = ((flattened_spike_times > historical_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
+            historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_all_historical_indicies],
+                                                                                            flattened_spike_positions_list[:, active_included_all_historical_indicies],
+                                                                                            spike_geom=spike_geom_box.copy())
 
-        if historical_spikes_pc.n_points >= 1:
-            self.plots['spikes_main_historical'] = self.p.add_mesh(historical_spikes_pc, name='historical_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=True, render=False)
+            if historical_spikes_pc.n_points >= 1:
+                self.plots['spikes_main_historical'] = self.p.add_mesh(historical_spikes_pc, name='historical_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=True, render=False)
 
 
         ## Recent Spikes:
-        recent_spikes_t_start = (t_stop - self.params.recent_spikes_window.duration_seconds) # Get the earliest time that will be included in the recent spikes
-        # print('recent_spikes_t_start: {}; t_start: {}'.format(recent_spikes_t_start, t_start))
+        if enable_recent_spikes:
+            recent_spikes_t_start = (t_stop - self.params.recent_spikes_window.duration_seconds) # Get the earliest time that will be included in the recent spikes
+            # print('recent_spikes_t_start: {}; t_start: {}'.format(recent_spikes_t_start, t_start))
 
-        active_included_recent_only_indicies = ((flattened_spike_times > recent_spikes_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
-        
-        active_recent_only_times = flattened_spike_times[active_included_recent_only_indicies] # the times of the recent spikes
-        
-        active_recent_only_times_offsets = ((active_recent_only_times - t_stop)/self.params.recent_spikes_window.duration_seconds) # Output is the time that's elapsed since the current time (which is the end of the current window). Number will be somewhere between 
-        # by dividing by self.params.recent_spikes_window.duration_seconds it means the output will be between -1.0 (for the oldest spikes about to exit the recent window) and 0.0 (for the newest spikes that just entered the window. 
-        active_recent_only_times_offsets += 1.0 # add one to make them scale factors instead of offsets.
-        
-        
-        # active_included_recent_only_indicies = ((flattened_spikes.flattened_spike_times > t_start) & (flattened_spikes.flattened_spike_times < t_stop)) # Two Sided Range Mode
-        recent_only_spikes_pdata, recent_only_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_recent_only_indicies],
-                                                                                        flattened_spike_positions_list[:, active_included_recent_only_indicies],
-                                                                                        scale_factors_list=active_recent_only_times_offsets,
-                                                                                        spike_geom=spike_geom_cone.copy())
+            active_included_recent_only_indicies = ((flattened_spike_times > recent_spikes_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
+            
+            active_recent_only_times = flattened_spike_times[active_included_recent_only_indicies] # the times of the recent spikes
+            
+            active_recent_only_times_offsets = ((active_recent_only_times - t_stop)/self.params.recent_spikes_window.duration_seconds) # Output is the time that's elapsed since the current time (which is the end of the current window). Number will be somewhere between 
+            # by dividing by self.params.recent_spikes_window.duration_seconds it means the output will be between -1.0 (for the oldest spikes about to exit the recent window) and 0.0 (for the newest spikes that just entered the window. 
+            active_recent_only_times_offsets += 1.0 # add one to make them scale factors instead of offsets.
+            
+            
+            # active_included_recent_only_indicies = ((flattened_spikes.flattened_spike_times > t_start) & (flattened_spikes.flattened_spike_times < t_stop)) # Two Sided Range Mode
+            recent_only_spikes_pdata, recent_only_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_recent_only_indicies],
+                                                                                            flattened_spike_positions_list[:, active_included_recent_only_indicies],
+                                                                                            scale_factors_list=active_recent_only_times_offsets,
+                                                                                            spike_geom=spike_geom_cone.copy())
 
-        if recent_only_spikes_pc.n_points >= 1:
-            self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False) # color='white'
+            if recent_only_spikes_pc.n_points >= 1:
+                self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False) # color='white'
 
         ## Position Updates:
         if enable_position_mesh_updates:
@@ -347,9 +349,11 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # print('Constraining to curr_time_fixedSegments with times (start: {}, end: {})'.format(t_start, t_stop))
         # print('curr_time_fixedSegments: {}'.format(curr_time_fixedSegments))
         
-        enable_time_only_position_mesh_updates=True
-        
-        self.on_active_window_update_mesh(t_start=t_start, t_stop=t_stop, enable_position_mesh_updates=enable_time_only_position_mesh_updates, render=False)
+        enable_time_only_position_mesh_updates = True
+        enable_historical_spikes = self.params.get('enable_historical_spikes', True)
+        enable_recent_spikes = self.params.get('enable_recent_spikes', True)
+
+        self.on_active_window_update_mesh(t_start=t_start, t_stop=t_stop, enable_historical_spikes=enable_historical_spikes, enable_recent_spikes=enable_recent_spikes, enable_position_mesh_updates=enable_time_only_position_mesh_updates, render=False)
         
         if not enable_time_only_position_mesh_updates:
             ## Animal Position and Location Trail Plotting:
