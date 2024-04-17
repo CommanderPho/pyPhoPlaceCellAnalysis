@@ -174,6 +174,7 @@ class DecodedTrajectoryPlotter:
     fig = field(default=None)
     axs: NDArray = field(default=None)
     laps_pages: List = field(default=Factory(list))
+    curr_epoch_idx: int = field(default=None)
 
 
     a_result: DecodedFilterEpochsResult = field(default=None)
@@ -185,10 +186,21 @@ class DecodedTrajectoryPlotter:
     def num_filter_epochs(self) -> int:
         """The num_filter_epochs: int property."""
         return self.a_result.num_filter_epochs
+    
+
+    @property
+    def curr_n_time_bins(self) -> int:
+        """The num_filter_epochs: int property."""
+        return len(self.a_result.time_bin_containers[self.curr_epoch_idx].centers)
+
 
 
     ## MAIN PLOT FUNCTION:
     def plot_epoch(self, an_epoch_idx: int):
+        """ 
+        """
+        self.curr_epoch_idx = an_epoch_idx
+
         an_ax = self.axs[0][1]
 
         assert len(self.xbin_centers) == np.shape(self.a_result.p_x_given_n_list[an_epoch_idx])[0], f"np.shape(a_result.p_x_given_n_list[an_epoch_idx]): {np.shape(self.a_result.p_x_given_n_list[an_epoch_idx])}, len(xbin_centers): {len(self.xbin_centers)}"
@@ -197,6 +209,8 @@ class DecodedTrajectoryPlotter:
         a_most_likely_positions = self.a_result.most_likely_positions_list[an_epoch_idx]
         a_time_bin_edges = self.a_result.time_bin_edges[an_epoch_idx]
         a_time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers
+
+        # n_time_bins: int = len(self.a_result.time_bin_containers[an_epoch_idx].centers)
 
         assert len(a_time_bin_centers) == len(a_most_likely_positions)
 
@@ -474,7 +488,8 @@ class DecodedTrajectoryPlotter:
                 cmap='viridis'
                 a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
                                 extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
-                                origin='lower', interpolation='none', vmin=vmin_global, vmax=vmax_global) # , norm=norm
+                                origin='lower', aspect='auto', interpolation='none',
+                                vmin=vmin_global, vmax=vmax_global) # , norm=norm
                 heatmaps.append(a_heatmap)
 
         # # Add colorbar
