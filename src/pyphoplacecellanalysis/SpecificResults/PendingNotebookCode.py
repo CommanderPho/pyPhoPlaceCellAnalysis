@@ -163,277 +163,336 @@ def make_saturating_red_cmap(time: float, N_colors:int=256, debug_print:bool=Fal
 #     red_grey_cmap = plt.matplotlib.colors.ListedColormap(red_greys)
 #     return red_grey_cmap
 
-
-# fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
-def _helper_add_gradient_line(ax, t, x, y, add_markers=False):
-    """ Adds a gradient line representing a timeseries of (x, y) positions.
-
-    add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
-    
-    
-    _helper_add_gradient_line(ax=axs[curr_row][curr_col]],
-        t=np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
-        x=laps_position_traces[curr_lap_id][0,:],
-        y=laps_position_traces[curr_lap_id][1,:]
-    )
-
-    """
-    # Create a continuous norm to map from data points to colors
-    assert len(t) == len(x), f"len(t): {len(t)} != len(x): {len(x)}"
-    norm = plt.Normalize(t.min(), t.max())
-    # needs to be (numlines) x (points per line) x 2 (for x and y)
-    points = np.array([x, y]).T.reshape(-1, 1, 2)
-    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-    lc = LineCollection(segments, cmap='viridis', norm=norm)
-    # Set the values used for colormapping
-    lc.set_array(t)
-    lc.set_linewidth(2)
-    lc.set_alpha(0.85)
-    line = ax.add_collection(lc)
-
-    if add_markers:
-        # Builds scatterplot markers (points) along the path
-        colors_arr = line.get_colors() # (17, 4)
-        # segments_arr = line.get_segments() # (16, 2, 2)
-        # len(a_most_likely_positions) # 17
-        _out_markers = ax.scatter(x=x, y=y, c=colors_arr)
-        return line, _out_markers
-    else:
-        return line
-
-def plot_decoded_trajectories_2d(sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 1, use_theoretical_tracks_instead: bool = True ):
-    """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
-     
-    Great plotting for laps.
-    Plots in a paginated manner.
-    
-    use_theoretical_tracks_instead: bool = True - # if False, renders all positions the animal traversed over the entire session. Otherwise renders the theoretical (idaal) track.
-
-    History: based off of plot_lap_trajectories_2d
-
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_decoded_trajectories_2d
-    
-        fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)
-
+@define(slots=False)
+class DecodedTrajectoryPlotter:
+    """ plots a decoded 1D or 2D trajectory using matplotlib. 
     
     """
+    prev_heatmaps: List = field(default=Factory(list))
+    a_line = field(default=None)
+    _out_markers = field(default=None)
+    fig = field(default=None)
+    axs: NDArray = field(default=None)
+    laps_pages: List = field(default=Factory(list))
 
-    if use_theoretical_tracks_instead:
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
-        long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(deepcopy(sess.config))
+
+    a_result: DecodedFilterEpochsResult = field(default=None)
+    xbin_centers: NDArray = field(default=None)
+    ybin_centers: Optional[NDArray] = field(default=None)
+    
+
+    @property
+    def num_filter_epochs(self) -> int:
+        """The num_filter_epochs: int property."""
+        return self.a_result.num_filter_epochs
 
 
-    def _subfn_chunks(iterable, size=10):
-        iterator = iter(iterable)
-        for first in iterator:    # stops when iterator is depleted
-            def chunk():          # construct generator for next chunk
-                yield first       # yield element from for loop
-                for more in islice(iterator, size - 1):
-                    yield more    # yield more elements from the iterator
-            yield chunk()         # in outer generator, yield next chunk
+    ## MAIN PLOT FUNCTION:
+    def plot_epoch(self, an_epoch_idx: int):
+        an_ax = self.axs[0][1]
+
+        assert len(self.xbin_centers) == np.shape(self.a_result.p_x_given_n_list[an_epoch_idx])[0], f"np.shape(a_result.p_x_given_n_list[an_epoch_idx]): {np.shape(self.a_result.p_x_given_n_list[an_epoch_idx])}, len(xbin_centers): {len(self.xbin_centers)}"
+
+        a_p_x_given_n = self.a_result.p_x_given_n_list[an_epoch_idx]
+        a_most_likely_positions = self.a_result.most_likely_positions_list[an_epoch_idx]
+        a_time_bin_edges = self.a_result.time_bin_edges[an_epoch_idx]
+        a_time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers
+
+        assert len(a_time_bin_centers) == len(a_most_likely_positions)
+
+        # heatmaps, a_line, _out_markers, _slider_tuple = add_decoded_posterior_and_trajectory(an_ax, xbin_centers=xbin_centers, a_p_x_given_n=a_p_x_given_n,
+        #                                                                      a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, ybin_centers=ybin_centers) # , allow_time_slider=True
+
+        # removing existing:
+        for a_heatmap in self.prev_heatmaps:
+            a_heatmap.remove()
+        self.prev_heatmaps.clear()
+
+        ## Perform the plot:
+        self.prev_heatmaps, self.a_line, self._out_markers = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
+                                                                            a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, ybin_centers=self.ybin_centers, include_most_likely_pos_line=False) # , allow_time_slider=True
+
+        self.fig.canvas.draw_idle()
+
+
+    # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
+    def _helper_add_gradient_line(self, ax, t, x, y, add_markers=False):
+        """ Adds a gradient line representing a timeseries of (x, y) positions.
+
+        add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
         
-    def _subfn_build_laps_multiplotter(nfields, linear_plot_data=None):
-        """ captures: fixed_columns, (long_track_inst, short_track_inst)
+        
+        _helper_add_gradient_line(ax=axs[curr_row][curr_col]],
+            t=np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+            x=laps_position_traces[curr_lap_id][0,:],
+            y=laps_position_traces[curr_lap_id][1,:]
+        )
+
+        """
+        # Create a continuous norm to map from data points to colors
+        assert len(t) == len(x), f"len(t): {len(t)} != len(x): {len(x)}"
+        norm = plt.Normalize(t.min(), t.max())
+        # needs to be (numlines) x (points per line) x 2 (for x and y)
+        points = np.array([x, y]).T.reshape(-1, 1, 2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        lc = LineCollection(segments, cmap='viridis', norm=norm)
+        # Set the values used for colormapping
+        lc.set_array(t)
+        lc.set_linewidth(2)
+        lc.set_alpha(0.85)
+        line = ax.add_collection(lc)
+
+        if add_markers:
+            # Builds scatterplot markers (points) along the path
+            colors_arr = line.get_colors() # (17, 4)
+            # segments_arr = line.get_segments() # (16, 2, 2)
+            # len(a_most_likely_positions) # 17
+            _out_markers = ax.scatter(x=x, y=y, c=colors_arr)
+            return line, _out_markers
+        else:
+            return line
+
+    def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True ):
+        """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
+        
+        Great plotting for laps.
+        Plots in a paginated manner.
+        
+        use_theoretical_tracks_instead: bool = True - # if False, renders all positions the animal traversed over the entire session. Otherwise renders the theoretical (idaal) track.
+
+        ISSUE: `fixed_columns: int = 1` doesn't work due to indexing
+
+
+        History: based off of plot_lap_trajectories_2d
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_decoded_trajectories_2d
+        
+            fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)
+
         
         """
-        linear_plotter_indicies = np.arange(nfields)
-        needed_rows = int(np.ceil(nfields / fixed_columns))
-        row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
-        mp, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True) #ndarray (5,2)
-        # mp.set_size_inches(18.5, 26.5)
 
-        background_track_shadings = {}
-        for a_linear_index in linear_plotter_indicies:
-            curr_row = row_column_indicies[0][a_linear_index]
-            curr_col = row_column_indicies[1][a_linear_index]
-            if not use_theoretical_tracks_instead:
-                background_track_shadings[a_linear_index] = axs[curr_row][curr_col].plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=0.2)
-            else:
-                # active_config = curr_active_pipeline.sess.config
-                an_ax = axs[curr_row][curr_col]
-                background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax)
+        if use_theoretical_tracks_instead:
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
+            long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(deepcopy(sess.config))
+
+
+        def _subfn_chunks(iterable, size=10):
+            iterator = iter(iterable)
+            for first in iterator:    # stops when iterator is depleted
+                def chunk():          # construct generator for next chunk
+                    yield first       # yield element from for loop
+                    for more in islice(iterator, size - 1):
+                        yield more    # yield more elements from the iterator
+                yield chunk()         # in outer generator, yield next chunk
             
-        return mp, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
-    
-    def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, laps_position_traces, lap_time_ranges, use_time_gradient_line=True):
-        # Add the lap trajectory:
-        for a_linear_index in linear_plotter_indicies:
-            curr_lap_id = active_page_laps_ids[a_linear_index]
-            curr_row = row_column_indicies[0][a_linear_index]
-            curr_col = row_column_indicies[1][a_linear_index]
-            curr_lap_time_range = lap_time_ranges[curr_lap_id]
-            curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
-            curr_lap_num_points = len(laps_position_traces[curr_lap_id][0,:])
-            if use_time_gradient_line:
-                # Create a continuous norm to map from data points to colors
-                curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
-                norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
-                # needs to be (numlines) x (points per line) x 2 (for x and y)
-                points = np.array([laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
-                segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                lc = LineCollection(segments, cmap='viridis', norm=norm)
-                # Set the values used for colormapping
-                lc.set_array(curr_lap_timeseries)
-                lc.set_linewidth(2)
-                lc.set_alpha(0.85)
-                a_line = axs[curr_row][curr_col].add_collection(lc)
-                # add_arrow(line)
-            else:
-                a_line = axs[curr_row][curr_col].plot(laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
-                # curr_lap_endpoint = curr_lap_position_traces[curr_lap_id][:,-1].T
-                a_start_arrow = _plot_helper_add_arrow(a_line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
-                a_middle_arrow = _plot_helper_add_arrow(a_line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
-                a_end_arrow = _plot_helper_add_arrow(a_line[0], position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
-                # add_arrow(line[0], position=curr_lap_endpoint, position_mode='abs', direction='right', size=50, color='blue')
-                # add_arrow(line[0], position=None, position_mode='rel', direction='right', size=50, color='blue')
-            # add lap text label
-            a_lap_label_text = axs[curr_row][curr_col].text(250, 126, curr_lap_label_text, horizontalalignment='right', size=12)
-            # PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
+        def _subfn_build_laps_multiplotter(nfields, linear_plot_data=None):
+            """ captures: fixed_columns, (long_track_inst, short_track_inst)
+            
+            """
+            linear_plotter_indicies = np.arange(nfields)
+            needed_rows = int(np.ceil(nfields / fixed_columns))
+            row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
+            mp, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True) #ndarray (5,2)
+            axs = np.atleast_2d(axs)
+            # mp.set_size_inches(18.5, 26.5)
 
-    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-
-    # Compute required data from session:
-    curr_position_df, lap_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(sess)
-    
-    # lap_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in session.laps.lap_id]
-
-    laps_position_traces_list = [lap_pos_df[['x','y']].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
-    laps_time_range_list = [[lap_pos_df[['t']].to_numpy()[0].item(), lap_pos_df[['t']].to_numpy()[-1].item()] for lap_pos_df in lap_specific_position_dfs]
-    
-    num_laps = len(sess.laps.lap_id)
-    linear_lap_index = np.arange(num_laps)
-    lap_time_ranges = dict(zip(sess.laps.lap_id, laps_time_range_list))
-    lap_position_traces = dict(zip(sess.laps.lap_id, laps_position_traces_list))
-    
-    all_maze_positions = curr_position_df[['x','y']].to_numpy().T # (2, 59308)
-    # np.shape(all_maze_positions)
-    all_maze_data = [all_maze_positions for i in np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
-    p, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
-    # generate the pages
-    laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)]
-    
-    if plot_actual_lap_lines:
-        active_page_laps_ids = laps_pages[active_page_index]
-        _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True)
-        # plt.ylim((125, 152))
+            background_track_shadings = {}
+            for a_linear_index in linear_plotter_indicies:
+                curr_row = row_column_indicies[0][a_linear_index]
+                curr_col = row_column_indicies[1][a_linear_index]
+                if not use_theoretical_tracks_instead:
+                    background_track_shadings[a_linear_index] = axs[curr_row][curr_col].plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=0.2)
+                else:
+                    # active_config = curr_active_pipeline.sess.config
+                    an_ax = axs[curr_row][curr_col]
+                    background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax)
+                
+            return mp, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
         
-    return p, axs, laps_pages
+        def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, laps_position_traces, lap_time_ranges, use_time_gradient_line=True):
+            # Add the lap trajectory:
+            for a_linear_index in linear_plotter_indicies:
+                curr_lap_id = active_page_laps_ids[a_linear_index]
+                curr_row = row_column_indicies[0][a_linear_index]
+                curr_col = row_column_indicies[1][a_linear_index]
+                curr_lap_time_range = lap_time_ranges[curr_lap_id]
+                curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
+                curr_lap_num_points = len(laps_position_traces[curr_lap_id][0,:])
+                if use_time_gradient_line:
+                    # Create a continuous norm to map from data points to colors
+                    curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                    norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
+                    # needs to be (numlines) x (points per line) x 2 (for x and y)
+                    points = np.array([laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
+                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                    lc = LineCollection(segments, cmap='viridis', norm=norm)
+                    # Set the values used for colormapping
+                    lc.set_array(curr_lap_timeseries)
+                    lc.set_linewidth(2)
+                    lc.set_alpha(0.85)
+                    a_line = axs[curr_row][curr_col].add_collection(lc)
+                    # add_arrow(line)
+                else:
+                    a_line = axs[curr_row][curr_col].plot(laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
+                    # curr_lap_endpoint = curr_lap_position_traces[curr_lap_id][:,-1].T
+                    a_start_arrow = _plot_helper_add_arrow(a_line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
+                    a_middle_arrow = _plot_helper_add_arrow(a_line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
+                    a_end_arrow = _plot_helper_add_arrow(a_line[0], position=curr_lap_num_points, position_mode='index', direction='right', size=20, color='red') # end
+                    # add_arrow(line[0], position=curr_lap_endpoint, position_mode='abs', direction='right', size=50, color='blue')
+                    # add_arrow(line[0], position=None, position_mode='rel', direction='right', size=50, color='blue')
+                # add lap text label
+                a_lap_label_text = axs[curr_row][curr_col].text(250, 126, curr_lap_label_text, horizontalalignment='right', size=12)
+                # PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
 
-def add_decoded_posterior_and_trajectory(an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, include_most_likely_pos_line: Optional[bool]=None):
-    """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
-    
-    np.shape(a_time_bin_centers) # 1D & 2D: (12,)
-    np.shape(a_most_likely_positions) # 2D: (12, 2)
-    np.shape(posterior): 1D: (56, 27);    2D: (12, 6, 57)
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
+        # Compute required data from session:
+        curr_position_df, lap_specific_position_dfs = LapsVisualizationMixin._compute_laps_specific_position_dfs(sess)
+        
+        # lap_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in session.laps.lap_id]
 
-    Usage:
-
-    # for 1D need to set `ybin_centers = None`
-    an_ax = axs[0][0]
-    heatmaps, a_line, _out_markers = add_decoded_posterior_and_trajectory(an_ax, xbin_centers=xbin_centers, a_p_x_given_n=a_p_x_given_n,
-                                                                        a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, ybin_centers=ybin_centers)
-
-
-    """
-    ## INPUTS: xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None
-    posterior = deepcopy(a_p_x_given_n).T # np.shape(posterior): 1D: (56, 27);    2D: (12, 6, 57)
-    print(f'np.shape(posterior): {np.shape(posterior)}')
-    # Create a masked array where all values < 0.25 are masked
-    masked_posterior = np.ma.masked_less(posterior, 0.02)
-    # Define a normalization instance which scales data values to the [0, 1] range
-    # norm = mcolors.Normalize(vmin=np.nanmin(masked_posterior), vmax=np.nanmax(masked_posterior))
-    is_2D: bool = False
-    if np.ndim(posterior) >= 3:
-        # 2D case
-        is_2D = True
-        # masked_posterior = np.sum(masked_posterior, axis=0)
-
-    x_values = deepcopy(xbin_centers)  # Replace with your x axis values
-
-    if not is_2D: # 1D case
-        # 1D Case:    
-        if include_most_likely_pos_line is None:
-            include_most_likely_pos_line = True # default to True for 2D
-        # Build fake 2D data out of 1D posterior
+        laps_position_traces_list = [lap_pos_df[['x','y']].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
+        laps_time_range_list = [[lap_pos_df[['t']].to_numpy()[0].item(), lap_pos_df[['t']].to_numpy()[-1].item()] for lap_pos_df in lap_specific_position_dfs]
+        
+        num_laps = len(sess.laps.lap_id)
+        linear_lap_index = np.arange(num_laps)
+        lap_time_ranges = dict(zip(sess.laps.lap_id, laps_time_range_list))
+        lap_position_traces = dict(zip(sess.laps.lap_id, laps_position_traces_list))
+        
+        all_maze_positions = curr_position_df[['x','y']].to_numpy().T # (2, 59308)
+        # np.shape(all_maze_positions)
+        all_maze_data = [all_maze_positions for i in np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
+        p, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
+        # generate the pages
+        laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)]
+        
+        if plot_actual_lap_lines:
+            active_page_laps_ids = laps_pages[active_page_index]
+            _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True)
+            # plt.ylim((125, 152))
             
-        ## Build the fake y-values from the current axes ylims, which are set when the track graphic is plotted:
-        y_min, y_max = an_ax.get_ylim()
-        fake_y_width = (y_max - y_min)
-        fake_y_center: float = y_min + (fake_y_width / 2.0)
-        fake_y_lower_bound: float = (fake_y_center - fake_y_width)
-        fake_y_upper_bound: float = (fake_y_center + fake_y_width)
+        self.fig = p
+        self.axs = axs
+        self.laps_pages = laps_pages
 
-        # ## Build the fake-y values from scratch using hardcoded values:
-        # fake_y_width: float = 2.5
-        # fake_y_center: float = 140.0
-        # fake_y_lower_bound: float = (fake_y_center - fake_y_width)
-        # fake_y_upper_bound: float = (fake_y_center + fake_y_width)
+        return p, axs, laps_pages
+
+    @classmethod
+    def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, include_most_likely_pos_line: Optional[bool]=None):
+        """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
+        
+        np.shape(a_time_bin_centers) # 1D & 2D: (12,)
+        np.shape(a_most_likely_positions) # 2D: (12, 2)
+        np.shape(posterior): 1D: (56, 27);    2D: (12, 6, 57)
 
 
-        fake_y_num_samples: int = 5
-        # y_values = np.linspace(0, 5, 50)    # Replace with your y axis values
-        y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples) # Replace with your y axis value
-        # posterior = np.repeat(a_p_x_given_n, repeats=fake_y_num_samples, axis=0)
-        fake_y_num_samples: int = len(a_time_bin_centers)
-        fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
-    else:
-        # 2D case:
-        assert ybin_centers is not None
-        y_values = deepcopy(ybin_centers)
-        if include_most_likely_pos_line is None:
-            include_most_likely_pos_line = False # default to False for 2D
+        Usage:
 
-    # Plot the posterior heatmap _________________________________________________________________________________________ #
-    # Note: origin='lower' makes sure that the [0, 0] index is at the bottom left corner.
-    if not is_2D: # 1D case
-        # 1D Case:    
-        a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap='viridis', alpha=0.92,
-                            extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
-                            origin='lower', interpolation='none') # , norm=norm
-        heatmaps = [a_heatmap]
+        # for 1D need to set `ybin_centers = None`
+        an_ax = axs[0][0]
+        heatmaps, a_line, _out_markers = add_decoded_posterior_and_trajectory(an_ax, xbin_centers=xbin_centers, a_p_x_given_n=a_p_x_given_n,
+                                                                            a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, ybin_centers=ybin_centers)
 
-    else:
-        # 2D case:
-        n_time_bins = len(a_time_bin_centers)
-        assert n_time_bins == np.shape(masked_posterior)[0]
-        heatmaps = []
-        vmin_global = np.nanmin(posterior)
-        vmax_global = np.nanmax(posterior)
-        print(f'vmin_global: {vmin_global}, vmax_global: {vmax_global}')
-        time_step_opacity: float = 0.92/float(n_time_bins)
-        time_step_opacity = max(time_step_opacity, 0.2)
-        print(f'time_step_opacity: {time_step_opacity}')
 
-        for i in np.arange(n_time_bins):
-            # time = float(i) / (float(n_time_bins) - 1.0)  # Normalize time to be between 0 and 1
-            # cmap = make_timestep_cmap(time)
-            # cmap = make_red_cmap(time)
-            # viridis_obj = mpl.colormaps['viridis'].resampled(8)
-            # cmap = viridis_obj
-            cmap='viridis'
-            a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
-                            extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
-                            origin='lower', interpolation='none', vmin=vmin_global, vmax=vmax_global) # , norm=norm
-            heatmaps.append(a_heatmap)
-
-    # # Add colorbar
-    # cbar = plt.colorbar(a_heatmap, ax=an_ax)
-    # cbar.set_label('Posterior Probability Density')
-
-    # Add Gradient Most Likely Position Line _____________________________________________________________________________ #
-    if include_most_likely_pos_line:
-        if not is_2D: # 1D case
-            # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
-            a_line, _out_markers = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=fake_y_arr, add_markers=True)
-        else:
+        """
+        ## INPUTS: xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None
+        posterior = deepcopy(a_p_x_given_n).T # np.shape(posterior): 1D: (56, 27);    2D: (12, 6, 57)
+        print(f'np.shape(posterior): {np.shape(posterior)}')
+        # Create a masked array where all values < 0.25 are masked
+        masked_posterior = np.ma.masked_less(posterior, 0.02)
+        # Define a normalization instance which scales data values to the [0, 1] range
+        # norm = mcolors.Normalize(vmin=np.nanmin(masked_posterior), vmax=np.nanmax(masked_posterior))
+        is_2D: bool = False
+        if np.ndim(posterior) >= 3:
             # 2D case
-            a_line, _out_markers = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=np.squeeze(a_most_likely_positions[:,0]), y=np.squeeze(a_most_likely_positions[:,1]), add_markers=True)
-    else:
-        a_line, _out_markers = None, None
+            is_2D = True
+            # masked_posterior = np.sum(masked_posterior, axis=0)
 
-    return heatmaps, a_line, _out_markers
+        x_values = deepcopy(xbin_centers)  # Replace with your x axis values
+
+        if not is_2D: # 1D case
+            # 1D Case:    
+            if include_most_likely_pos_line is None:
+                include_most_likely_pos_line = True # default to True for 2D
+            # Build fake 2D data out of 1D posterior
+                
+            ## Build the fake y-values from the current axes ylims, which are set when the track graphic is plotted:
+            y_min, y_max = an_ax.get_ylim()
+            fake_y_width = (y_max - y_min)
+            fake_y_center: float = y_min + (fake_y_width / 2.0)
+            fake_y_lower_bound: float = (fake_y_center - fake_y_width)
+            fake_y_upper_bound: float = (fake_y_center + fake_y_width)
+
+            # ## Build the fake-y values from scratch using hardcoded values:
+            # fake_y_width: float = 2.5
+            # fake_y_center: float = 140.0
+            # fake_y_lower_bound: float = (fake_y_center - fake_y_width)
+            # fake_y_upper_bound: float = (fake_y_center + fake_y_width)
+
+            fake_y_num_samples: int = 5
+            # y_values = np.linspace(0, 5, 50)    # Replace with your y axis values
+            y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples) # Replace with your y axis value
+            # posterior = np.repeat(a_p_x_given_n, repeats=fake_y_num_samples, axis=0)
+            fake_y_num_samples: int = len(a_time_bin_centers)
+            fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
+        else:
+            # 2D case:
+            assert ybin_centers is not None
+            y_values = deepcopy(ybin_centers)
+            if include_most_likely_pos_line is None:
+                include_most_likely_pos_line = False # default to False for 2D
+
+        # Plot the posterior heatmap _________________________________________________________________________________________ #
+        # Note: origin='lower' makes sure that the [0, 0] index is at the bottom left corner.
+        if not is_2D: # 1D case
+            # 1D Case:    
+            a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap='viridis', alpha=0.92,
+                                extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                origin='lower', interpolation='none') # , norm=norm
+            heatmaps = [a_heatmap]
+
+        else:
+            # 2D case:
+            n_time_bins = len(a_time_bin_centers)
+            assert n_time_bins == np.shape(masked_posterior)[0]
+            heatmaps = []
+            vmin_global = np.nanmin(posterior)
+            vmax_global = np.nanmax(posterior)
+            print(f'vmin_global: {vmin_global}, vmax_global: {vmax_global}')
+            time_step_opacity: float = 0.92/float(n_time_bins)
+            time_step_opacity = max(time_step_opacity, 0.2)
+            print(f'time_step_opacity: {time_step_opacity}')
+
+            for i in np.arange(n_time_bins):
+                # time = float(i) / (float(n_time_bins) - 1.0)  # Normalize time to be between 0 and 1
+                # cmap = make_timestep_cmap(time)
+                # cmap = make_red_cmap(time)
+                # viridis_obj = mpl.colormaps['viridis'].resampled(8)
+                # cmap = viridis_obj
+                cmap='viridis'
+                a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
+                                extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                origin='lower', interpolation='none', vmin=vmin_global, vmax=vmax_global) # , norm=norm
+                heatmaps.append(a_heatmap)
+
+        # # Add colorbar
+        # cbar = plt.colorbar(a_heatmap, ax=an_ax)
+        # cbar.set_label('Posterior Probability Density')
+
+        # Add Gradient Most Likely Position Line _____________________________________________________________________________ #
+        if include_most_likely_pos_line:
+            if not is_2D: # 1D case
+                # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
+                a_line, _out_markers = self._helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=fake_y_arr, add_markers=True)
+            else:
+                # 2D case
+                a_line, _out_markers = self._helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=np.squeeze(a_most_likely_positions[:,0]), y=np.squeeze(a_most_likely_positions[:,1]), add_markers=True)
+        else:
+            a_line, _out_markers = None, None
+
+        return heatmaps, a_line, _out_markers
 
 
 
