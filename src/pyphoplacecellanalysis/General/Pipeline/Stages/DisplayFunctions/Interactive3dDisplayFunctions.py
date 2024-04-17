@@ -116,7 +116,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         Outputs: {'iplapsDataExplorer', 'plotter'}
         """
         active_laps_config = InteractivePlaceCellConfig(active_session_config=computation_result.sess.config, active_epochs=None, video_output_config=None, plotting_config=None) # '3|1    
-        active_laps_config.plotting_config = PlottingConfig(output_subplots_shape='1|5', output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
+        active_laps_config.plotting_config = PlottingConfig.init_from_params(output_subplots_shape='1|5', output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
         # try: pActiveInteractiveLapsPlotter
         # except NameError: pActiveInteractiveLapsPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
         pActiveInteractiveLapsPlotter = kwargs.get('extant_plotter', None)
@@ -130,7 +130,7 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
 
 
     @function_attributes(short_name='3d_image_plotter', tags=['display', 'image', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00', is_global=False)
-    def _display_3d_image_plotter(computation_result, active_config, **kwargs):
+    def _display_3d_image_plotter(computation_result, active_config, image_file=None, **kwargs):
         """ Plots an existing image in a 3D environment
         Inputs: {'extant_plotter': None} 
         Outputs: {'plotter'}
@@ -141,6 +141,9 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
             return ImagePlaneRendering.plot_3d_image(pActiveImageTestPlotter, active_epoch_placefields2D.ratemap.xbin, active_epoch_placefields2D.ratemap.ybin, active_epoch_placefields2D.ratemap.occupancy, loaded_image_tex=loaded_image_tex)
             
         # Texture from file:
-        image_file = r'output\2006-6-07_11-26-53\maze\speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.10\pf2D-Occupancy-maze-odd_laps-speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.png'
+        image_file = kwargs.get('image_file', r'output\2006-6-07_11-26-53\maze\speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.10\pf2D-Occupancy-maze-odd_laps-speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.png')
+        if not isinstance(image_file, Path):
+            image_file = Path(image_file).resolve()
+            assert image_file.exists(), f"image_file: '{image_file}' does not exist!"
         pActiveImageTestPlotter = plot_3d_image_plotter(computation_result.computed_data['pf2D'], image_file=image_file)
         return {'plotter': pActiveImageTestPlotter}
