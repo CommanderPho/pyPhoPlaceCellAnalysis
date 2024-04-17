@@ -196,7 +196,7 @@ class DecodedTrajectoryPlotter:
 
 
     ## MAIN PLOT FUNCTION:
-    def plot_epoch(self, an_epoch_idx: int):
+    def plot_epoch(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None):
         """ 
         """
         self.curr_epoch_idx = an_epoch_idx
@@ -222,15 +222,57 @@ class DecodedTrajectoryPlotter:
             a_heatmap.remove()
         self.prev_heatmaps.clear()
 
+        if self._out_markers is not None:
+            self._out_markers.remove()
+
+        if self.a_line is not None:
+            self.a_line.remove()
+
         ## Perform the plot:
         self.prev_heatmaps, self.a_line, self._out_markers = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
-                                                                            a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, ybin_centers=self.ybin_centers, include_most_likely_pos_line=False) # , allow_time_slider=True
+                                                                            a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, ybin_centers=self.ybin_centers, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index) # , allow_time_slider=True
 
         self.fig.canvas.draw_idle()
 
 
+    def plot_epoch_with_slider_widget(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None):
+        import ipywidgets as widgets
+        from IPython.display import display
+
+        def integer_slider(update_func):
+            """ Captures: valid_aclus
+            """
+            # slider = widgets.IntSlider(description='epoch_IDX:', min=0, max=a_decoded_traj_plotter.num_filter_epochs-1, value=0)
+            slider = widgets.IntSlider(description='time bin:', min=0, max=(self.curr_n_time_bins-1), value=0)
+
+            def on_slider_change(change):
+                if change['type'] == 'change' and change['name'] == 'value':
+                    # Call the user-provided update function with the current slider index
+                    update_func(change['new'])
+            slider.observe(on_slider_change)
+            display(slider)
+
+
+        def update_function(index):
+            """ Define an update function that will be called with the current slider index 
+            Captures a_result, an_ax, an_epoch_idx
+            """
+            # print(f'Slider index: {index}')
+            a_time_bin_index: int = int(index)
+            self.plot_epoch(an_epoch_idx=an_epoch_idx, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=a_time_bin_index)
+
+        ## Start by doing a plot:
+        self.plot_epoch(an_epoch_idx=an_epoch_idx)
+        # n_time_bins: int = a_decoded_traj_plotter.curr_n_time_bins
+        # Call the integer_slider function with the update function
+        return integer_slider(update_function)
+    
+
+
+
     # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
-    def _helper_add_gradient_line(self, ax, t, x, y, add_markers=False):
+    @classmethod
+    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False):
         """ Adds a gradient line representing a timeseries of (x, y) positions.
 
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
@@ -394,12 +436,16 @@ class DecodedTrajectoryPlotter:
         return p, axs, laps_pages
 
     @classmethod
-    def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, include_most_likely_pos_line: Optional[bool]=None):
+    def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None,
+                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, debug_print=False):
         """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
         
         np.shape(a_time_bin_centers) # 1D & 2D: (12,)
         np.shape(a_most_likely_positions) # 2D: (12, 2)
         np.shape(posterior): 1D: (56, 27);    2D: (12, 6, 57)
+
+        
+        time_bin_index: if time_bin_index is not None, only a single time bin will be plotted. Provide this to plot using a slider or programmatically animating.
 
 
         Usage:
@@ -411,18 +457,22 @@ class DecodedTrajectoryPlotter:
 
 
         """
+        posterior_masking_value: float = 0.01
+        # full_posterior_opacity: float = 0.92
+        full_posterior_opacity: float = 1.0
+        
         ## INPUTS: xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None
         posterior = deepcopy(a_p_x_given_n).T # np.shape(posterior): 1D: (56, 27);    2D: (12, 6, 57)
-        print(f'np.shape(posterior): {np.shape(posterior)}')
+        if debug_print:
+            print(f'np.shape(posterior): {np.shape(posterior)}')
         # Create a masked array where all values < 0.25 are masked
-        masked_posterior = np.ma.masked_less(posterior, 0.02)
+        masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
         # Define a normalization instance which scales data values to the [0, 1] range
         # norm = mcolors.Normalize(vmin=np.nanmin(masked_posterior), vmax=np.nanmax(masked_posterior))
         is_2D: bool = False
         if np.ndim(posterior) >= 3:
             # 2D case
             is_2D = True
-            # masked_posterior = np.sum(masked_posterior, axis=0)
 
         x_values = deepcopy(xbin_centers)  # Replace with your x axis values
 
@@ -460,37 +510,57 @@ class DecodedTrajectoryPlotter:
 
         # Plot the posterior heatmap _________________________________________________________________________________________ #
         # Note: origin='lower' makes sure that the [0, 0] index is at the bottom left corner.
+        n_time_bins = len(a_time_bin_centers)
+        assert n_time_bins == np.shape(masked_posterior)[0]
+
         if not is_2D: # 1D case
             # 1D Case:    
-            a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap='viridis', alpha=0.92,
-                                extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
-                                origin='lower', interpolation='none') # , norm=norm
+            if time_bin_index is not None:
+                assert (time_bin_index < n_time_bins)
+                a_heatmap = an_ax.imshow(masked_posterior[time_bin_index, :], aspect='auto', cmap='viridis', alpha=full_posterior_opacity,
+                                    extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                    origin='lower', interpolation='none') # , norm=norm
+            else:
+                a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap='viridis', alpha=full_posterior_opacity,
+                                    extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                    origin='lower', interpolation='none') # , norm=norm
+                
             heatmaps = [a_heatmap]
 
         else:
             # 2D case:
-            n_time_bins = len(a_time_bin_centers)
-            assert n_time_bins == np.shape(masked_posterior)[0]
             heatmaps = []
             vmin_global = np.nanmin(posterior)
             vmax_global = np.nanmax(posterior)
-            print(f'vmin_global: {vmin_global}, vmax_global: {vmax_global}')
-            time_step_opacity: float = 0.92/float(n_time_bins)
-            time_step_opacity = max(time_step_opacity, 0.2)
-            print(f'time_step_opacity: {time_step_opacity}')
-
-            for i in np.arange(n_time_bins):
-                # time = float(i) / (float(n_time_bins) - 1.0)  # Normalize time to be between 0 and 1
-                # cmap = make_timestep_cmap(time)
-                # cmap = make_red_cmap(time)
-                # viridis_obj = mpl.colormaps['viridis'].resampled(8)
-                # cmap = viridis_obj
+            if debug_print:
+                print(f'vmin_global: {vmin_global}, vmax_global: {vmax_global}')
+            if time_bin_index is not None:
+                assert (time_bin_index < n_time_bins)
                 cmap='viridis'
-                a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
+                a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[time_bin_index,:,:]), aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
                                 extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
-                                origin='lower', aspect='auto', interpolation='none',
+                                origin='lower', interpolation='none',
                                 vmin=vmin_global, vmax=vmax_global) # , norm=norm
                 heatmaps.append(a_heatmap)
+            else:
+                # plot all of them in a loop:
+                time_step_opacity: float = full_posterior_opacity/float(n_time_bins)
+                time_step_opacity = max(time_step_opacity, 0.2) # no less than 0.2
+                if debug_print:
+                    print(f'time_step_opacity: {time_step_opacity}')
+
+                for i in np.arange(n_time_bins):
+                    # time = float(i) / (float(n_time_bins) - 1.0)  # Normalize time to be between 0 and 1
+                    # cmap = make_timestep_cmap(time)
+                    # cmap = make_red_cmap(time)
+                    # viridis_obj = mpl.colormaps['viridis'].resampled(8)
+                    # cmap = viridis_obj
+                    cmap='viridis'
+                    a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
+                                    extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                    origin='lower', interpolation='none',
+                                    vmin=vmin_global, vmax=vmax_global) # , norm=norm
+                    heatmaps.append(a_heatmap)
 
         # # Add colorbar
         # cbar = plt.colorbar(a_heatmap, ax=an_ax)
@@ -498,12 +568,27 @@ class DecodedTrajectoryPlotter:
 
         # Add Gradient Most Likely Position Line _____________________________________________________________________________ #
         if include_most_likely_pos_line:
+            if not is_2D:
+                x = np.atleast_1d([a_most_likely_positions[time_bin_index]])
+                y = np.atleast_1d([fake_y_arr[time_bin_index]])
+            else:
+                # 2D:
+                x = np.squeeze(a_most_likely_positions[:,0])
+                y = np.squeeze(a_most_likely_positions[:,1])
+                
+            if time_bin_index is not None:
+                ## restrict to single time bin if time_bin_index is not None:
+                assert (time_bin_index < n_time_bins)
+                a_time_bin_centers = np.atleast_1d([a_time_bin_centers[time_bin_index]])
+                x = np.atleast_1d([x[time_bin_index]])
+                y = np.atleast_1d([y[time_bin_index]])
+                
             if not is_2D: # 1D case
                 # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
-                a_line, _out_markers = self._helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=fake_y_arr, add_markers=True)
+                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=x, y=y, add_markers=True)
             else:
                 # 2D case
-                a_line, _out_markers = self._helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=np.squeeze(a_most_likely_positions[:,0]), y=np.squeeze(a_most_likely_positions[:,1]), add_markers=True)
+                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=x, y=y, add_markers=True)
         else:
             a_line, _out_markers = None, None
 
