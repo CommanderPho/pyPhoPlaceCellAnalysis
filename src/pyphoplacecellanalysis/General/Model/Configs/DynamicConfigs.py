@@ -42,6 +42,13 @@ class BaseConfig:
             self.__dict__.update(state)
 
 
+    def get(self, attribute_name, default=None):
+        """ Use the getattr built-in function to retrieve attributes """
+        # If the attribute doesn't exist, return the default value
+        return getattr(self, attribute_name, default)
+    
+
+
 
 @define(slots=False)
 class VideoOutputModeConfig(BaseConfig):
