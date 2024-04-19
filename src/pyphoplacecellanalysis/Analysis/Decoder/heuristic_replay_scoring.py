@@ -34,8 +34,6 @@ def is_valid_sequence_index(sequence, test_index: int) -> bool:
     return ((test_index >= min_sequence_index) and (test_index <= max_sequence_index))
 
 
-
-
 def _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, continuous_sequence_lengths, longest_sequence_start_idx: int, max_ignore_bins: int = 2):
     """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
@@ -152,7 +150,6 @@ class HeuristicReplayScoring:
             total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
             ## RETURNS: total_first_order_change_score
             return total_first_order_change_score
-
 
     @classmethod
     @function_attributes(short_name='coverage', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
@@ -324,9 +321,6 @@ class HeuristicReplayScoring:
         # total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
         ## RETURNS: ratio_bins_higher_than_diffusion_across_time
         # return ratio_bins_higher_than_diffusion_across_time
-
-
-
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 08:00', related_items=[])
