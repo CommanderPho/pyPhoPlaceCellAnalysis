@@ -4509,7 +4509,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                         requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['TrainTestSplit'],
                         validate_computation_test=_workaround_validate_has_directional_train_test_split_result, is_global=True)
     def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
-                                    training_data_portion: float = 9.0/10.0, debug_output_hdf5_file_path = None):
+                                    training_data_portion: float = 5.0/6.0, debug_output_hdf5_file_path = None):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
