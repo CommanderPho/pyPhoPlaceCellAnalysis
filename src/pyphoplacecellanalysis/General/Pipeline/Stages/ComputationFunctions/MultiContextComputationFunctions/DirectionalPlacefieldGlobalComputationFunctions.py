@@ -3594,6 +3594,42 @@ def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decod
     return a_directional_laps_filter_epochs_decoder_result, a_directional_ripple_filter_epochs_decoder_result #, (laps_radon_transform_df, ripple_radon_transform_df)
 
 
+@function_attributes(short_name=None, tags=['wcorr', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-19 18:07', related_items=[])
+def compute_weighted_correlations(decoder_decoded_epochs_result_dict, debug_print=False):
+    """ 
+    ## Weighted Correlation can only be applied to decoded posteriors, not spikes themselves.
+    ### It works by assessing the degree to which a change in position corresponds to a change in time. For a simple diagonally increasing trajectory across the track at early timebins position will start at the bottom of the track, and as time increases the position also increases. The "weighted" part just corresponds to making use of the confidence probabilities of the decoded posterior: instead of relying on only the most-likely position we can include all information returned. Naturally will emphasize sharp decoded positions and de-emphasize diffuse ones.
+
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
+
+        decoder_laps_weighted_corr_df_dict = _compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict))
+        decoder_ripple_weighted_corr_df_dict = _compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_ripple_filter_epochs_decoder_result_dict))
+
+        
+    History:
+        Extracted and renamed from `_subfn_compute_weighted_correlations`
+
+    """
+    from neuropy.analyses.decoders import wcorr
+    # INPUTS: decoder_decoded_epochs_result_dict
+
+    weighted_corr_data_dict = {}
+
+    # for a_name in track_templates.get_decoder_names():
+    for a_name, curr_results_obj in decoder_decoded_epochs_result_dict.items():            
+        weighted_corr_data = np.array([wcorr(a_P_x_given_n) for a_P_x_given_n in curr_results_obj.p_x_given_n_list]) # each `wcorr(a_posterior)` call returns a float
+        if debug_print:
+            print(f'a_name: "{a_name}"\n\tweighted_corr_data.shape: {np.shape(weighted_corr_data)}') # (84, ) - (n_epochs, )
+        weighted_corr_data_dict[a_name] = pd.DataFrame({'wcorr': weighted_corr_data})
+
+    ## end for
+    return weighted_corr_data_dict
+
+
+
+
 
 
 # ==================================================================================================================== #
@@ -4054,30 +4090,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
             return laps_radon_transform_df, laps_radon_transform_extras, ripple_radon_transform_df, ripple_radon_transform_extras
 
-        def _subfn_compute_weighted_correlations(decoder_decoded_epochs_result_dict, debug_print=False):
-            """ 
-            ## Weighted Correlation can only be applied to decoded posteriors, not spikes themselves.
-            ### It works by assessing the degree to which a change in position corresponds to a change in time. For a simple diagonally increasing trajectory across the track at early timebins position will start at the bottom of the track, and as time increases the position also increases. The "weighted" part just corresponds to making use of the confidence probabilities of the decoded posterior: instead of relying on only the most-likely position we can include all information returned. Naturally will emphasize sharp decoded positions and de-emphasize diffuse ones.
-
-            Usage:
-                decoder_laps_weighted_corr_df_dict = _compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict))
-                decoder_ripple_weighted_corr_df_dict = _compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_ripple_filter_epochs_decoder_result_dict))
-
-            """
-            from neuropy.analyses.decoders import wcorr
-            # INPUTS: decoder_decoded_epochs_result_dict
-
-            weighted_corr_data_dict = {}
-
-            # for a_name in track_templates.get_decoder_names():
-            for a_name, curr_results_obj in decoder_decoded_epochs_result_dict.items():            
-                weighted_corr_data = np.array([wcorr(a_P_x_given_n) for a_P_x_given_n in curr_results_obj.p_x_given_n_list]) # each `wcorr(a_posterior)` call returns a float
-                if debug_print:
-                    print(f'a_name: "{a_name}"\n\tweighted_corr_data.shape: {np.shape(weighted_corr_data)}') # (84, ) - (n_epochs, )
-                weighted_corr_data_dict[a_name] = pd.DataFrame({'wcorr': weighted_corr_data})
-
-            ## end for
-            return weighted_corr_data_dict
 
         def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "DirectionalMergedDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_df_dict: Dict[str, pd.DataFrame], decoder_ripple_df_dict: Dict[str, pd.DataFrame], active_df_columns = ['wcorr']):
             """ Called one for each specific score metric (e.g. (Radon Transform, WCorr, PearsonR)) after it is computed to compute its merged dataframes and dataframe dicts. 
@@ -4189,8 +4201,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 laps_radon_transform_merged_df, ripple_radon_transform_merged_df = None, None
 
             ## Weighted Correlation
-            decoder_laps_weighted_corr_df_dict = _subfn_compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict))
-            decoder_ripple_weighted_corr_df_dict = _subfn_compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_ripple_filter_epochs_decoder_result_dict))
+            decoder_laps_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict))
+            decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_ripple_filter_epochs_decoder_result_dict))
             (laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df), (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = _subfn_compute_complete_df_metrics(directional_merged_decoders_result, track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                                                                                                                         decoder_laps_df_dict=deepcopy(decoder_laps_weighted_corr_df_dict), decoder_ripple_df_dict=deepcopy(decoder_ripple_weighted_corr_df_dict), active_df_columns = ['wcorr'])
             
