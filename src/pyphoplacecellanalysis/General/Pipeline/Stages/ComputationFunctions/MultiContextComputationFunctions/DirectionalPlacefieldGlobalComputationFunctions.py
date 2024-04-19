@@ -1787,6 +1787,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
     def add_groundtruth_information(self, curr_active_pipeline):
         """ adds the ground_truth to `self.laps_epochs_df`:
 
+        Updates: ['maze_id', 'is_LR_dir', 'is_most_likely_track_identity_Long', 'is_most_likely_direction_LR']
+
+        Usage:
             a_directional_merged_decoders_result: DirectionalMergedDecodersResult = directional_merged_decoders_result
             result_laps_epochs_df: pd.DataFrame = a_directional_merged_decoders_result.add_groundtruth_information(curr_active_pipeline)
             result_laps_epochs_df
@@ -1809,7 +1812,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
         laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
         
         result_laps_epochs_df: pd.DataFrame = self.laps_epochs_df
-
 
         ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
         result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
@@ -2589,6 +2591,17 @@ MeasuredDecodedPositionComparison = attrs.make_class("MeasuredDecodedPositionCom
 
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
+    """ 
+    
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult
+
+            
+        CustomDecodeEpochsResult.build_measured_decoded_position_comparison
+
+
+    """
     measured_decoded_position_comparion: MeasuredDecodedPositionComparison = field()
     decoder_result: DecodedFilterEpochsResult = field()
 
@@ -2596,9 +2609,6 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame) -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
-        from sklearn.metrics import mean_squared_error
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_measured_decoded_position_comparison
-
         """
         from sklearn.metrics import mean_squared_error
 
@@ -2643,12 +2653,12 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
         from sklearn.metrics import mean_squared_error
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_measured_decoded_position_comparison
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult
 
         # Interpolated measured position DataFrame - looks good
         global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe()
-        test_measured_positions_dfs_dict, test_decoded_positions_df_dict, test_decoded_measured_diff_df_dict = build_measured_decoded_position_comparison(test_laps_decoder_results_dict, global_measured_position_df=global_measured_position_df)
-        train_measured_positions_dfs_dict, train_decoded_positions_df_dict, train_decoded_measured_diff_df_dict = build_measured_decoded_position_comparison(train_laps_decoder_results_dict, global_measured_position_df=global_measured_position_df)
+        test_measured_positions_dfs_dict, test_decoded_positions_df_dict, test_decoded_measured_diff_df_dict = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_laps_decoder_results_dict, global_measured_position_df=global_measured_position_df)
+        train_measured_positions_dfs_dict, train_decoded_positions_df_dict, train_decoded_measured_diff_df_dict = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(train_laps_decoder_results_dict, global_measured_position_df=global_measured_position_df)
 
 
         """
