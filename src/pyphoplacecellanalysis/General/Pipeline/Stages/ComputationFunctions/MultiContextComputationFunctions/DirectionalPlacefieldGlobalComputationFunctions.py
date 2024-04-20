@@ -3739,7 +3739,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'],
         validate_computation_test=DirectionalMergedDecodersResult.validate_has_directional_merged_placefields, is_global=True)
     def _build_merged_directional_placefields(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
-                                                laps_decoding_time_bin_size: float = 0.250, # 750ms
+                                                laps_decoding_time_bin_size: float = 0.250, # 250ms
                                                 ripple_decoding_time_bin_size: float = 0.025, # 25ms
                                             ):
         """
