@@ -98,7 +98,13 @@ def add_laps_groundtruth_information_to_dataframe(curr_active_pipeline, result_l
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     laps_obj: Laps = curr_active_pipeline.sess.laps
     laps_df = laps_obj.to_dataframe()
-    laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
+    laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess, replace_existing=True) # NOTE: .sess is used because global_session is missing the last two laps
+
+    ## 2024-04-20 - HACK
+    print(f"2024-04-20 - HACK -- FIXME: Invert the 'is_LR_dir' column since it is clearly reversed. No clue why.")
+    laps_df['is_LR_dir'] = np.logical_not(laps_df['is_LR_dir'])
+    is_RL_dir = np.logical_not(laps_df['is_LR_dir'])
+    laps_df['lap_dir'] = is_RL_dir.astype(int) # 1 for RL, 0 for LR
 
     ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
     result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
@@ -107,7 +113,7 @@ def add_laps_groundtruth_information_to_dataframe(curr_active_pipeline, result_l
 
     assert np.all([a_col in result_laps_epochs_df.columns for a_col in ('maze_id', 'is_LR_dir')]), f"result_laps_epochs_df.columns: {list(result_laps_epochs_df.columns)}"
 
-    result_laps_epochs_df['true_decoder_index'] = (result_laps_epochs_df['maze_id'].astype(int) * 2) + result_laps_epochs_df['is_LR_dir'].astype(int)
+    result_laps_epochs_df['true_decoder_index'] = (result_laps_epochs_df['maze_id'].astype(int) * 2) + np.logical_not(result_laps_epochs_df['is_LR_dir']).astype(int)
 
     return result_laps_epochs_df
 
@@ -1518,9 +1524,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         """
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
-        # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
-        # active_global_laps_df = _subfn_compute_lap_dir_from_smoothed_velocity(global_session, active_global_laps_df=active_global_laps_df)
-        active_global_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(active_global_laps_df, global_session=global_session) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
+        active_global_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(active_global_laps_df, global_session=global_session, replace_existing=False) ## NOTE: global_session does not work, use curr_active_pipeline.sess instead (unfiltered session) otherwise it clips the last two laps
 
         # Validate Laps:
         # ground_truth_lap_dirs = active_global_laps_df['lap_dir'].to_numpy()
@@ -4864,7 +4868,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
-    @function_attributes(short_name='directional_laps_overview', tags=['directional','laps','overview'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-09 12:03', related_items=[], is_global=True)
+    @function_attributes(short_name='directional_laps_overview', tags=['directional','laps','overview'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['EpochsEditor'], used_by=[], creation_date='2023-11-09 12:03', related_items=[], is_global=True)
     def _display_directional_laps_overview(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
             """ Renders a window with the position/laps displayed in the middle and the four templates displayed to the left and right of them.
 
@@ -4907,7 +4911,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
             # uses `global_session`
-            epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=False, include_accel=False)
+            epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=True, include_accel=False)
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(epochs_editor.plots.win, None, title='Pho Directional Laps Templates')
 
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
