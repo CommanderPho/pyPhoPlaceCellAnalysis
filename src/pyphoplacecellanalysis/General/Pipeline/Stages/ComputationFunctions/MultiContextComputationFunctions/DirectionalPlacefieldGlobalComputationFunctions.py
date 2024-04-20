@@ -70,6 +70,50 @@ def find_shift(a1, a2):
     return lag
 
 
+@function_attributes(short_name=None, tags=['laps', 'groundtruth', 'validate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-19 21:42', related_items=[])
+def add_laps_groundtruth_information_to_dataframe(curr_active_pipeline, result_laps_epochs_df: pd.DataFrame) -> pd.DataFrame:
+    """ adds the ground_truth to the passed dataframe: `result_laps_epochs_df` and returns it:
+
+    Updates: ['maze_id', 'is_LR_dir', 'is_most_likely_track_identity_Long', 'is_most_likely_direction_LR']
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import add_laps_groundtruth_information_to_dataframe
+
+        laps_weighted_corr_merged_df: pd.DataFrame = add_laps_groundtruth_information_to_dataframe(curr_active_pipeline=curr_active_pipeline, result_laps_epochs_df=laps_weighted_corr_merged_df)
+        laps_weighted_corr_merged_df
+
+
+    """
+    from neuropy.core import Laps
+
+    ## Inputs: a_directional_merged_decoders_result, laps_df
+
+    if 'lap_id' not in result_laps_epochs_df.columns:
+        assert 'lap_idx' in result_laps_epochs_df.columns, f"`result_laps_epochs_df` dataframe must have either 'lap_id' or 'lap_idx' as a column in order to add the correct groundtruths"
+        result_laps_epochs_df['lap_id'] = result_laps_epochs_df['lap_idx'] + 1
+    
+    # Ensure it has the 'lap_track' column
+    ## Compute the ground-truth information using the position information:
+    # adds columns: ['maze_id', 'is_LR_dir']
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    laps_obj: Laps = curr_active_pipeline.sess.laps
+    laps_df = laps_obj.to_dataframe()
+    laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
+
+    ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
+    result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
+    ## add the 'is_LR_dir' groud-truth column in:
+    result_laps_epochs_df['is_LR_dir'] = laps_df['is_LR_dir'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
+
+    assert np.all([a_col in result_laps_epochs_df.columns for a_col in ('maze_id', 'is_LR_dir')]), f"result_laps_epochs_df.columns: {list(result_laps_epochs_df.columns)}"
+
+    result_laps_epochs_df['true_decoder_index'] = (result_laps_epochs_df['maze_id'].astype(int) * 2) + result_laps_epochs_df['is_LR_dir'].astype(int)
+
+    return result_laps_epochs_df
+
+
+
+
 # Define the namedtuple
 DirectionalDecodersTuple = namedtuple('DirectionalDecodersTuple', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
 
@@ -1783,7 +1827,33 @@ class DirectionalMergedDecodersResult(ComputedResult):
         corr_df.index.name = 'epoch_id'
         return corr_df, corr_column_names
 
-    @function_attributes(short_name=None, tags=['ground-truth', 'laps', 'validation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 19:23', related_items=['cls.validate_lap_dir_estimations()'])
+    @function_attributes(short_name=None, tags=['ground-truth', 'laps'], input_requires=[], output_provides=[], uses=['add_laps_groundtruth_information_to_dataframe'], used_by=['add_groundtruth_information'], creation_date='2024-04-19 18:53', related_items=[])
+    def _perform_add_groundtruth_information_to_dataframe(self, curr_active_pipeline, result_laps_epochs_df: pd.DataFrame) -> pd.DataFrame:
+        """ adds the ground_truth to the passed dataframe: `result_laps_epochs_df` and returns it:
+
+        Updates: ['maze_id', 'is_LR_dir', 'is_most_likely_track_identity_Long', 'is_most_likely_direction_LR']
+
+        Usage:
+            a_directional_merged_decoders_result: DirectionalMergedDecodersResult = directional_merged_decoders_result
+            result_laps_epochs_df: pd.DataFrame = a_directional_merged_decoders_result.add_groundtruth_information(curr_active_pipeline)
+            result_laps_epochs_df
+
+        """     
+        result_laps_epochs_df = add_laps_groundtruth_information_to_dataframe(curr_active_pipeline=curr_active_pipeline, result_laps_epochs_df=result_laps_epochs_df)
+
+        ## Add the decoded results to the laps df:
+        ## Get the most likely direction/track from the decoded posteriors:
+        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = self.laps_directional_marginals_tuple
+        laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
+        result_laps_epochs_df['is_most_likely_track_identity_Long'] = laps_is_most_likely_track_identity_Long
+        result_laps_epochs_df['is_most_likely_direction_LR'] = laps_is_most_likely_direction_LR_dir
+
+        assert np.all([a_col in result_laps_epochs_df.columns for a_col in ('maze_id', 'is_LR_dir', 'is_most_likely_track_identity_Long', 'is_most_likely_direction_LR')]), f"result_laps_epochs_df.columns: {list(result_laps_epochs_df.columns)}"
+
+        return result_laps_epochs_df
+    
+
+    @function_attributes(short_name=None, tags=['ground-truth', 'laps', 'validation'], input_requires=[], output_provides=[], uses=['_perform_add_groundtruth_information_to_dataframe'], used_by=[], creation_date='2024-04-05 19:23', related_items=['cls.validate_lap_dir_estimations()'])
     def add_groundtruth_information(self, curr_active_pipeline):
         """ adds the ground_truth to `self.laps_epochs_df`:
 
@@ -1795,39 +1865,21 @@ class DirectionalMergedDecodersResult(ComputedResult):
             result_laps_epochs_df
 
         """
-        from neuropy.core import Laps
-
-        ## Inputs: a_directional_merged_decoders_result, laps_df
-        
-        ## Get the most likely direction/track from the decoded posteriors:
-        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = self.laps_directional_marginals_tuple
-        laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
-
-        # Ensure it has the 'lap_track' column
-        ## Compute the ground-truth information using the position information:
-        # adds columns: ['maze_id', 'is_LR_dir']
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-        laps_obj: Laps = curr_active_pipeline.sess.laps
-        laps_df = laps_obj.to_dataframe()
-        laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
-        
-        result_laps_epochs_df: pd.DataFrame = self.laps_epochs_df
-
-        ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
-        result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
-        ## add the 'is_LR_dir' groud-truth column in:
-        result_laps_epochs_df['is_LR_dir'] = laps_df['is_LR_dir'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
-
-        ## Add the decoded results to the laps df:
-        result_laps_epochs_df['is_most_likely_track_identity_Long'] = laps_is_most_likely_track_identity_Long
-        result_laps_epochs_df['is_most_likely_direction_LR'] = laps_is_most_likely_direction_LR_dir
-
-        assert np.all([a_col in result_laps_epochs_df.columns for a_col in ('maze_id', 'is_LR_dir', 'is_most_likely_track_identity_Long', 'is_most_likely_direction_LR')]), f"result_laps_epochs_df.columns: {list(result_laps_epochs_df.columns)}"
-
         ## Update the source:
-        self.laps_epochs_df = result_laps_epochs_df
+        self.laps_epochs_df = self._perform_add_groundtruth_information_to_dataframe(curr_active_pipeline=curr_active_pipeline, result_laps_epochs_df=self.laps_epochs_df)
 
-        return result_laps_epochs_df
+        # self.laps_weighted_corr_merged_df = self._perform_add_groundtruth_information_to_dataframe(curr_active_pipeline=curr_active_pipeline, result_laps_epochs_df=self.laps_weighted_corr_merged_df)
+        # self.laps_simple_pf_pearson_merged_df = self._perform_add_groundtruth_information_to_dataframe(curr_active_pipeline=curr_active_pipeline, result_laps_epochs_df=self.laps_simple_pf_pearson_merged_df)
+
+        ## Dict-type:
+        # decoder_laps_radon_transform_df_dict = directional_decoders_epochs_decode_result.decoder_laps_radon_transform_df_dict
+        # decoder_laps_radon_transform_extras_dict = directional_decoders_epochs_decode_result.decoder_laps_radon_transform_extras_dict
+        # decoder_laps_weighted_corr_df_dict: Dict[str, pd.DataFrame] = directional_decoders_epochs_decode_result.decoder_laps_weighted_corr_df_dict
+
+        return self.laps_epochs_df
+    
+
+
 
 
 
