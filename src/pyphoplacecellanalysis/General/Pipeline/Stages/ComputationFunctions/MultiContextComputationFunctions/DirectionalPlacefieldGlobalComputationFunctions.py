@@ -3814,7 +3814,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                                                       long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
                                                       short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder)
         
-        result_laps_epochs_df: pd.DataFrame = directional_merged_decoders_result.add_groundtruth_information(owning_pipeline_reference)
+        
 
 
 
@@ -3838,6 +3838,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         ## Post Compute Validations:
         directional_merged_decoders_result.perform_compute_marginals()
         
+        result_laps_epochs_df: pd.DataFrame = directional_merged_decoders_result.add_groundtruth_information(owning_pipeline_reference)
+
          # Validate Laps:
         try:
             laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = directional_merged_decoders_result.laps_directional_marginals_tuple
