@@ -90,6 +90,22 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         """ 
         Inputs: {'extant_plotter': None} 
         Outputs: {'ipspikesDataExplorer', 'plotter'}
+
+        Usage:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            active_config_modifiying_kwargs = {
+                'plotting_config': {'should_use_linear_track_geometry': True, 
+                                    't_start': t_start, 't_delta': t_delta, 't_end': t_end,
+                                    }
+            }
+            _out_global = curr_active_pipeline.display(display_function='_display_3d_interactive_spike_and_behavior_browser', active_session_configuration_context=global_epoch_context,
+                                                        active_config_modifiying_kwargs=active_config_modifiying_kwargs,
+                                                        params_kwargs=dict(enable_historical_spikes=False, enable_recent_spikes=False, should_use_linear_track_geometry=True, **{'t_start': t_start, 't_delta': t_delta, 't_end': t_end}),
+                                                    )
+            ipspikesDataExplorer = _out_global['ipspikesDataExplorer']
+            p = _out_global['plotter']
+
+
         """
         active_config.plotting_config.show_legend = True        
         active_session = computation_result.sess # this is unfiltered, shouldn't be used... actually, it should be filtered. Don't know what's wrong here.
