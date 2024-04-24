@@ -5,6 +5,7 @@
 
 
 """
+from typing import Optional, Tuple
 import numpy as np
 import pyvista as pv
 
@@ -42,10 +43,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     sigOnUpdateMeshes = QtCore.Signal(float, float) # Emitted after meshes are updated to allow connected slots to be called to perform their own updates. args: t_start, t_stop
     
     
-    @safely_accepts_kwargs
-    def __init__(self, active_config, active_session, extant_plotter=None):
+    def __init__(self, active_config, active_session, extant_plotter=None, **kwargs):
         # super().__init__(active_config, active_session, extant_plotter)
-        super(InteractivePlaceCellDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer')
+        super(InteractivePlaceCellDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer', **kwargs)
         self._setup()
         
         app = pg.mkQApp() # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>

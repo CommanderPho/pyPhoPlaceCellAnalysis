@@ -5,6 +5,7 @@
 
 A class wrapper for PyVista's plotter class used to simplify adding interactive playback elements (animations) and storing common state for the purpose of 3D plotting.
 """
+from attrs import define, field, Factory
 import pyvista as pv
 from pyvistaqt import BackgroundPlotter
 
@@ -24,9 +25,12 @@ class AnimationStateVTKMixin(AnimationStateBaseMixin):
         self.interactive_checkbox_actor = self.p.add_checkbox_button_widget(self.toggle_animation, value=False, color_on='green')
 
 
+@define(slots=False, init=False)
 class PhoInteractivePlotter(AnimationStateVTKMixin):
     """A class wrapper for PyVista's plotter class used to simplify adding interactive playback elements (animations) and storing common state for the purpose of 3D plotting."""
-    
+    interface_properties: InterfaceProperties = field()
+
+
     def __init__(self, pyvista_plotter, interactive_timestamp_slider_actor):
         # interactive_timestamp_slider_actor: the slider actor object to use for the interactive slider        
         self.p = pyvista_plotter # The actual plotter object, must be either a pyvista.plotter or pyvistaqt.BackgroundPlotter
