@@ -263,8 +263,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
                                                                                             spike_geom=spike_geom_box.copy())
 
             if historical_spikes_pc.n_points >= 1:
-                self.plots['spikes_main_historical'] = self.p.add_mesh(historical_spikes_pc, name='historical_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=True, render=False)
-
+                self.plots['spikes_main_historical'] = self.p.add_mesh(historical_spikes_pc, name='historical_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=True, render=False, reset_camera=False)
 
         ## Recent Spikes:
         if enable_recent_spikes:
@@ -287,7 +286,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
                                                                                             spike_geom=spike_geom_cone.copy())
 
             if recent_only_spikes_pc.n_points >= 1:
-                self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False) # color='white'
+                self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False, reset_camera=False) # color='white'
 
         ## Position Updates:
         if enable_position_mesh_updates:
