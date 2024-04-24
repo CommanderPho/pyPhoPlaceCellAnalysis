@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Optional
+from typing import Any, Optional
 import param
 from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDataParams
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -90,6 +90,26 @@ class InteractivePyvistaPlotter_MazeRenderingMixin:
         return self.params.get('hidden_track_opacity', 0.1)
 
 
+    @property
+    def grid_bin_bounds(self) -> Optional[Any]:
+        ## prefer self.params..get('hidden_track_opacity', 0.1)
+        grid_bin_bounds = self.params.get('grid_bin_bounds', None)
+        if grid_bin_bounds is not None:
+            return grid_bin_bounds # return this grid_bin_bounds
+        
+        ## otherwise try to get it from the active config
+        grid_bin_bounds = None
+        try:
+            grid_bin_bounds = self.active_config.computation_config.pf_params.grid_bin_bounds
+        except (KeyError, AttributeError) as err:
+            # raise e
+            print(f'WARNING: could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds')
+        except BaseException as err:
+            raise err
+
+        return grid_bin_bounds    
+
+
     def perform_plot_maze(self, color=[0.3, 0.3, 0.3]):
         """ called from within implementor's self.plot(...) implementation to add the track/maze 
         Updates:
@@ -107,12 +127,15 @@ class InteractivePyvistaPlotter_MazeRenderingMixin:
         else:
             #TODO 2023-09-13 14:23: - [ ] 2023-09-13 - A superior version for the linear track that uses actually known maze geometry and the user-provided `grid_bin_bounds` used to compute:
             ## Add the 3D Maze Shape
-            assert self.active_config.computation_config.pf_params.grid_bin_bounds is not None, f"could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds"
+
+            assert self.grid_bin_bounds is not None, f"could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds"
+
+            # assert self.active_config.computation_config.pf_params.grid_bin_bounds is not None, f"could not get the grid_bin_bounds from self.params.active_epoch_placefields.config.grid_bin_bounds"
             # a_track_dims = LinearTrackDimensions3D()
             # a_track_dims, ideal_maze_pdata = LinearTrackDimensions3D.init_from_grid_bin_bounds(self.active_config.computation_config.pf_params.grid_bin_bounds, return_geoemtry=True)
+            # grid_bin_bounds = deepcopy(self.active_config.computation_config.pf_params.grid_bin_bounds)
+            grid_bin_bounds = deepcopy(self.grid_bin_bounds)
 
-
-            grid_bin_bounds = deepcopy(self.active_config.computation_config.pf_params.grid_bin_bounds)
             long_track_dims = LinearTrackDimensions3D(track_length=170.0)
             short_track_dims = LinearTrackDimensions3D(track_length=100.0)
 

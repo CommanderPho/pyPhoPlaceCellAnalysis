@@ -55,7 +55,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
     show_legend = True
 
     def __init__(self, active_config, active_session, active_epoch_placefields, pf_colors, extant_plotter=None, **kwargs):
-        super(InteractivePlaceCellTuningCurvesDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='TuningMapDataExplorer')
+        super(InteractivePlaceCellTuningCurvesDataExplorer, self).__init__(active_config=active_config, active_session=active_session, extant_plotter=extant_plotter, data_explorer_name='TuningMapDataExplorer', **kwargs)
         self.params.active_epoch_placefields = deepcopy(active_epoch_placefields)
         self.params.pf_colors = deepcopy(pf_colors)
         self.params.pf_colors_hex = None

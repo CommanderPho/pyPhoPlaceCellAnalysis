@@ -79,7 +79,7 @@ def plot_3d_binned_bars(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
     kwargs['name'] = plot_name # this is the only one to overwrite in kwargs
     # print(f'name: {plot_name}')    
     plotActor = p.add_mesh(mesh,
-                            **({'show_edges': True, 'edge_color': 'k', 'nan_opacity': 0.0, 'scalars': 'Elevation', 'opacity': 1.0, 'use_transparency': False, 'smooth_shading': False, 'show_scalar_bar': False, 'render': True} | kwargs)
+                            **({'show_edges': True, 'edge_color': 'k', 'nan_opacity': 0.0, 'scalars': 'Elevation', 'opacity': 1.0, 'use_transparency': False, 'smooth_shading': False, 'show_scalar_bar': False, 'render': True, 'reset_camera': False} | kwargs)
                           )
     # p.enable_depth_peeling() # this fixes bug where it appears transparent even when opacity is set to 1.00
     

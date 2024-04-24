@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 import pyvista as pv
 import pyvistaqt as pvqt
@@ -131,14 +132,30 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         Inputs: {'extant_plotter': None} 
         Outputs: {'iplapsDataExplorer', 'plotter'}
         """
+        kwargs['params_kwargs'] = kwargs.get('params_kwargs', {})
+        
+        extant_params_kwargs_grid_bin_bounds = kwargs['params_kwargs'].get('grid_bin_bounds', None)
+        if extant_params_kwargs_grid_bin_bounds is None:
+            # set grid_bin_bounds if not set in params
+            grid_bin_bounds = deepcopy(active_config.computation_config.pf_params.grid_bin_bounds)
+            assert grid_bin_bounds is not None
+            kwargs['params_kwargs']['grid_bin_bounds'] = grid_bin_bounds
+
+
         active_laps_config = InteractivePlaceCellConfig(active_session_config=computation_result.sess.config, active_epochs=None, video_output_config=None, plotting_config=None) # '3|1    
         active_laps_config.plotting_config = PlottingConfig.init_from_params(output_subplots_shape='1|5', output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
+
+        ## Need: `active_laps_config.computation_config.pf_params.grid_bin_bounds`
+        
+        # active_laps_config.computation_config.pf_params = deepcopy(active_config.pf_params)
+
+
         # try: pActiveInteractiveLapsPlotter
         # except NameError: pActiveInteractiveLapsPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
         pActiveInteractiveLapsPlotter = kwargs.get('extant_plotter', None)
         # iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, **({'extant_plotter':None} | kwargs))
         # iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, **overriding_dict_with({'extant_plotter':None}, **kwargs))
-        iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, extant_plotter=kwargs.get('extant_plotter', None))
+        iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, extant_plotter=kwargs.get('extant_plotter', None), **kwargs)
 
         
         pActiveInteractiveLapsPlotter = iplapsDataExplorer.plot(pActivePlotter=pActiveInteractiveLapsPlotter)
