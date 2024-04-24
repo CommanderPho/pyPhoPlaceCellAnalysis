@@ -143,7 +143,9 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
 
 
         active_laps_config = InteractivePlaceCellConfig(active_session_config=computation_result.sess.config, active_epochs=None, video_output_config=None, plotting_config=None) # '3|1    
-        active_laps_config.plotting_config = PlottingConfig.init_from_params(output_subplots_shape='1|5', output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
+        # active_laps_config.plotting_config = PlottingConfig.init_from_params(output_subplots_shape='1|5', output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
+        active_laps_config.plotting_config = PlottingConfig.init_from_params(output_subplots_shape=None, output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
+
 
         ## Need: `active_laps_config.computation_config.pf_params.grid_bin_bounds`
         

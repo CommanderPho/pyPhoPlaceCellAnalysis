@@ -142,19 +142,35 @@ class InteractivePyvistaPlotter_MazeRenderingMixin:
             long_track_pdata = long_track_dims.build_maze_geometry(position_offset=None, grid_bin_bounds=grid_bin_bounds)
             short_track_pdata = short_track_dims.build_maze_geometry(position_offset=None, grid_bin_bounds=grid_bin_bounds)
 
+            def _subfn_perform_plot_mazes(a_plotter, a_plotter_id_prefix: str=''):
+                long_maze_bg_key: str = f"long_maze_bg"
+                short_maze_bg_key: str = f"short_maze_bg"
+                if (a_plotter_id_prefix is not None) and (len(a_plotter_id_prefix) > 0):
+                    long_maze_bg_key: str = '_'.join([a_plotter_id_prefix, long_maze_bg_key])
+                    short_maze_bg_key: str = '_'.join([a_plotter_id_prefix, short_maze_bg_key])
 
-            self.plots['long_maze_bg'] = perform_plot_flat_arena(self.p, long_track_pdata, name='long_maze_bg', label='long_idealized_maze', color=color) # [0.3, 0.3, 0.3]
+                self.plots[long_maze_bg_key] = perform_plot_flat_arena(a_plotter, long_track_pdata, name=long_maze_bg_key, label='long_idealized_maze', color=color) # [0.3, 0.3, 0.3]
+                self.plots[short_maze_bg_key] = perform_plot_flat_arena(a_plotter, short_track_pdata, name=short_maze_bg_key, label='short_idealized_maze', color=color) # [0.3, 0.3, 0.3]
+
             self.plots_data['long_maze_bg'] = {'track_dims': long_track_dims, 'maze_pdata': long_track_pdata}
-
-            self.plots['short_maze_bg'] = perform_plot_flat_arena(self.p, short_track_pdata, name='short_maze_bg', label='short_idealized_maze', color=color) # [0.3, 0.3, 0.3]
             self.plots_data['short_maze_bg'] = {'track_dims': short_track_dims, 'maze_pdata': short_track_pdata}
 
-            # keys = ['long_maze_bg', 'short_maze_bg']
 
+            is_multiplotter: bool = (hasattr(self.p, '__getitem__') and hasattr(self.p, '_nrows') and hasattr(self.p, '_ncols'))
+            if is_multiplotter:
+                for row in range(self.p._nrows):
+                    for col in range(self.p._ncols):
+                        p = self.p[row, col]
+                        _subfn_perform_plot_mazes(a_plotter=p, a_plotter_id_prefix=f"p[{row}][{col}]")
+
+            else:
+                p = self.p
+                _subfn_perform_plot_mazes(a_plotter=p)
+
+            # keys = ['long_maze_bg', 'short_maze_bg']
             # self.plots['maze_bg'] = perform_plot_flat_arena(self.p, ideal_maze_pdata, name='maze_bg', label='idealized_maze', color=color) # [0.3, 0.3, 0.3]
             # self.plots_data['maze_bg'] = {'track_dims': a_track_dims, 'maze_pdata': ideal_maze_pdata}
-            
-            return (self.plots['short_maze_bg'], self.plots_data['short_maze_bg']), (self.plots['long_maze_bg'], self.plots_data['long_maze_bg'])
+            # return (self.plots['short_maze_bg'], self.plots_data['short_maze_bg']), (self.plots['long_maze_bg'], self.plots_data['long_maze_bg'])
     
 
     def perform_remove_maze_actor(self) -> bool:
@@ -218,5 +234,29 @@ class InteractivePyvistaPlotter_MazeRenderingMixin:
 
         ## Now we have: long_track_opacity, short_track_opacity
         ## post-delta:
-        self.long_maze_bg.GetProperty().SetOpacity(long_track_opacity)
-        self.short_maze_bg.GetProperty().SetOpacity(short_track_opacity)
+        # self.long_maze_bg.GetProperty().SetOpacity(long_track_opacity)
+        # self.short_maze_bg.GetProperty().SetOpacity(short_track_opacity)
+
+        def _subfn_perform_update_maze_opacity(long_track_opacity: float, short_track_opacity: float, a_plotter_id_prefix: str=''):
+            """ captures: long_track_opacity, short_track_opacity
+            
+            """
+            long_maze_bg_key: str = f"long_maze_bg"
+            short_maze_bg_key: str = f"short_maze_bg"
+            if (a_plotter_id_prefix is not None) and (len(a_plotter_id_prefix) > 0):
+                long_maze_bg_key: str = '_'.join([a_plotter_id_prefix, long_maze_bg_key])
+                short_maze_bg_key: str = '_'.join([a_plotter_id_prefix, short_maze_bg_key])
+            long_maze_bg = self.plots[long_maze_bg_key]
+            short_maze_bg = self.plots[short_maze_bg_key]
+            long_maze_bg.GetProperty().SetOpacity(long_track_opacity)
+            short_maze_bg.GetProperty().SetOpacity(short_track_opacity)
+            
+
+        is_multiplotter: bool = (hasattr(self.p, '__getitem__') and hasattr(self.p, '_nrows') and hasattr(self.p, '_ncols'))
+        if is_multiplotter:
+            for row in range(self.p._nrows):
+                for col in range(self.p._ncols):
+                    _subfn_perform_update_maze_opacity(long_track_opacity=long_track_opacity, short_track_opacity=short_track_opacity, a_plotter_id_prefix=f"p[{row}][{col}]")
+
+        else:
+            _subfn_perform_update_maze_opacity(long_track_opacity=long_track_opacity, short_track_opacity=short_track_opacity)
