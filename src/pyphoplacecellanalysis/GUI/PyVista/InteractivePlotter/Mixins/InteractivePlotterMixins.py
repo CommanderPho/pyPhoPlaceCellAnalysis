@@ -62,6 +62,11 @@ class InteractivePyvistaPlotterBuildIfNeededMixin:
         return pActiveTuningCurvesPlotter
 
 
+    @property
+    def is_multiplotter(self) -> bool:
+        return (hasattr(self.p, '__getitem__') and hasattr(self.p, '_nrows') and hasattr(self.p, '_ncols'))
+    
+
 class InteractivePyvistaPlotter_ObjectManipulationMixin:
     """ Has a self.plots dict that uses string keys to access named plots
         This mixin adds functions that enables interactive manipulation of plotted objects post-hoc

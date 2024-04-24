@@ -160,6 +160,24 @@ class PlottingConfig(BaseConfig):
         _obj.subplots_shape = output_subplots_shape
         _obj.use_age_proportional_spike_scale = use_age_proportional_spike_scale
         _obj.plotter_type = plotter_type
+
+        if isinstance(_obj.subplots_shape, str):
+            subplots_shape_str: str = _obj.subplots_shape # '1|5'
+            subplots_shape_arr_strs = subplots_shape_str.split('|')
+            subplots_shape = [int(k) for k in subplots_shape_arr_strs]
+        else:
+            subplots_shape = [int(k) for k in _obj.subplots_shape]
+
+        try:
+            total_n_plots: int = np.prod(subplots_shape)
+            # subplots_shape_tuple = tuple(subplots_shape)
+            if total_n_plots > 1:
+                print(f'total_n_plots: {total_n_plots} > 1: overriding .plotter_type <= "MultiPlotter"')
+                _obj.plotter_type = 'MultiPlotter'
+                #'BackgroundPlotter'
+        except BaseException as e:
+            raise e
+
         return _obj
 
 
