@@ -382,8 +382,36 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # self.p.app.processEvents() # not needed probably
         return
 
+
+    ## Slider Properties:
+    @property
+    def active_timestamp_slider_wrapper(self) -> Optional[InteractiveSliderWrapper]:
+        """The active_timestap_slider_wrapper property."""
+        return self.ui.interactive_plotter.interface_properties.active_timestamp_slider_wrapper
+
+    @property
+    def active_timestamp_slider_curr_index(self) -> int:
+        """The integer index of the current timestamp slider property."""
+        return int(self.active_timestamp_slider_wrapper.curr_index)
+
+    @property
+    def active_timestamp_slider_curr_start_stop_times(self) -> Tuple[float, float]:
+        """Get the times that fall within the current plot window based on the slider."""
+        active_window_sample_indicies = np.squeeze(self.params.pre_computed_window_sample_indicies[self.active_timestamp_slider_curr_index,:]) # Get the current precomputed indicies for this curr_i
+        curr_time_fixedSegments = self.t[active_window_sample_indicies] # New Way
+        t_start = curr_time_fixedSegments[0]
+        t_stop = curr_time_fixedSegments[-1]
+        return (t_start, t_stop)
+
+
+
+
     # pf_colors, active_config
     def plot(self, pActivePlotter=None):
+        """ 
+        - Adds the slider GUI widget for the time
+
+        """
         ################################################
         ### Build Appropriate Plotter and set it up:
         #####################
