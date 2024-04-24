@@ -26,7 +26,9 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter
 from pyphoplacecellanalysis.Pho3D.PyVista.gui import customize_default_pyvista_theme, print_controls_helper_text
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, spike_geom_box, spike_geom_cone
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveSliderWrapper import InteractiveSliderWrapper 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
+
 
 class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, InteractiveDataExplorerBase):
     """ This 3D PyVista GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
@@ -121,6 +123,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         self.params.setdefault('should_use_linear_track_geometry', False) # should only be True on the linear track with known geometry, otherwise it will be obviously incorrect.
         if hasattr(self.active_config.plotting_config, 'should_use_linear_track_geometry') and (self.active_config.plotting_config.should_use_linear_track_geometry is not None):
             self.params.should_use_linear_track_geometry = self.active_config.plotting_config.should_use_linear_track_geometry
+
+        ## MIXINS:
+        # self.setup_occupancy_plotting_mixin()
+        self.setup_MazeRenderingMixin()
 
 
 
@@ -328,10 +334,16 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             curr_animal_point = [self.x[active_included_all_window_position_indicies[-1]], self.y[active_included_all_window_position_indicies[-1]], self.z_fixed[-1]]
             self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
 
+
+        ## Maze Plotting Updates:
+        self.on_update_current_window_MazeRenderingMixin(new_window_t_start=t_start, new_window_t_stop=t_stop)
+
+
         self.sigOnUpdateMeshes.emit(t_start, t_stop) # TODO: efficiency - defer rendering optionally , False
         
         if render:
             self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
+
 
     def on_slider_update_mesh(self, value):
         """ called to update the current active time window from an integer index (such as that produced by the slider's update function or the class responsible for making videos) """
@@ -397,7 +409,8 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             interactive_timestamp_slider_actor = self.p.add_slider_widget(self.on_slider_update_mesh, [0, (self.params.num_time_points-1)], title='Trajectory Timestep', event_type='always', style='modern', pointa=(0.025, 0.08), pointb=(0.98, 0.08), fmt='%0.2f') # fmt="%0.2f"
             # interactive_timestamp_slider_wrapper = InteractiveSliderWrapper(interactive_timestamp_slider_actor)
             # interactive_plotter = pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter.PhoInteractivePlotter(pyvista_plotter=p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor)
-            interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor)
+            self.ui.interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor)
+
             # interactive_checkbox_actor = p.add_checkbox_button_widget(toggle_animation, value=False, color_on='green')
             helper_controls_text = print_controls_helper_text()
             self.p.add_text(helper_controls_text, position='upper_left', name='lblControlsHelperText', color='grey', font_size=8.0)
@@ -408,11 +421,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             # debug_console_widget.add_line_to_buffer('test log 2')
 
         # Plot the flat arena
-        if not self.params.get('should_use_linear_track_geometry', False):
-            self.plots['maze_bg'], self.plots_data['maze_bg'] = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
-        else:
-            (self.plots['short_maze_bg'], self.plots_data['short_maze_bg']), (self.plots['long_maze_bg'], self.plots_data['long_maze_bg']) = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
-    
+        self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
+
+
         # Legend:
         
         # the legend is supposed to be for the placefields, of which there are fewer than the neuron_ids (because some cells don't have a good placefield).

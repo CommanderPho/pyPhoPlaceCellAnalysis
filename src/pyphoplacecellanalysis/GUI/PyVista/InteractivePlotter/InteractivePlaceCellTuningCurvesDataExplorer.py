@@ -231,6 +231,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
+        self.setup_MazeRenderingMixin()
         
 
 
@@ -292,12 +293,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.p.enable_depth_peeling(number_of_peels=8, occlusion_ratio=0) # drastically improves rendering but bogs down performance
         
         # Plot the flat arena
-        if not self.params.get('should_use_linear_track_geometry', False):
-            self.plots['maze_bg'], self.plots_data['maze_bg'] = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
-        else:
-            (self.plots['short_maze_bg'], self.plots_data['short_maze_bg']), (self.plots['long_maze_bg'], self.plots_data['long_maze_bg']) = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
-    
-
+        self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
 
         if self.plot_placefields():
             needs_render = True
