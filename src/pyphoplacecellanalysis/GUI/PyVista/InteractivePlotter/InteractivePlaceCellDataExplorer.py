@@ -437,7 +437,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             interactive_timestamp_slider_actor = self.p.add_slider_widget(self.on_slider_update_mesh, [0, (self.params.num_time_points-1)], title='Trajectory Timestep', event_type='always', style='modern', pointa=(0.025, 0.08), pointb=(0.98, 0.08), fmt='%0.2f') # fmt="%0.2f"
             # interactive_timestamp_slider_wrapper = InteractiveSliderWrapper(interactive_timestamp_slider_actor)
             # interactive_plotter = pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter.PhoInteractivePlotter(pyvista_plotter=p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor)
-            self.ui.interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor)
+            self.ui.interactive_plotter = PhoInteractivePlotter.init_from_plotter_and_slider(pyvista_plotter=self.p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor, step_size=15)
 
             # interactive_checkbox_actor = p.add_checkbox_button_widget(toggle_animation, value=False, color_on='green')
             helper_controls_text = print_controls_helper_text()

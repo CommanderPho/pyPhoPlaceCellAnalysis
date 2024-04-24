@@ -367,7 +367,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         safe_integer_wrapper = lambda integer_local_idx: self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks']([int(integer_local_idx)])
         self.ui['interactive_unitID_slider_actor'] = PhoWidgetHelper.add_discrete_slider_widget(self.p, safe_integer_wrapper, [0, (len(self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'])-1)], value=0, title='Selected Unit',event_type='end')
         ## I don't think this does anything:
-        interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.ui['interactive_unitID_slider_actor'])
+        self.ui.interactive_plotter = PhoInteractivePlotter.init_from_plotter_and_slider(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.ui['interactive_unitID_slider_actor'], step_size=15)
         
         
         

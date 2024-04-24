@@ -5,16 +5,22 @@
 
 """
 
+from typing import Any
+from attrs import define, field, Factory
+
 ## TODO: very VTK centric, but doesn't need to be
 
+@define(slots=False)
 class InteractiveSliderWrapper:
     """ a wrapper around a VTK GUI slider widget that can be used to sync state between the slider and the pyvista plotter that it controls. """
+    slider_obj: Any = field()
+
     # instance attributes
-    def __init__(self, slider_obj):
-        self.slider_obj = slider_obj
-        # curr_min_value = self.slider_obj.GetRepresentation().GetMinimumValue()
-        # curr_max_value = self.slider_obj.GetRepresentation().GetMaximumValue()
-        # curr_value = self.slider_obj.GetRepresentation().GetValue()
+    # def __init__(self, slider_obj):
+    #     self.slider_obj = slider_obj
+    #     # curr_min_value = self.slider_obj.GetRepresentation().GetMinimumValue()
+    #     # curr_max_value = self.slider_obj.GetRepresentation().GetMaximumValue()
+    #     # curr_value = self.slider_obj.GetRepresentation().GetValue()
 
     @property
     def curr_value(self):
@@ -27,10 +33,9 @@ class InteractiveSliderWrapper:
 
 
     @property
-    def curr_index(self):
+    def curr_index(self) -> int:
         """The curr_index property."""
         return int(self.curr_value)
-    
     @curr_index.setter
     def curr_index(self, value):
         self.update_value(float(value))
@@ -61,11 +66,12 @@ class InteractiveSliderWrapper:
         return proposed_index
     
         
-    def step_index(self, step_size):
+    def step_index(self, step_size: int):
         curr_index = self.curr_index
         proposed_index = self._safe_constrain_index(curr_index + step_size)
+        did_change: bool = (curr_index != proposed_index) ## did change
         self.curr_index = proposed_index
-        return proposed_index
+        return proposed_index, did_change
     
     def step_next_index(self):
         return self.step_index(1)

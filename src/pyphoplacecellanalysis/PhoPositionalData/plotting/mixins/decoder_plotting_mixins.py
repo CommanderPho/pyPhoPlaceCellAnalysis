@@ -549,6 +549,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         return heatmaps, a_line, _out_markers
 
 
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
+
 @define(slots=False)
 class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
     """ plots a decoded 3D using pyqtgraph. 
@@ -574,7 +576,9 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
     slider_epoch = field(default=None)
     slider_epoch_time_bin = field(default=None)
-
+    slider_epoch_time_bin_playback_checkbox = field(default=None)
+    
+    interactive_plotter: PhoInteractivePlotter = field(default=None)
     plotActors = field(default=None)
     data_dict = field(default=None)
     plotActors_CenterLabels = field(default=None)
@@ -582,6 +586,9 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
 
     def build_ui(self):
+        """ builds the slider vtk widgets 
+        """
+
         assert self.p is not None
         if self.curr_epoch_idx is None:
             self.curr_epoch_idx = 0
@@ -615,9 +622,18 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
                 fmt='%0.0f',
             )
 
+
+        if (self.interactive_plotter is None) or (self.slider_epoch_time_bin_playback_checkbox is None):
+            self.interactive_plotter = PhoInteractivePlotter.init_from_plotter_and_slider(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.slider_epoch_time_bin, step_size=1, animation_callback_interval_ms=500) # 500ms per time bin
+            self.slider_epoch_time_bin_playback_checkbox = self.interactive_plotter.interactive_checkbox_actor
+
+
+
+
     def update_ui(self):
-        self.slider_epoch_time_bin.GetRepresentation().SetMaximumValue((self.curr_n_time_bins-1))
-        self.slider_epoch_time_bin.GetRepresentation().SetValue(self.slider_epoch_time_bin.GetRepresentation().GetMinimumValue()) # set to 0
+        if (self.slider_epoch_time_bin is not None) and (self.curr_n_time_bins is not None):
+            self.slider_epoch_time_bin.GetRepresentation().SetMaximumValue((self.curr_n_time_bins-1))
+            self.slider_epoch_time_bin.GetRepresentation().SetValue(self.slider_epoch_time_bin.GetRepresentation().GetMinimumValue()) # set to 0
 
 
     def on_update_slider_epoch_idx(self, value: int):
