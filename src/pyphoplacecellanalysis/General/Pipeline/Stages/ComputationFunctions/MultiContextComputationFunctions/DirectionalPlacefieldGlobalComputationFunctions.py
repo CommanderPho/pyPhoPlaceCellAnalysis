@@ -1795,6 +1795,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         # spikes_df
 
         ## Compute the spike-t v. pf_peak_x correlation for each of the decoders
+        should_NaN_out_results_for_epochs_with_too_few_cells: bool = False
         required_min_percentage_of_active_cells: float = 0.333333 # 20% of active cells
         active_min_num_unique_aclu_inclusions_requirement: int = 15 # track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells)
         min_num_required_unique_aclus_list = [max(5, int(float(len(a_decoder_neuron_IDs)) * 0.333)) for a_decoder_neuron_IDs in neuron_IDs_lists]
@@ -1817,11 +1818,14 @@ class DirectionalMergedDecodersResult(ComputedResult):
                 active_epoch_decoder_active_aclus = a_decoder_specific_spikes_df.aclu.unique()
 
                 # min_num_required_unique_aclus = max(5, int(float(len(a_decoder_neuron_IDs)) * 0.333))
-                if len(active_epoch_decoder_active_aclus) < min_num_required_unique_aclus:
-                    _simple_corr_results_dict[an_epoch_idx].append(np.nan)
+                if (should_NaN_out_results_for_epochs_with_too_few_cells and (len(active_epoch_decoder_active_aclus) < min_num_required_unique_aclus)):
+                    _simple_corr_results_dict[an_epoch_idx].append(np.nan) ## NaN can be added here to indicate that the curr epoch has too few active aclus for this decoder.
                 else:
                     _an_arr = a_decoder_specific_spikes_df[['t_rel_seconds', a_peak_x_col_name]].dropna(subset=['t_rel_seconds', a_peak_x_col_name], inplace=False).to_numpy().T
-                    _simple_corr_results_dict[an_epoch_idx].append(pearsonr(_an_arr[0], _an_arr[1]).statistic)
+                    a_pearson_v = pearsonr(_an_arr[0], _an_arr[1]).statistic
+                    if np.isnan(a_pearson_v):
+                        print(f'WARNING: hit NaN a_pearson_v: {a_pearson_v} for a_peak_x_col_name: {a_peak_x_col_name}, a_decoder_neuron_IDs: {a_decoder_neuron_IDs}, min_num_required_unique_aclus: {min_num_required_unique_aclus}')
+                    _simple_corr_results_dict[an_epoch_idx].append(a_pearson_v) ## how is this returning NaN for some entries?
 
 
         ## Convert results dict into a pd.DataFrame            
