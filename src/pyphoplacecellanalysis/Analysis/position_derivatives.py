@@ -14,19 +14,84 @@ from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
+from scipy.interpolate import UnivariateSpline
+import numpy as np
+
+
+def robust_velocity_and_acceleration(t: NDArray, x: NDArray) -> Tuple[NDArray, NDArray]:
+    # N = len(x)
+    # v = np.zeros(N)
+    # a = np.zeros(N)
+
+    # # Helper function to compute central, forward, or backward difference
+    # def compute_diff(x_vals, t_vals, mode='central'):
+    #     if mode == 'central':
+    #         return (x_vals[2] - x_vals[0]) / (t_vals[2] - t_vals[0])  # central difference
+    #     elif mode == 'forward':
+    #         return (x_vals[1] - x_vals[0]) / (t_vals[1] - t_vals[0])  # forward difference
+    #     elif mode == 'backward':
+    #         return (x_vals[1] - x_vals[0]) / (t_vals[1] - t_vals[0])  # backward difference
+    #     else:
+    #         raise ValueError("Invalid mode for difference computation: choose 'central', 'forward', or 'backward'")
+
+    # # Compute velocities
+    # for i in range(N):
+    #     if i == 0:
+    #         v[i] = compute_diff(x[i:i+2], t[i:i+2], mode='forward')
+    #     elif i == N - 1:
+    #         v[i] = compute_diff(x[i-1:i+1], t[i-1:i+1], mode='backward')
+    #     else:
+    #         v[i] = compute_diff(x[i-1:i+2], t[i-1:i+2], mode='central')
+
+    # # Compute accelerations using velocities calculated above
+    # for i in range(N):
+    #     if i == 0:
+    #         a[i] = compute_diff(v[i:i+2], t[i:i+2], mode='forward')
+    #     elif i == N - 1:
+    #         a[i] = compute_diff(v[i-1:i+1], t[i-1:i+1], mode='backward')
+    #     else:
+    #         a[i] = compute_diff(v[i-1:i+2], t[i-1:i+2], mode='central')
+
+
+    # # Compute instantaneous velocities
+    # v = np.gradient(x, t)
+    # # Compute instantaneous accelerations
+    # a = np.gradient(v, t)
+
+
+    # Create a spline of x with respect to t
+    spline = UnivariateSpline(t, x, s=0, k=4)  # s=0 ensures it passes through all points, k=4 means cubic spline
+    # The first derivative of the spline gives the velocity
+    v = spline.derivative()(t)
+    # The second derivative of the spline gives the acceleration
+    a = spline.derivative(n=2)(t)
+
+    return v, a
+
+
+
 
 @function_attributes(short_name=None, tags=['decode', 'position', 'derivitives'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 14:30', related_items=[])
-def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size, debug_print=False):
+def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size: float, debug_print=False) -> pd.DataFrame:
     """try recomputing velocties/accelerations
     
     from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_derivs
     
     decoding_time_bin_size = a_result.decoding_time_bin_size
     """ 
+    t = deepcopy(time_window_centers)
     position = deepcopy(position)
-    a_first_order_diff = np.diff(position, n=1, prepend=[position[0]]) 
-    velocity = a_first_order_diff / float(decoding_time_bin_size) # velocity with real world units of cm/sec
-    acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
+
+    # delta_t_diff = np.diff(time_window_centers, n=1, prepend=[0.0])
+    # a_first_order_diff = np.diff(position, n=1, prepend=[position[0]])
+    # assert len(delta_t_diff) == len(a_first_order_diff), f"len(delta_t_diff): {len(delta_t_diff)} != len(a_first_order_diff): {len(a_first_order_diff)}"
+    # velocity = a_first_order_diff / float(decoding_time_bin_size) # velocity with real world units of cm/sec
+
+    # velocity = a_first_order_diff / delta_t_diff # velocity with real world units of cm/sec
+    # acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
+
+    # Calculate the instantaneous velocities and accelerations
+    velocity, acceleration = robust_velocity_and_acceleration(t=t, x=position)
 
     position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
     if debug_print:

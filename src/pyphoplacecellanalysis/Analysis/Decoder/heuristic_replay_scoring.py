@@ -19,6 +19,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
+from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_derivs
 
 
 HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", "position_derivatives_df")})
@@ -256,16 +257,18 @@ class HeuristicReplayScoring:
         total_first_order_change: float = np.nansum(a_first_order_diff[1:]) # this is very susceptable to misplaced bins
         epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
 
-        position = deepcopy(a_most_likely_positions_list)
-        velocity = a_first_order_diff / float(a_result.decoding_time_bin_size) # velocity with real world units of cm/sec
-        acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
+        # position = deepcopy(a_most_likely_positions_list)
+        # velocity = a_first_order_diff / float(a_result.decoding_time_bin_size) # velocity with real world units of cm/sec
+        # acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
 
-        position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
+        # position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
 
-        position_derivative_column_names = ['x', 'vel_x', 'accel_x']
-        position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
-        position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
-        # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
+        # position_derivative_column_names = ['x', 'vel_x', 'accel_x']
+        # position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
+        # position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
+        # # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
+
+        position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, decoding_time_bin_size=float(a_result.decoding_time_bin_size), debug_print=False)
 
         # Now split the array at each point where a direction change occurs
         
@@ -345,6 +348,8 @@ class HeuristicReplayScoring:
             _out_new_scores
 
         """
+        
+
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
@@ -384,33 +389,17 @@ class HeuristicReplayScoring:
         else:
 
             # The idea here was to look at the most-likely positions and their changes (derivatives) to see if these were predictive of good vs. bad ripples. For example, bad ripples might have extreme accelerations while good ones fall within a narrow window of physiologically consistent accelerations
+            position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, decoding_time_bin_size=float(a_result.decoding_time_bin_size), debug_print=debug_print)
 
+            ## TODO: reuse the values computed (properly) in `position_derivatives_df` instead of doing it from scratch again here:
             # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[0.0])
             a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
-            a_first_order_diff
+            # a_first_order_diff
             total_first_order_change: float = np.nansum(a_first_order_diff[1:])
-            total_first_order_change
+            # total_first_order_change
             epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
-            epoch_change_direction
+            # epoch_change_direction
 
-            position = deepcopy(a_most_likely_positions_list)
-            velocity = a_first_order_diff / float(a_result.decoding_time_bin_size) # velocity with real world units of cm/sec
-            acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
-
-            position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
-            if debug_print:
-                print(f'time_window_centers: {time_window_centers}')
-                print(f'position: {position}')
-                print(f'velocity: {velocity}')
-                print(f'acceleration: {acceleration}')
-
-            position_derivative_column_names = ['x', 'vel_x', 'accel_x']
-            position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
-            position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
-            # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
-            if debug_print:
-                print(f'\tposition_derivative_means: {position_derivative_means}')
-                print(f'\tposition_derivative_medians: {position_derivative_medians}')
 
             # Now split the array at each point where a direction change occurs
             # Calculate the signs of the differences
