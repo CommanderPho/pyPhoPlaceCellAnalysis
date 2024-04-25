@@ -998,25 +998,39 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
             for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(num_filter_epochs), epochs_linear_fit_df[velocity_col_name].values, epochs_linear_fit_df[intercept_col_name].values, epochs_linear_fit_df[score_col_name].values, epochs_linear_fit_df[speed_col_name].values):
                 # build the discrete line over the centered time bins:
-                nt: int = time_bin_containers[epoch_idx].num_bins # .step, .variable_extents
-                dt: float = time_bin_containers[epoch_idx].edge_info.step
-                # t_start, t_end = time_bin_containers[epoch_idx].variable_extents
+                # nt: int = time_bin_containers[epoch_idx].num_bins # .step, .variable_extents
+                # dt: float = time_bin_containers[epoch_idx].edge_info.step
+                # half_dt: float = (0.5 * dt)
+                epoch_time_bin_edges = time_bin_containers[epoch_idx].edges
+                t_start, t_end = epoch_time_bin_edges[0], epoch_time_bin_edges[-1]
+
                 # duration: float = t_end - t_start
                 # time_bin_containers[epoch_idx].edge_info
                 # time_mid: float = nt * dt / 2
                 
-                
                 ## Hacky `epoch_time_bins` methods that might have been used to work around a bug in plotting the posterior
-                epoch_time_bins = time_bin_containers[epoch_idx].centers
-                epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
+                # epoch_time_bins = time_bin_containers[epoch_idx].centers
+                # epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
                 #TODO 2024-02-15 12:19: - [ ] MAYBE THE CENTER of the epoch, not the start!!
                 # epoch_time_bins = epoch_time_bins - time_mid
                 # Try subtracting another half o a time bin width just for fun:
                 # epoch_time_bins = epoch_time_bins - (0.5 * dt)
 
-                
-                epoch_line_fn = lambda t: (epoch_vel * (t - epoch_time_bins[0])) + epoch_intercept
-                epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
+
+                # # epoch_intercept occurs at the left edge of the epoch, meaning t=0.0 relative times:
+                # epoch_time_bins = time_bin_containers[epoch_idx].edges
+                # epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch 
+
+                # epoch_line_fn = lambda t: (epoch_vel * (t - epoch_time_bins[0])) + epoch_intercept
+                # epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
+
+                # first_bin_center_epoch_intercept: float = epoch_intercept + (epoch_vel * half_dt)
+                epoch_line_fn = lambda t: (epoch_vel * (t - t_start)) + epoch_intercept # first_bin_center_epoch_intercept
+                # epoch_line_eqn = (epoch_vel * epoch_time_bins) + first_bin_center_epoch_intercept
+                epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers])
+
+                # resample at midpoints
+
                 with np.printoptions(precision=3, suppress=True, threshold=5):
                     score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
                     speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
@@ -1146,8 +1160,6 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         text_kwargs, plot_kwargs = _subfn_build_kwargs(curr_ax)
-
-
         debug_print = kwargs.pop('debug_print', True)
 
         ## Extract the visibility:
