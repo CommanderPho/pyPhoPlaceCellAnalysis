@@ -432,7 +432,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
 
     @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=[], creation_date='2024-02-13 17:25', related_items=[])
-    def compute_radon_transforms(self, pos_bin_size:float, nlines:int=8192, margin:int=16, jump_stat=None, n_jobs:int=4, enable_return_neighbors_arr=True) -> pd.DataFrame:
+    def compute_radon_transforms(self, pos_bin_size:float, nlines:int=8192, margin:float=8, jump_stat=None, n_jobs:int=4, enable_return_neighbors_arr=True) -> pd.DataFrame:
         """ 2023-05-25 - Computes the line of best fit (which gives the velocity) for the 1D Posteriors for each replay epoch using the Radon Transform approch.
         
         # pos_bin_size: the size of the x_bin in [cm]
@@ -459,7 +459,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         ## compute the Radon transform to get the lines of best fit
         extra_outputs = []
-        score, velocity, intercept, *extra_outputs = get_radon_transform(active_posterior, decoding_time_bin_duration=self.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs, enable_return_neighbors_arr=enable_return_neighbors_arr)
+        score, velocity, intercept, *extra_outputs = get_radon_transform(active_posterior, decoding_time_bin_duration=self.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs, enable_return_neighbors_arr=enable_return_neighbors_arr, debug_print=True)
         epochs_linear_fit_df = pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept, 'speed': np.abs(velocity)})
         return epochs_linear_fit_df, extra_outputs
 

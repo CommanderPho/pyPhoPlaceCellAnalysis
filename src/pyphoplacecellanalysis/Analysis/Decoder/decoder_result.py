@@ -1038,7 +1038,7 @@ def old_score_posterior(posterior, n_jobs:int=8):
     return np.asarray(score), np.asarray(slope)
 
 
-def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[int]=16, neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True):
+def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[float]=16.0, neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True):
         """ 2023-05-25 - Radon Transform to fit line to decoded replay epoch posteriors. Gives score, velocity, and intercept. 
 
         Usage:
@@ -1063,7 +1063,7 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
         if neighbours is None:
             # Set neighbors from margin, pos_bin_size
             assert margin is not None, f"both neighbours and margin are None!"
-            neighbours: int = int(margin / pos_bin_size)
+            neighbours: int = max(int(round(float(margin) / float(pos_bin_size))), 1) # neighbors must be at least one
             if debug_print:
                 print(f'neighbours will be calculated from margin and pos_bin_size. neighbours: {neighbours} = int(margin: {margin} / pos_bin_size: {pos_bin_size})')
         else:

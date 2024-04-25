@@ -3609,7 +3609,7 @@ def get_proper_global_spikes_df(owning_pipeline_reference) -> pd.DataFrame:
     return global_spikes_df
 
 
-def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False):
+def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False) -> Tuple[DecodedFilterEpochsResult, Optional[DecodedFilterEpochsResult]]:
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder.
     ~12.2s per decoder.
 
@@ -4086,7 +4086,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
 
-        def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result, track_templates):
+        def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result, track_templates) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, Optional[DecodedFilterEpochsResult]]]:
             """ Custom Decoder Computation:
             2024-02-15 - Appears to be best to refactor to the TrackTemplates object. __________________________________________ #
                 # directional_merged_decoders_result mmakes more sense since it has the time_bin_size already
@@ -4102,8 +4102,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
 
             ## Decode epochs for all four decoders:
-            decoder_laps_filter_epochs_decoder_result_dict = {}
-            decoder_ripple_filter_epochs_decoder_result_dict = {}
+            decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {}
+            decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]] = {}
 
             for a_name, a_decoder in track_templates.get_decoders_dict().items():
                 decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
@@ -4133,7 +4133,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             a_marginals_df['most_likely_decoder_index'] = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].apply(lambda row: np.argmax(row.values), axis=1)
             return a_marginals_df
 
-        def _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result, a_directional_ripple_filter_epochs_decoder_result, nlines=4192, margin=16, n_jobs=4):
+        def _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult, a_directional_ripple_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult], nlines=4192, margin=16, n_jobs=4):
             """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder.
             ~12.2s per decoder.
 
@@ -4211,7 +4211,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             return (laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
 
         # @function_attributes(short_name=None, tags=['weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=['_compute_complete_df_metrics', '_compute_weighted_correlations', '_compute_epoch_decoding_radon_transform_for_decoder', '_compute_matching_best_indicies'], used_by=[], creation_date='2024-02-15 19:55', related_items=[])
-        def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalMergedDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, spikes_df: pd.DataFrame, should_skip_radon_transform=False):
+        def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalMergedDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]], spikes_df: pd.DataFrame, should_skip_radon_transform=False):
             """ computes for all score metrics (Radon Transform, WCorr, PearsonR) and adds them appropriately. 
             
             spikes_df is needed for Simple Correlation Score calculation.
@@ -4244,9 +4244,11 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             if not should_skip_radon_transform:
                 for a_name, a_decoder in track_templates.get_decoders_dict().items():
                     # decoder_laps_radon_transform_df_dict[a_name], decoder_ripple_radon_transform_df_dict[a_name] = _compute_epoch_decoding_radon_transform_for_decoder(a_decoder, decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name], n_jobs=4)
-                    decoder_laps_radon_transform_df_dict[a_name], decoder_laps_radon_transform_extras_dict[a_name], decoder_ripple_radon_transform_df_dict[a_name], decoder_ripple_radon_transform_extras_dict[a_name] = _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_decoder, decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name], n_jobs=4)
-
-                # laps_radon_transform_df, ripple_radon_transform_df = 
+                    decoder_laps_radon_transform_df_dict[a_name], decoder_laps_radon_transform_extras_dict[a_name], decoder_ripple_radon_transform_df_dict[a_name], decoder_ripple_radon_transform_extras_dict[a_name] = _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder=a_decoder, 
+                                                                                                                                                                                                                                                                                   a_directional_laps_filter_epochs_decoder_result=decoder_laps_filter_epochs_decoder_result_dict[a_name],
+                                                                                                                                                                                                                                                                                   a_directional_ripple_filter_epochs_decoder_result=decoder_ripple_filter_epochs_decoder_result_dict[a_name],
+                                                                                                                                                                                                                                                                                   nlines=8192, margin=16.0,
+                                                                                                                                                                                                                                                                                   n_jobs=6)
                     
                 # 6m 19.7s - nlines=8192, margin=16, n_jobs=1
                 # 17m 57.6s - nlines=24000, margin=16, n_jobs=1
@@ -4346,7 +4348,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
         
-        decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(owning_pipeline_reference, directional_merged_decoders_result, track_templates)
+        decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(owning_pipeline_reference, directional_merged_decoders_result, track_templates) # Dict[str, Optional[DecodedFilterEpochsResult]]
 
         ## Recompute the epoch scores/metrics such as radon transform and wcorr:
         (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(directional_merged_decoders_result, track_templates,
