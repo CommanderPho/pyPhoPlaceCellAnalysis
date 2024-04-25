@@ -75,7 +75,7 @@ def plot_3d_binned_bars(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
     mesh = pv.StructuredGrid(twoDimGrid_x, twoDimGrid_y, active_data)
     mesh["Elevation"] = (active_data.ravel(order="F") * zScalingFactor)
 
-    plot_name = build_3d_plot_identifier_name('plot_3d_binned_bars', kwargs.get('name', ''))
+    plot_name = kwargs.pop('plot_name', build_3d_plot_identifier_name('plot_3d_binned_bars', kwargs.get('name', ''))) # if 'plot_name' is provided, use that as the full name without modifications
     kwargs['name'] = plot_name # this is the only one to overwrite in kwargs
     # print(f'name: {plot_name}')    
     plotActor = p.add_mesh(mesh,
@@ -93,6 +93,53 @@ def plot_3d_binned_bars(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
     }
     return plotActors, data_dict
     
+
+
+
+
+def plot_3d_binned_bars_timeseries(p, xbin, ybin, t_bins, data, zScalingFactor=1.0, drop_below_threshold: float=None, **kwargs):
+    """ Plots a a series of 3D bar-graphs representing data over time
+    Usage:
+        plotActors, data_dict = plot_3d_binned_data(pActiveTuningCurvesPlotter, active_epoch_placefields2D.ratemap.xbin, active_epoch_placefields2D.ratemap.ybin, active_epoch_placefields2D.ratemap.occupancy)
+    """
+
+    assert np.ndim(data) > 2, f"np.ndim(data): {np.ndim(data)} but it should be a 3D timeseries"
+    n_xbins, n_ybins, n_tbins = np.shape(data)
+    assert n_tbins == len(t_bins), f"n_tbins: {n_tbins} != len(t_bins): {len(t_bins)}"
+
+    all_plotActors_dict = {}
+    all_data_dict = {}
+
+    for t_bin_idx, t_value in enumerate(t_bins):
+        a_plot_name: str = f"plot_3d_binned_bars[{t_value}]"
+        a_plotActors, a_data_dict = plot_3d_binned_bars(p=p, xbin=xbin, ybin=ybin, data=np.squeeze(data[:, :, t_bin_idx]),
+                                                        zScalingFactor=zScalingFactor, drop_below_threshold=drop_below_threshold, plot_name=a_plot_name, 
+                                                        **{'render': False},
+                                                        # **kwargs,
+                                                        ) 
+        # all_plotActors_dict[a_plot_name] = a_plotActors[a_plot_name]['main']
+        all_plotActors_dict.update(a_plotActors)
+        all_data_dict.update(a_data_dict)
+
+
+    return all_plotActors_dict, all_data_dict
+
+
+def clear_3d_binned_bars_plots(p, plotActors):
+    """ usage:
+
+    from pyphoplacecellanalysis.Pho3D.PyVista.graphs import clear_3d_binned_bars_plots
+    clear_3d_binned_bars_plots(p=a_decoded_trajectory_pyvista_plotter.p, plotActors=a_decoded_trajectory_pyvista_plotter.plotActors)
+    
+    """
+    if plotActors is None:
+        return
+    for k, v in plotActors.items():
+        did_remove = p.remove_actor(v['main'])
+        v.clear()
+    plotActors.clear()
+    return
+
 
 
     
