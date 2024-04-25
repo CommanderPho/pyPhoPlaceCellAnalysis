@@ -1526,8 +1526,47 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             return text_kwargs
         
 
+        def _helper_build_text_kwargs_adjacent_right(a_curr_ax):
+            """ captures nothing. """
+            # Get the axes bounding box in figure coordinates
+            a_fig = a_curr_ax.get_figure()
+            bbox = a_curr_ax.get_position()
+            half_x_margin_width = (1.0 - bbox.width) / 2.0
+            half_y_margin_width = (1.0 - bbox.ymax) / 2.0
+            bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
+
+
+            # TEXT FORMATTING AND POSITIONING KWARGS _____________________________________________________________________________ #
+            # text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
+            # text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
+            # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
+            text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
+
+            font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+                                #   size=10,
+                                weight='bold',
+                                #   style='italic',
+                                )
+            text_kwargs['fontproperties'] = font_prop
+
+            ## Positioning kwargs:
+            text_kwargs |= dict(loc='upper right',
+                                    # horizontalalignment='center', ## DOES NOTHING?
+                                    #verticalalignment='center', ## BREAKS IT
+                                    # multialignment='r', ## BREAKS IT
+                                    # horizontalalignment='right',  
+                                    # rotation=-45, #transform=a_curr_ax.transAxes,
+                                    bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure,
+                                    # bbox_to_anchor=((1.0 + bbox_offset_magnitude), (1.0 + bbox_offset_magnitude)), bbox_transform=a_curr_ax.transAxes,                        
+                                    ) # oriented in upper-right corner, at a diagonal angle
+
+            return text_kwargs
+        
+        
+
         # text_kwargs = _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax=curr_ax)
-        text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
+        # text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
+        text_kwargs = _helper_build_text_kwargs_adjacent_right(a_curr_ax=curr_ax)
 
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
