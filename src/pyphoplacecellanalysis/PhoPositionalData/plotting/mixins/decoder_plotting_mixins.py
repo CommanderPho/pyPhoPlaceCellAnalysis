@@ -577,6 +577,15 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             self.slider_epoch_time_bin.GetRepresentation().SetValue(self.slider_epoch_time_bin.GetRepresentation().GetMinimumValue()) # set to 0
 
 
+    def perform_programmatic_slider_epoch_update(self, value):
+        """ called to programmatically update the epoch_idx slider. """
+        if (self.slider_epoch is not None):
+            print(f'updating slider_epoch index to : {int(value)}')
+            self.slider_epoch.GetRepresentation().SetValue(int(value)) # set to 0
+            self.on_update_slider_epoch_idx(value=int(value))
+            print(f'\tdone.')
+
+
     def on_update_slider_epoch_idx(self, value: int):
         """ called when the epoch_idx slider changes. 
         """
@@ -799,6 +808,36 @@ class DecoderRenderingPyVistaMixin:
         self.params['decoded_trajectory_pyvista_plotter'] = a_decoded_trajectory_pyvista_plotter
         return a_decoded_trajectory_pyvista_plotter
     
+
+    def clear_all_added_decoded_posterior_plots(self, clear_ui_elements_also: bool = False):
+        """ clears the plotted posterior actors and optionally the control sliders
+        
+        """
+        if ('decoded_trajectory_pyvista_plotter' in self.params) and (self.decoded_trajectory_pyvista_plotter is not None):
+            self.decoded_trajectory_pyvista_plotter.perform_clear_existing_decoded_trajectory_plots()
+            
+            ## can remove the UI (sliders and such) via:
+            if clear_ui_elements_also:
+                if self.decoded_trajectory_pyvista_plotter.slider_epoch is not None:
+                    self.decoded_trajectory_pyvista_plotter.slider_epoch.RemoveAllObservers()
+                    self.decoded_trajectory_pyvista_plotter.slider_epoch.Off()
+                    # a_decoded_trajectory_pyvista_plotter.slider_epoch.FastDelete()
+                    self.decoded_trajectory_pyvista_plotter.slider_epoch = None
+
+
+                if self.decoded_trajectory_pyvista_plotter.slider_epoch_time_bin is not None:
+                    self.decoded_trajectory_pyvista_plotter.slider_epoch_time_bin.RemoveAllObservers()
+                    self.decoded_trajectory_pyvista_plotter.slider_epoch_time_bin.Off()
+                    # a_decoded_trajectory_pyvista_plotter.slider_epoch_time_bin.FastDelete()
+                    self.decoded_trajectory_pyvista_plotter.slider_epoch_time_bin = None
+                    
+
+                self.decoded_trajectory_pyvista_plotter.p.clear_slider_widgets()
+
+            self.decoded_trajectory_pyvista_plotter.p.update()
+            self.decoded_trajectory_pyvista_plotter.p.render()
+
+
 
     @classmethod
     def perform_plot_posterior_bars(cls, p, xbin, ybin, xbin_centers, ybin_centers, posterior_p_x_given_n, time_bin_centers=None, enable_point_labels: bool = True, point_labeling_function=None, point_masking_function=None, posterior_name='P_x_given_n'):
