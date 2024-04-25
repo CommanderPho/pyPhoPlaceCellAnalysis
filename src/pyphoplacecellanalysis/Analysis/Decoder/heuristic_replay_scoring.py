@@ -250,7 +250,6 @@ class HeuristicReplayScoring:
         # Calculate where the sign changes occur (non-zero after taking diff of signs)
         sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
-
         # sign_change_indices = np.where(np.abs(np.diff(a_first_order_diff_sign.astype(float))) > 0.0)[0] + 1  # Add 1 because np.diff reduces the index by 1 -- Oh no, is this right when I preserve length?
 
 
