@@ -631,6 +631,8 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
 
     def update_ui(self):
+        """ called to update the epoch_time_bin slider when the epoch_index slider is changed. 
+        """
         if (self.slider_epoch_time_bin is not None) and (self.curr_n_time_bins is not None):
             self.slider_epoch_time_bin.GetRepresentation().SetMaximumValue((self.curr_n_time_bins-1))
             self.slider_epoch_time_bin.GetRepresentation().SetValue(self.slider_epoch_time_bin.GetRepresentation().GetMinimumValue()) # set to 0
