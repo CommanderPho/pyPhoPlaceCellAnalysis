@@ -899,6 +899,37 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     return params, plots_data, plots, ui
 
 
+## Plotting grid (both time_bins and xbins) as grey thin lines on both axes:
+@function_attributes(short_name=None, tags=['matplotlib', 'grid', 'bins', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-24 15:12', related_items=[])
+def _perform_plot_bin_grids(curr_ax, edges: NDArray, xbin: NDArray):
+    """ Plotting grid (both time_bins and xbins) as grey thin lines on both axes:
+    
+    Usage:
+
+        xlines_dict, ylines_dict =  _perform_plot_bin_grids(curr_ax=curr_ax, edges=curr_time_bin_container.edges, xbin=params.xbin)
+
+    """
+    ## INPUTS: curr_time_bin_container, params.xbin
+    assert edges is not None
+    assert xbin is not None
+
+    # curr_time_bin_edges = curr_time_bin_container.edges
+    # Draw fixed grid lines at specific x-axis and y-axis positions
+    # grid_plot_lines_kwargs = dict(linestyle='--')
+    grid_plot_lines_kwargs = dict(color='gray', linestyle='-', linewidth=0.5, alpha=0.5)
+    
+    xlines_dict = {}
+    for val in edges:  # Example x-axis positions
+        xlines_dict[val] = curr_ax.axvline(x=val, **grid_plot_lines_kwargs)
+
+    ylines_dict = {}
+    for val in xbin:  # Example y-axis positions
+        ylines_dict[val] = curr_ax.axhline(y=val, **grid_plot_lines_kwargs)
+
+    return xlines_dict, ylines_dict
+
+    
+
 
 # ==================================================================================================================== #
 # Pagination Data Providers                                                                                            #
