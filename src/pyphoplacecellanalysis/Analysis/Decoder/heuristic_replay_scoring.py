@@ -862,3 +862,71 @@ def expand_peaks_mask(peaks_mask, kernel=np.ones((3, 3))):
     return expanded_mask
 
 
+
+
+# ==================================================================================================================== #
+# 2023-12-21 - Inversion Count Concept                                                                                 #
+# ==================================================================================================================== #
+
+@metadata_attributes(short_name=None, tags=['inversion-count', 'heuristic', 'concept', 'untested', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-21 00:00', related_items=[])
+class InversionCount:
+    """ 2023-12-21 - "Inversion Count" Quantification of Order (as an alternative to Spearman?
+
+        computes the number of swap operations required to sort the list `arr` 
+
+
+
+    # Example usage
+
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import InversionCount
+        # list1 = [3, 1, 5, 2, 4]
+        list1 = [1, 2, 4, 3, 5] # 1
+        list1 = [1, 3, 4, 5, 2] # 3
+        num_swaps = count_swaps_to_sort(list1)
+        print("Number of swaps required:", num_swaps)
+
+        >>> Number of swaps required: 3
+
+
+
+    """
+    @classmethod
+    def merge_sort_and_count(cls, arr):
+        """ Inversion Count - computes the number of swap operations required to sort the list `arr` 
+        """
+        if len(arr) <= 1:
+            return arr, 0
+
+        mid = len(arr) // 2
+        left, count_left = cls.merge_sort_and_count(arr[:mid])
+        right, count_right = cls.merge_sort_and_count(arr[mid:])
+        merged, count_split = cls.merge_and_count(left, right)
+
+        return merged, (count_left + count_right + count_split)
+
+    @classmethod
+    def merge_and_count(cls, left, right):
+        """ Inversion Count """
+        merged = []
+        count = 0
+        i = j = 0
+
+        while i < len(left) and j < len(right):
+            if left[i] <= right[j]:
+                merged.append(left[i])
+                i += 1
+            else:
+                merged.append(right[j])
+                count += len(left) - i
+                j += 1
+
+        merged.extend(left[i:])
+        merged.extend(right[j:])
+        return merged, count
+
+    @classmethod
+    def count_swaps_to_sort(cls, arr):
+        _, swaps = cls.merge_sort_and_count(arr)
+        return swaps
+
+
