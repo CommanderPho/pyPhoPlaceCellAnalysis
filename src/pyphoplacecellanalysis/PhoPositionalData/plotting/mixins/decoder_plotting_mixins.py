@@ -30,78 +30,7 @@ from itertools import islice
 from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import LapsVisualizationMixin, LineCollection, _plot_helper_add_arrow # plot_lap_trajectories_2d
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
 
-def adjust_saturation(rgb, saturation_factor: float):
-    """ adjusts the rgb colors by the saturation_factor by converting to HSV space.
-    
-    """
-    import matplotlib.colors as mcolors
-    import colorsys
-    # Convert RGB to HSV
-    hsv = mcolors.rgb_to_hsv(rgb)
-
-    if np.ndim(hsv) < 3:
-        # Multiply the saturation by the saturation factor
-        hsv[:, 1] *= saturation_factor
-        
-        # Clip the saturation value to stay between 0 and 1
-        hsv[:, 1] = np.clip(hsv[:, 1], 0, 1)
-        
-    else: 
-        # Multiply the saturation by the saturation factor
-        hsv[:, :, 1] *= saturation_factor
-        # Clip the saturation value to stay between 0 and 1
-        hsv[:, :, 1] = np.clip(hsv[:, :, 1], 0, 1)
-    
-    # Convert back to RGB
-    return mcolors.hsv_to_rgb(hsv)
-
-
-# Define a function to create the colormap
-def make_saturating_red_cmap(time: float, N_colors:int=256, debug_print:bool=False):
-    """ time is between 0.0 and 1.0 
-    
-    Usage: Test Example:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import make_saturating_red_cmap
-
-        n_time_bins = 5
-        cmaps = [make_saturating_red_cmap(float(i) / float(n_time_bins - 1)) for i in np.arange(n_time_bins)]
-        for cmap in cmaps:
-            cmap
-            
-    Usage:
-        # Example usage
-        # You would replace this with your actual data and timesteps
-        data = np.random.rand(10, 10)  # Sample data
-        n_timesteps = 5  # Number of timesteps
-
-        # Plot data with increasing red for each timestep
-        fig, axs = plt.subplots(1, n_timesteps, figsize=(15, 3))
-        for i in range(n_timesteps):
-            time = i / (n_timesteps - 1)  # Normalize time to be between 0 and 1
-            # cmap = make_timestep_cmap(time)
-            cmap = make_red_cmap(time)
-            axs[i].imshow(data, cmap=cmap)
-            axs[i].set_title(f'Timestep {i+1}')
-        plt.show()
-
-    """
-    colors = np.array([(0, 0, 0), (1, 0, 0)]) # np.shape(colors): (2, 3)
-    if debug_print:
-        print(f'np.shape(colors): {np.shape(colors)}')
-    # Apply a saturation change
-    saturation_factor = float(time) # 0.5  # Increase saturation by 1.5 times
-    adjusted_colors = adjust_saturation(colors, saturation_factor)
-    if debug_print:
-        print(f'np.shape(adjusted_colors): {np.shape(adjusted_colors)}')
-    adjusted_colors = adjusted_colors.tolist()
-    ## Set the alpha of the first color to 0.0 and of the final color to 0.82
-    adjusted_colors = [[*v, 0.82] for v in adjusted_colors]
-    adjusted_colors[0][-1] = 0.0
-
-    # n_bins = [2]  # Discretizes the interpolation into bins
-    return LinearSegmentedColormap.from_list('CustomMap', adjusted_colors, N=N_colors)
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
 
@@ -598,6 +527,12 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         num_filter_epochs: int = self.num_filter_epochs
         curr_num_epoch_time_bins: int = self.curr_n_time_bins
 
+        slider_epoch_kwargs = dict()
+        if self.enable_plot_all_time_bins_in_epoch_mode:
+            slider_epoch_kwargs = slider_epoch_kwargs | dict(event_type="always")
+
+        
+
         if self.slider_epoch is None:
             self.slider_epoch = self.p.add_slider_widget(
                 callback=lambda value: self.on_update_slider_epoch_idx(int(value)), #storage_engine('epoch', int(value)), # triggering .__call__(self, param='epoch', value)....
@@ -608,6 +543,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
                 pointb=(0.64, 0.1),
                 style='modern',
                 fmt='%0.0f',
+                **slider_epoch_kwargs,
             )
 
 
@@ -669,7 +605,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         
 
 
-    @function_attributes(short_name=None, tags=['main_plot_update'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-25 02:03', related_items=[])
+    @function_attributes(short_name=None, tags=['main_plot_update', 'single_time_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-25 02:03', related_items=[])
     def perform_update_plot_single_epoch_time_bin(self, value: int):
         """ single-time-bin plotting:
         """
@@ -686,7 +622,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
                                                                                                 posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels)
         
 
-    @function_attributes(short_name=None, tags=['main_plot_update'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-25 02:04', related_items=[])
+    @function_attributes(short_name=None, tags=['main_plot_update', 'multi_time_bins', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-25 02:04', related_items=[])
     def perform_update_plot_epoch_time_bin_range(self, value: Optional[NDArray]=None):
         """ multi-time-bin plotting:
         """
@@ -713,7 +649,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             self.plotActors.clear()
         if self.data_dict is not None:
             self.data_dict.clear()
-            
+
         if self.plotActors_CenterLabels is not None:
             self.plotActors_CenterLabels.clear()
         if self.data_dict_CenterLabels is not None:
