@@ -1318,7 +1318,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 class WeightedCorrelationPlotData:
 
     data_values_dict: Dict[str, Optional[Any]] = field(factory=dict)
-    column_formatting_fn_dict: Dict[str, Optional[callable]] = field(factory=dict)
+    column_formatting_fn_dict: Dict[str, Optional[Callable]] = field(factory=dict)
 
     data_formatted_strings_dict: Dict[str, Optional[str]] = field(factory=dict)
 
@@ -1329,7 +1329,7 @@ class WeightedCorrelationPlotData:
     should_include_epoch_times: bool = field(default=False)
 
     @classmethod
-    def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[callable]]) -> "WeightedCorrelationPlotData":
+    def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[Callable]]) -> "WeightedCorrelationPlotData":
         a_tuple_dict = a_tuple._asdict()
         all_df_column_keys: List[str] = list(a_tuple_dict.keys())
         curr_formatted_strings = {k:column_formatting_fn_dict[k](v) for k,v in a_tuple_dict.items() if ((k in column_formatting_fn_dict) and (column_formatting_fn_dict.get(k, None) is not None))}
