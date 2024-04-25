@@ -237,13 +237,13 @@ def plot_3d_binned_bars_timeseries(p, xbin, ybin, t_bins, data, zScalingFactor=1
     all_plotActors_dict = {}
     all_data_dict = {}
 
-    # from pyphoplacecellanalysis.Pho3D.PyVista.graphs import make_saturating_red_cmap
-    # cmaps = [make_saturating_red_cmap((float(i) / float(n_tbins - 1)), min_alpha=1.0, max_alpha=1.0) for i in np.arange(n_tbins)] # pretty good
+    from pyphoplacecellanalysis.Pho3D.PyVista.graphs import make_saturating_red_cmap
+    cmaps = [make_saturating_red_cmap((float(i) / float(n_tbins - 1)), min_alpha=0.75, max_alpha=1.0) for i in np.arange(n_tbins)] # pretty good
 
-    # Load the existing 'viridis' colormap
-    viridis = plt.cm.get_cmap('viridis')
-    desaturation_factors = np.linspace(start=1.0, stop=0.1, num=n_tbins)
-    cmaps = [desaturate_colormap(viridis, a_desaturation_factor) for a_desaturation_factor in desaturation_factors]
+    # # Load the existing 'viridis' colormap
+    # viridis = plt.cm.get_cmap('viridis')
+    # desaturation_factors = np.linspace(start=1.0, stop=0.1, num=n_tbins)
+    # cmaps = [desaturate_colormap(viridis, a_desaturation_factor) for a_desaturation_factor in desaturation_factors]
         
     for t_bin_idx, t_value in enumerate(t_bins):
         a_plot_name: str = f"plot_3d_binned_bars[{t_value}]"

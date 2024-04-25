@@ -19,6 +19,8 @@ import neuropy.utils.type_aliases as types
 def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size, debug_print=False):
     """try recomputing velocties/accelerations
     
+    from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_derivs
+    
     decoding_time_bin_size = a_result.decoding_time_bin_size
     """ 
     position = deepcopy(position)
@@ -84,6 +86,13 @@ def debug_plot_helper_add_position_and_derivatives(time_window_centers, position
         common_plot_kwargs = common_plot_kwargs or {}
         common_plot_kwargs = common_plot_kwargs or dict(marker='o', linestyle='None', alpha=0.6)
 
+        # draw_style = common_plot_kwargs.pop('draw_style', None)
+        # # Using step with `where='post'` for a steps-post effect
+        # if (draw_style is not None) and (draw_style != 'default'):
+        #     assert draw_style in ['post', 'mid', 'pre']
+        #     debug_plot_axs[0].step(time_window_centers, position, where=draw_style, label='Step (post)')
+
+
         # Plot the position data on the first subplot
         debug_plot_axs[0].plot(time_window_centers, position, label=f'{debug_plot_name}_Position', **common_plot_kwargs) # , color='blue'
         debug_plot_axs[0].set_ylabel('Position (m)')
@@ -138,12 +147,12 @@ def debug_plot_position_and_derivatives_figure(new_measured_pos_df, all_epochs_p
 
     ## Plot measured
     fig, debug_plot_axs = debug_plot_helper_add_position_and_derivatives(new_measured_pos_df['t'].to_numpy(), new_measured_pos_df['x'].to_numpy(), new_measured_pos_df['vel_x'].to_numpy(), new_measured_pos_df['accel_x'].to_numpy(),
-                                                                            debug_plot_axs=debug_plot_axs, debug_plot_name='measured', common_plot_kwargs=dict(color='k', markersize='2', marker='.', linestyle='None', alpha=0.35))
+                                                                            debug_plot_axs=debug_plot_axs, debug_plot_name='measured', common_plot_kwargs=dict(color='k', markersize='2', marker='.', linestyle='solid', alpha=0.35))
 
     ## Plot decoded
     for a_name, a_df in all_epochs_position_derivatives_df_dict.items():
         fig, debug_plot_axs = debug_plot_helper_add_position_and_derivatives(a_df['t'].to_numpy(), a_df['x'].to_numpy(), a_df['vel_x'].to_numpy(), a_df['accel_x'].to_numpy(),
-                                                                            debug_plot_axs=debug_plot_axs, debug_plot_name=a_name, common_plot_kwargs=dict(marker='o', markersize=3, linestyle='None', alpha=0.6))
+                                                                            debug_plot_axs=debug_plot_axs, debug_plot_name=a_name, common_plot_kwargs=dict(marker='o', markersize=3, linestyle='solid', alpha=0.6))
 
     if debug_figure_title is not None:
         plt.suptitle(debug_figure_title)
@@ -290,7 +299,10 @@ def debug_plot_position_derivatives_stack(new_measured_pos_df, all_epochs_positi
                                                                 fig, series_idx,
                                                                 debug_plot_name='measured',
                                                                 color_palette=color_palette,
-                                                                scatter_plot_kwargs=dict(mode='markers', marker=dict(size=5, opacity=0.35)), show_scatter=show_scatter) # , color=series_color
+                                                                # scatter_plot_kwargs=dict(mode='markers', marker=dict(size=5, opacity=0.35)),
+                                                                scatter_plot_kwargs=dict(mode='lines+markers', marker=dict(size=5, opacity=0.35)), # , fill='tozeroy'
+                                                                    # mode='lines',  # 'lines+markers' to show both lines and markers fill='tozeroy'  # Fill to zero on the y-axis     
+                                                                show_scatter=show_scatter) # , color=series_color
         
         # Add histograms to y-axis of existing scatter trace
         series_idx += 1
