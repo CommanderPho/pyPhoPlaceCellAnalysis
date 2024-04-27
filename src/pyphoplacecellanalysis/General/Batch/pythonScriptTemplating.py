@@ -1,10 +1,13 @@
 import sys
 import os
+import platform
 import pkg_resources # for Slurm templating
 from jinja2 import Environment, FileSystemLoader # for Slurm templating
 from datetime import datetime, timedelta
 import pathlib
 from pathlib import Path
+import attrs
+from attrs import define, field, Factory
 from typing import List, Dict, Optional, Tuple, Union, Callable
 # import numpy as np
 # import pandas as pd
@@ -22,11 +25,15 @@ from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.utils.result_context import IdentifyingContext
 # from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
+# included_session_contexts, output_python_scripts, output_slurm_scripts, powershell_script_path, vscode_workspace_path
+BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_slurm_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
+
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
-         create_slurm_scripts:bool=False, separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None,
-        batch_session_completion_handler_kwargs=None, **renderer_script_generation_kwargs):
+         create_slurm_scripts:bool=False, should_create_vscode_workspace:bool=True,          # , should_create_powershell_scripts:bool=True
+         separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None,
+        batch_session_completion_handler_kwargs=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
     output_directory
@@ -137,7 +144,21 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             # Add the output files:
             output_slurm_scripts.append(slurm_script_path)
     
-    return included_session_contexts, output_python_scripts, output_slurm_scripts
+
+    # if should_create_powershell_scripts and (platform.system() == 'Windows'):
+    #     powershell_script_path = build_windows_powershell_run_script(output_python_scripts, max_concurrent_jobs=max_parallel_executions)
+    #     powershell_script_path
+
+
+    ## Generate VSCode Workspace for it
+    if should_create_vscode_workspace:
+        output_compute_python_scripts = [x[0] for x in output_python_scripts]
+        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts)
+        print(f'vscode_workspace_path: {vscode_workspace_path}')
+
+
+    return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_slurm_scripts=output_slurm_scripts, vscode_workspace_path=vscode_workspace_path)
+    # return included_session_contexts, output_python_scripts, output_slurm_scripts
 
 
 def display_generated_scripts_ipywidget(included_session_contexts, output_python_scripts):
