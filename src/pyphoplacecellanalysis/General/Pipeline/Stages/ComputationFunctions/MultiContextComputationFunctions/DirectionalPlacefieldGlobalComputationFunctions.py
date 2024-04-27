@@ -2107,40 +2107,56 @@ class DecoderDecodedEpochsResult(ComputedResult):
         """   
         filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df = dfs_list # , additional_columns_merged_df
 
-        df: pd.DataFrame = filtered_ripple_simple_pf_pearson_merged_df.copy()
-        direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
-        track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
-        # Get only the best direction long/short values for each metric:
-        df['long_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['long_LR_pf_peak_x_pearsonr'], df['long_RL_pf_peak_x_pearsonr'])
-        df['short_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['short_LR_pf_peak_x_pearsonr'], df['short_RL_pf_peak_x_pearsonr'])
-        if should_drop_directional_columns:
-            df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']) # drop the directional column names
+        df: Optional[pd.DataFrame] = None
+
+        if filtered_ripple_simple_pf_pearson_merged_df is not None:
+            if df is None:
+                df = filtered_ripple_simple_pf_pearson_merged_df.copy()
+                assert np.all(np.isin(['P_LR', 'P_RL'], df.columns)), f"{list(df.columns)}" # ,'P_Long', 'P_Short'
+                direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
+                # track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+
+            direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
+            track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+            # Get only the best direction long/short values for each metric:
+            df['long_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['long_LR_pf_peak_x_pearsonr'], df['long_RL_pf_peak_x_pearsonr'])
+            df['short_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['short_LR_pf_peak_x_pearsonr'], df['short_RL_pf_peak_x_pearsonr'])
+            if should_drop_directional_columns:
+                df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']) # drop the directional column names
 
         # Outputs: df
 
         ## Add new weighted correlation results as new columns in existing filter_epochs df:
         # Inputs: ripple_weighted_corr_merged_df, df from previous step
 
-        ## Perfrom a 1D matching of the epoch start times:
-        ## ORDER MATTERS:
-        # elements =  df[start_t_idx_name].to_numpy()
-        # test_elements = ripple_weighted_corr_merged_df[start_t_idx_name].to_numpy()
-        # valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0] #TODO 2024-03-14 09:34: - [ ] ERROR HERE?!?!
-        # hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True) ## NOTE .iloc used here!
-        valid_found_indicies = find_data_indicies_from_epoch_times(ripple_weighted_corr_merged_df, epoch_times=df[start_t_idx_name].to_numpy(), t_column_names=[start_t_idx_name,], atol=1e-3)
-        hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.loc[valid_found_indicies].reset_index(drop=True) ## Switched to .loc
+        if ripple_weighted_corr_merged_df is not None:
+            if df is None:
+                df: pd.DataFrame = ripple_weighted_corr_merged_df.copy()
+                assert np.all(np.isin(['P_LR', 'P_RL'], df.columns)), f"{list(df.columns)}" # ,'P_Long', 'P_Short'
+                direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
+                # track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
 
-        ## Add the wcorr columns to `df`:
-        wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
-        df[wcorr_column_names] = hand_selected_ripple_weighted_corr_merged_df[wcorr_column_names] # add the columns to the dataframe
-        df['long_best_wcorr'] = np.where(direction_max_indices, df['wcorr_long_LR'], df['wcorr_long_RL'])
-        df['short_best_wcorr'] = np.where(direction_max_indices, df['wcorr_short_LR'], df['wcorr_short_RL'])
-        if should_drop_directional_columns:
-            df = df.drop(columns=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']) # drop the directional column names
-        
-        ## Add differences:
-        df['wcorr_abs_diff'] = df['long_best_wcorr'].abs() - df['short_best_wcorr'].abs()
-        df['pearsonr_abs_diff'] = df['long_best_pf_peak_x_pearsonr'].abs() - df['short_best_pf_peak_x_pearsonr'].abs()
+
+            ## Perfrom a 1D matching of the epoch start times:
+            ## ORDER MATTERS:
+            # elements =  df[start_t_idx_name].to_numpy()
+            # test_elements = ripple_weighted_corr_merged_df[start_t_idx_name].to_numpy()
+            # valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0] #TODO 2024-03-14 09:34: - [ ] ERROR HERE?!?!
+            # hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True) ## NOTE .iloc used here!
+            valid_found_indicies = find_data_indicies_from_epoch_times(ripple_weighted_corr_merged_df, epoch_times=df[start_t_idx_name].to_numpy(), t_column_names=[start_t_idx_name,], atol=1e-3)
+            hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.loc[valid_found_indicies].reset_index(drop=True) ## Switched to .loc
+
+            ## Add the wcorr columns to `df`:
+            wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
+            df[wcorr_column_names] = hand_selected_ripple_weighted_corr_merged_df[wcorr_column_names] # add the columns to the dataframe
+            df['long_best_wcorr'] = np.where(direction_max_indices, df['wcorr_long_LR'], df['wcorr_long_RL'])
+            df['short_best_wcorr'] = np.where(direction_max_indices, df['wcorr_short_LR'], df['wcorr_short_RL'])
+            if should_drop_directional_columns:
+                df = df.drop(columns=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']) # drop the directional column names
+            
+            ## Add differences:
+            df['wcorr_abs_diff'] = df['long_best_wcorr'].abs() - df['short_best_wcorr'].abs()
+            df['pearsonr_abs_diff'] = df['long_best_pf_peak_x_pearsonr'].abs() - df['short_best_pf_peak_x_pearsonr'].abs()
 
         return df
 
