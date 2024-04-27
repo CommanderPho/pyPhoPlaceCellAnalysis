@@ -2125,6 +2125,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     time_bin_sizes: int = data_results_df['time_bin_size'].unique()
     num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
 
+    if px_scatter_kwargs is None:
+        px_scatter_kwargs = {}
+        
     # f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
     # main_title: str = f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
     if num_unique_sessions == 1:
