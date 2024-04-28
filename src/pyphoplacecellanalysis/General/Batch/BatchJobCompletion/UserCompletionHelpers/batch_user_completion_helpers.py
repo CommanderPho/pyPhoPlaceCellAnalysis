@@ -750,6 +750,68 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
 
 
 
+def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+    """  Export the pipeline's HDF5 as 'pipeline_results.h5'
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+    
+    Results can be extracted from batch output by 
+    
+    # Extracts the callback results 'determine_session_t_delta_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+
+    """
+    import sys
+    from datetime import timedelta, datetime
+    from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
+    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'export_session_h5_file_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    
+
+    hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('pipeline_results.h5').resolve()
+    print(f'pipeline hdf5_output_path: {hdf5_output_path}')
+    err = None
+    # Only get files newer than date
+    skip_overwriting_files_newer_than_specified:bool = False
+
+    was_write_good: bool = False
+    newest_file_to_overwrite_date = datetime.now() - timedelta(days=1) # don't overwrite any files more recent than 1 day ago
+    can_skip_if_allowed: bool = (hdf5_output_path.exists() and (FilesystemMetadata.get_last_modified_time(hdf5_output_path)<=newest_file_to_overwrite_date))
+    if (not skip_overwriting_files_newer_than_specified) or (not can_skip_if_allowed):
+        # if skipping is disabled OR skipping is enabled but it's not valid to skip, overwrite.
+        # file is folder than the date to overwrite, so overwrite it
+        print(f'OVERWRITING (or writing) the file {hdf5_output_path}!')
+        # with ExceptionPrintingContext(suppress=False):
+        try:
+            curr_active_pipeline.export_pipeline_to_h5()
+            was_write_good = True
+        except BaseException as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
+            hdf5_output_path = None # set to None because it failed.
+            if self.fail_on_exception:
+                raise err.exc
+    else:
+        print(f'WARNING: file {hdf5_output_path} is newer than the allowed overwrite date, so it will be skipped.')
+        print(f'\t\tnewest_file_to_overwrite_date: {newest_file_to_overwrite_date}\t can_skip_if_allowed: {can_skip_if_allowed}\n')
+        # return (hdf5_output_path, None)
+
+
+    callback_outputs = {
+     'hdf5_output_path': hdf5_output_path, 'e':err, #'t_end': t_end   
+    }
+    across_session_results_extended_dict['export_session_h5_file_completion_function'] = callback_outputs
+    
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    return across_session_results_extended_dict
+
+
+
 
 _pre_user_completion_functions_header_template_str: str = f"""
 # ==================================================================================================================== #
@@ -795,6 +857,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
                                     'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,
                                     'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
+                                    'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                                     }
     
     
