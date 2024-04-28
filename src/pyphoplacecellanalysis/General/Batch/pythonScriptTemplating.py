@@ -155,6 +155,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         output_compute_python_scripts = [x[0] for x in output_python_scripts]
         vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts)
         print(f'vscode_workspace_path: {vscode_workspace_path}')
+    else:
+        vscode_workspace_path = None
 
 
     return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_slurm_scripts=output_slurm_scripts, vscode_workspace_path=vscode_workspace_path)
