@@ -686,7 +686,8 @@ class BatchSessionCompletionHandler:
         ## run external completion functions:
         for a_fn in self.completion_functions:
             print(f'\t>> calling external computation function: {a_fn.__name__}')
-            across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
+            with ExceptionPrintingContext():
+                across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
             
 
 
