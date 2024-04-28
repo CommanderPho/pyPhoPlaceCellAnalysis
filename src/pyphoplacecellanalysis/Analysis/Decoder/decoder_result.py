@@ -1039,7 +1039,7 @@ def old_score_posterior(posterior, n_jobs:int=8):
 
 
 
-def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[float]=16.0, neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True):
+def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[float]=16.0, n_neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True):
         """ 2023-05-25 - Radon Transform to fit line to decoded replay epoch posteriors. Gives score, velocity, and intercept. 
 
         Usage:
@@ -1061,26 +1061,26 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
             assert posterior is not None, "No posteriors found"
             posteriors = posterior
 
-        if neighbours is None:
+        if n_neighbours is None:
             # Set neighbors from margin, pos_bin_size
             assert margin is not None, f"both neighbours and margin are None!"
-            neighbours: int = max(int(round(float(margin) / float(pos_bin_size))), 1) # neighbors must be at least one
+            n_neighbours = max(int(round(float(margin) / float(pos_bin_size))), 1) # neighbors must be at least one
             if debug_print:
-                print(f'neighbours will be calculated from margin and pos_bin_size. neighbours: {neighbours} = int(margin: {margin} / pos_bin_size: {pos_bin_size})')
+                print(f'neighbours will be calculated from margin and pos_bin_size. n_neighbours: {n_neighbours} = int(margin: {margin} / pos_bin_size: {pos_bin_size})')
         else:
             # use existing neighbors
-            neighbors = int(neighbors)
+            n_neighbours = int(n_neighbours)
             if margin is not None:
-                print(f'WARN: margin is not None but its value will not be used because neighbours is provided directly (neighbors: {neighbors}, margin: {margin})')
+                print(f'WARN: margin is not None but its value will not be used because n_neighbours is provided directly (n_neighbours: {n_neighbours}, margin: {margin})')
 
         run_parallel = _allow_parallel_run_general and (n_jobs > 1)
         if (n_jobs > 1) and (not _allow_parallel_run_general):
             print(f'WARNING: n_jobs > 1 (n_jobs: {n_jobs}) but _allow_parallel_run_general == False, so parallel computation will not be performed.')
         if run_parallel:
             from joblib import Parallel, delayed
-            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr) for epoch in posteriors)
+            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr) for epoch in posteriors)
         else:
-            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr) for epoch in posteriors]
+            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr) for epoch in posteriors]
 
         if enable_return_neighbors_arr:
             # score_velocity_intercept_tuple, (num_neighbours, neighbors_arr) = results # unpack
@@ -1090,14 +1090,16 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
             intercept = []
             num_neighbours = []
             neighbors_arr = []
+            debug_info = []
 
             for a_result_tuple in results:
-                a_score, a_velocity, a_intercept, (a_num_neighbours, a_neighbors_arr) = a_result_tuple
+                a_score, a_velocity, a_intercept, (a_num_neighbours, a_neighbors_arr, a_debug_info) = a_result_tuple
                 score.append(a_score)
                 velocity.append(a_velocity)
                 intercept.append(a_intercept)
                 num_neighbours.append(a_num_neighbours)
                 neighbors_arr.append(a_neighbors_arr)
+                debug_info.append(a_debug_info)
                
             score = np.array(score)
             velocity = np.array(velocity)
@@ -1113,7 +1115,7 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
         # else:
 
         if enable_return_neighbors_arr:
-            return score, velocity, intercept, (num_neighbours, neighbors_arr)
+            return score, velocity, intercept, (num_neighbours, neighbors_arr, debug_info)
         else:
             return score, velocity, intercept
 
