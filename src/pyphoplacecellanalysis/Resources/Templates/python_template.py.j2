@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, redirect_stderr
 
 import numpy as np
 import pandas as pd
@@ -28,13 +28,19 @@ from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHand
 
 script_file_path = os.path.abspath(__file__)
 script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
-log_file_path = script_file_parent_path.joinpath('log_file.log')
-
 
 curr_session_context = {{ curr_session_context }}
 curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
 
-curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=log_file_path) # create logger
+curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True)
+final_log_file_path: Path = None
+for a_handler in curr_task_logger.handlers:
+    if hasattr(a_handler, 'baseFilename'):
+        final_log_file_path = Path(a_handler.baseFilename).resolve()
+        print(f'final_log_file_path: {final_log_file_path}')
+        
+assert final_log_file_path is not None, f"final_log_file_path was not found after creating logger!!"
+
 _line_sweep = '=========================='
 ## REPLACES THE `print` function within this scope
 _original_print = print
@@ -135,8 +141,8 @@ for a_custom_custom_user_completion_function in custom_user_completion_functions
     result_handler.completion_functions.append(a_custom_custom_user_completion_function)
 
 
-with open(log_file_path, 'a') as f:
-    with redirect_stdout(f):
+with open(final_log_file_path, 'w') as f:
+    with redirect_stdout(f), redirect_stderr(f):
         run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
                                                         curr_session_context=curr_session_context,
                                                         curr_session_basedir=curr_session_basedir,
@@ -154,7 +160,7 @@ with open(log_file_path, 'a') as f:
 
         new_print(f'/* script_file_parent_path: {script_file_parent_path} __________________________________________________________________________________ */')
         new_print(f'/* script_file_path: {script_file_path} __________________________________________________________________________________ */')
-        new_print(f'/* log_file_path: {log_file_path} __________________________________________________________________________________ */')
+        new_print(f'/* log_file_path: {final_log_file_path} __________________________________________________________________________________ */')
         new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
         new_print(f'/* local_computations_override_file: {local_computations_override_file} __________________________________________________________________________________ */')
         new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
