@@ -55,7 +55,6 @@ from qtpy import QtCore, QtWidgets, QtGui
 # Pipeline Logging:
 import logging
 from pyphocorehelpers.print_helpers import build_module_logger
-pipeline_module_logger = build_module_logger('Spike3D.pipeline')
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PipelineSavingScheme
 
@@ -141,7 +140,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.pipeline_name = name
         self.session_data_type = None
         self._stage = None
-        self._logger = pipeline_module_logger
+
+        self._logger = build_module_logger('Spike3D.pipeline', file_logging_dir=None, debug_print=False)
         self._logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
         
         self._persistance_state = None # indicate that this pipeline doesn't have a corresponding pickle file that it was loaded from
@@ -595,7 +595,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         super(NeuropyPipeline, self).__init__() # from 
         
         # Restore unpickable properties:
-        self._logger = pipeline_module_logger
+        self._logger = build_module_logger('Spike3D.pipeline', file_logging_dir=None, debug_print=False)
         self._logger.info(f'NeuropyPipeline.__setstate__(state="{state}")') # AttributeError: 'DisplayPipelineStage' object has no attribute 'identity'
 
         self._persistance_state = None # the pickle_path has to be set manually after loading

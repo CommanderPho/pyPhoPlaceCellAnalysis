@@ -18,6 +18,7 @@ from enum import Enum, unique  # SessionBatchProgress
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.print_helpers import get_now_time_precise_str
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -62,7 +63,10 @@ def build_batch_processing_session_task_identifier(session_context: IdentifyingC
         return f"{hostname}.{session_component}"
 
 @function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
-def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), debug_print=False) -> logging.Logger:
+def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), 
+                            logging_root_FQDN: str = f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch',
+                            include_curr_time_str: bool = True,
+                            debug_print=False) -> logging.Logger:
     """ Builds a logger for a specific module that logs to BOTH console output and a file. 
     
     Creates output files like: f'debug_com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.{batch_processing_session_task_identifier}.log'
@@ -89,7 +93,22 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
     batch_processing_session_task_identifier:str = build_batch_processing_session_task_identifier(session_context, include_runtime=False)
     if additional_suffix is not None:
         batch_processing_session_task_identifier = f"{batch_processing_session_task_identifier}.{additional_suffix.lstrip('.')}"
-    batch_task_logger: logging.Logger = logging.getLogger(f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.{batch_processing_session_task_identifier}') # create logger
+        
+    logger_resolved_FQDN_parts_array = []
+
+    if include_curr_time_str:
+        curr_time_str: str = get_now_time_precise_str()
+        logger_resolved_FQDN_parts_array.append(curr_time_str)
+
+    if (logging_root_FQDN is not None) and (len(logging_root_FQDN) > 0):
+        logger_resolved_FQDN_parts_array.append(logging_root_FQDN)
+
+    logger_resolved_FQDN_parts_array.append(batch_processing_session_task_identifier) ## append the session name
+
+
+    logger_full_task: str = '.'.join(logger_resolved_FQDN_parts_array)
+
+    batch_task_logger: logging.Logger = logging.getLogger(logger_full_task) # create logger
     print(f'build_batch_task_logger(module_name="{batch_processing_session_task_identifier}"):')
     if debug_print:
         print(f'\t batch_task_logger.handlers: {batch_task_logger.handlers}')
@@ -111,8 +130,10 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
 
         # File Logging:    
         print(f'\t Batch Task logger "{batch_task_logger.name}" has file logging enabled and will log to "{str(module_logging_path)}"')
-        fileHandler = logging.FileHandler(module_logging_path)
+        fileHandler: logging.FileHandler = logging.FileHandler(module_logging_path)
         fileHandler.setFormatter(logFormatter)
+        
+        # fileHandler.baseFilename
         batch_task_logger.addHandler(fileHandler)
 
     # consoleHandler = logging.StreamHandler(sys.stdout)

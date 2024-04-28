@@ -256,7 +256,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """
         super(SpikeRasterBase, self).__init__(**kwargs)
         # Initialize member variables:
-        _GLOBAL_spike_raster_logger = build_module_logger('Spike3D.display.SpikeRasterBase') # Only now do we build the module logger. This way it isn't made when the SpikeRaster plots aren't even used.
+        _GLOBAL_spike_raster_logger = build_module_logger('Spike3D.display.SpikeRasterBase', file_logging_dir=None) # Only now do we build the module logger. This way it isn't made when the SpikeRaster plots aren't even used.
         self._logger = _GLOBAL_spike_raster_logger
         self.logger.info(f'SpikeRasterBase.__init__(...)')
         
