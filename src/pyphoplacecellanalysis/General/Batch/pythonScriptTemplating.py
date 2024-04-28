@@ -337,6 +337,7 @@ def build_vscode_workspace(script_paths):
             "python.terminal.focusAfterLaunch": true,
             "python.terminal.launchArgs": [
             ],
+            "powershell.cwd": "gen_scripts",
         }
     }
     """
