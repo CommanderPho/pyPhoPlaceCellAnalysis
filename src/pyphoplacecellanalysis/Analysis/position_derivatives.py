@@ -59,12 +59,20 @@ def robust_velocity_and_acceleration(t: NDArray, x: NDArray) -> Tuple[NDArray, N
     # a = np.gradient(v, t)
 
 
-    # Create a spline of x with respect to t
-    spline = UnivariateSpline(t, x, s=0, k=4)  # s=0 ensures it passes through all points, k=4 means cubic spline
-    # The first derivative of the spline gives the velocity
-    v = spline.derivative()(t)
-    # The second derivative of the spline gives the acceleration
-    a = spline.derivative(n=2)(t)
+    try:
+        # Create a spline of x with respect to t
+        desired_k = 4
+        k = min(desired_k, len(t)-1)
+        spline = UnivariateSpline(t, x, s=0, k=k)  # s=0 ensures it passes through all points, k=4 means cubic spline
+        # The first derivative of the spline gives the velocity
+        v = spline.derivative()(t)
+        # The second derivative of the spline gives the acceleration
+        a = spline.derivative(n=2)(t)
+    except BaseException as err:
+        # Compute instantaneous velocities
+        v = np.gradient(x, t)
+        # Compute instantaneous accelerations
+        a = np.gradient(v, t)
 
     return v, a
 

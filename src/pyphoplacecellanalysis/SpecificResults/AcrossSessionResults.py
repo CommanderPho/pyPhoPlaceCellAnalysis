@@ -640,6 +640,7 @@ class AcrossSessionsResults:
         """
         global_batch_result_inst_fr_file_path = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
         print(f'global_batch_result_inst_fr_file_path: {global_batch_result_inst_fr_file_path}')
+        assert global_batch_result_inst_fr_file_path.exists()
         across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path)
         num_sessions = len(across_sessions_instantaneous_fr_dict)
         print(f'num_sessions: {num_sessions}')
@@ -1085,23 +1086,29 @@ class AcrossSessionTables:
     def write_table_to_files(cls, df, global_data_root_parent_path:Path, output_basename:str='neuron_identities_table', include_csv:bool=False, include_pkl:bool=True):
         """ 
         
-        AcrossSessionTables.write_table_to_files(v, global_data_root_parent_path=global_data_root_parent_path, output_basename='a_table')
+        out_path_dict = AcrossSessionTables.write_table_to_files(v, global_data_root_parent_path=global_data_root_parent_path, output_basename='a_table')
         """
         out_parent_path = global_data_root_parent_path.resolve() # = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
         out_parent_path.mkdir(parents=True, exist_ok=True)
         # print(f'global_batch_result_inst_fr_file_path: {out_parent_path}')
         # print(f'a_name: {a_name}')
+        out_path_dict = {}
         if not isinstance(output_basename, Path):
             output_basename = Path(output_basename)
         if include_csv:
             csv_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.csv'))
-            print(f'writing {csv_out_path}.')
+            print(f'writing {csv_out_path}')
             df.to_csv(csv_out_path)
+            out_path_dict['.csv'] = csv_out_path
+
         if include_pkl:
             pkl_out_path = out_parent_path.joinpath(output_basename.with_suffix(suffix='.pkl'))
-            print(f'writing {pkl_out_path}.')
+            print(f'writing {pkl_out_path}')
             saveData(pkl_out_path, db=df, safe_save=False)
-
+            out_path_dict['.pkl'] = pkl_out_path
+    
+        return out_path_dict
+    
 
     @classmethod
     def load_table_from_file(cls, global_data_root_parent_path:Path, output_filename:str='neuron_identities_table', skip_on_error=False) -> pd.DataFrame:
@@ -1122,7 +1129,7 @@ class AcrossSessionTables:
             output_filename = Path(output_filename)#.with_suffix(suffix='.pkl')
         pkl_out_path = out_parent_path.joinpath(output_filename)
         assert pkl_out_path.exists(), f"pkl_out_path: '{pkl_out_path}' does not exist!"
-        print(f'reading {pkl_out_path}.')
+        print(f'reading {pkl_out_path}')
         v = loadData(pkl_out_path)
         # try to rename the columns if needed
         v.rename(columns=cls.aliases_columns_dict, inplace=True)
@@ -1132,7 +1139,7 @@ class AcrossSessionTables:
         
 
     @classmethod
-    def build_and_save_all_combined_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None):
+    def build_and_save_all_combined_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None, include_csv:bool=True, include_pkl:bool=True):
         """Save converted back to .h5 file, .csv file, and several others
         
         Usage:
@@ -1142,7 +1149,7 @@ class AcrossSessionTables:
             included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
         
             
-            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
+            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths, override_output_parent_path=override_output_parent_path, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
             
 
         """
@@ -1166,20 +1173,16 @@ class AcrossSessionTables:
         'long_short_fr_indicies_analysis_table': long_short_fr_indicies_analysis_table,
         'neuron_replay_stats_table': neuron_replay_stats_table}
 
+        output_path_dicts = {}
+
         for table_name, v in across_session_outputs.items():
             table_name = Path(table_name)
             a_name = table_name.name
-            print(f'a_name: {a_name}')
-            cls.write_table_to_files(v, global_data_root_parent_path=out_parent_path, output_basename=table_name)
-            # csv_out_path = out_parent_path.joinpath(table_name.with_suffix(suffix='.csv'))
-            # print(f'writing {csv_out_path}.')
-            # v.to_csv(csv_out_path)
-            # pkl_out_path = out_parent_path.joinpath(table_name.with_suffix(suffix='.pkl'))
-            # print(f'writing {pkl_out_path}.')
-            # saveData(pkl_out_path, db=v, safe_save=False)
+            print(f'table: "{a_name}"')
+            output_path_dicts[a_name] = cls.write_table_to_files(v, global_data_root_parent_path=out_parent_path, output_basename=table_name, include_csv=include_csv, include_pkl=include_pkl)
             # v.to_hdf(k, key=f'/{a_name}', format='table', data_columns=True)    # TypeError: objects of type ``StringArray`` are not supported in this context, sorry; supported objects are: NumPy array, record or scalar; homogeneous list or tuple, integer, float, complex or bytes
             
-        return neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table
+        return (neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table), output_path_dicts
     
 
     @classmethod
@@ -1405,7 +1408,23 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     """
     # Function 'parse_filename' should be defined in the global scope
     parsed_paths = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)] # note we append path p to the end of the tuple
-    parsed_paths.sort(reverse=True)
+
+    # Function that helps sort tuples by handling None values.
+    def sort_key(tup):
+        # Assign a boolean for each element, True if it's None, to ensure None values are sorted last.
+        return (
+            tup[0],                       # Sort by datetime first
+            tup[1] or '',                  # Then by the string, ensuring None becomes empty string
+            tup[2] or '',                  # Then by the next string, ensuring None becomes empty string
+            tup[2] or '', #float('-inf') if tup[3] is None else tup[3],  # Then use -inf to ensure None ends up last
+            tup[4]                         # Finally by path which should handle None by itself
+        )
+
+    # Now we sort the data using our custom sort key
+    parsed_paths = sorted(parsed_paths, key=sort_key, reverse=True)
+
+    # parsed_paths.sort(key=lambda x: (x[3] is not None, x), reverse=True)
+    # parsed_paths.sort(reverse=True) # old way
 
     if debug_print:
         print(f'parsed_paths: {parsed_paths}')
@@ -1639,6 +1658,64 @@ def _common_cleanup_operations(a_df):
         if 'ripple_idx' in a_df:
             a_df['epoch_idx'] = a_df['ripple_idx']
     return a_df
+
+def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cuttoff_date: Optional[datetime] = None, known_bad_session_strs=None, debug_print: bool = False):
+    """ 
+    
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_across_sessions_exported_h5_files
+
+
+    """
+    from neuropy.core.user_annotations import UserAnnotationsManager
+
+    if collected_outputs_directory is None:
+        known_collected_outputs_paths = [Path(v).resolve() for v in [r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
+                                                                    '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']]
+        collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+
+    assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
+    # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
+    print(f'collected_outputs_directory: {collected_outputs_directory}')
+
+    ## Find the files:
+    h5_files = find_HDF5_files(collected_outputs_directory)
+    h5_sessions = find_most_recent_files(found_session_export_paths=h5_files)
+
+    ## INPUTS: h5_sessions, session_dict, cuttoff_date, known_bad_session_strs
+    if known_bad_session_strs is None:
+        known_bad_session_strs = []
+
+    parsed_h5_files_df: pd.DataFrame = convert_to_dataframe(h5_sessions)
+
+    if cuttoff_date is not None:
+        # 'session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime'
+        parsed_h5_files_df = parsed_h5_files_df[parsed_h5_files_df['export_datetime'] >= cuttoff_date]
+
+
+    parsed_h5_files_df = parsed_h5_files_df[np.isin(parsed_h5_files_df['session'], known_bad_session_strs, invert=True)] # drop all sessions that are in the known_bad_session_strs
+
+    # parsed_h5_files_df: pd.DataFrame = convert_to_dataframe(final_h5_sessions)
+
+    ## INPUTS: h5_sessions
+    h5_session_names = list(h5_sessions.keys())
+    good_sessions = UserAnnotationsManager.get_hardcoded_good_sessions()
+    h5_session_contexts = [a_good_session_ctxt for a_good_session_ctxt in good_sessions if (a_good_session_ctxt.session_name in h5_session_names)]
+
+    # included_h5_paths = [a_session_dict.get('pipeline_results', None)[0] for a_sess_name, a_session_dict in h5_sessions.items()] # these are mis-ordered
+    included_h5_paths = [h5_sessions[a_good_session_ctxt.session_name].get('pipeline_results', None)[0] for a_good_session_ctxt in h5_session_contexts]
+    assert len(included_h5_paths) == len(h5_session_contexts)
+
+    h5_contexts_paths_dict = dict(zip(h5_session_contexts, included_h5_paths))
+    return parsed_h5_files_df, h5_contexts_paths_dict
+
+    ## OUTPUTS: parsed_h5_files_df, h5_contexts_paths_dict
+    # h5_session_contexts = list(h5_contexts_paths_dict.keys())
+    # included_h5_paths = list(h5_contexts_paths_dict.values())
+
+    ## OUTPUTS: (csv_files, csv_sessions), (h5_files, h5_sessions)
+
+
+
 
 @function_attributes(short_name=None, tags=['across_sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 08:47', related_items=[])
 def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None, debug_print: bool = False):
@@ -2091,7 +2168,7 @@ def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_
 
 def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25, px_scatter_kwargs=None,
                                    histogram_variable_name='P_Long', hist_kwargs=None,
-                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None):
+                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None, **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
     
     px_scatter_kwargs: only used if out_scatter_fig is None
@@ -2258,6 +2335,18 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     # figure_context_dict['n_tbin'] = num_unique_time_bins
 
     figure_context = IdentifyingContext(**figure_context_dict)
+
+    # Update layout to add a title to the legend
+    legend_title_text = kwargs.get('legend_title_text', None)
+    if legend_title_text is None:
+        legend_key: str = px_scatter_kwargs.get('color', None)
+        legend_title_text = legend_key
+
+    if legend_title_text is not None:
+        fig.update_layout(
+            legend_title_text=legend_title_text  # Add a title to the legend
+        )
+
 
     return fig, figure_context
 
@@ -3010,7 +3099,7 @@ def plot_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec:
 
 
 @function_attributes(short_name=None, tags=['histogram', 'stacked', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, **kwargs) -> None:
+def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', **kwargs) -> None:
     """ plots a colorful stacked histogram for each of the many time-bin sizes
     """
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
@@ -3033,17 +3122,23 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
     
     histogram_kwargs = dict(orientation="horizontal", bins=25)
     
+    assert column_name in data_results_df, f"column_name: {column_name} missing from df. {list(data_results_df.columns)}"
+    time_bin_sizes: int = data_results_df['time_bin_size'].unique()
+    if (not np.all(np.isnan(time_bin_sizes))):
+        # if there's at least one non-NaN time_bin_size, drop the NaNs:
+        data_results_df = data_results_df.dropna(subset=['time_bin_size'], inplace=False)
+        time_bin_sizes = data_results_df['time_bin_size'].unique() # drop the NaN timebin size
+
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
-
-    time_bin_sizes: int = pre_delta_df['time_bin_size'].unique()
     
     # plot pre-delta histogram:
     for time_bin_size in time_bin_sizes:
         df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
-        df_tbs['P_Long'].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+        df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
     
+    ax_dict['epochs_pre_delta'].set_ylabel(f"{column_name}") # only set on the leftmost subplot
     ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ time bins')
     ax_dict['epochs_pre_delta'].legend()
 
@@ -3051,10 +3146,11 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
     time_bin_sizes: int = post_delta_df['time_bin_size'].unique()
     for time_bin_size in time_bin_sizes:
         df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
-        df_tbs['P_Long'].hist(ax=ax_dict['epochs_post_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+        df_tbs[column_name].hist(ax=ax_dict['epochs_post_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
     
     ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ time bins')
-    ax_dict['epochs_post_delta'].legend()
+    if len(time_bin_sizes) > 1:
+        ax_dict['epochs_post_delta'].legend()
     
     if not defer_show:
         fig.show()
