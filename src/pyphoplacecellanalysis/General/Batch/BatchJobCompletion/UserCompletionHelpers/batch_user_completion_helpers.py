@@ -9,7 +9,8 @@ from nptyping import NDArray
 import numpy as np
 import pandas as pd
 
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 
 
@@ -48,7 +49,7 @@ and can be extracted from batch output by:
 # self.collected_outputs_path: Path = Path('/home/halechr/cloud/turbo/Data/Output/collected_outputs').resolve() # GreatLakes
 # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve() # Apogee
 
-
+@function_attributes(short_name=None, tags=['batch', 'rank-order'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:21', related_items=[])
 def export_rank_order_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     # print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -91,6 +92,7 @@ def export_rank_order_results_completion_function(self, global_data_root_parent_
     # return True
     return across_session_results_extended_dict
 
+@function_attributes(short_name=None, tags=['figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:21', related_items=[])
 def figures_rank_order_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderGlobalDisplayFunctions
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -113,6 +115,8 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
     # return True
     return across_session_results_extended_dict
 
+
+@function_attributes(short_name=None, tags=['marginal', 'across-sessions', 'CSV'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:22', related_items=[])
 def compute_and_export_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...,across_session_results_extended_dict: {across_session_results_extended_dict})')
@@ -201,6 +205,8 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
 
     return across_session_results_extended_dict
 
+
+@function_attributes(short_name=None, tags=['CSV', 'time_bin_sizes', 'marginals'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:24', related_items=[])
 def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_hdf=True, save_csvs=True, return_full_decoding_results:bool=False, 
                                                                              custom_all_param_sweep_options=None,
@@ -576,6 +582,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     return across_session_results_extended_dict
 
 
+@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """
     Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
