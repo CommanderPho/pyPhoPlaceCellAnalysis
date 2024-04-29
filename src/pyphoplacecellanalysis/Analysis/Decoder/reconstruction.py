@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import Any, List, Tuple, Union, Optional
 from attrs import define, field, Factory
 from neuropy.analyses import Epoch
 from neuropy.core.epoch import ensure_dataframe
@@ -384,6 +384,62 @@ class Zhang_Two_Step:
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
     
 
+@custom_define(slots=False, repr=False)
+class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+    """ Values for a single epoch. Class to hold debugging information for a transformation process """
+    p_x_given_n: NDArray = non_serialized_field()
+    epoch_info_tuple: Tuple = non_serialized_field()
+
+    most_likely_positions: NDArray = non_serialized_field()
+    most_likely_position_indicies: NDArray = non_serialized_field()
+
+    nbins: int = non_serialized_field()
+    time_bin_container: Any = non_serialized_field()
+    time_bin_edges: NDArray = non_serialized_field()
+
+    marginal_x: NDArray = non_serialized_field()
+    marginal_y: Optional[NDArray] = non_serialized_field()
+
+    # active_num_neighbors: int = serialized_attribute_field()
+    # active_neighbors_arr: List = field()
+
+    # start_point: Tuple[float, float] = field()
+    # end_point: Tuple[float, float] = field()
+    # band_width: float = field()
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+            DecodedFilterEpochsResult(decoding_time_bin_size: float,
+                filter_epochs: neuropy.core.epoch.Epoch,
+                num_filter_epochs: int,
+                most_likely_positions_list: list | shape (n_epochs),
+                p_x_given_n_list: list | shape (n_epochs),
+                marginal_x_list: list | shape (n_epochs),
+                marginal_y_list: list | shape (n_epochs),
+                most_likely_position_indicies_list: list | shape (n_epochs),
+                spkcount: list | shape (n_epochs),
+                nbins: numpy.ndarray | shape (n_epochs),
+                time_bin_containers: list | shape (n_epochs),
+                time_bin_edges: list | shape (n_epochs),
+                epoch_description_list: list | shape (n_epochs)
+            )
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        # content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
+        # return f"{type(self).__name__}({content}\n)"
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+    
+
+
 
 @custom_define(slots=False, repr=False)
 class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
@@ -430,6 +486,26 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return deepcopy([self.time_bin_containers[an_epoch_idx].centers for an_epoch_idx in np.arange(self.num_filter_epochs)])
 
 
+    def get_result_for_epoch(self, active_epoch_idx: int) -> SingleEpochDecodedResult:
+        """ returns a container with the result from a single epoch. 
+        """
+        single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # a_decoder_decoded_epochs_result._test_find_fields_by_shape_metadata()
+        fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'],
+            ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges']))
+        
+        # class_fields = self.__attrs_attrs__
+        # single_epoch_fields = [field for field in class_fields if field.name in single_epoch_field_names]
+        # values_dict = {fields_to_single_epoch_fields_dict[field.name]:getattr(self, field.name)[epoch_IDX] for field in single_epoch_fields}
+
+        values_dict = {fields_to_single_epoch_fields_dict[field_name]:getattr(self, field_name)[active_epoch_idx] for field_name in single_epoch_field_names}
+
+        a_posterior = self.p_x_given_n_list[active_epoch_idx].copy()
+        active_epoch_info_tuple = tuple(self.active_filter_epochs.itertuples(name='EpochTuple'))[active_epoch_idx]
+
+        single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult(**values_dict, epoch_info_tuple=active_epoch_info_tuple)
+    
+        return single_epoch_result
+    
 
     @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=[], creation_date='2024-02-13 17:25', related_items=[])
     def compute_radon_transforms(self, pos_bin_size:float, nlines:int=8192, margin:float=8, jump_stat=None, n_jobs:int=4, enable_return_neighbors_arr=True) -> pd.DataFrame:
@@ -603,25 +679,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return subset
     
 
-    @classmethod
-    def _test_find_fields_by_shape_metadata(cls):
-        """ tries to get all the fields that match the shape criteria. Not completely implemented, but seems to work.
-        
-        
-        # # Get the values at epoch_IDX from a particular instance `active_result`:
-        # epoch_IDX: int = 0
-        # # values = [getattr(active_result, field)[epoch_IDX] for field in indices_fields_n_epochs]
-        # # values = [getattr(active_result, field) for field in indices_fields_n_epochs]
-        # values_dict = {field:getattr(active_result, field)[epoch_IDX] for field in indices_fields_n_epochs if field in desired_keys}
-        # values_dict
-
-        """
-        class_fields = cls.__attrs_attrs__
-        # indices_fields_n_epochs = [field.name for field in class_fields if hasattr(field.metadata, 'shape') and field.metadata['shape'][0] == 'n_epochs']
-        indices_fields_n_epochs = [field.name for field in class_fields if 'shape' in field.metadata and field.metadata['shape'][0] == 'n_epochs']
-        # print(f'indices_fields_n_epochs: {indices_fields_n_epochs}') # ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'spkcount', 'nbins', 'time_bin_containers', 'time_bin_edges', 'epoch_description_list']
-        desired_keys = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges']
-        return [a_field for a_field in indices_fields_n_epochs if a_field in desired_keys]
 
 
 # ==================================================================================================================== #
