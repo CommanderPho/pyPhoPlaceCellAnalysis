@@ -1341,14 +1341,12 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
 
     # BEGIN PLOTTING _____________________________________________________________________________________________________ #
 
-
-
     track_1D_height=1.0*base_1D_height
     platform_1D_height=1.0*base_1D_height + base_platform_additive_height # want same (additive) height offset even when scaling.
 
-    long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=((track_1D_height * long_height_multiplier) + base_platform_additive_height), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
+    long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=((track_1D_height * long_height_multiplier) + base_platform_additive_height), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=debug_print)
     # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=(platform_1D_height * long_height_multiplier), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
-    short_path = _build_track_1D_verticies(platform_length=22.0, track_length=short_track_dims.track_length, track_1D_height=track_1D_height, platform_1D_height=platform_1D_height, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=True)
+    short_path = _build_track_1D_verticies(platform_length=22.0, track_length=short_track_dims.track_length, track_1D_height=track_1D_height, platform_1D_height=platform_1D_height, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=debug_print)
 
     ## Create the remapping figure:
     # fig, ax = plt.subplots()
@@ -1465,14 +1463,14 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
 
         adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()] + [v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax,
                     #  expand=(1.2, 2), # expand text bounding boxes by 1.2 fold in x direction and 2 fold in y direction
-                    arrowprops=dict(arrowstyle='->', color='gray', alpha=.5), # ensure the labeling is clear by adding arrows
-                    avoid_self=False,
-                    # force_text=(0, 0.5),# Since the movements are so contrained, high force speeds up the process a lot
-                    # expand=(1, 1), # We want them to be quite compact, so reducing expansion makes sense
+                    arrowprops=dict(arrowstyle='-', color='gray', alpha=.5), # ensure the labeling is clear by adding arrows
+                    # avoid_self=False,
+                    force_text=(0.5, 0),# Since the movements are so contrained, high force speeds up the process a lot
+                    expand=(1, 1), # We want them to be quite compact, so reducing expansion makes sense
                     # only_move='x-', #Only allow movement to the left
                     # only_move='y', #Only allow movement on y
-                    # max_move=None
-                    
+                    # max_move=None,
+                    # autoalign=True
         )
 
 
