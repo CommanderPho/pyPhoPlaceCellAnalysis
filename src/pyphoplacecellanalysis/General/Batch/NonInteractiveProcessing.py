@@ -733,6 +733,13 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         print(f'batch_extended_programmatic_figures(...): "_display_rank_order_z_stats_results" failed with error: {e}\n skipping.')
 
 
+    try:
+        _out = curr_active_pipeline.display('_display_directional_track_remapping_diagram', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
+    except BaseException as e:
+        print(f'batch_extended_programmatic_figures(...): "_display_directional_track_remapping_diagram" failed with error: {e}\n skipping.')
+
+
+
 
 
 class BatchPhoJonathanFiguresHelper:

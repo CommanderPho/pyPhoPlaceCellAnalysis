@@ -5363,6 +5363,59 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             graphics_output_dict = {'win': template_debugger.ui.root_dockAreaWindow, 'app': template_debugger.ui.app,  'ui': template_debugger.ui, 'plots': template_debugger.plots, 'data': template_debugger.plots_data, 'obj': template_debugger}
 
 
+    @function_attributes(short_name='track_remapping_diagram', tags=['remapping'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_bidirectional_track_remapping_diagram'], used_by=[], creation_date='2024-04-29 09:24', related_items=[], is_global=True)
+    def _display_directional_track_remapping_diagram(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
+            """ For both directions, plots a subplot showing the cell's location on the long track and the short track with connecting arrows showing their transition. Draws both tracks in the background as reference. 
+            """
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import plot_bidirectional_track_remapping_diagram
+
+            active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
+
+            fignum = kwargs.pop('fignum', None)
+            if fignum is not None:
+                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+            defer_render: bool = kwargs.pop('defer_render', False)
+            should_show: bool = (not defer_render)    
+            debug_print: bool = kwargs.pop('debug_print', False)
+
+            use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
+
+            figure_name: str = kwargs.pop('figure_name', 'directional_track_template_pf1Ds')
+            # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
+            # _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
+
+            # Recover from the saved global result:
+            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+
+            assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
+            rank_order_results = global_computation_results.computed_data['RankOrder'] # RankOrderComputationsContainer
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            assert minimum_inclusion_fr_Hz is not None
+            if (use_shared_aclus_only_templates):
+                track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # shared-only
+            else:
+                track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only
+
+            decoders_dict = track_templates.get_decoders_dict()
+            decoders_dict_keys = list(decoders_dict.keys())
+            a_decoder = list(track_templates.get_decoders_dict().values())[-1]
+            grid_bin_bounds = deepcopy(a_decoder.pf.config.grid_bin_bounds)
+
+            active_display_ctx = active_context.adding_context('display_fn', display_fn_name='track_remapping_diagram')
+
+            def _perform_write_to_file_callback(final_context, fig):
+                if save_figure:
+                    return owning_pipeline_reference.output_figure(final_context, fig)
+                else:
+                    pass # do nothing, don't save
+                
+
+            collector = plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds=grid_bin_bounds, active_context=active_context, perform_write_to_file_callback=_perform_write_to_file_callback, enable_interactivity=True, draw_point_aclu_labels=True)
+
+            return collector
+
+
     @function_attributes(short_name='directional_merged_pfs', tags=['display'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-04 03:27', related_items=[], is_global=True)
     def _display_directional_merged_pfs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
                                         plot_all_directions=True, plot_long_directional=False, plot_short_directional=False, **kwargs):
