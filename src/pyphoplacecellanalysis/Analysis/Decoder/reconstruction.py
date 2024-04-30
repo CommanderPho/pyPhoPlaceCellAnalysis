@@ -386,7 +386,11 @@ class Zhang_Two_Step:
 
 @custom_define(slots=False, repr=False)
 class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
-    """ Values for a single epoch. Class to hold debugging information for a transformation process """
+    """ Values for a single epoch. Class to hold debugging information for a transformation process
+     
+      from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+       
+    """
     p_x_given_n: NDArray = non_serialized_field()
     epoch_info_tuple: Tuple = non_serialized_field()
 
@@ -406,6 +410,12 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     # start_point: Tuple[float, float] = field()
     # end_point: Tuple[float, float] = field()
     # band_width: float = field()
+
+    @property
+    def n_xbins(self):
+        """The n_xbins property."""
+        return np.shape(self.p_x_given_n)[0]
+    
 
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes
