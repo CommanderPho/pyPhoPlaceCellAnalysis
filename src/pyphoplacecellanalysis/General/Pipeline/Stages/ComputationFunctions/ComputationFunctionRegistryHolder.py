@@ -1,6 +1,45 @@
 from pyphocorehelpers.mixins.auto_registering import RegistryHolder
 from typing import Dict
 
+
+def global_function(is_global:bool=True):
+    """Adds function attributes to a function that marks it as global
+
+    ```python
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import global_function
+
+        @global_function()
+        def _perform_time_dependent_pf_sequential_surprise_computation(computation_result, debug_print=False):
+            # function body
+    ```
+
+    func.is_global
+    """
+    def decorator(func):
+        func.is_global = is_global
+        return func
+    return decorator
+
+def computation_precidence_specifying_function(overriden_computation_precidence: float):
+    """Adds function attributes to a function that marks it as global
+
+    ```python
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import computation_precidence_specifying_function
+
+        @global_function()
+        def _perform_time_dependent_pf_sequential_surprise_computation(computation_result, debug_print=False):
+            # function body
+    ```
+
+    func.is_global
+    """
+    def decorator(func):
+        func.computation_precidence = overriden_computation_precidence
+        return func
+    return decorator
+
+
+
 class ComputationFunctionRegistryHolder(RegistryHolder):
     REGISTRY: Dict[str, "ComputationFunctionRegistryHolder"] = {}
     
@@ -18,6 +57,7 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
     def get_global_registry_items(cls):
         """ ensures that registry items are returned sorted by their ._computationPrecidence """
         return {k:v for k,v in cls.get_registry().items() if v._is_global}
+
 
     
     @classmethod
@@ -54,6 +94,54 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
             
         return out_dict
     
+
+
+
+    @classmethod
+    def get_ordered_registry_items_functions_list(cls, include_local:bool = True, include_global: bool = True, absolute_flat_path_keys=False, applying_disable_dict=None):
+        """Returns a computationPrecidence ordered hierarchy of registry items and their children
+
+        Args:
+            absolute_flat_path_keys (bool, optional): _description_. Defaults to False.
+            applying_disable_dict (dict, optional): a dictionary to exclude returned items 
+        Returns:
+            _type_: _description_
+        """
+        out_dict = {}
+        for (a_computation_class_name, a_computation_class) in reversed(cls.get_registry().items()):
+            if not absolute_flat_path_keys:
+                curr_class_relative_out_dict = {}
+            
+            for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
+                if not absolute_flat_path_keys:
+                    # Relative dict mode:
+                    curr_class_relative_out_dict[a_computation_fn_name] = a_computation_fn
+
+                else:
+                    curr_absolute_path_list = [a_computation_class_name, a_computation_fn_name]
+                    curr_absolute_path_key = '.'.join(curr_absolute_path_list)
+                    out_dict[curr_absolute_path_key] = a_computation_fn # absolute path
+                    
+            if not absolute_flat_path_keys:
+                out_dict[a_computation_class_name] = curr_class_relative_out_dict
+            
+        if applying_disable_dict is not None:
+            # Must apply disable dict:
+            out_dict = cls.applying_disable_dict(out_dict, applying_disable_dict)
+            
+        return out_dict
+    
+
+
+        # # Non-Global Items:
+        # for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_non_global_registry_items().items()):
+        #     for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
+        #         self.register_computation(a_computation_fn_name, a_computation_fn, is_global=False)
+        # # Global Items:
+        # for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_global_registry_items().items()):
+        #     for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
+        #         self.register_computation(a_computation_fn_name, a_computation_fn, is_global=True)
+                
     
     
     @classmethod

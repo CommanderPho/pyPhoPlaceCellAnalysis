@@ -14,7 +14,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingResult, LeaveOneOutDecodingAnalysisResult, _analyze_leave_one_out_decoding_results ## !!DO_NOT_REMOVE_DILL!! 2023-05-26 - Required to unpickle pipelines, imported just for dill compatibility
 
