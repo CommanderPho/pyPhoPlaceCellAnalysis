@@ -92,6 +92,7 @@ class SpecificComputationValidator:
     short_name:str = field() # 'long_short_post_decoding'
     computation_fn_name:str = field() # '_perform_long_short_post_decoding_analysis'
     validate_computation_test:Callable = field(repr=False) # lambda curr_active_pipeline, computation_filter_name='maze'
+    computation_precidence: float = field()
     results_specification: SpecificComputationResultsSpecification = field(default=Factory(SpecificComputationResultsSpecification), repr=False) # (provides_global_keys=['DirectionalMergedDecoders']) # results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders'])
     computation_fn_kwargs:dict = field(default=Factory(dict), repr=True)  # {'perform_cache_load': False}]`
     is_global:bool = field(default=False)
@@ -131,8 +132,11 @@ class SpecificComputationValidator:
                 results_specification = SpecificComputationResultsSpecification(provides_global_keys=list(a_fn.provides_global_keys))
             if hasattr(a_fn, 'requires_global_keys') and (a_fn.requires_global_keys is not None):
                 results_specification.requires_global_keys = a_fn.requires_global_keys
-    
-        return cls(short_name=a_fn.short_name, computation_fn_name=a_fn.__name__, validate_computation_test=a_fn.validate_computation_test, results_specification=results_specification, is_global=a_fn.is_global)
+
+        assert (hasattr(a_fn, 'computation_precidence') and (a_fn.computation_precidence is not None))
+        computation_precidence = a_fn.computation_precidence
+
+        return cls(short_name=a_fn.short_name, computation_fn_name=a_fn.__name__, validate_computation_test=a_fn.validate_computation_test, results_specification=results_specification, computation_precidence=computation_precidence, is_global=a_fn.is_global)
 
     def does_name_match(self, name_str: str) -> bool:
         """ checks if either short_name or computation_name"""        
