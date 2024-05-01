@@ -404,6 +404,8 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     marginal_x: NDArray = non_serialized_field()
     marginal_y: Optional[NDArray] = non_serialized_field()
 
+    epoch_data_index: Optional[int] = non_serialized_field()
+
     # active_num_neighbors: int = serialized_attribute_field()
     # active_neighbors_arr: List = field()
 
@@ -449,7 +451,55 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return f"{type(self).__name__}({content}\n)"
     
 
+    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=200, desired_width=None, skip_img_normalization=True):
+        """ gets the posterior as a colormapped image 
+        
+        Usage:
 
+            posterior_image = active_captured_single_epoch_result.get_posterior_as_image(desired_height=400)
+            posterior_image
+
+
+        """
+        from pyphocorehelpers.plotting.media_output_helpers import get_array_as_image
+
+        if self.epoch_data_index is not None:
+            epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+        else:
+            epoch_id_str = f"{epoch_id_identifier_str}"
+
+        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization)
+
+
+    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=100, desired_width=None, skip_img_normalization=True):
+        """ saves the posterior to disk
+        
+        Usage:
+
+            posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder='output', desired_height=400)
+            posterior_image
+
+
+        """
+        from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image
+
+        if isinstance(parent_array_as_image_output_folder, str):
+            parent_array_as_image_output_folder = Path(parent_array_as_image_output_folder).resolve()
+        assert parent_array_as_image_output_folder.exists()
+        
+        if self.epoch_data_index is not None:
+            epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+        else:
+            epoch_id_str = f"{epoch_id_identifier_str}"
+
+        _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}.png').resolve()
+        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, out_path=_img_path)
+        image_raw, path_raw = raw_tuple
+        return image_raw, path_raw
+
+        
 
 @custom_define(slots=False, repr=False)
 class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
@@ -512,7 +562,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         a_posterior = self.p_x_given_n_list[active_epoch_idx].copy()
         active_epoch_info_tuple = tuple(self.active_filter_epochs.itertuples(name='EpochTuple'))[active_epoch_idx]
 
-        single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult(**values_dict, epoch_info_tuple=active_epoch_info_tuple)
+        single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult(**values_dict, epoch_info_tuple=active_epoch_info_tuple, epoch_data_index=active_epoch_idx)
     
         return single_epoch_result
     
