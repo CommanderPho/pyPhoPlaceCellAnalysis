@@ -105,6 +105,12 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             
         NOTE:
             Label for `title` is too large, needs to changed to a smaller font
+
+
+        from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+        out = BasicBinnedImageRenderingWindow(active_eloy_analysis.avg_2D_speed_per_pos, active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity')
+
+
     """
 
     @property
