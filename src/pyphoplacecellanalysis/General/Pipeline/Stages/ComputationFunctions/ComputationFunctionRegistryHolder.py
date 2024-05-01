@@ -60,7 +60,7 @@ def global_function(is_global:bool=True):
     return decorator
 
 def computation_precidence_specifying_function(overriden_computation_precidence: float):
-    """Adds function attributes to a function that marks it as global
+    """Adds function attributes to a function that specify its computation_precidence
 
     ```python
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import computation_precidence_specifying_function

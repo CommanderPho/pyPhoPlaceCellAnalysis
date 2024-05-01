@@ -392,7 +392,7 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
                             if _comp_specifier.short_name not in needs_computation_output_dict:
                                 needs_computation_output_dict[_comp_specifier.short_name] = {}
 
-                            needs_computation_output_dict[_comp_specifier.short_name][a_computation_filter_name] = True
+                            needs_computation_output_dict[_comp_specifier.short_name][a_computation_filter_name] = _comp_specifier.computation_precidence
 
                 else:
                     # Global-Only:
@@ -404,7 +404,9 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
 
                     needs_compute: bool = (not has_valid_computation)
                     if needs_compute:
-                        needs_computation_output_dict[_comp_specifier.short_name] = True
+                        needs_computation_output_dict[_comp_specifier.short_name] = _comp_specifier.computation_precidence
+
+                        
 
                 ## ENDIF is_global
                         
