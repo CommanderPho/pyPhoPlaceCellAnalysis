@@ -111,8 +111,8 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
                                         global_all_exclude_list=['PBE_stats']) -> Tuple[List[str], List[str]]:
         """ Gets the hardcoded or dynamically loaded computation names
         
-        
-        non_global_comp_names, global_comp_names = get_all_batch_computation_names(curr_active_pipeline)
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+        non_global_comp_names, global_comp_names = ComputationFunctionRegistryHolder.get_all_batch_computation_names()
         
         
         """
