@@ -95,7 +95,7 @@ def get_all_batch_computation_names():
     """ Gets the hardcoded or dynamically loaded computation names
     
     
-    non_global_comp_names, global_comp_names = get_all_batch_computation_names(curr_active_pipeline)
+    non_global_comp_names, global_comp_names = get_all_batch_computation_names()
     
     
     """
@@ -461,7 +461,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
 
     ## Get the names of the global and non-global computations:
-    non_global_comp_names, global_comp_names = get_all_batch_computation_names(curr_active_pipeline)
+    non_global_comp_names, global_comp_names = get_all_batch_computation_names()
     
     if include_includelist is None:
         # include all:
