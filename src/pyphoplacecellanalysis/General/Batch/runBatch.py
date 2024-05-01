@@ -57,11 +57,11 @@ def build_batch_processing_session_task_identifier(session_context: IdentifyingC
     ## Get runtime:
     if include_runtime:
         runtime_start_str: str = f'{datetime.now().strftime("%Y%m%d%H%M%S")}'
-        return f"{hostname}.{session_component}.{runtime_start_str}"    
+        return f"{runtime_start_str}.{hostname}.{session_component}"    
     else:
         return f"{hostname}.{session_component}"
 
-@function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
+@function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=['build_batch_processing_session_task_identifier'], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
 def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), 
                             logging_root_FQDN: str = f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch',
                             include_curr_time_str: bool = True,

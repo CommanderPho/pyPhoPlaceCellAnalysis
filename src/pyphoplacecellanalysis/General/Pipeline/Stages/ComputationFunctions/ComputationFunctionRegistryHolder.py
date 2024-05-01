@@ -200,20 +200,6 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
         return out_dict
     
 
-
-        # # Non-Global Items:
-        # for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_non_global_registry_items().items()):
-        #     for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
-        #         self.register_computation(a_computation_fn_name, a_computation_fn, is_global=False)
-        # # Global Items:
-        # for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_global_registry_items().items()):
-        #     for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
-        #         self.register_computation(a_computation_fn_name, a_computation_fn, is_global=True)
-                
-    
-    
-
-
     # Disable Dicts ______________________________________________________________________________________________________ #
     @classmethod
     def applying_disable_dict(cls, rel_compuitations_functions_list, disable_dict):

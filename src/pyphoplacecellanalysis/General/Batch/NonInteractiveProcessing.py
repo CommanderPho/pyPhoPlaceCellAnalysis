@@ -336,7 +336,7 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
     force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
 
     ## Get the names of the global and non-global computations:
-    non_global_comp_names, global_comp_names = get_all_batch_computation_names(curr_active_pipeline)
+    non_global_comp_names, global_comp_names = get_all_batch_computation_names()
     
     if include_includelist is None:
         # include all:
@@ -370,7 +370,6 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
     ## Hardcoded comp_specifiers
     _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
     # ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
-    # _comp_specifiers = reversed(_comp_specifiers)
 
     remaining_include_function_names = {k:False for k in include_includelist.copy()}
 
@@ -497,8 +496,6 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     ## Hardcoded comp_specifiers
     _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
     ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
-    # _comp_specifiers = reversed(_comp_specifiers)
-    # _comp_specifiers = list(reversed(_comp_specifiers))
 
     ## apply arbitrary sort:
     _comp_specifier_dict = {_comp_specifier.short_name:_comp_specifier for _comp_specifier in _comp_specifiers}
