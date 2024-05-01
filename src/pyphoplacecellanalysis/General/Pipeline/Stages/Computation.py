@@ -3,7 +3,7 @@ import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
 import typing
-from typing import Optional, Dict, List, Tuple, Union
+from typing import Callable, Optional, Dict, List, Tuple, Union
 from warnings import warn
 import numpy as np
 import pandas as pd
@@ -142,31 +142,31 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         return self._get_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
 
     @property
-    def registered_computation_functions(self):
+    def registered_computation_functions(self) -> List[Callable]:
         return list(self.registered_computation_function_dict.values())
     @property
-    def registered_computation_function_names(self):
+    def registered_computation_function_names(self) -> List[str]:
         return list(self.registered_computation_function_dict.keys()) 
 
 
     @property
-    def registered_global_computation_functions(self):
+    def registered_global_computation_functions(self) -> List[Callable]:
         return list(self.registered_global_computation_function_dict.values())
     @property
-    def registered_global_computation_function_names(self):
+    def registered_global_computation_function_names(self) -> List[str]:
         return list(self.registered_global_computation_function_dict.keys()) 
 
 
     # 'merged' refers to the fact that both global and non-global computation functions are included _____________________ #
     @property
-    def registered_merged_computation_function_dict(self):
+    def registered_merged_computation_function_dict(self) -> Dict[str, Callable]:
         """build a merged function dictionary containing both global and non-global functions:"""
         return (self.registered_global_computation_function_dict | self.registered_computation_function_dict)
     @property
-    def registered_merged_computation_functions(self):
+    def registered_merged_computation_functions(self) -> List[Callable]:
         return list(self.registered_merged_computation_function_dict.values())
     @property
-    def registered_merged_computation_function_names(self):
+    def registered_merged_computation_function_names(self) -> List[str]:
         return list(self.registered_merged_computation_function_dict.keys()) 
 
 
@@ -186,7 +186,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 self.register_computation(a_computation_fn_name, a_computation_fn, is_global=True)
 
         
-    def register_computation(self, registered_name, computation_function, is_global:bool):
+    def register_computation(self, registered_name: str, computation_function, is_global:bool):
         # Set the .is_global attribute on the function object itself, since functions are 1st-class objects in Python:
         computation_function.is_global = is_global
 
@@ -970,22 +970,22 @@ class PipelineWithComputedPipelineStageMixin:
         return self.stage.active_incomplete_computation_result_status_dicts
     
     @property
-    def registered_computation_functions(self):
+    def registered_computation_functions(self) -> List[Callable]:
         """The registered_computation_functions property."""
         return self.stage.registered_computation_functions
         
     @property
-    def registered_computation_function_names(self):
+    def registered_computation_function_names(self) -> List[str]:
         """The registered_computation_function_names property."""
         return self.stage.registered_computation_function_names
     
     @property
-    def registered_computation_function_dict(self):
+    def registered_computation_function_dict(self) -> Dict[str, Callable]:
         """The registered_computation_function_dict property can be used to get the corresponding function from the string name."""
         return self.stage.registered_computation_function_dict
     
     @property
-    def registered_computation_function_docs_dict(self):
+    def registered_computation_function_docs_dict(self) -> Dict[str, str]:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_computation_function_dict.items()}
 
@@ -1008,36 +1008,36 @@ class PipelineWithComputedPipelineStageMixin:
     #     return self.stage._get_global_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
     
     @property
-    def registered_global_computation_functions(self):
+    def registered_global_computation_functions(self) -> List[Callable]:
         """The registered_global_computation_functions property."""
         return self.stage.registered_global_computation_functions
         
     @property
-    def registered_global_computation_function_names(self):
+    def registered_global_computation_function_names(self) -> List[str]:
         """The registered_global_computation_function_names property."""
         return self.stage.registered_global_computation_function_names
     
     @property
-    def registered_global_computation_function_dict(self):
+    def registered_global_computation_function_dict(self) -> Dict[str, Callable]:
         """The registered_global_computation_function_dict property can be used to get the corresponding function from the string name."""
         return self.stage.registered_global_computation_function_dict
     
     @property
-    def registered_global_computation_function_docs_dict(self):
+    def registered_global_computation_function_docs_dict(self) -> Dict[str, str]:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_global_computation_function_dict.items()}
     
 
     # 'merged' refers to the fact that both global and non-global computation functions are included _____________________ #
     @property
-    def registered_merged_computation_function_dict(self):
+    def registered_merged_computation_function_dict(self) -> Dict[str, Callable]:
         """build a merged function dictionary containing both global and non-global functions:"""
         return self.stage.registered_merged_computation_function_dict
     @property
-    def registered_merged_computation_functions(self):
+    def registered_merged_computation_functions(self) -> List[Callable]:
         return self.stage.registered_merged_computation_functions
     @property
-    def registered_merged_computation_function_names(self):
+    def registered_merged_computation_function_names(self) -> List[str]:
         return self.stage.registered_merged_computation_function_names
 
     def get_merged_computation_function_validators(self) -> Dict[str, SpecificComputationValidator]:
