@@ -176,14 +176,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         # Sort by precidence:
             _computationPrecidence
         """
-        # Non-Global Items:
-        for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_non_global_registry_items().items()):
-            for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
-                self.register_computation(a_computation_fn_name, a_computation_fn, is_global=False)
-        # Global Items:
-        for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_global_registry_items().items()):
-            for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
-                self.register_computation(a_computation_fn_name, a_computation_fn, is_global=True)
+        for (a_computation_fn_key, a_computation_fn) in ComputationFunctionRegistryHolder.get_ordered_registry_items_functions(include_local=True, include_global=True):
+                self.register_computation(a_computation_fn.__name__, a_computation_fn, is_global=a_computation_fn.is_global)
+
 
         
     def register_computation(self, registered_name: str, computation_function, is_global:bool):

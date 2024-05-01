@@ -21,6 +21,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.exception_helpers import CapturedException, ExceptionPrintingContext
 
 # pyPhoPlaceCellAnalysis:
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import SplitPartitionMembership # needed for batch_extended_computations, batch_programmatic_figures
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import programmatic_display_to_PDF, programmatic_render_to_file
@@ -90,7 +91,7 @@ filters should be checkable to express whether we want to build that one or not
     #     raise e
 
 
-def get_all_batch_computation_names(curr_active_pipeline):
+def get_all_batch_computation_names():
     """ Gets the hardcoded or dynamically loaded computation names
     
     
@@ -98,17 +99,30 @@ def get_all_batch_computation_names(curr_active_pipeline):
     
     
     """
+    
+
     # all_validators_dict = curr_active_pipeline.get_merged_computation_function_validators()
     # global_only_validators_dict = {k:v for k, v in all_validators_dict.items() if v.is_global}
     # non_global_only_validators_dict = {k:v for k, v in all_validators_dict.items() if (not v.is_global)}
     # non_global_comp_names: List[str] = [v.short_name for k, v in non_global_only_validators_dict.items() if (not v.short_name.startswith('_DEP'))] # ['firing_rate_trends', 'spike_burst_detection', 'pf_dt_sequential_surprise', 'extended_stats', 'placefield_overlap', 'ratemap_peaks_prominence2d', 'velocity_vs_pf_simplified_count_density', 'EloyAnalysis', '_perform_specific_epochs_decoding', 'recursive_latent_pf_decoding', 'position_decoding_two_step', 'position_decoding', 'lap_direction_determination', 'pfdt_computation', 'pf_computation']
     # global_comp_names: List[str] = [v.short_name for k, v in global_only_validators_dict.items() if (not v.short_name.startswith('_DEP'))] # ['long_short_endcap_analysis', 'long_short_inst_spike_rate_groups', 'long_short_post_decoding', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_decoding_analyses', 'PBE_stats', 'rank_order_shuffle_analysis', 'directional_decoders_epoch_heuristic_scoring', 'directional_decoders_evaluate_epochs', 'directional_decoders_decode_continuous', 'merged_directional_placefields', 'split_to_directional_laps']
 
-    ## Hardcoded names of all possible global/non-global computation functions:
-    non_global_comp_names = ['lap_direction_determination', 'pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
-    global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'pf_dt_sequential_surprise', 'long_short_endcap_analysis',
-                         'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis', 'directional_train_test_split', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'] # , 'long_short_rate_remapping'
-    return non_global_comp_names, global_comp_names
+    # ## Hardcoded names of all possible global/non-global computation functions:
+    # non_global_comp_names = ['lap_direction_determination', 'pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
+    # global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'long_short_endcap_analysis',
+    #                      'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis', 'directional_train_test_split', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'] # , 'long_short_rate_remapping'
+
+
+    # _non_global_comp_names = ['lap_direction_determination', 'pf_computation', 'pfdt_computation', 'firing_rate_trends', 'pf_dt_sequential_surprise', 'ratemap_peaks_prominence2d', 'position_decoding', 'position_decoding_two_step', 'spike_burst_detection']
+    # _global_comp_names = ['long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_rate_remapping', 'long_short_inst_spike_rate_groups', 'long_short_endcap_analysis',
+    #                     'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis', 'directional_train_test_split', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'] # , 'long_short_rate_remapping'
+
+
+    ## functions to exclude from the outputs:
+    non_global_all_exclude_list = ['EloyAnalysis', '_DEP_ratemap_peaks', '_perform_specific_epochs_decoding', 'extended_stats', 'placefield_overlap', 'recursive_latent_pf_decoding', 'velocity_vs_pf_simplified_count_density']
+    global_all_exclude_list = ['PBE_stats']
+    return ComputationFunctionRegistryHolder.get_all_computation_fn_names(non_global_all_exclude_list=non_global_all_exclude_list,
+                                                                           global_all_exclude_list=global_all_exclude_list)
 
 
 
@@ -355,8 +369,8 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
 
     ## Hardcoded comp_specifiers
     _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
-    ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
-    _comp_specifiers = reversed(_comp_specifiers)
+    # ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
+    # _comp_specifiers = reversed(_comp_specifiers)
 
     remaining_include_function_names = {k:False for k in include_includelist.copy()}
 
@@ -450,7 +464,6 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     ## Get the names of the global and non-global computations:
     non_global_comp_names, global_comp_names = get_all_batch_computation_names(curr_active_pipeline)
     
-
     if include_includelist is None:
         # include all:
         include_includelist = non_global_comp_names + global_comp_names
@@ -485,13 +498,16 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
     ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
     # _comp_specifiers = reversed(_comp_specifiers)
-    _comp_specifiers = list(reversed(_comp_specifiers))
+    # _comp_specifiers = list(reversed(_comp_specifiers))
+
     ## apply arbitrary sort:
     _comp_specifier_dict = {_comp_specifier.short_name:_comp_specifier for _comp_specifier in _comp_specifiers}
-    move_to_end_names = ['directional_train_test_split', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring']
-    _comp_specifier_dict = reorder_keys_relative(_comp_specifier_dict, key_names=move_to_end_names, relative_mode='end') # list(filter(lambda column: column.endswith('_peak_heights'), existing_columns))
+    # move_to_end_names = ['directional_train_test_split', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring']
+    # _comp_specifier_dict = reorder_keys_relative(_comp_specifier_dict, key_names=move_to_end_names, relative_mode='end') # list(filter(lambda column: column.endswith('_peak_heights'), existing_columns))
     # back to list
     _comp_specifiers = list(_comp_specifier_dict.values())
+
+
 
     remaining_include_function_names = {k:False for k in include_includelist.copy()}
 
