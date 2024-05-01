@@ -19,6 +19,8 @@ from enum import Enum, unique  # SessionBatchProgress
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.print_helpers import get_now_time_precise_str
+from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
+
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -42,26 +44,16 @@ from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import generate
 
 from pyphocorehelpers.Filesystem.path_helpers import copy_movedict
 
+
+
+
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
 def get_file_str_if_file_exists(v:Path)->str:
     """ returns the string representation of the resolved file if it exists, or the empty string if not """
     return (str(v.resolve()) if v.exists() else '')
 
-def build_batch_processing_session_task_identifier(session_context: IdentifyingContext, include_runtime: bool=False) -> str:
-    """ Builds an identifier string for logging task progress like 'LNX00052.kdiba.gor01.two.2006-6-07_16-40-19' """
-    import socket
-    hostname: str = socket.gethostname() # get the system's hostname
-    # print(f"Hostname: {hostname}") # Hostname: LNX00052
-    session_component: str = session_context.get_description(separator='.') # 'kdiba.gor01.two.2006-6-07_16-40-19'
-    ## Get runtime:
-    if include_runtime:
-        runtime_start_str: str = f'{datetime.now().strftime("%Y%m%d%H%M%S")}'
-        return f"{runtime_start_str}.{hostname}.{session_component}"    
-    else:
-        return f"{hostname}.{session_component}"
-
-@function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=['build_batch_processing_session_task_identifier'], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
+@function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=['build_run_log_task_identifier', 'build_logger'], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
 def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), 
                             logging_root_FQDN: str = f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch',
                             include_curr_time_str: bool = True,
@@ -88,57 +80,10 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
     """
     # logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] %(name)s [%(levelname)-5.5s]  %(message)s")
     logFormatter = logging.Formatter("%(relativeCreated)d %(name)s]  [%(levelname)-5.5s]  %(message)s")
-    
-    batch_processing_session_task_identifier:str = build_batch_processing_session_task_identifier(session_context, include_runtime=False)
-    if additional_suffix is not None:
-        batch_processing_session_task_identifier = f"{batch_processing_session_task_identifier}.{additional_suffix.lstrip('.')}"
-        
-    logger_resolved_FQDN_parts_array = []
+    logger_full_task: str = build_run_log_task_identifier(run_context=session_context, logging_root_FQDN=logging_root_FQDN, include_curr_time_str=include_curr_time_str,
+                                                          include_hostname=True, additional_suffix=additional_suffix)
 
-    if include_curr_time_str:
-        curr_time_str: str = get_now_time_precise_str()
-        logger_resolved_FQDN_parts_array.append(curr_time_str)
-
-    if (logging_root_FQDN is not None) and (len(logging_root_FQDN) > 0):
-        logger_resolved_FQDN_parts_array.append(logging_root_FQDN)
-
-    logger_resolved_FQDN_parts_array.append(batch_processing_session_task_identifier) ## append the session name
-
-
-    logger_full_task: str = '.'.join(logger_resolved_FQDN_parts_array)
-
-    batch_task_logger: logging.Logger = logging.getLogger(logger_full_task) # create logger
-    print(f'build_batch_task_logger(module_name="{batch_processing_session_task_identifier}"):')
-    if debug_print:
-        print(f'\t batch_task_logger.handlers: {batch_task_logger.handlers}')
-    batch_task_logger.handlers = []
-    # batch_task_logger.removeHandler()
-
-    if file_logging_dir is not None:
-        # file logging enabled:
-        if file_logging_dir.is_file():
-            # file_logging_dir is an entire logging file:
-            module_logging_path = file_logging_dir.resolve()
-            file_logging_dir = module_logging_path.parent.resolve() # get the parent of the log file provided as the logging directory
-        else:
-            # file_logging_dir = Path('EXTERNAL/TESTING/Logging') # 'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\TESTING\Logging'
-            module_logging_path = file_logging_dir.joinpath(f'debug_{batch_task_logger.name}.log') # batch_task_logger.name # 'com.PhoHale.Spike3D.notebook'
-
-        # Create logging directory if it doesn't exist
-        file_logging_dir.mkdir(parents=True, exist_ok=True)
-
-        # File Logging:    
-        print(f'\t Batch Task logger "{batch_task_logger.name}" has file logging enabled and will log to "{str(module_logging_path)}"')
-        fileHandler: logging.FileHandler = logging.FileHandler(module_logging_path)
-        fileHandler.setFormatter(logFormatter)
-        
-        # fileHandler.baseFilename
-        batch_task_logger.addHandler(fileHandler)
-
-    # consoleHandler = logging.StreamHandler(sys.stdout)
-    # consoleHandler.setFormatter(logFormatter)
-    # # batch_task_logger.addHandler(consoleHandler)
-
+    batch_task_logger: logging.Logger = build_logger(full_logger_string=logger_full_task, file_logging_dir=file_logging_dir, logFormatter=logFormatter, debug_print=False)
     # General Logger Setup:
     batch_task_logger.setLevel(logging.DEBUG)
     batch_task_logger.info(f'==========================================================================================\n========== Module Logger INIT "{batch_task_logger.name}" ==============================')
