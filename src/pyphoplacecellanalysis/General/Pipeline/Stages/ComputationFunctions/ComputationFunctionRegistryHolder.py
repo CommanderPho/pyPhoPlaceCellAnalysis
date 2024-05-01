@@ -3,6 +3,8 @@ from typing import Dict, Callable, List, Tuple
 
 """
 Computation order is determined by `computation_precidence`.
+    Conceptually a higher computation_precidence value indicates that a function needs to be computed BEFORE lower-valued functions.
+        `computation_precidence` == priority
 
 Each computation functions class has its own `._computationPrecidence`.
 All of its functions get their `.computation_precidence` based on the order that they are defined in the class, with the earliest-running functions appearing at the top of the class.
@@ -149,7 +151,7 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
             # if not absolute_flat_path_keys:
             #     curr_class_relative_out_dict = {}
                 
-            curr_all_computation_functions = list(reversed(a_computation_class.get_all_functions(use_definition_order=True)))
+            curr_all_computation_functions = list(reversed(a_computation_class.get_all_functions(use_definition_order=True))) # reversed definition order means that functions at the bottom of the class are given the lowest precidence, while those at the top are given the highest (and will be computed first)
             class_num_computations: int = len(curr_all_computation_functions)
             # not going to have more than 100 computation functions ever
             assert class_num_computations < 100, f"100 is the max number of functions a class can have right now. Change the default_computation_precidence_step_size: float = 0.001 to have 1000."
@@ -183,7 +185,8 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
                 
 
         ## now they all have computation precidence, sort them accordingly:
-        out_dict = dict(sorted(out_dict.items(), key=lambda item: float(item[1].computation_precidence)))
+        # out_dict = dict(sorted(out_dict.items(), key=lambda item: float(item[1].computation_precidence)))
+        out_dict = dict(sorted(out_dict.items(), key=lambda item: float(item[1].computation_precidence), reverse=True)) # I think we need reverse=True so that the highest precidence items are first in the list and they descend in order.
         
         if applying_disable_dict is not None:
             # Must apply disable dict:
