@@ -186,7 +186,7 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
 
         ## now they all have computation precidence, sort them accordingly:
         # out_dict = dict(sorted(out_dict.items(), key=lambda item: float(item[1].computation_precidence)))
-        out_dict = dict(sorted(out_dict.items(), key=lambda item: float(item[1].computation_precidence), reverse=True)) # I think we need reverse=True so that the highest precidence items are first in the list and they descend in order.
+        out_dict = dict(sorted(out_dict.items(), key=lambda item: float(item[1].computation_precidence), reverse=False)) # I think we need reverse=True so that the highest precidence items are first in the list and they descend in order.
         
         if applying_disable_dict is not None:
             # Must apply disable dict:
