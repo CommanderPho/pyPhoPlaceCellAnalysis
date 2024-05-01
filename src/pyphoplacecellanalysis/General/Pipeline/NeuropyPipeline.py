@@ -53,7 +53,6 @@ from qtpy import QtCore, QtWidgets, QtGui
 
 # Pipeline Logging:
 import logging
-# from pyphocorehelpers.print_helpers import build_module_logger
 
 
 
@@ -598,8 +597,10 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         super(NeuropyPipeline, self).__init__() # from 
         
+        
         # Restore unpickable properties:
-        self._logger = build_module_logger('Spike3D.pipeline', file_logging_dir=None, debug_print=False)
+        task_id: str = build_run_log_task_identifier(self.get_session_context(), logging_root_FQDN='pipeline') # '2024-05-01_14-05-26.Apogee.Spike3D.test'
+        self._logger = build_logger(full_logger_string=task_id, file_logging_dir=None, debug_print=False)
         self._logger.info(f'NeuropyPipeline.__setstate__(state="{state}")') # AttributeError: 'DisplayPipelineStage' object has no attribute 'identity'
 
         self._persistance_state = None # the pickle_path has to be set manually after loading
