@@ -11,6 +11,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 import pyvista as pv
 import pyvistaqt as pvqt
 
+from neuropy.utils.dynamic_container import override_dict
 from neuropy.utils.matplotlib_helpers import plot_position_curves_figure # for plot_laps_2d
 
 from pyphocorehelpers.function_helpers import function_attributes
@@ -208,6 +209,8 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     Called by:
         estimation_session_laps
     """
+
+
     # Passed 'even_lap_kwargs', 'odd_lap_kwargs' are to `_plot_helper_render_laps` when rendering the laps
     default_even_lap_kwargs = dict(color=DisplayColorsEnum.Laps.RL, include_highlight=True) # a yellowish-green
     default_odd_lap_kwargs = dict(color=DisplayColorsEnum.Laps.LR, include_highlight=True) # a purplish-royal-blue
@@ -219,8 +222,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     pos_df = position_obj.to_dataframe()
     
     curr_laps_df = sess.laps.to_dataframe()
-    
-    fig, out_axes_list = plot_position_curves_figure(position_obj, **(dict(include_velocity=True, include_accel=False, figsize=(24, 10)) | kwargs)) #include_velocity=True, include_accel=True, figsize=(24, 10))
+    fig, out_axes_list = plot_position_curves_figure(position_obj, **(override_dict(dict(include_velocity=True, include_accel=False, figsize=(24, 10)), kwargs))) #include_velocity=True, include_accel=True, figsize=(24, 10))
 
     ## Draw on top of the existing position curves with the lap colors:
     if legacy_plotting_mode:
