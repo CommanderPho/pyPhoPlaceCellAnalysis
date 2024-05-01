@@ -176,7 +176,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         # Sort by precidence:
             _computationPrecidence
         """
-        for (a_computation_fn_key, a_computation_fn) in ComputationFunctionRegistryHolder.get_ordered_registry_items_functions(include_local=True, include_global=True):
+        for (a_computation_fn_key, a_computation_fn) in ComputationFunctionRegistryHolder.get_ordered_registry_items_functions(include_local=True, include_global=True).items():
                 self.register_computation(a_computation_fn.__name__, a_computation_fn, is_global=a_computation_fn.is_global)
 
 
@@ -796,7 +796,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             if fail_on_exception:
                 ## normal version that fails on any exception:
                 total_num_funcs = len(active_computation_functions)
-                for i, f in enumerate(reversed(active_computation_functions)):
+                for i, f in enumerate(active_computation_functions):
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
                     previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i])
@@ -814,7 +814,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 accumulated_errors = dict() # empty list for keeping track of exceptions
                 
                 total_num_funcs = len(active_computation_functions)
-                for i, f in enumerate(reversed(active_computation_functions)):
+                for i, f in enumerate(active_computation_functions):
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
                     try:
