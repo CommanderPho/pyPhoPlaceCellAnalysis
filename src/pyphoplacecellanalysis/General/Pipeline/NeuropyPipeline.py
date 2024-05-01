@@ -30,6 +30,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.hashing_helpers import get_hash_tuple, freeze
 from pyphocorehelpers.mixins.diffable import DiffableObject
 from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
 from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
@@ -48,13 +49,13 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import OutputsSpecifier
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
-
-
 from qtpy import QtCore, QtWidgets, QtGui
 
 # Pipeline Logging:
 import logging
-from pyphocorehelpers.print_helpers import build_module_logger
+# from pyphocorehelpers.print_helpers import build_module_logger
+
+
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PipelineSavingScheme
 
@@ -141,7 +142,10 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.session_data_type = None
         self._stage = None
 
-        self._logger = build_module_logger('Spike3D.pipeline', file_logging_dir=None, debug_print=False)
+
+        session_identifier: str = f"{name}.{session_data_type}"
+        task_id: str = build_run_log_task_identifier(session_identifier, logging_root_FQDN='pipeline') # '2024-05-01_14-05-26.Apogee.Spike3D.test'
+        self._logger = build_logger(full_logger_string=task_id, file_logging_dir=None, debug_print=False)
         self._logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
         
         self._persistance_state = None # indicate that this pipeline doesn't have a corresponding pickle file that it was loaded from
