@@ -167,11 +167,16 @@ class HeuristicReplayScoring:
         # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
 
-        cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per time bin.
+        cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per pos bin.
         
+        # 2024-04-30 - New Idea - give the animal a "cursor" with which it can sweep the track. This prevents the small jumps in decoder position from messing up the bins.
+
+        
+        
+
         # Determine baseline (uniform) value for equally distributed bins
         uniform_diffusion_prob = (1.0 / float(n_pos_bins)) # equally diffuse everywhere on the track
-        uniform_diffusion_cumprob_all_bins = float(uniform_diffusion_prob) * float(n_time_bins)
+        uniform_diffusion_cumprob_all_bins = float(uniform_diffusion_prob) * float(n_time_bins) # can often be like 0.3 or so. Seems a little high.
 
         is_higher_than_diffusion = (cum_pos_bin_probs > uniform_diffusion_cumprob_all_bins)
 
