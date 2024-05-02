@@ -2294,19 +2294,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
         return df, (long_best_col_name, short_best_col_name, LS_diff_col_name)
         
 
-    @function_attributes(short_name=None, tags=['merged', 'all_scores', 'df', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-14 19:10', related_items=[])
-    def build_complete_all_scores_merged_df(self) -> pd.DataFrame:
-        """ Builds a single merged dataframe from the four separate .filter_epochs dataframes from the result for each decoder, merging them into a single dataframe with ['_long_LR','_long_RL','_short_LR','_short_RL'] suffixes for the combined columns.
-        2024-03-14 19:04 
-
-        Usage:
-            extracted_merged_scores_df = build_complete_all_scores_merged_df(directional_decoders_epochs_decode_result)
-            extracted_merged_scores_df
-
-        """
-        from neuropy.core.epoch import ensure_dataframe
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df
-
+    @classmethod
+    def get_all_scores_column_names(cls) -> Tuple:
         # Column Names _______________________________________________________________________________________________________ #
         basic_df_column_names = ['start', 'stop', 'label', 'duration']
         selection_col_names = ['is_user_annotated_epoch', 'is_valid_epoch']
@@ -2325,6 +2314,65 @@ class DecoderDecodedEpochsResult(ComputedResult):
         all_df_score_column_names: List[str] = decoder_bayes_prob_col_names + radon_transform_col_names + weighted_corr_col_names + pearson_col_names + heuristic_score_col_names 
         all_df_column_names: List[str] = all_df_shared_column_names + all_df_score_column_names ## All included columns, includes the score columns which will not be replicated
 
+        ## Add in the 'wcorr' metrics:
+        merged_conditional_prob_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
+        merged_wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
+
+
+        # ScoresDataFrameColumnNames = attrs.make_class("ScoresDataFrameColumnNames", {k:field() for k in ("all_df_shared_column_names", "all_df_score_column_names", "all_df_column_names",
+        #                                                                                                   "merged_conditional_prob_column_names", "merged_wcorr_column_names", "heuristic_score_col_names")})
+        
+        # return ScoresDataFrameColumnNames(all_df_shared_column_names=all_df_shared_column_names, all_df_score_column_names=all_df_score_column_names, all_df_column_names=all_df_column_names,
+        #             merged_conditional_prob_column_names=merged_conditional_prob_column_names, merged_wcorr_column_names=merged_wcorr_column_names, heuristic_score_col_names=heuristic_score_col_names)
+
+
+        # ScoresDataFrameColumnNames = attrs.make_class("ScoresDataFrameColumnNames", {k:field() for k in ("all_df_shared_column_names", "all_df_score_column_names", "all_df_column_names",
+        #                                                                                                   "merged_conditional_prob_column_names", "merged_wcorr_column_names", "heuristic_score_col_names")})
+        
+        return (all_df_shared_column_names, all_df_score_column_names, all_df_column_names,
+                    merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names)
+
+
+
+
+    @function_attributes(short_name=None, tags=['merged', 'all_scores', 'df', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-14 19:10', related_items=[])
+    def build_complete_all_scores_merged_df(self) -> pd.DataFrame:
+        """ Builds a single merged dataframe from the four separate .filter_epochs dataframes from the result for each decoder, merging them into a single dataframe with ['_long_LR','_long_RL','_short_LR','_short_RL'] suffixes for the combined columns.
+        2024-03-14 19:04 
+
+        Usage:
+            extracted_merged_scores_df = build_complete_all_scores_merged_df(directional_decoders_epochs_decode_result)
+            extracted_merged_scores_df
+
+        """
+        from neuropy.core.epoch import ensure_dataframe
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df
+
+        # # Column Names _______________________________________________________________________________________________________ #
+        # basic_df_column_names = ['start', 'stop', 'label', 'duration']
+        # selection_col_names = ['is_user_annotated_epoch', 'is_valid_epoch']
+
+        # # Score Columns (one value for each decoder) _________________________________________________________________________ #
+        # decoder_bayes_prob_col_names = ['P_decoder']
+
+        # radon_transform_col_names = ['score', 'velocity', 'intercept', 'speed']
+        # weighted_corr_col_names = ['wcorr']
+        # pearson_col_names = ['pearsonr']
+
+        # heuristic_score_col_names = ['travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] # , 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness', 'longest_sequence_length'
+
+        # ## Add in the 'wcorr' metrics:
+        # merged_conditional_prob_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
+        # merged_wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
+
+        # ## All included columns:
+        # all_df_shared_column_names: List[str] = basic_df_column_names + selection_col_names # these are not replicated for each decoder, they're the same for the epoch
+        # all_df_score_column_names: List[str] = decoder_bayes_prob_col_names + radon_transform_col_names + weighted_corr_col_names + pearson_col_names + heuristic_score_col_names 
+        # all_df_column_names: List[str] = all_df_shared_column_names + all_df_score_column_names ## All included columns, includes the score columns which will not be replicated
+
+
+        all_df_shared_column_names, all_df_score_column_names, all_df_column_names, merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names = self.get_all_scores_column_names()
+
         ## Extract the concrete dataframes from the results:
         extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
         ## Merge the dict of four dataframes, one for each decoder, with column names like ['wcorr', 'travel', 'speed'] to a single merged df with suffixed of the dict keys like ['wcorr_long_LR', 'wcorr_long_RL',  ...., 'travel_long_LR', 'travel_long_RL', 'travel_short_LR', 'travel_short_RL', ...]
@@ -2333,10 +2381,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         # `common_shared_portion_df` the columns of the dataframe that is the same for all four decoders
         common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][all_df_shared_column_names]) # copy it from the first dataframe
-
-        ## Add in the 'wcorr' metrics:
-        merged_conditional_prob_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
-        merged_wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
 
         ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
         conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_conditional_prob_column_names]) ## just use the columns from this
@@ -2606,9 +2650,18 @@ def _workaround_validate_has_directional_decoded_epochs_evaluations(curr_active_
     #TODO 2024-02-16 13:52: - [ ] Rest of properties
     return True
 
+# from neuropy.utils.indexing_helpers import MissingColumnsError
 
 def _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline, computation_filter_name='maze') -> bool:
+    """ 
+    
+    KeyError: "['travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] not in index"
+
+    
+    """
     from neuropy.core.epoch import ensure_dataframe
+
+    print_missing_columns: bool = True
 
     directional_decoders_decode_epochs_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
     if directional_decoders_decode_epochs_result is None:
@@ -2622,15 +2675,21 @@ def _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_a
     if decoder_ripple_filter_epochs_decoder_result_dict is None:
         return False
     
+
+    all_df_shared_column_names, all_df_score_column_names, all_df_column_names, merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names = DecoderDecodedEpochsResult.get_all_scores_column_names()
+    
+    # heuristic_score_col_names = ['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel']
     
     ripple_has_required_columns = PandasHelpers.require_columns({a_name:ensure_dataframe(a_result.filter_epochs) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()},
-        required_columns=['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel'])
-    if ripple_has_required_columns is None:
+        required_columns=heuristic_score_col_names, print_missing_columns=print_missing_columns)
+    if (ripple_has_required_columns is None) or (not ripple_has_required_columns):
+        # raise MissingColumnsError(heuristic_score_col_names)
         return False
 
     laps_has_required_columns = PandasHelpers.require_columns({a_name:ensure_dataframe(a_result.filter_epochs) for a_name, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()},
-        required_columns=['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel'])
-    if laps_has_required_columns is None:
+        required_columns=heuristic_score_col_names,  print_missing_columns=print_missing_columns)
+    if (laps_has_required_columns is None) or (not laps_has_required_columns):
+        # raise MissingColumnsError(heuristic_score_col_names)
         return False
 
     return True
@@ -2939,16 +2998,6 @@ def _workaround_validate_has_directional_train_test_split_result(curr_active_pip
     if (train_lap_specific_pf1D_Decoder_dict is None) or (len(train_lap_specific_pf1D_Decoder_dict) == 0):
         return False
     
-    # ripple_has_required_columns = PandasHelpers.require_columns({a_name:ensure_dataframe(a_result.filter_epochs) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()},
-    #     required_columns=['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel'])
-    # if ripple_has_required_columns is None:
-    #     return False
-
-    # laps_has_required_columns = PandasHelpers.require_columns({a_name:ensure_dataframe(a_result.filter_epochs) for a_name, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()},
-    #     required_columns=['congruent_dir_bins_ratio', 'coverage', 'direction_change_bin_ratio', 'longest_sequence_length', 'longest_sequence_length_ratio', 'travel'])
-    # if laps_has_required_columns is None:
-    #     return False
-
     return True
 
 
