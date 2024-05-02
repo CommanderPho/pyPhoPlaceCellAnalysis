@@ -4509,7 +4509,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
     @function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
-        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
+        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
         validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, 
                         is_global=True, computation_precidence=1002.2)
     def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
