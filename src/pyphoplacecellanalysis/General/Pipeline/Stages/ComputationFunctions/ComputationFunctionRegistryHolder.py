@@ -3,8 +3,9 @@ from typing import Dict, Callable, List, Tuple
 
 """
 Computation order is determined by `computation_precidence`.
-    Conceptually a higher computation_precidence value indicates that a function needs to be computed BEFORE lower-valued functions.
-        `computation_precidence` == priority
+    Lower values => earlier computations
+
+    If a function `fB` depends on the result added to the pipeline by a function `fA`, then `fA.computation_precidence < fB.computation_precidence`
 
 Each computation functions class has its own `._computationPrecidence`.
 All of its functions get their `.computation_precidence` based on the order that they are defined in the class, with the earliest-running functions appearing at the top of the class.
@@ -123,14 +124,6 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
 
         global_comp_names = [getattr(v, 'short_name', v.__name__) for k,v in cls.get_global_registry_items().items() if ((getattr(v, 'short_name', v.__name__) not in either_exclude_list) and (v.__name__ not in either_exclude_list))]
         non_global_comp_names = [getattr(v, 'short_name', v.__name__) for k,v in cls.get_non_global_registry_items().items() if ((getattr(v, 'short_name', v.__name__) not in either_exclude_list) and (v.__name__ not in either_exclude_list))]
-
-        ## Checking that same as old:
-        # set(_non_global_comp_names).difference(non_global_comp_names)
-        # set(_global_comp_names).difference(global_comp_names)
-
-        # set(non_global_comp_names).difference(_non_global_comp_names)
-        # set(global_comp_names).difference(_global_comp_names)
-
         return non_global_comp_names, global_comp_names
 
 
