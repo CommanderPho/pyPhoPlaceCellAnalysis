@@ -499,14 +499,14 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
     ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
 
+
     ## apply arbitrary sort:
     _comp_specifier_dict = {_comp_specifier.short_name:_comp_specifier for _comp_specifier in _comp_specifiers}
     # move_to_end_names = ['directional_train_test_split', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring']
     # _comp_specifier_dict = reorder_keys_relative(_comp_specifier_dict, key_names=move_to_end_names, relative_mode='end') # list(filter(lambda column: column.endswith('_peak_heights'), existing_columns))
+    _comp_specifier_dict = dict(sorted(_comp_specifier_dict.items(), key=lambda item: item[1].computation_precidence))
     # back to list
     _comp_specifiers = list(_comp_specifier_dict.values())
-
-
 
     remaining_include_function_names = {k:False for k in include_includelist.copy()}
 

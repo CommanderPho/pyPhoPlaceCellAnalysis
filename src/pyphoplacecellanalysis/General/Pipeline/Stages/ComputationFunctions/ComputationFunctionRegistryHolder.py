@@ -151,7 +151,9 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
             # if not absolute_flat_path_keys:
             #     curr_class_relative_out_dict = {}
                 
-            curr_all_computation_functions = list(reversed(a_computation_class.get_all_functions(use_definition_order=True))) # reversed definition order means that functions at the bottom of the class are given the lowest precidence, while those at the top are given the highest (and will be computed first)
+            # curr_all_computation_functions = list(reversed(a_computation_class.get_all_functions(use_definition_order=True))) # reversed definition order means that functions at the bottom of the class are given the lowest precidence, while those at the top are given the highest (and will be computed first)
+            curr_all_computation_functions = list(a_computation_class.get_all_functions(use_definition_order=True)) # 2024-05-02 - Correct order
+
             class_num_computations: int = len(curr_all_computation_functions)
             # not going to have more than 100 computation functions ever
             assert class_num_computations < 100, f"100 is the max number of functions a class can have right now. Change the default_computation_precidence_step_size: float = 0.001 to have 1000."
