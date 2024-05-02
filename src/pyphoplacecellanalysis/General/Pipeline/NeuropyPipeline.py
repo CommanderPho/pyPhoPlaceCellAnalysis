@@ -54,8 +54,6 @@ from qtpy import QtCore, QtWidgets, QtGui
 # Pipeline Logging:
 import logging
 
-
-
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PipelineSavingScheme
 
 class PipelineSavingScheme(ExtendedEnum):

@@ -228,8 +228,12 @@ class SpecificComputationValidator:
             """ captures: comp_specifier, curr_active_pipeline, computation_filter_name, debug_print """
             try:
                 # try the validation again.
-                comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name) # passed the validation
-                return True
+                _is_valid = comp_specifier.validate_computation_test(curr_active_pipeline, computation_filter_name=computation_filter_name) # passed the validation
+                if (_is_valid is not None) and (isinstance(_is_valid, bool)):
+                    return _is_valid
+
+                return True # some are valid just by not throwing errors?
+
             except (AttributeError, KeyError, TypeError, ValueError, AssertionError) as validation_err:
                 # Handle the inner exception
                 if is_post_recompute:
@@ -259,7 +263,7 @@ class SpecificComputationValidator:
                 print(f"missing required value, so we don't need to call .validate_computation_test(...) to know it isn't valid!")
             return False
 
-        did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)        
+        did_successfully_validate = _subfn_try_validate(validate_fail_on_exception=False, is_post_recompute=False)  # 2024-05-02 - this is returning True indicating successful validation when it should fail! 
         return did_successfully_validate ## #TODO 2024-04-03 11:03: - [ ] this should NEVER be assigned to `needs_compute` 
     
 
