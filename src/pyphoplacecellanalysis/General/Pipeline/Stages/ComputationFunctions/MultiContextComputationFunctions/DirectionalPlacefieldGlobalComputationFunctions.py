@@ -743,7 +743,8 @@ class DirectionalLapsHelpers:
         # determine if needs
         has_updated_laps_dirs = ('is_LR_dir' in curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe().columns)
         
-        has_matching_filter_name = (computation_filter_name in split_directional_laps_config_names)
+        has_matching_filter_name = (computation_filter_name in split_directional_laps_config_names) # what is this requirement? Does it pass a valid name, or just 'maze'? I thought it was called 'maze_all' or something after it's made directional.
+        
         # assert (computation_filter_name in computed_base_epoch_names), f'computation_filter_name: {computation_filter_name} is missing from computed_base_epoch_names: {computed_base_epoch_names} '
         return (has_matching_filter_name and has_updated_laps_dirs)
         # return (computation_filter_name in computed_base_epoch_names)
