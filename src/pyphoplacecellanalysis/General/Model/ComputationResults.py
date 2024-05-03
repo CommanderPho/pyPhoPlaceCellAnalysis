@@ -99,7 +99,7 @@ global_computation_results: pyphocorehelpers.DataStructure.dynamic_parameters.Dy
 
 
 @custom_define(slots=False)
-class ComputationResult(HDF_SerializationMixin):
+class ComputationResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """
         The result of a single computation, on a filtered session with a specified config 
         The primary output data is stored in self.computed_data's dict
@@ -255,7 +255,7 @@ class VersionedResultMixin:
 
 
 @define(slots=False, repr=False)
-class ComputedResult(VersionedResultMixin, HDFMixin):
+class ComputedResult(VersionedResultMixin, HDFMixin, AttrsBasedClassHelperMixin):
     """ 2023-05-10 - an object to replace DynamicContainers and static dicts for holding specific computed results
     
     Usage:

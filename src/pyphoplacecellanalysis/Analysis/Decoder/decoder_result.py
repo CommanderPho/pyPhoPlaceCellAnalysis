@@ -29,7 +29,7 @@ from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.misc import shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 from neuropy.utils.misc import split_array
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
-from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
+from neuropy.utils.mixins.HDF5_representable import HDFMixin
 
 from pyphocorehelpers.indexing_helpers import find_neighbours
 from pyphocorehelpers.function_helpers import function_attributes
@@ -271,7 +271,7 @@ def _convert_optional_ndarray_to_hdf_attrs_fn(f, key: str, value):
 
 
 @custom_define(slots=False, repr=False)
-class LeaveOneOutDecodingResult(HDFMixin):
+class LeaveOneOutDecodingResult(HDFMixin, AttrsBasedClassHelperMixin):
     """Newer things to merge into LeaveOneOutDecodingAnalysisResult
     
     Usage:
@@ -300,7 +300,7 @@ class LeaveOneOutDecodingResult(HDFMixin):
 
     
 @custom_define(slots=False, repr=False)
-class TimebinnedNeuronActivity(HDFMixin):
+class TimebinnedNeuronActivity(HDFMixin, AttrsBasedClassHelperMixin):
     """ 2023-04-18 - keeps track of which neurons are active and inactive in each decoded timebin
     
     TODO TimebinnedNeuronActivity is not HDF serializable, and it doesn't make sense to make it such. It should be a non_serialized_field
@@ -342,7 +342,7 @@ class TimebinnedNeuronActivity(HDFMixin):
 
 
 @custom_define(slots=False, repr=False)
-class LeaveOneOutDecodingAnalysisResult(HDFMixin):
+class LeaveOneOutDecodingAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
     """ 2023-03-27 - Holds the results from a surprise analysis
 
     Built with:

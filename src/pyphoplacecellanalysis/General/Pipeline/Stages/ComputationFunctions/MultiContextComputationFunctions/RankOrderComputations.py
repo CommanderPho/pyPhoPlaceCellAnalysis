@@ -84,7 +84,7 @@ z
 
 
 @define(slots=False, repr=False, eq=False)
-class Zscorer(HDFMixin):
+class Zscorer(HDFMixin, AttrsBasedClassHelperMixin):
     """
     Zscorer recieves the list of raw metric values, one for each shuffle, which is stores in .original_values
 
@@ -350,7 +350,7 @@ def save_rank_order_results(curr_active_pipeline, day_date: str='2023-12-19_729p
 
 
 @define(slots=False, repr=False, eq=False)
-class ShuffleHelper(HDFMixin):
+class ShuffleHelper(HDFMixin, AttrsBasedClassHelperMixin):
     """ holds the result of shuffling templates. Used for rank-order analyses """
     shared_aclus_only_neuron_IDs: NDArray = serialized_field(eq=attrs.cmp_using(eq=np.array_equal))
     is_good_aclus: NDArray = serialized_field(repr=False, eq=attrs.cmp_using(eq=np.array_equal))

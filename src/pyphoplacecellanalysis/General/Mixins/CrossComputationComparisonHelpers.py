@@ -16,7 +16,7 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 
 from neuropy.utils.colors_util import get_neuron_colors # required for build_neurons_color_map 
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
-from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFConvertableEnum, HDFMixin, HDF_Converter
+from neuropy.utils.mixins.HDF5_representable import HDFConvertableEnum, HDFMixin
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 

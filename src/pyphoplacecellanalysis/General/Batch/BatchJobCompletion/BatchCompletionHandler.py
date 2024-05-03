@@ -32,7 +32,7 @@ class SavingOptions(Enum):
 
 
 @custom_define(slots=False)
-class BatchComputationProcessOptions(HDF_SerializationMixin):
+class BatchComputationProcessOptions(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ specifies how computations should be ran. Should they be loaded from previously saved data? Computed? Saved? """
     should_load: bool = serialized_attribute_field() # should try to load from existing results from disk at all
         # never
