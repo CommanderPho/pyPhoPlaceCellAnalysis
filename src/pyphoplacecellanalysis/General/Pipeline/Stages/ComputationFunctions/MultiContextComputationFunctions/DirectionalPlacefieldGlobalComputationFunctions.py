@@ -731,25 +731,6 @@ class DirectionalLapsHelpers:
     # ['maze_even_laps', 'maze_odd_laps']
 
     @classmethod
-    def validate_has_directional_laps(cls, curr_active_pipeline, computation_filter_name='maze'):
-        # Unpacking:
-        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-        # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
-        directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = directional_laps_results.directional_lap_specific_configs, directional_laps_results.split_directional_laps_dict, directional_laps_results.split_directional_laps_config_names, directional_laps_results.computed_base_epoch_names
-
-        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
-        long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders()
-
-        # determine if needs
-        has_updated_laps_dirs = ('is_LR_dir' in curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe().columns)
-        
-        has_matching_filter_name = (computation_filter_name in split_directional_laps_config_names) # what is this requirement? Does it pass a valid name, or just 'maze'? I thought it was called 'maze_all' or something after it's made directional.
-        
-        # assert (computation_filter_name in computed_base_epoch_names), f'computation_filter_name: {computation_filter_name} is missing from computed_base_epoch_names: {computed_base_epoch_names} '
-        return (has_matching_filter_name and has_updated_laps_dirs)
-        # return (computation_filter_name in computed_base_epoch_names)
-
-    @classmethod
     def has_duplicated_memory_references(cls, *args) -> bool:
         # Check for duplicated memory references in the configs first:
         memory_ids = [id(a_config) for a_config in args] # YUP, they're different for odd/even but duplicated for long/short
@@ -1031,6 +1012,27 @@ class DirectionalLapsHelpers:
         return directional_laps_result
 
 
+def validate_has_directional_laps(curr_active_pipeline, computation_filter_name='maze'):
+    # Unpacking:
+    directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
+    directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = directional_laps_results.directional_lap_specific_configs, directional_laps_results.split_directional_laps_dict, directional_laps_results.split_directional_laps_config_names, directional_laps_results.computed_base_epoch_names
+
+    long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
+    long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = directional_laps_results.get_shared_aclus_only_decoders()
+
+    # determine if needs
+    has_updated_laps_dirs = ('is_LR_dir' in curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe().columns)
+    
+
+    has_matching_filter_name = (computation_filter_name in split_directional_laps_config_names) # what is this requirement? 
+    # Does it pass a valid name, or just 'maze'?
+        # >> It does pass a valid name: 'maze_any'.
+    
+
+    # assert (computation_filter_name in computed_base_epoch_names), f'computation_filter_name: {computation_filter_name} is missing from computed_base_epoch_names: {computed_base_epoch_names} '
+    return (has_matching_filter_name and has_updated_laps_dirs)
+    # return (computation_filter_name in computed_base_epoch_names)
 
 
 @define(slots=False, repr=False)
@@ -1227,32 +1229,6 @@ class DirectionalMergedDecodersResult(ComputedResult):
         ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
         ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
         ripple_marginals_df
-
-
-    @classmethod
-    def validate_has_directional_merged_placefields(cls, curr_active_pipeline, computation_filter_name='maze'):
-        """ 
-            DirectionalMergedDecodersResult.validate_has_directional_merged_placefields
-        """
-        # Unpacking:
-        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-        directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
-        
-        # extract properties:
-        all_directional_decoder_dict_value = directional_merged_decoders_result.all_directional_decoder_dict
-        all_directional_pf1D_Decoder_value = directional_merged_decoders_result.all_directional_pf1D_Decoder
-        long_directional_pf1D_Decoder_value = directional_merged_decoders_result.long_directional_pf1D_Decoder
-        long_directional_decoder_dict_value = directional_merged_decoders_result.long_directional_decoder_dict
-        short_directional_pf1D_Decoder_value = directional_merged_decoders_result.short_directional_pf1D_Decoder
-        short_directional_decoder_dict_value = directional_merged_decoders_result.short_directional_decoder_dict
-
-        all_directional_laps_filter_epochs_decoder_result_value = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
-        all_directional_ripple_filter_epochs_decoder_result_value = directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result
-
-        laps_epochs_df = directional_merged_decoders_result.laps_epochs_df
-        ripple_epochs_df = directional_merged_decoders_result.ripple_epochs_df
-
-        return True
 
     @classmethod
     def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result, debug_print=False):
@@ -1890,6 +1866,30 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
 
 
+def validate_has_directional_merged_placefields(curr_active_pipeline, computation_filter_name='maze'):
+    """ 
+        DirectionalMergedDecodersResult.validate_has_directional_merged_placefields
+    """
+    # Unpacking:
+    directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+    
+    # extract properties:
+    all_directional_decoder_dict_value = directional_merged_decoders_result.all_directional_decoder_dict
+    all_directional_pf1D_Decoder_value = directional_merged_decoders_result.all_directional_pf1D_Decoder
+    long_directional_pf1D_Decoder_value = directional_merged_decoders_result.long_directional_pf1D_Decoder
+    long_directional_decoder_dict_value = directional_merged_decoders_result.long_directional_decoder_dict
+    short_directional_pf1D_Decoder_value = directional_merged_decoders_result.short_directional_pf1D_Decoder
+    short_directional_decoder_dict_value = directional_merged_decoders_result.short_directional_decoder_dict
+
+    all_directional_laps_filter_epochs_decoder_result_value = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
+    all_directional_ripple_filter_epochs_decoder_result_value = directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result
+
+    laps_epochs_df = directional_merged_decoders_result.laps_epochs_df
+    ripple_epochs_df = directional_merged_decoders_result.ripple_epochs_df
+
+    return True
+
 
 
 @define(slots=False, repr=False)
@@ -2294,7 +2294,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         return df, (long_best_col_name, short_best_col_name, LS_diff_col_name)
         
-
     @classmethod
     def get_all_scores_column_names(cls) -> Tuple:
         # Column Names _______________________________________________________________________________________________________ #
@@ -2332,9 +2331,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
         
         return (all_df_shared_column_names, all_df_score_column_names, all_df_column_names,
                     merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names)
-
-
-
 
     @function_attributes(short_name=None, tags=['merged', 'all_scores', 'df', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-14 19:10', related_items=[])
     def build_complete_all_scores_merged_df(self) -> pd.DataFrame:
@@ -2616,6 +2612,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
     # 	self.__dict__.update(state)
     # 	# Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
     # 	super(DecoderDecodedEpochsResult, self).__init__() # from
+
+
 
 
 def _workaround_validate_has_directional_decoded_epochs_evaluations(curr_active_pipeline, computation_filter_name='maze') -> bool:
@@ -3823,7 +3821,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
     @function_attributes(short_name='split_to_directional_laps', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
         provides_global_keys=['DirectionalLaps'],
-        validate_computation_test=DirectionalLapsHelpers.validate_has_directional_laps, is_global=True)
+        validate_computation_test=validate_has_directional_laps, is_global=True)
     def _split_to_directional_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Splits the existing laps into directional versions
     
@@ -3862,7 +3860,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
     @function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields'], used_by=[], creation_date='2023-10-25 09:33', related_items=['DirectionalMergedDecodersResult'],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'],
-        validate_computation_test=DirectionalMergedDecodersResult.validate_has_directional_merged_placefields, is_global=True)
+        validate_computation_test=validate_has_directional_merged_placefields, is_global=True)
     def _build_merged_directional_placefields(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
                                                 laps_decoding_time_bin_size: float = 0.250, # 250ms
                                                 ripple_decoding_time_bin_size: float = 0.025, # 25ms

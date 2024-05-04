@@ -2053,86 +2053,6 @@ class RankOrderAnalyses:
 
         return True
 
-        
-
-    @classmethod
-    def validate_has_rank_order_results(cls, curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
-        """ Returns True if the pipeline has a valid RankOrder results set of the latest version
-
-        TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
-
-        """
-        # Unpacking:
-        rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-        ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
-
-        ## Used to be `x[0] for x.long_stats_z_scorer` and `x[1] for x.short_stats_z_scorer`
-        # Extract the real spearman-values/p-values:
-        # LR_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()]) # x is LongShortStatsItem,  # AttributeError: 'dict' object has no attribute 'real_p_value'
-        # LR_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-
-        # LR_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-        # LR_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-
-        LR_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.LR_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
-        LR_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.LR_ripple.extra_info_dict.values()])
-
-        # RL_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-        # RL_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-
-        # RL_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-        # RL_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-
-        RL_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.RL_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
-        RL_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.RL_ripple.extra_info_dict.values()])
-
-        ## z-diffs:
-        LR_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-        LR_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-        RL_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-        RL_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-
-        # make sure result is for the current minimimum:
-        results_minimum_inclusion_fr_Hz = rank_order_results.minimum_inclusion_fr_Hz
-        included_qclu_values = rank_order_results.included_qclu_values
-
-        ## TODO: require same `included_qclu_values` values
-        rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
-        if rank_order_z_score_df is None:
-            return False
-
-        # 2023-12-15 - Newest method:
-        ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
-        if ripple_combined_epoch_stats_df is None:
-            return False
-
-        if np.isnan(rank_order_results.ripple_combined_epoch_stats_df.index).any():
-            return False # can't have dataframe index that is missing values.
-
-        assert (len(rank_order_results.ripple_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
-        
-
-        laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
-        if laps_combined_epoch_stats_df is None:
-            return False
-
-        assert (len(rank_order_results.laps_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
-        
-
-        # if 'LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df:
-        #     return False
-
-        if not cls.validate_has_rank_order_results_quantiles(curr_active_pipeline, computation_filter_name=computation_filter_name, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz):
-            return False
-        
-        # rank_order_results.included_qclu_values
-
-        if minimum_inclusion_fr_Hz is not None:
-            return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
-        else:
-            #TODO 2023-11-29 08:42: - [ ] cannot validate minimum because none was passed, eventually reformulate to use parameters
-            return True
-
     @classmethod
     def _validate_can_display_RankOrderRastersDebugger(cls, curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
         spikes_df = curr_active_pipeline.sess.spikes_df
@@ -2467,34 +2387,6 @@ class RankOrderAnalyses:
         shuffled_dfs, shuffled_stats_dfs = cls._new_perform_efficient_shuffle(track_templates, active_selected_spikes_df, decoder_aclu_peak_map_dict, num_shuffles=num_shuffles)
         output_active_epoch_computed_values = shuffled_stats_dfs
 
-        # # On-the-fly shuffling mode using shuffle_helper:
-        # all_decoder_aclus_map_keys_dict = {a_decoder_name:np.array(list(a_map.keys())) for a_decoder_name, a_map in decoder_aclu_peak_map_dict.items()} # list of four elements
-        # all_decoder_aclus_map_values_dict = {a_decoder_name:np.array(list(a_map.values())) for a_decoder_name, a_map in decoder_aclu_peak_map_dict.items()} # list of four elements
-        
-        # ## This is build the shuffle indicies ahead of time:
-        # all_shuffled_decoder_aclus_map_keys_dict = {a_decoder_name:build_shuffled_ids(a_map_keys, num_shuffles=num_shuffles, seed=None)[0] for a_decoder_name, a_map_keys in all_decoder_aclus_map_keys_dict.items()} # [0] only gets the shuffled_aclus themselves, which are of shape .shape: ((num_shuffles, n_neurons[i]) where i is the decoder_index
-
-        # # all_shuffled_override_decoder_aclu_peak_map_dict: one for each shuffle.
-        # all_shuffled_override_decoder_aclu_peak_map_dict = [{a_decoder_name:dict(zip(a_decoder_specific_shuffled_aclus_arr[shuffle_IDX], all_decoder_aclus_map_values_dict[a_decoder_name])) for a_decoder_name, a_decoder_specific_shuffled_aclus_arr in all_shuffled_decoder_aclus_map_keys_dict.items()} for shuffle_IDX in np.arange(num_shuffles)]
-
-        ## USES selected_spikes_df
-        ## Shuffle a single map, but will eventually need one for each of the four decoders::
-        # epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = build_shuffled_ids(list(long_LR_aclu_peak_map.keys()), num_shuffles=num_shuffles, seed=None) # .shape: ((num_shuffles, n_neurons), (num_shuffles, n_neurons))
-
-        # ## OLD:
-        # output_active_epoch_computed_values = []
-
-        # for shuffle_IDX in np.arange(num_shuffles):
-        #     # """ within the loop we modify: 
-        #     #     active_selected_spikes_df, active_epochs 
-                
-        #     #     From active_selected_spikes_df I only need: ['t_rel_seconds', 'aclu', 'Probe_Epoch_id', 'label']  ## 'Probe_Epoch_id' goes up to 610 for some reason?!?!? It does NOT seem to be 'label'
-                
-        #     # """
-        #     shuffle_real_stats_df = cls._compute_single_rank_order_shuffle(track_templates, selected_spikes_df=selected_spikes_df, override_decoder_aclu_peak_map_dict=all_shuffled_override_decoder_aclu_peak_map_dict[shuffle_IDX]) # pre-compute
-        #     output_active_epoch_computed_values.append(shuffle_real_stats_df)
-
-
         # Build the output `stacked_arrays`: _________________________________________________________________________________ #
 
         stacked_arrays = np.stack([a_shuffle_real_stats_df[combined_variable_names].to_numpy() for a_shuffle_real_stats_df in output_active_epoch_computed_values], axis=0) # for compatibility: .shape (n_shuffles, n_epochs, n_columns)
@@ -2552,6 +2444,83 @@ class RankOrderAnalyses:
         return combined_epoch_stats_df, (output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
     
 
+def validate_has_rank_order_results(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
+        """ Returns True if the pipeline has a valid RankOrder results set of the latest version
+
+        TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
+
+        """
+        # Unpacking:
+        rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+
+        ## Used to be `x[0] for x.long_stats_z_scorer` and `x[1] for x.short_stats_z_scorer`
+        # Extract the real spearman-values/p-values:
+        # LR_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()]) # x is LongShortStatsItem,  # AttributeError: 'dict' object has no attribute 'real_p_value'
+        # LR_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+
+        # LR_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        # LR_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+
+        LR_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.LR_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
+        LR_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.LR_ripple.extra_info_dict.values()])
+
+        # RL_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        # RL_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+
+        # RL_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        # RL_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+
+        RL_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.RL_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
+        RL_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.RL_ripple.extra_info_dict.values()])
+
+        ## z-diffs:
+        LR_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        LR_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+        RL_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+        RL_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+
+        # make sure result is for the current minimimum:
+        results_minimum_inclusion_fr_Hz = rank_order_results.minimum_inclusion_fr_Hz
+        included_qclu_values = rank_order_results.included_qclu_values
+
+        ## TODO: require same `included_qclu_values` values
+        rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
+        if rank_order_z_score_df is None:
+            return False
+
+        # 2023-12-15 - Newest method:
+        ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
+        if ripple_combined_epoch_stats_df is None:
+            return False
+
+        if np.isnan(rank_order_results.ripple_combined_epoch_stats_df.index).any():
+            return False # can't have dataframe index that is missing values.
+
+        assert (len(rank_order_results.ripple_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
+        
+
+        laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
+        if laps_combined_epoch_stats_df is None:
+            return False
+
+        assert (len(rank_order_results.laps_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
+        
+
+        # if 'LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df:
+        #     return False
+
+        if not cls.validate_has_rank_order_results_quantiles(curr_active_pipeline, computation_filter_name=computation_filter_name, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz):
+            return False
+        
+        # rank_order_results.included_qclu_values
+
+        if minimum_inclusion_fr_Hz is not None:
+            return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
+        else:
+            #TODO 2023-11-29 08:42: - [ ] cannot validate minimum because none was passed, eventually reformulate to use parameters
+            return True
+        
 
 
 
@@ -2564,7 +2533,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
     @function_attributes(short_name='rank_order_shuffle_analysis', tags=['directional_pf', 'laps', 'rank_order', 'session', 'pf1D', 'pf2D'], input_requires=['DirectionalLaps'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['RankOrder'],
-        validate_computation_test=RankOrderAnalyses.validate_has_rank_order_results, is_global=True)
+        validate_computation_test=validate_has_rank_order_results, is_global=True)
     def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2], skip_laps=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
@@ -2862,9 +2831,6 @@ def plot_rank_order_epoch_inst_fr_result_tuples(curr_active_pipeline, result_tup
     active_context = (active_context or curr_active_pipeline.sess.get_context())
     plot_rank_order_epoch_inst_fr_result_tuples_display_context = active_context.adding_context('display_fn', display_fn_name='plot_rank_order_epoch_inst_fr_result_tuples')
     active_display_context = plot_rank_order_epoch_inst_fr_result_tuples_display_context.adding_context('analysis_type', subplot_name=analysis_type)
-
-    # global_spikes_df, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=1000)
-    # spikes_df = deepcopy(global_spikes_df)
 
     if analysis_type == 'Ripple':
         # global_events = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay)
