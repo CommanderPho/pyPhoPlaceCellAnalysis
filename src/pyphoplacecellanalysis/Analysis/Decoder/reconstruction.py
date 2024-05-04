@@ -451,7 +451,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return f"{type(self).__name__}({content}\n)"
     
 
-    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=200, desired_width=None, skip_img_normalization=True):
+    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True):
         """ gets the posterior as a colormapped image 
         
         Usage:
@@ -560,7 +560,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         values_dict = {fields_to_single_epoch_fields_dict[field_name]:getattr(self, field_name)[active_epoch_idx] for field_name in single_epoch_field_names}
 
         a_posterior = self.p_x_given_n_list[active_epoch_idx].copy()
-        active_epoch_info_tuple = tuple(self.active_filter_epochs.itertuples(name='EpochTuple'))[active_epoch_idx]
+        active_epoch_info_tuple = tuple(ensure_dataframe(self.active_filter_epochs).itertuples(name='EpochTuple'))[active_epoch_idx]
 
         single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult(**values_dict, epoch_info_tuple=active_epoch_info_tuple, epoch_data_index=active_epoch_idx)
     
