@@ -568,7 +568,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
 
     @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=[], creation_date='2024-02-13 17:25', related_items=[])
-    def compute_radon_transforms(self, pos_bin_size:float, nlines:int=8192, margin:float=8, jump_stat=None, n_jobs:int=4, enable_return_neighbors_arr=True) -> pd.DataFrame:
+    def compute_radon_transforms(self, pos_bin_size:float, xbin_centers: NDArray, nlines:int=8192, margin:float=8, jump_stat=None, n_jobs:int=4, enable_return_neighbors_arr=False) -> pd.DataFrame:
         """ 2023-05-25 - Computes the line of best fit (which gives the velocity) for the 1D Posteriors for each replay epoch using the Radon Transform approch.
         
         # pos_bin_size: the size of the x_bin in [cm]
@@ -592,10 +592,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         # active_time_bins = active_epoch_decoder_result.time_bin_edges[0]
         # active_posterior_container = active_epoch_decoder_result.marginal_x_list[0]
         active_posterior = self.p_x_given_n_list # one for each epoch
-
+        active_time_window_centers_list = [t[0] for t in self.time_window_centers] # first index
         ## compute the Radon transform to get the lines of best fit
         extra_outputs = []
-        score, velocity, intercept, *extra_outputs = get_radon_transform(active_posterior, decoding_time_bin_duration=self.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs, enable_return_neighbors_arr=enable_return_neighbors_arr, debug_print=True)
+        score, velocity, intercept, *extra_outputs = get_radon_transform(active_posterior, decoding_time_bin_duration=self.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs, enable_return_neighbors_arr=enable_return_neighbors_arr, debug_print=True,
+                                                                          x0=xbin_centers[0], t0=active_time_window_centers_list)
         epochs_linear_fit_df = pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept, 'speed': np.abs(velocity)})
         return epochs_linear_fit_df, extra_outputs
 

@@ -1007,7 +1007,9 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 import numpy as np
 from neuropy.analyses.decoders import radon_transform, old_radon_transform
 
-_allow_parallel_run_general:bool = True
+# _allow_parallel_run_general:bool = True
+_allow_parallel_run_general:bool = False
+
 
 def old_score_posterior(posterior, n_jobs:int=8):
     """Old version scoring of epochs that uses `old_radon_transform`
@@ -1093,7 +1095,7 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
             print(f'WARNING: n_jobs > 1 (n_jobs: {n_jobs}) but _allow_parallel_run_general == False, so parallel computation will not be performed.')
         if run_parallel:
             from joblib import Parallel, delayed
-            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s))
+            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=a_t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s))
         else:
             results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=a_t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s)]
 
