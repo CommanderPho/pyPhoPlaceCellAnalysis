@@ -175,6 +175,7 @@ class RadonTransformDebugger:
     """ interactive debugger
     
     from pyphoplacecellanalysis.GUI.Silx.RadonTransformDebuggerWidget import RadonTransformDebugger, RadonDebugValue
+
     """
     pos_bin_size: float = field()
     decoder_filter_epochs_decoder_result_dict: Dict = field()
@@ -306,7 +307,7 @@ class RadonTransformDebugger:
 
         # 0-indexed
         index_space_t_mid = ((NT) / 2)
-        index_space_x_mid = ((NP)/2)
+        index_space_x_mid = ((NP) / 2)
 
         if debug_print:
             print(f'index_space_t_mid: {index_space_t_mid}, index_space_x_mid: {index_space_x_mid}')
@@ -321,7 +322,7 @@ class RadonTransformDebugger:
             ## all bins:
             real_space_t_mid = np.array([((active_time_window_centers[0]+active_time_window_centers[-1]) / 2) for active_time_window_centers in self.result.time_window_centers])
 
-        real_space_x_mid = ((self.xbin[-1]+self.xbin[0])/2)
+        real_space_x_mid = ((self.xbin[-1]+self.xbin[0])/2.0)
 
 
         ## Conversion functions:
