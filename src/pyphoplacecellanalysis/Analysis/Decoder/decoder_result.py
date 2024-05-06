@@ -1039,7 +1039,8 @@ def old_score_posterior(posterior, n_jobs:int=8):
 
 
 
-def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[float]=16.0, n_neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True):
+def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[float]=16.0, n_neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True,
+                         t0: Optional[float]=None, x0: Optional[float]=None):
         """ 2023-05-25 - Radon Transform to fit line to decoded replay epoch posteriors. Gives score, velocity, and intercept. 
 
         Usage:
@@ -1059,7 +1060,21 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
 
         if posteriors is None:
             assert posterior is not None, "No posteriors found"
-            posteriors = posterior
+            if isinstance(posterior, (list, tuple)):
+                posteriors = posterior # multiple posteriors, okay
+            else:
+                # a single posterior, wrap in a list:
+                posteriors = [posterior,]
+
+        if t0 is not None:
+            if isinstance(t0, (list, tuple, NDArray)):
+                t0s = t0 # multiple posteriors, okay
+                assert len(t0s) == len(posteriors)
+            else:
+                # a single posterior, wrap in a list:
+                t0s = [t0,]
+        else:
+            t0s = [None] * len(posteriors) # a list of all Nones
 
         if n_neighbours is None:
             # Set neighbors from margin, pos_bin_size
@@ -1078,13 +1093,12 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
             print(f'WARNING: n_jobs > 1 (n_jobs: {n_jobs}) but _allow_parallel_run_general == False, so parallel computation will not be performed.')
         if run_parallel:
             from joblib import Parallel, delayed
-            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr) for epoch in posteriors)
+            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s))
         else:
-            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr) for epoch in posteriors]
+            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=a_t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s)]
 
         if enable_return_neighbors_arr:
             # score_velocity_intercept_tuple, (num_neighbours, neighbors_arr) = results # unpack
-
             score = []
             velocity = []
             intercept = []
