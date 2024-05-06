@@ -4248,22 +4248,23 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             a_marginals_df['most_likely_decoder_index'] = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].apply(lambda row: np.argmax(row.values), axis=1)
             return a_marginals_df
 
-        def _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult, a_directional_ripple_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult], nlines=4192, margin=16, n_jobs=4):
+        def _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult, a_directional_ripple_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult], nlines=4192, margin=4, n_jobs=4):
             """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder.
             ~12.2s per decoder.
 
             """
             a_directional_pf1D_Decoder = deepcopy(a_directional_pf1D_Decoder)
-            pos_bin_size: float = a_directional_pf1D_Decoder.pos_bin_size # 3.793023081021702
+            pos_bin_size: float = a_directional_pf1D_Decoder.pos_bin_size # 3.793023081021702'
+            xbin_centers = deepcopy(a_directional_pf1D_Decoder.xbin_centers)
 
             laps_radon_transform_extras = []
-            laps_radon_transform_df, *laps_radon_transform_extras = a_directional_laps_filter_epochs_decoder_result.compute_radon_transforms(pos_bin_size=pos_bin_size, nlines=nlines, margin=margin, n_jobs=n_jobs)
+            laps_radon_transform_df, *laps_radon_transform_extras = a_directional_laps_filter_epochs_decoder_result.compute_radon_transforms(pos_bin_size=pos_bin_size, xbin_centers=xbin_centers, nlines=nlines, margin=margin, n_jobs=n_jobs)
 
             ## Decode Ripples:
             if a_directional_ripple_filter_epochs_decoder_result is not None:
                 ripple_radon_transform_extras = []
                 # ripple_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_ripple_filter_epochs_decoder_result)
-                ripple_radon_transform_df, *ripple_radon_transform_extras = a_directional_ripple_filter_epochs_decoder_result.compute_radon_transforms(pos_bin_size=pos_bin_size, nlines=nlines, margin=margin, n_jobs=n_jobs)
+                ripple_radon_transform_df, *ripple_radon_transform_extras = a_directional_ripple_filter_epochs_decoder_result.compute_radon_transforms(pos_bin_size=pos_bin_size, xbin_centers=xbin_centers, nlines=nlines, margin=margin, n_jobs=n_jobs)
             else:
                 ripple_radon_transform_extras = None
                 ripple_radon_transform_df = None
@@ -4362,7 +4363,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                     decoder_laps_radon_transform_df_dict[a_name], decoder_laps_radon_transform_extras_dict[a_name], decoder_ripple_radon_transform_df_dict[a_name], decoder_ripple_radon_transform_extras_dict[a_name] = _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder=a_decoder, 
                                                                                                                                                                                                                                                                                    a_directional_laps_filter_epochs_decoder_result=decoder_laps_filter_epochs_decoder_result_dict[a_name],
                                                                                                                                                                                                                                                                                    a_directional_ripple_filter_epochs_decoder_result=decoder_ripple_filter_epochs_decoder_result_dict[a_name],
-                                                                                                                                                                                                                                                                                   nlines=8192, margin=16.0,
+                                                                                                                                                                                                                                                                                   nlines=8192, margin=4.0,
                                                                                                                                                                                                                                                                                    n_jobs=6)
                     
                 # 6m 19.7s - nlines=8192, margin=16, n_jobs=1

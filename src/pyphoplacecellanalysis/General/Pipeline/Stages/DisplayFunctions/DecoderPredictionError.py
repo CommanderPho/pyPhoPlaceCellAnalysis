@@ -1032,8 +1032,15 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 # nt: int = time_bin_containers[epoch_idx].num_bins # .step, .variable_extents
                 # dt: float = time_bin_containers[epoch_idx].edge_info.step
                 # half_dt: float = (0.5 * dt)
-                epoch_time_bin_edges = time_bin_containers[epoch_idx].edges
-                t_start, t_end = epoch_time_bin_edges[0], epoch_time_bin_edges[-1]
+                # epoch_time_bin_edges = time_bin_containers[epoch_idx].edges
+                # t_start, t_end = epoch_time_bin_edges[0], epoch_time_bin_edges[-1]
+
+
+                # ## 2024-05-06 - Compute new epoch_intercepts aligned with the proper time bin. The ones computed are aligned with (0, 0)
+                epoch_time_bin_centers = deepcopy(time_bin_containers[epoch_idx].centers)
+                t_start, t_end = epoch_time_bin_centers[0], epoch_time_bin_centers[-1]
+                # epoch_intercept_old = epoch_intercept
+                # epoch_intercept = epoch_intercept_old - (epoch_vel * epoch_time_bin_centers[0])
 
                 # duration: float = t_end - t_start
                 # time_bin_containers[epoch_idx].edge_info
@@ -1057,11 +1064,16 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
                 # first_bin_center_epoch_intercept: float = epoch_intercept + (epoch_vel * half_dt)
                 epoch_line_fn = lambda t: (epoch_vel * (t - t_start)) + epoch_intercept # first_bin_center_epoch_intercept
+                # # epoch_line_eqn = (epoch_vel * epoch_time_bins) + first_bin_center_epoch_intercept
+                # epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers])
+                # epoch_line_fn = lambda t: (epoch_vel * t) + epoch_intercept # first_bin_center_epoch_intercept
                 # epoch_line_eqn = (epoch_vel * epoch_time_bins) + first_bin_center_epoch_intercept
-                epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers])
+                epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers]) # this works when plotted with 
+
+
+
 
                 # resample at midpoints
-
                 with np.printoptions(precision=3, suppress=True, threshold=5):
                     score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
                     speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
@@ -1225,6 +1237,15 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             # curr_ax.clear()
             pass
 
+        if curr_time_bin_container is not None:
+            actual_time_bins = curr_time_bin_container.centers
+            print(f'actual_time_bins: {actual_time_bins}')
+            print(f'curr_time_bins: {curr_time_bins}')
+
+        else:
+            print(f'No actual time bins!')
+            print(f'curr_time_bins: {curr_time_bins}')
+            actual_time_bins = deepcopy(curr_time_bins)
 
         ## Plot the line plot. Could update this like I did for the text?        
         if should_enable_radon_transform_info:
@@ -1235,12 +1256,18 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                     # Re-add the line to the axis if necessary
                     curr_ax.add_artist(extant_line)
             
-                extant_line.set_data(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y)
+
+                # curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
+                curr_line_y = plots_data.radon_transform_data[data_idx].line_y
+                extant_line.set_data(actual_time_bins, curr_line_y)
+                # extant_line.set_data(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y)
                 radon_transform_plot = extant_line
             else:
                 # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
-                radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
-            
+                # radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
+                # curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
+                curr_line_y = plots_data.radon_transform_data[data_idx].line_y
+                radon_transform_plot, = curr_ax.plot(actual_time_bins, curr_line_y, **plot_kwargs)
         else:
             ## Remove the existing one
             if extant_line is not None:
