@@ -120,12 +120,6 @@ class HeuristicReplayScoring:
 
     """
 
-    
-
-
-
-
-
     @classmethod
     @function_attributes(short_name='jump', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
     def bin_wise_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
