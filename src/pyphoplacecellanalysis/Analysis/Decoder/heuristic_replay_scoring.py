@@ -90,6 +90,27 @@ def _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays
     return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
 
 
+def _compute_diffusion_value(a_p_x_given_n: NDArray) -> float:
+    """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
+
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _compute_diffusion_value
+
+    
+    """
+    ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
+    n_pos_bins, n_time_bins = np.shape(a_p_x_given_n) # np.shape(a_p_x_given_n): (62, 9)
+    # Determine baseline (uniform) value for equally distributed bins
+    uniform_diffusion_prob = (1.0 / float(n_pos_bins)) # equally diffuse everywhere on the track
+    # uniform_diffusion_cumprob_all_bins = float(uniform_diffusion_prob) * float(n_time_bins) # can often be like 0.3 or so. Seems a little high.
+
+    # is_higher_than_diffusion = (cum_pos_bin_probs > uniform_diffusion_cumprob_all_bins)
+
+    # num_bins_higher_than_diffusion_across_time: int = np.nansum(is_higher_than_diffusion, axis=0)
+    # ratio_bins_higher_than_diffusion_across_time: float = (float(num_bins_higher_than_diffusion_across_time) / float(n_pos_bins))
+
+    return uniform_diffusion_prob
+
+
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
 class HeuristicReplayScoring:
@@ -98,6 +119,13 @@ class HeuristicReplayScoring:
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, HeuristicScoresTuple
 
     """
+
+    
+
+
+
+
+
     @classmethod
     @function_attributes(short_name='jump', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
     def bin_wise_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:

@@ -366,10 +366,19 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
 
             x_first_extent = (xmin, xmax, ymin, ymax)
             active_extent = x_first_extent
-            im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=False, **main_plot_kwargs)
-            # assert xmin < xmax
-            ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
-            ax.set_ylim((ymin, ymax))
+            try:
+                im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=False, **main_plot_kwargs) 
+                # assert xmin < xmax
+                ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
+                ax.set_ylim((ymin, ymax))
+            except ValueError as err:
+                # ValueError: Axis limits cannot be NaN or Inf
+                print(f'WARN: active_extent (xmin, xmax, ymin, ymax): {active_extent} contains NaN or Inf.\n\terr: {err}')
+                # ax.clear() # clear the existing and now invalid image
+                
+                im_posterior_x = None
+
+
         else:
             im_posterior_x = None
 
@@ -1063,15 +1072,14 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 # epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
 
                 # first_bin_center_epoch_intercept: float = epoch_intercept + (epoch_vel * half_dt)
-                epoch_line_fn = lambda t: (epoch_vel * (t - t_start)) + epoch_intercept # first_bin_center_epoch_intercept
+                # epoch_line_fn = lambda t: (epoch_vel * (t - t_start)) + epoch_intercept # first_bin_center_epoch_intercept
+                epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: (vel_bound * (t - t_start_bound)) + icpt_bound # Attempt to fix the issue with the function by binding each loop variable as a default value.
+
                 # # epoch_line_eqn = (epoch_vel * epoch_time_bins) + first_bin_center_epoch_intercept
                 # epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers])
                 # epoch_line_fn = lambda t: (epoch_vel * t) + epoch_intercept # first_bin_center_epoch_intercept
                 # epoch_line_eqn = (epoch_vel * epoch_time_bins) + first_bin_center_epoch_intercept
                 epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers]) # this works when plotted with 
-
-
-
 
                 # resample at midpoints
                 with np.printoptions(precision=3, suppress=True, threshold=5):
@@ -1257,16 +1265,16 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                     curr_ax.add_artist(extant_line)
             
 
-                # curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
-                curr_line_y = plots_data.radon_transform_data[data_idx].line_y
+                curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
+                # curr_line_y = plots_data.radon_transform_data[data_idx].line_y
                 extant_line.set_data(actual_time_bins, curr_line_y)
                 # extant_line.set_data(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y)
                 radon_transform_plot = extant_line
             else:
                 # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
                 # radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
-                # curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
-                curr_line_y = plots_data.radon_transform_data[data_idx].line_y
+                curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
+                # curr_line_y = plots_data.radon_transform_data[data_idx].line_y
                 radon_transform_plot, = curr_ax.plot(actual_time_bins, curr_line_y, **plot_kwargs)
         else:
             ## Remove the existing one
