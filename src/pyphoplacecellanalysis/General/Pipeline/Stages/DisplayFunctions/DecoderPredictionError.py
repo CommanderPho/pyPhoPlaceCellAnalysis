@@ -11,7 +11,8 @@ from matplotlib.widgets import Slider
 from matplotlib.patches import FancyArrowPatch, FancyArrow
 from matplotlib import patheffects
 
-from neuropy.core import Epoch
+# from neuropy.core import Epoch
+from neuropy.core.epoch import Epoch, ensure_dataframe
 from neuropy.utils.dynamic_container import overriding_dict_with, get_dict_subset # required for safely_accepts_kwargs
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
 from neuropy.utils.result_context import IdentifyingContext
@@ -1459,9 +1460,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         Usage:
 
         """
-        active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
-        if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
-            active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
+        active_filter_epochs_df: pd.DataFrame = ensure_dataframe(curr_results_obj.active_filter_epochs)
         wcorr_data = WeightedCorrelationPlotData.init_batch_from_epochs_df(active_filter_epochs_df=active_filter_epochs_df.copy())
         # wcorr_data = _subfn_wcorr_data_build(active_filter_epochs_df=active_filter_epochs_df.copy())
         return wcorr_data
@@ -1622,7 +1621,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                                     # multialignment='r', ## BREAKS IT
                                     # horizontalalignment='right',  
                                     # rotation=-45, #transform=a_curr_ax.transAxes,
-                                    bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure,
+                                    # bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, ## good
+                                    bbox_to_anchor=(1.0, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure,
                                     # bbox_to_anchor=((1.0 + bbox_offset_magnitude), (1.0 + bbox_offset_magnitude)), bbox_transform=a_curr_ax.transAxes,                        
                                     ) # oriented in upper-right corner, at a diagonal angle
 
