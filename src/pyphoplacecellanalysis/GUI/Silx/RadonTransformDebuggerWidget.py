@@ -416,7 +416,7 @@ class RadonTransformDebugger:
         # updateThread.start()  # Start updating the plot
 
         # define some image and curve
-        self.window.plot.addImage(self.active_radon_values.p_x_given_n, legend='P_x_given_n')
+        self.window.plot.addImage(self.active_radon_values.p_x_given_n, legend='P_x_given_n', replace=True, xlabel='time bins', ylabel='pos_bins', selectable=False, draggable=False)
         # window.plot.addImage(numpy.random.random(10000).reshape(100, 100), legend='img2', origin=(0, 100))
         self.window.setStats(self.stats_measures)
 
