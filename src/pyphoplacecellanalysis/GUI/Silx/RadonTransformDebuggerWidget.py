@@ -12,8 +12,10 @@ import numpy as np
 import pandas as pd
 
 from neuropy.core.epoch import ensure_dataframe
+from neuropy.analyses.decoders import RadonTransformDebugValue
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
 
 from silx.gui import qt
 from silx.gui.data.DataViewerFrame import DataViewerFrame
@@ -30,7 +32,9 @@ from silx.gui.plot.actions import control as control_actions
 from silx.gui.plot.ROIStatsWidget import ROIStatsWidget
 from silx.gui.plot.StatsWidget import UpdateModeWidget
 from silx.gui.plot import Plot2D
-
+from silx.gui.plot.items import Curve
+from silx.gui.plot.items import ImageData
+from silx.gui.colors import Colormap
 
 """ 
 
@@ -47,6 +51,11 @@ class RadonDebugValue:
     # epoch_info_tuple: Tuple = field()	
 
     active_decoded_epoch_container: SingleEpochDecodedResult = field()
+    active_debug_info: RadonTransformDebugValue = field()
+    
+    score: float = field()
+    velocity: float = field()
+    intercept: float = field()
 
     active_num_neighbors: int = field(default=None)
     active_neighbors_arr: List = field(default=None)
@@ -70,6 +79,13 @@ class RadonDebugValue:
     @epoch_info_tuple.setter
     def  epoch_info_tuple(self, value):
         self.active_decoded_epoch_container.epoch_info_tuple = value
+    
+    @property
+    def epoch_data_index(self) -> int:
+        """The epoch_data_index for the computed epoch."""
+        return self.active_decoded_epoch_container.epoch_data_index
+    
+
     
     
 def compute_score(arr, y_line):
@@ -183,6 +199,9 @@ class RadonTransformDebugger:
     
     active_decoder_name: str = field(default='long_LR') # , on_setattr=on_set_active_decoder_name_changed
     _active_epoch_idx: int = field(default=3) # , on_setattr=on_set_active_epoch_idx_changed
+    _active_epoch_radon_values: Optional[RadonDebugValue] = field(default=None)
+
+# self.update_epoch_idx(active_epoch_idx=self.active_epoch_idx)
 
     window: _RoiStatsDisplayExWindow = field(default=None)
     _band_roi: BandROI = field(default=None)
@@ -241,8 +260,67 @@ class RadonTransformDebugger:
         """ value for current index """
         # a_posterior, (start_point, end_point, band_width), (active_num_neighbors, active_neighbors_arr) = self.on_update_epoch_idx(active_epoch_idx=self.active_epoch_idx)
         # return RadonDebugValue(a_posterior=a_posterior, active_epoch_info_tuple=active_epoch_info_tuple, start_point=start_point, end_point=end_point, band_width=band_width, active_num_neighbors=active_num_neighbors, active_neighbors_arr=active_neighbors_arr)
-        return self.update_epoch_idx(active_epoch_idx=self.active_epoch_idx)
-            
+        if (self._active_epoch_radon_values is not None) and (self._active_epoch_radon_values.epoch_data_index == self._active_epoch_idx):
+            # recompute not needed. Return the existing `self._active_epoch_radon_values`
+            return self._active_epoch_radon_values
+        else:
+            # needs a recompute:
+            self._active_epoch_radon_values = self.update_epoch_idx(active_epoch_idx=self.active_epoch_idx) ## update to the new value
+            assert ((self._active_epoch_radon_values is not None) and (self._active_epoch_radon_values.epoch_data_index == self._active_epoch_idx)), f"self._active_epoch_radon_values.epoch_data_index: {self._active_epoch_radon_values.epoch_data_index} != self._active_epoch_idx: {self._active_epoch_idx}"
+            return self._active_epoch_radon_values
+
+
+    @classmethod
+    def perform_add_real_space_posterior(cls, a_plot, p_x_given_n: NDArray, active_time_bin_edges: NDArray, xbin: NDArray, time_bin_size: float, pos_bin_size: float, legend_key:str='p_x_given_n', debug_print=False):
+        """ 
+        
+        active_time_bin_edges = deepcopy(dbgr.result.time_bin_edges[dbgr.active_epoch_idx])
+        p_x_given_n = deepcopy(dbgr.active_radon_values.p_x_given_n)
+        new_image = perform_add_real_space_posterior(a_plot=new_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=xbin, time_bin_size=time_bin_size, pos_bin_size=pos_bin_size)
+
+        """
+        a_cmap = Colormap(name="viridis", vmin=0) # , vmax=1
+        img_origin = (active_time_bin_edges[0], xbin[0]) # (origin X, origin Y)
+        img_scale = (time_bin_size, pos_bin_size) # ??
+        if debug_print:
+            print(f'img_origin: {img_origin}')
+            print(f'img_scale: {img_scale}')
+
+        label_kwargs = dict(xlabel='t (sec)', ylabel='x (cm)')
+        # label_kwargs = dict(xlabel='t (bin)', ylabel='x (bin)')
+
+        new_image: ImageData = a_plot.addImage(p_x_given_n, legend=legend_key, replace=True, colormap=a_cmap, origin=img_origin, scale=img_scale, **label_kwargs, resetzoom=True) # , colormap="viridis", vmin=0, vmax=1
+        return new_image
+
+
+    def add_real_space_posterior(self, a_plot, legend_key:str='p_x_given_n', debug_print=False):
+        active_time_bin_edges = deepcopy(self.result.time_bin_edges[self.active_epoch_idx])
+        p_x_given_n = deepcopy(self.active_radon_values.p_x_given_n)
+        return self.perform_add_real_space_posterior(a_plot=a_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=self.xbin, time_bin_size=self.time_bin_size, pos_bin_size=self.pos_bin_size)
+
+
+    def add_real_space_curve(self, a_plot, legend_key:str='real_curve', debug_print=False):
+        """ 
+        real_space_curve = dbgr.add_real_space_curve(a_plot=new_plot)
+
+        """
+        ## add the absolute line:
+        real_line_t = deepcopy(self.active_radon_values.active_debug_info.t)
+        best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in self.active_radon_values.active_debug_info.best_y_line_idxs])
+
+        # real_space_curve: Curve = new_plot.addCurve(x=(self.active_radon_values.active_debug_info.ci+0.5), y=self.active_radon_values.active_debug_info.best_y_line_idxs, legend='curve', color='#dfb976', linestyle=':', symbol='o', replace=True) ## This works
+        real_space_curve: Curve = a_plot.addCurve(x=real_line_t, y=best_y_line, legend=legend_key, color='#dfb976', linestyle=':', symbol='o', replace=True) ## This works
+        real_space_curve.setAlpha(alpha=0.86)
+
+        return real_space_curve
+
+
+
+
+# .result.time_bin_edges[dbgr.active_epoch_idx]
+
+
+
 
     def update_epoch_idx(self, active_epoch_idx: int, debug_print=False):
         """ 
@@ -291,7 +369,6 @@ class RadonTransformDebugger:
 
         only_compute_current_active_epoch_time_bins: bool = True
         
-
         NP: int = [np.shape(p)[0] for p in self.result.p_x_given_n_list][0] # just get the first one, they're all the same
         NT: NDArray = np.array([np.shape(p)[1] for p in self.result.p_x_given_n_list]) # These are all different, depends on the length of the epoch.
         if only_compute_current_active_epoch_time_bins:
@@ -390,12 +467,47 @@ class RadonTransformDebugger:
         #                         active_num_neighbors=active_num_neighbors, active_neighbors_arr=active_neighbors_arr,
         #                         start_point=start_point, end_point=end_point, band_width=band_width)
     
+
+
+        # Entirely new radon computation: ____________________________________________________________________________________ #
+        active_time_window_centers = deepcopy(self.result.time_window_centers[self.active_epoch_idx]) # will need this either way later
+        # score, velocity, intercept, (num_neighbours, neighbors_arr, debug_info) = get_radon_transform(posterior=deepcopy(self.active_radon_values.p_x_given_n),
+        #                     decoding_time_bin_duration=self.time_bin_size, pos_bin_size=self.pos_bin_size,
+        #                     nlines=5000, n_jobs=1,
+        #                     margin=None, n_neighbours=1,
+        #                     enable_return_neighbors_arr=True,
+        #                     t0=active_time_window_centers[0],
+        #                     x0=self.xbin_centers[0])
+
+        score, velocity, intercept, (num_neighbours, neighbors_arr, debug_info) = get_radon_transform(posterior=a_posterior,
+                    decoding_time_bin_duration=self.time_bin_size, pos_bin_size=self.pos_bin_size,
+                    nlines=5000, n_jobs=1,
+                    margin=None, n_neighbours=active_num_neighbors,
+                    enable_return_neighbors_arr=True,
+                    t0=active_time_window_centers[0],
+                    x0=self.xbin_centers[0])
+        
+
+        
+
+        score = score[0]
+        velocity = velocity[0]
+        intercept = intercept[0]
+        num_neighbours = num_neighbours[0]
+        neighbors_arr = neighbors_arr[0]
+        a_debug_info: RadonTransformDebugValue = debug_info[0]
+        # a_debug_info
+
+
         ## upgrade to RadonDebugValue:
-        return RadonDebugValue(active_decoded_epoch_container=single_epoch_result,
+        return RadonDebugValue(active_decoded_epoch_container=single_epoch_result, active_debug_info=a_debug_info, score=score, velocity=velocity, intercept=intercept,
+                            # active_num_neighbors=num_neighbours, active_neighbors_arr=neighbors_arr,
                             active_num_neighbors=active_num_neighbors, active_neighbors_arr=active_neighbors_arr,
                             start_point=start_point, end_point=end_point, band_width=band_width)
 
     
+
+
 
     def build_GUI(self):
         ## Get the current data for this index:
