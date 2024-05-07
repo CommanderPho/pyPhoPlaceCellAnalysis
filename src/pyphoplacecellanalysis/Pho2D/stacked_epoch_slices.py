@@ -700,7 +700,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         kwargs['disable_toolbar'] = disable_toolbar
 
 
-        params, plots_data, plots, ui = plot_decoded_epoch_slices(deepcopy(active_filter_epochs), deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
+        params, plots_data, plots, ui = plot_decoded_epoch_slices(filter_epochs=deepcopy(active_filter_epochs), filter_epochs_decoder_result=deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, params_kwargs=params_kwargs, **kwargs)
 
         new_obj = cls(params, plots_data, plots, ui)
@@ -719,7 +719,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         target_height = new_obj.params.get('scrollAreaContents_MinimumHeight', None)
         if target_height is None:
-            target_height = (new_obj.params.all_plots_height + 30)
+            target_height = (new_obj.params.all_plots_height + 30) # 30 is for the scrollbar footer
         # target_height = new_obj.params.get('scrollAreaContents_MinimumHeight', None) | (new_obj.params.all_plots_height + 30)
         desired_final_height = int(min(target_height, screen_size.height())) # don't allow the height to exceed the screen height.
         # print(f'target_height: {target_height}, {  desired_final_height = }')
