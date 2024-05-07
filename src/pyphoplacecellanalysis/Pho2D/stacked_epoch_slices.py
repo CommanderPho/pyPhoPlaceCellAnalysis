@@ -448,9 +448,23 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
         ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name, **kwargs)
         plots.fig = ui.mw.getFigure()
 
-
     plots.fig.suptitle(plots.name)
-    plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False)
+
+    # plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False)
+
+    ## Begin to support a separate column for showing labels
+    subplots_kwargs = dict()
+    params.setdefault('should_use_separate_details_column', False)
+    if params.should_use_separate_details_column:
+        params.n_active_columns = 2
+        subplots_kwargs.update(dict(gridspec_kw={'width_ratios': [1, 2]}))
+
+    else:
+        params.n_active_columns = 1
+        
+    plots.axs = plots.fig.subplots(ncols=params.n_active_columns, nrows=params.active_num_slices, sharex=False, sharey=False, **subplots_kwargs)
+
+
     if not isinstance(plots.axs, (list, tuple, np.ndarray)):
         # if it's not wrapped in a list-like container, wrap it (this should only happen when (params.active_num_slices == 1)
         print(f'type(plots.axs): {type(plots.axs)}: {plots.axs}')
