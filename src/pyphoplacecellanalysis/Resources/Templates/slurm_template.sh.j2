@@ -69,6 +69,17 @@ module load globus-cli
 	source "$( poetry env list --full-path | grep Activated | cut -d' ' -f1 )/bin/activate"
 #}
 source '/home/halechr/repos/Spike3D/.venv/bin/activate'
-srun '/home/halechr/repos/Spike3D/.venv/bin/python' '{{ python_script_path }}'
 
+# srun '/home/halechr/repos/Spike3D/.venv/bin/python' '{{ python_script_path }}'
+
+# You can verify which Python interpreter is being used with 'which python'
+which python
+
+# Run the Python script
+python '{{ python_script_path }}'
+
+
+
+# Deactivate the virtual environment when done (optional here but good practice)
+deactivate
 
