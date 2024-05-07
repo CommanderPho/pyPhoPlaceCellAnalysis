@@ -294,9 +294,13 @@ class RadonTransformDebugger:
 
 
     def add_real_space_posterior(self, a_plot, legend_key:str='p_x_given_n', debug_print=False):
+        """
+        new_image_data: ImageData = dbgr.add_real_space_posterior(a_plot=new_plot)
+
+        """
         active_time_bin_edges = deepcopy(self.result.time_bin_edges[self.active_epoch_idx])
         p_x_given_n = deepcopy(self.active_radon_values.p_x_given_n)
-        return self.perform_add_real_space_posterior(a_plot=a_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=self.xbin, time_bin_size=self.time_bin_size, pos_bin_size=self.pos_bin_size)
+        return self.perform_add_real_space_posterior(a_plot=a_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=self.xbin, time_bin_size=self.time_bin_size, pos_bin_size=self.pos_bin_size, legend_key=legend_key, debug_print=debug_print)
 
 
     def add_real_space_curve(self, a_plot, legend_key:str='real_curve', debug_print=False):
@@ -316,14 +320,8 @@ class RadonTransformDebugger:
 
 
 
-
-# .result.time_bin_edges[dbgr.active_epoch_idx]
-
-
-
-
     def update_epoch_idx(self, active_epoch_idx: int, debug_print=False):
-        """ 
+        """ Called when the active_epoch_idx is updated to recompute the required RadonTransform values and update the GUI/ROIs
         Usage:
             a_posterior, (start_point, end_point, band_width), (active_num_neighbors, active_neighbors_arr) = on_update_epoch_idx(active_epoch_idx=5)
         
@@ -459,45 +457,32 @@ class RadonTransformDebugger:
         # Initialize an instance of TransformDebugger using the variables as keyword arguments
         # transform_debug_instance = RadonDebugValue(a_posterior=a_posterior, start_point=start_point, end_point=end_point, band_width=band_width, active_num_neighbors=active_num_neighbors, active_neighbors_arr=active_neighbors_arr)
 
-
         single_epoch_result: SingleEpochDecodedResult = self.result.get_result_for_epoch(active_epoch_idx=self.active_epoch_idx)
-
-        # return a_posterior, active_epoch_info_tuple, (active_num_neighbors, active_neighbors_arr), (start_point, end_point, band_width)
-        # return RadonDebugValue(p_x_given_n=a_posterior, epoch_info_tuple=active_epoch_info_tuple,
-        #                         active_num_neighbors=active_num_neighbors, active_neighbors_arr=active_neighbors_arr,
-        #                         start_point=start_point, end_point=end_point, band_width=band_width)
-    
-
 
         # Entirely new radon computation: ____________________________________________________________________________________ #
         active_time_window_centers = deepcopy(self.result.time_window_centers[self.active_epoch_idx]) # will need this either way later
-        # score, velocity, intercept, (num_neighbours, neighbors_arr, debug_info) = get_radon_transform(posterior=deepcopy(self.active_radon_values.p_x_given_n),
-        #                     decoding_time_bin_duration=self.time_bin_size, pos_bin_size=self.pos_bin_size,
-        #                     nlines=5000, n_jobs=1,
-        #                     margin=None, n_neighbours=1,
-        #                     enable_return_neighbors_arr=True,
-        #                     t0=active_time_window_centers[0],
-        #                     x0=self.xbin_centers[0])
-
         score, velocity, intercept, (num_neighbours, neighbors_arr, debug_info) = get_radon_transform(posterior=a_posterior,
                     decoding_time_bin_duration=self.time_bin_size, pos_bin_size=self.pos_bin_size,
-                    nlines=5000, n_jobs=1,
+                    nlines=8192, n_jobs=1,
                     margin=None, n_neighbours=active_num_neighbors,
                     enable_return_neighbors_arr=True,
                     t0=active_time_window_centers[0],
                     x0=self.xbin_centers[0])
-        
-
-        
-
         score = score[0]
         velocity = velocity[0]
         intercept = intercept[0]
         num_neighbours = num_neighbours[0]
         neighbors_arr = neighbors_arr[0]
         a_debug_info: RadonTransformDebugValue = debug_info[0]
-        # a_debug_info
 
+
+        ## Get the correct band roi start/end points using the same equations as the absolute line:
+        real_line_t = deepcopy(a_debug_info.t)
+        best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in a_debug_info.best_y_line_idxs])
+        start_point = [real_line_t[0], best_y_line[0]]
+        end_point = [real_line_t[-1], best_y_line[-1]]
+        band_width = float(num_neighbours)
+        
 
         ## upgrade to RadonDebugValue:
         return RadonDebugValue(active_decoded_epoch_container=single_epoch_result, active_debug_info=a_debug_info, score=score, velocity=velocity, intercept=intercept,
@@ -528,7 +513,12 @@ class RadonTransformDebugger:
         # updateThread.start()  # Start updating the plot
 
         # define some image and curve
-        self.window.plot.addImage(self.active_radon_values.p_x_given_n, legend='P_x_given_n', replace=True, xlabel='time bins', ylabel='pos_bins', selectable=False, draggable=False)
+        # self.window.plot.addImage(self.active_radon_values.p_x_given_n, legend='P_x_given_n', replace=True, xlabel='time bins', ylabel='pos_bins', selectable=False, draggable=False)
+
+        new_image_data: ImageData = self.add_real_space_posterior(a_plot=self.window.plot, legend_key='P_x_given_n')
+        real_space_curve = self.add_real_space_curve(a_plot=self.window.plot)
+
+
         # window.plot.addImage(numpy.random.random(10000).reshape(100, 100), legend='img2', origin=(0, 100))
         self.window.setStats(self.stats_measures)
 

@@ -76,7 +76,7 @@ class _RoiStatsDisplayExWindow(qt.QMainWindow):
         qt.QMainWindow.__init__(self, parent)
         self.plot = Plot2D()
         self.plot.getDefaultColormap().setName('viridis')
-        self.plot.setKeepDataAspectRatio(True)
+        # self.plot.setKeepDataAspectRatio(True)
 
         self.setCentralWidget(self.plot)
 
