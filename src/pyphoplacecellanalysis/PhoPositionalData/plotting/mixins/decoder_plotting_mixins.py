@@ -482,7 +482,7 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter
 
 @define(slots=False)
 class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
-    """ plots a decoded 3D using pyqtgraph. 
+    """ plots a decoded trajectory using pyvista. 
     
     Usage:
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryPyVistaPlotter
@@ -676,7 +676,14 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             n_xbins, n_ybins, actual_n_epoch_timebins = np.shape(a_posterior_p_x_given_n) # (5, 312)
             assert n_epoch_timebins == actual_n_epoch_timebins, f"n_epoch_timebins: {n_epoch_timebins} != actual_n_epoch_timebins: {actual_n_epoch_timebins} from np.shape(a_posterior_p_x_given_n) ({np.shape(a_posterior_p_x_given_n)})"
         else:
+            a_posterior_p_x_given_n = np.atleast_2d(a_posterior_p_x_given_n).T # (57, 1)
+            required_n_y_bins: int = len(self.ybin_centers)
             n_xbins, n_ybins = np.shape(a_posterior_p_x_given_n) # (5, 312)
+
+            ## for a 1D posterior, fill solid across all y-bins
+            if (n_ybins < required_n_y_bins) and (n_ybins == 1):
+                a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, required_n_y_bins)) # (57, 6)
+                n_xbins, n_ybins = np.shape(a_posterior_p_x_given_n) # update again with new matrix
 
         assert n_xbins == np.shape(self.xbin_centers)[0], f"n_xbins: {n_xbins} != np.shape(xbin_centers)[0]: {np.shape(self.xbin_centers)}"
         assert n_ybins == np.shape(self.ybin_centers)[0], f"n_ybins: {n_ybins} != np.shape(ybin_centers)[0]: {np.shape(self.ybin_centers)}"
@@ -696,7 +703,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         # n_time_bins: int = len(self.a_result.time_bin_containers[an_epoch_idx].centers)
         assert len(a_time_bin_centers) == len(a_most_likely_positions), f"len(a_time_bin_centers): {len(a_time_bin_centers)} != len(a_most_likely_positions): {len(a_most_likely_positions)}"
         # print(f'np.shape(a_posterior_p_x_given_n): {np.shape(a_posterior_p_x_given_n)}') # : (58, 5, 312) - (n_xbins, n_ybins, n_epoch_timebins)
-        n_xbins, n_ybins, n_epoch_timebins = np.shape(a_posterior_p_x_given_n_all_t)
+        # 
 
         min_v = np.nanmin(a_posterior_p_x_given_n_all_t)
         max_v = np.nanmax(a_posterior_p_x_given_n_all_t)
@@ -705,7 +712,14 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         # print(f'multiplier_factor: {multiplier_factor}')
 
         ## get the specific time_bin_index posterior:
-        a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, :, time_bin_index])
+        if np.ndim(a_posterior_p_x_given_n_all_t) > 2:
+            ## multiple time bins case (3D)
+            # n_xbins, n_ybins, n_epoch_timebins = np.shape(a_posterior_p_x_given_n_all_t)
+            a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, :, time_bin_index])
+        else:
+            ## single time bin case (2D)
+            # n_xbins, n_ybins = np.shape(a_posterior_p_x_given_n_all_t) ???
+            a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, time_bin_index])
         a_posterior_p_x_given_n = a_posterior_p_x_given_n * multiplier_factor # multiply by the desired multiplier factor
         return a_posterior_p_x_given_n, a_time_bin_centers
 
