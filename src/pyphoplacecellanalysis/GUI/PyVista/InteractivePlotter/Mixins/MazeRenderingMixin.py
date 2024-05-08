@@ -40,7 +40,6 @@ class TrackShapePlottingConfig(BasePlotDataParams):
     visible_track_opacity = param.Number(default=1.0, bounds=(0.0, 1.0), step=0.1)
     hidden_track_opacity = param.Number(default=0.1, bounds=(0.0, 1.0), step=0.1)
 
-
     long_maze_bg_color = param.Color(default="#4c4c4c", doc="the color of the long track mesh")
     short_maze_bg_color = param.Color(default="#4c4c4c", doc="the color of the short track mesh")
     
