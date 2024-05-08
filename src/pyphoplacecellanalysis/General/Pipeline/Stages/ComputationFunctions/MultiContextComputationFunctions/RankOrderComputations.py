@@ -1690,7 +1690,7 @@ class RankOrderAnalyses:
 
         # `combined_best_direction_indicies` method:
         active_replay_epochs_df = deepcopy(rank_order_results.LR_ripple.epochs_df)
-        assert 'combined_best_direction_indicies' in active_replay_epochs_df, f"active_replay_epochs_df needs combined_best_direction_indicies"
+        assert 'combined_best_direction_indicies' in active_replay_epochs_df, f"active_replay_epochs_df needs 'combined_best_direction_indicies'"
         combined_best_direction_indicies = deepcopy(active_replay_epochs_df['combined_best_direction_indicies'])
         assert np.shape(combined_best_direction_indicies)[0] == np.shape(rank_order_results.ripple_combined_epoch_stats_df)[0]
         long_best_direction_indicies = combined_best_direction_indicies # use same (globally best) indicies for Long/Short
@@ -2026,6 +2026,8 @@ class RankOrderAnalyses:
         TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
 
         """
+        from neuropy.utils.indexing_helpers import PandasHelpers
+
         # Unpacking:
         rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
         # ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
@@ -2045,11 +2047,26 @@ class RankOrderAnalyses:
         if laps_combined_epoch_stats_df is None:
             return False
 
-        for a_combined_epoch_stats_df_name, a_combined_epoch_stats_df in {'laps_combined_epoch_stats_df': laps_combined_epoch_stats_df, 'ripple_combined_epoch_stats_df': ripple_combined_epoch_stats_df}.items():
-            for a_column in ('Long_BestDir_quantile', 'Short_BestDir_quantile', 'combined_best_direction_indicies', 'LR_Long_pearson_percentile', 'LR_Short_percentile', 'RL_Long_percentile', 'RL_Short_percentile'):
-                if not a_column in a_combined_epoch_stats_df.columns:
-                    print(f'`{a_combined_epoch_stats_df_name}` is missing quantile column "{a_column}". Has columns {list(a_combined_epoch_stats_df.columns)}')
-                    return False
+        # missing: 'combined_best_direction_indicies'
+        # rank_order_results.c
+        # global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference)
+
+        shared_required_cols = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'combined_best_direction_indicies', 'LR_Long_pearson_percentile', 'LR_Short_percentile', 'RL_Long_percentile', 'RL_Short_percentile']
+        ripple_required_cols = shared_required_cols + ['combined_best_direction_indicies']
+
+        required_cols_dict = dict(laps=shared_required_cols, ripple=ripple_required_cols)
+    
+
+        # for a_combined_epoch_stats_df_name, a_combined_epoch_stats_df in {'laps_combined_epoch_stats_df': laps_combined_epoch_stats_df, 'ripple_combined_epoch_stats_df': ripple_combined_epoch_stats_df}.items():
+        for a_combined_epoch_stats_df_name, a_combined_epoch_stats_df in {'laps': laps_combined_epoch_stats_df, 'ripple': ripple_combined_epoch_stats_df}.items():
+            has_required_columns = PandasHelpers.require_columns({a_name:a_result.filter_epochs for a_name, a_result in a_combined_epoch_stats_df.items()}, required_cols_dict[a_combined_epoch_stats_df_name], print_missing_columns=True)
+            if not has_required_columns:
+                return False
+
+            # for a_column in ('Long_BestDir_quantile', 'Short_BestDir_quantile', 'combined_best_direction_indicies', 'LR_Long_pearson_percentile', 'LR_Short_percentile', 'RL_Long_percentile', 'RL_Short_percentile'):
+            #     if not a_column in a_combined_epoch_stats_df.columns:
+            #         print(f'`{a_combined_epoch_stats_df_name}` is missing quantile column "{a_column}". Has columns {list(a_combined_epoch_stats_df.columns)}')
+            #         return False
 
         return True
 
@@ -2452,7 +2469,15 @@ def validate_has_rank_order_results(curr_active_pipeline, computation_filter_nam
         """
         # Unpacking:
         rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-        ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+        results_minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        results_included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        ripple_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.ripple_most_likely_result_tuple
+        laps_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.laps_most_likely_result_tuple
+
+        ## TODO: make sure result is for the current minimimum:
+
+        ## TODO: require same `included_qclu_values` values
+
 
         ## Used to be `x[0] for x.long_stats_z_scorer` and `x[1] for x.short_stats_z_scorer`
         # Extract the real spearman-values/p-values:
@@ -2480,14 +2505,22 @@ def validate_has_rank_order_results(curr_active_pipeline, computation_filter_nam
         RL_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
         RL_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
 
-        # make sure result is for the current minimimum:
-        results_minimum_inclusion_fr_Hz = rank_order_results.minimum_inclusion_fr_Hz
-        included_qclu_values = rank_order_results.included_qclu_values
 
-        ## TODO: require same `included_qclu_values` values
-        rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
-        if rank_order_z_score_df is None:
-            return False
+        # `LongShortStatsItem` form (2024-01-02):
+        # LR_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+        # RL_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+        LR_results_long_short_z_diffs = np.array([a_result_item.long_short_z_diff for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+        RL_results_long_short_z_diff = np.array([a_result_item.long_short_z_diff for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+
+
+        laps_merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.laps_merged_complete_epoch_stats_df ## New method
+        ripple_merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.ripple_merged_complete_epoch_stats_df ## New method
+
+        if ripple_result_tuple is not None:
+            rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
+            # if rank_order_z_score_df is None:
+            #     return False # failing here
+
 
         # 2023-12-15 - Newest method:
         ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
@@ -2510,7 +2543,7 @@ def validate_has_rank_order_results(curr_active_pipeline, computation_filter_nam
         # if 'LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df:
         #     return False
 
-        if not cls.validate_has_rank_order_results_quantiles(curr_active_pipeline, computation_filter_name=computation_filter_name, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz):
+        if not RankOrderAnalyses.validate_has_rank_order_results_quantiles(curr_active_pipeline, computation_filter_name=computation_filter_name, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz):
             return False
         
         # rank_order_results.included_qclu_values
