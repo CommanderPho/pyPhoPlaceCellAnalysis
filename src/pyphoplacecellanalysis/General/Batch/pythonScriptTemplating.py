@@ -412,7 +412,8 @@ def build_vscode_workspace(script_paths):
 @function_attributes(short_name=None, tags=['Windows-only', 'powershell', 'batch', 'script'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 11:00', related_items=[])
 def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int = 3,
                                         activate_path='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/activate.bat', 
-                                        python_executable='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe'):
+                                        python_executable='c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe',
+                                        script_name: str = 'run_scripts'):
     """
     Builds a Powershell script to run Python scripts in parallel on Windows.
 
@@ -429,7 +430,7 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
 
     # Get the top-level directory to save the Powershell script
     top_level_script_folders_path = Path(script_paths[0]).resolve().parent.parent
-    ps_script_path = top_level_script_folders_path.joinpath('run_scripts.ps1').resolve()
+    ps_script_path = top_level_script_folders_path.joinpath(f'{script_name}.ps1').resolve()
     print(f'ps_script_path: {ps_script_path}')
 
     # PowerShell script preamble
