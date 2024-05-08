@@ -479,6 +479,8 @@ class RadonTransformDebugger:
         ## Get the correct band roi start/end points using the same equations as the absolute line:
         real_line_t = deepcopy(a_debug_info.t)
         best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in a_debug_info.best_y_line_idxs])
+
+        # Compute ROI band values. These don't look right despite the above being right.
         start_point = [real_line_t[0], best_y_line[0]]
         end_point = [real_line_t[-1], best_y_line[-1]]
         band_width = float(num_neighbours)
