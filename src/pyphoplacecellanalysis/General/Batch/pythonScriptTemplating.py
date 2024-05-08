@@ -437,9 +437,15 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
     # Define a ScriptBlock to activate the virtual environment, change directory, and execute the Python script
     $scriptBlock = {{
         param([string]$activatePath, [string]$pythonExec, [string]$scriptPath, [string]$parentDir)
-        & $activatePath | Out-Null
-        Set-Location -Path $parentDir
-        & $pythonExec $scriptPath | Out-Null
+        try {{
+            & $activatePath | Out-Null
+            Set-Location -Path $parentDir
+            Write-Output "Starting script: $scriptPath" # Log which script is starting
+            & $pythonExec $scriptPath | Out-Null
+            Write-Output "Completed script: $scriptPath" # Log when the script completes
+        }} catch {{
+            Write-Error "An error occurred for script: $scriptPath"
+        }}
     }}
 
     # Initialize job queue and set the job limit
@@ -454,12 +460,14 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
     # Wait until there is a free slot to run a new job
     while ($jobQueue.Count -ge $jobLimit) {{
         $completedJobs = @($jobQueue | Where-Object {{ $_.State -eq 'Completed' }})
-        if ($completedJobs) {{
+        foreach ($job in $completedJobs) {{
             # Remove completed jobs from the queue
-            $completedJobs | Remove-Job
-            $jobQueue = @($jobQueue | Where-Object {{ $_.State -ne 'Completed' }})
-        }} else {{
-            # Wait for some time before checking again
+            $job | Remove-Job
+            Write-Output "Job $($job.Id) has been removed from the queue."
+        }}
+        $jobQueue = @($jobQueue | Where-Object {{ $_.State -ne 'Completed' }})
+        if (!$completedJobs) {{
+            # Wait for some time before checking again if no jobs were completed
             Start-Sleep -Seconds 5
         }}
     }}
@@ -467,21 +475,31 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
     # Add a new job to the queue
     $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList '{activate_path}', '{python_executable}', '{script}', '{parent_directory}'
     $jobQueue += , $job  # Append job to the queue as an array element
+
+    Write-Output "Starting Job for '{script}'"
     """
 
     # Finish the script with job monitoring and cleanup
-    powershell_script += """
-    # Wait for all queued jobs to complete
-    $jobQueue | Wait-Job
+    powershell_script += f"""
+    # Wait for all queued jobs to complete, logging after each completes
+    while ($jobQueue.Count -gt 0) {{
+        $completedJobs = @($jobQueue | Wait-Job -Any)
 
-    # Gather the results of each job (optional)
-    $jobQueue | ForEach-Object {
-        $_ | Receive-Job
-    }
+        # Receive and log output from completed jobs
+        foreach ($job in $completedJobs) {{
+            Receive-Job -Job $job
+            Write-Output "Job $($job.Id) has completed."
+            # Remove the completed job from the job queue
+            $jobQueue = $jobQueue | Where-Object {{ $_.Id -ne $job.Id }}
+        }}
 
-    # Clean up the job queue
-    $jobQueue | Remove-Job
+        # Clean up completed job objects
+        Remove-Job -Job $completedJobs
+    }}
+
+    Write-Output "All jobs have been processed."
     """
+
 
     # Save the generated PowerShell script to a file
     with open(ps_script_path, 'w') as file:
