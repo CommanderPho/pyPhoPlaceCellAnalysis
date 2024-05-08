@@ -350,36 +350,35 @@ def build_vscode_workspace(script_paths):
             "python.terminal.launchArgs": [
             ],
             "powershell.cwd": "gen_scripts",
-            "actionButtons": {
-				"commands": [
-				{
-					"cwd": "${workspaceFolder}/EyeTrackApp/", /* Terminal initial folder */
-					"name": "Run Powershell Batch Script",
-					"color": "#33FF33",
-					"singleInstance": true,
-					"command": "powershell.exe -File run_scripts.ps1", /* This is executed in the terminal */
-					"terminalName": "Powershell Batch Run Terminal",
-					"tooltip": "Runs 'run_scripts.ps1' in powershell to batch process the sesse the eyetrackapp GUI",
-				},
-				// {
-				// 	"cwd": "${workspaceFolder}/EyeTrackApp/",
-				//     "name": "Build pyinstaller",
-				//     "color": "green",
-				//     "command": "python -m pyinstaller eyetrackapp.spec --noconfirm",
-				// },
-				],
-				"defaultColor": "white",
-				"reloadButton": "↻",
-				"loadNpmCommands": false
-			},
         },
-		"extensions": {
-			"recommendations": [
-				"jkearins.action-buttons-ext"
-			]
-		},
+        "extensions": {
+            "recommendations": [
+                "jkearins.action-buttons-ext"
+            ]
+        },
     }
     """
+
+
+    # """
+    #             "actionButtons": {
+    #             "commands": [
+    #                 {
+    #                     "cwd": "${workspaceFolder}", /* Terminal initial folder */
+    #                     "name": "Run Powershell Batch Script",
+    #                     "color": "#33FF33",
+    #                     "singleInstance": true,
+    #                     "command": "powershell.exe -File run_scripts.ps1", /* This is executed in the terminal */
+    #                     "terminalName": "Powershell Batch Run Terminal",
+    #                     "tooltip": "Runs 'run_scripts.ps1' in powershell to batch process the sesse the eyetrackapp GUI",
+    #                 },
+    #             ],
+    #             "defaultColor": "white",
+    #             "reloadButton": "↻",
+    #             "loadNpmCommands": false
+    #         },
+
+    # """
 
     # Create Jinja template object
     template = Template(vscode_workspace_template)
