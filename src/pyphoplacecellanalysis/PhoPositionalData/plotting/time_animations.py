@@ -41,16 +41,22 @@ class CustomTimeAnimationRoutine:
 @define(slots=False)
 class TrackConfigurationTimeAnimationRoutine(CustomTimeAnimationRoutine):
     """ used to animate the transition between active tracks (long/short) by adjusting the opacity of the 3D track
-     
+     NOTE: this is not actually needed because there is a hardcoded implementation built in to `InteractivePyvistaPlotter_MazeRenderingMixin`: see `on_update_current_window_MazeRenderingMixin`
       
     Usage:
 
         from pyphoplacecellanalysis.PhoPositionalData.plotting.time_animations import TrackConfigurationTimeAnimationRoutine
     
         t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-        custom_track_animatior: TrackConfigurationTimeAnimationRoutine = CustomTimeAnimationRoutine(t_start=t_start, t_delta=t_delta, t_end=t_end, 
+        custom_track_animatior: TrackConfigurationTimeAnimationRoutine = TrackConfigurationTimeAnimationRoutine(t_start=t_start, t_delta=t_delta, t_end=t_end, 
                 long_maze_bg=ipspikesDataExplorer.plots['long_maze_bg'], short_maze_bg=ipspikesDataExplorer.plots['short_maze_bg'],
             )
+
+        
+        self.params.custom_track_animatior = TrackConfigurationTimeAnimationRoutine(t_start=self.active_config.plotting_config.t_start, t_delta=self.active_config.plotting_config.t_delta, t_end=self.active_config.plotting_config.t_end, 
+            long_maze_bg=self.long_maze_bg, short_maze_bg=self.short_maze_bg,
+        )
+
             
     """
     t_start: float = field()
