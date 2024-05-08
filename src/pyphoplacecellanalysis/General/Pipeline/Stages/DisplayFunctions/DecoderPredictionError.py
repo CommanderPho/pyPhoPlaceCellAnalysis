@@ -1064,7 +1064,6 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 # Try subtracting another half o a time bin width just for fun:
                 # epoch_time_bins = epoch_time_bins - (0.5 * dt)
 
-
                 # # epoch_intercept occurs at the left edge of the epoch, meaning t=0.0 relative times:
                 # epoch_time_bins = time_bin_containers[epoch_idx].edges
                 # epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch 
@@ -1074,7 +1073,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
                 # first_bin_center_epoch_intercept: float = epoch_intercept + (epoch_vel * half_dt)
                 # epoch_line_fn = lambda t: (epoch_vel * (t - t_start)) + epoch_intercept # first_bin_center_epoch_intercept
-                epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: (vel_bound * (t - t_start_bound)) + icpt_bound # Attempt to fix the issue with the function by binding each loop variable as a default value.
+                # epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: (vel_bound * (t - t_start_bound)) + icpt_bound # Attempt to fix the issue with the function by binding each loop variable as a default value.
+
+                epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: (vel_bound * t) + icpt_bound # Attempt to fix the issue with the function by binding each loop variable as a default value.
 
                 # # epoch_line_eqn = (epoch_vel * epoch_time_bins) + first_bin_center_epoch_intercept
                 # epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers])
@@ -1266,17 +1267,27 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                     curr_ax.add_artist(extant_line)
             
 
-                curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
-                # curr_line_y = plots_data.radon_transform_data[data_idx].line_y
-                extant_line.set_data(actual_time_bins, curr_line_y)
+                # curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
+                curr_line_y = plots_data.radon_transform_data[data_idx].line_y
+                real_line_extrapolated_t = np.squeeze(curr_time_bins)
+                real_line_extrapolated_x = np.interp(real_line_extrapolated_t, xp=np.squeeze(actual_time_bins), fp=np.squeeze(curr_line_y))
+
+                extant_line.set_data(real_line_extrapolated_t, real_line_extrapolated_x)
+                # extant_line.set_data(actual_time_bins, curr_line_y)
                 # extant_line.set_data(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y)
                 radon_transform_plot = extant_line
             else:
                 # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
                 # radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
-                curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
-                # curr_line_y = plots_data.radon_transform_data[data_idx].line_y
-                radon_transform_plot, = curr_ax.plot(actual_time_bins, curr_line_y, **plot_kwargs)
+
+                # curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
+                curr_line_y = plots_data.radon_transform_data[data_idx].line_y
+                real_line_extrapolated_t = np.squeeze(curr_time_bins)
+                real_line_extrapolated_x = np.interp(real_line_extrapolated_t, xp=np.squeeze(actual_time_bins), fp=np.squeeze(curr_line_y))
+
+                radon_transform_plot, = curr_ax.plot(real_line_extrapolated_t, real_line_extrapolated_x, **plot_kwargs)
+
+                # radon_transform_plot, = curr_ax.plot(actual_time_bins, curr_line_y, **plot_kwargs)
         else:
             ## Remove the existing one
             if extant_line is not None:
@@ -1393,9 +1404,9 @@ class WeightedCorrelationPlotData:
             column_formatting_fn_dict = {'start':None, 'stop':None, 'label':None, 'duration':None,
                 'wcorr': (lambda v:f"wcorr: {default_float_formatting_fn(v)}"),
                 'P_decoder':(lambda v:f"$P_i$: {default_float_formatting_fn(v)}"),
-                'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
-                'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
-                'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
+                # 'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
+                # 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
+                # 'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
                 # 'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
                 # 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
             }
