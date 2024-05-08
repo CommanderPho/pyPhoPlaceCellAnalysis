@@ -29,6 +29,8 @@ from neuropy.utils.result_context import IdentifyingContext
 BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_slurm_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
 
 
+
+
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
          create_slurm_scripts:bool=False, should_create_vscode_workspace:bool=True,          # , should_create_powershell_scripts:bool=True
@@ -60,6 +62,13 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
         
     """
+    def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_slurm_script_name_prefix:str='run'):
+        slurm_script_path = os.path.join(curr_batch_script_rundir, f'{a_slurm_script_name_prefix}_{a_curr_session_context}.sh')
+        with open(slurm_script_path, 'w') as script_file:
+            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
+            script_file.write(script_content)
+        return slurm_script_path
+
     assert isinstance(session_batch_basedirs, dict)
 
     if not isinstance(output_directory, Path):
@@ -93,7 +102,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
     output_python_scripts = []
 
-    output_slurm_scripts = []
+    output_slurm_scripts = {'run': [], 'figs': []}
     # Make sure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
     
@@ -136,13 +145,16 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
         # Create the SLURM script
         if create_slurm_scripts:
-            slurm_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.sh')
-            with open(slurm_script_path, 'w') as script_file:
-                script_content = slurm_template.render(curr_session_context=f"{curr_session_context}", python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
-                script_file.write(script_content)
+            slurm_run_script_path = _subfn_build_slurm_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_slurm_script_name_prefix='run')
+            output_slurm_scripts['run'].append(slurm_run_script_path)
 
-            # Add the output files:
-            output_slurm_scripts.append(slurm_script_path)
+            if should_perform_figure_generation_to_file:
+                slurm_figure_script_path = _subfn_build_slurm_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_slurm_script_name_prefix='figs')
+                output_slurm_scripts['figs'].append(slurm_figure_script_path)
+
+
+
+
     
 
     # if should_create_powershell_scripts and (platform.system() == 'Windows'):
@@ -338,7 +350,34 @@ def build_vscode_workspace(script_paths):
             "python.terminal.launchArgs": [
             ],
             "powershell.cwd": "gen_scripts",
-        }
+            "actionButtons": {
+				"commands": [
+				{
+					"cwd": "${workspaceFolder}/EyeTrackApp/", /* Terminal initial folder */
+					"name": "Run Powershell Batch Script",
+					"color": "#33FF33",
+					"singleInstance": true,
+					"command": "powershell.exe -File run_scripts.ps1", /* This is executed in the terminal */
+					"terminalName": "Powershell Batch Run Terminal",
+					"tooltip": "Runs 'run_scripts.ps1' in powershell to batch process the sesse the eyetrackapp GUI",
+				},
+				// {
+				// 	"cwd": "${workspaceFolder}/EyeTrackApp/",
+				//     "name": "Build pyinstaller",
+				//     "color": "green",
+				//     "command": "python -m pyinstaller eyetrackapp.spec --noconfirm",
+				// },
+				],
+				"defaultColor": "white",
+				"reloadButton": "↻",
+				"loadNpmCommands": false
+			},
+        },
+		"extensions": {
+			"recommendations": [
+				"jkearins.action-buttons-ext"
+			]
+		},
     }
     """
 
