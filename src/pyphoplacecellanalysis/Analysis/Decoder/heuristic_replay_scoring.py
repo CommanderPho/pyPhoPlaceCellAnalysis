@@ -9,7 +9,7 @@ from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 import attrs
-from attrs import field, Factory, asdict, astuple
+from attrs import asdict, astuple, define, field, Factory
 
 import numpy as np
 import pandas as pd
@@ -17,13 +17,15 @@ import pandas as pd
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
 from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_derivs
 
 
-HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", "position_derivatives_df")})
-
+HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", "position_derivatives_df")}, bases=(UnpackableMixin, object,))
+# longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change, position_derivatives_df = a_tuple
 
 def is_valid_sequence_index(sequence, test_index: int) -> bool:
     """ checks if the passed index is a valid index without wrapping.        
