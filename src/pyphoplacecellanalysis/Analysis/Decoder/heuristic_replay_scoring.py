@@ -604,7 +604,7 @@ class HeuristicReplayScoring:
         if n_time_bins <= 1:
             if debug_print:
                 print(f"WARN: n_time_bins must be greater than 1 for the first_order_diff to make any sense, but it it isn't. n_time_bins: {n_time_bins}")
-            return HeuristicScoresTuple(1, None, None, None, None, None)
+            return HeuristicScoresTuple(1, None, None, None, None, None, None, None, None)
         else:
 
             # The idea here was to look at the most-likely positions and their changes (derivatives) to see if these were predictive of good vs. bad ripples. For example, bad ripples might have extreme accelerations while good ones fall within a narrow window of physiologically consistent accelerations
