@@ -24,8 +24,10 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_derivs
 
 
-HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", "position_derivatives_df")}, bases=(UnpackableMixin, object,))
-# longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change, position_derivatives_df = a_tuple
+HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", 
+                                                                                     "total_variation", "integral_second_derivative", "stddev_of_diff",
+                                                                                     "position_derivatives_df")}, bases=(UnpackableMixin, object,))
+# longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change, total_variation, integral_second_derivative, stddev_of_diff, position_derivatives_df = a_tuple
 
 def is_valid_sequence_index(sequence, test_index: int) -> bool:
     """ checks if the passed index is a valid index without wrapping.        
@@ -111,6 +113,30 @@ def _compute_diffusion_value(a_p_x_given_n: NDArray) -> float:
     # ratio_bins_higher_than_diffusion_across_time: float = (float(num_bins_higher_than_diffusion_across_time) / float(n_pos_bins))
 
     return uniform_diffusion_prob
+
+def _compute_total_variation(arr) -> float:
+    """ very simple description of how much each datapoint varies
+     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _compute_total_variation
+      
+    """
+    return np.nansum(np.abs(np.diff(arr)))
+
+
+def _compute_integral_second_derivative(arr, dx=1) -> float:
+    """ very simple description of how much each datapoint varies
+     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _compute_integral_second_derivative
+      
+    """
+    return np.nansum(np.diff(arr, n=2))/dx
+
+
+def _compute_stddev_of_diff(arr) -> float:
+    """ very simple description of how much each datapoint varies
+     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _compute_stddev_of_diff
+      
+    """
+    return np.std(np.diff(arr, n=1))
+
 
 
 @define(slots=False)
@@ -691,7 +717,16 @@ class HeuristicReplayScoring:
             total_incongruent_direction_change: float = np.nansum(np.abs(incongruent_bin_diffs))
             if debug_print:
                 print(f'total_congruent_direction_change: {total_congruent_direction_change}, total_incongruent_direction_change: {total_incongruent_direction_change}')
-            return HeuristicScoresTuple(longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change, position_derivatives_df)
+
+            ## 2024-05-09 - New - "integral_second_derivative", "stddev_of_diff"
+            total_variation = _compute_total_variation(a_most_likely_positions_list)
+            integral_second_derivative = _compute_integral_second_derivative(a_most_likely_positions_list)
+            stddev_of_diff = _compute_stddev_of_diff(a_most_likely_positions_list)
+
+            
+            return HeuristicScoresTuple(longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change,
+                                        total_variation=total_variation, integral_second_derivative=integral_second_derivative, stddev_of_diff=stddev_of_diff,
+                                        position_derivatives_df=position_derivatives_df)
 
     @classmethod
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=['compute_all_heuristic_scores'], creation_date='2024-03-07 19:54', related_items=[])
