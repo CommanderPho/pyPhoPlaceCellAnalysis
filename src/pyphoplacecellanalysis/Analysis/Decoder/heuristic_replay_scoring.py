@@ -113,7 +113,7 @@ def _compute_diffusion_value(a_p_x_given_n: NDArray) -> float:
     return uniform_diffusion_prob
 
 
-def partition_subsequences_ignoring_same_positions(lst: List, same_thresh: float = 4.0, debug_print=False):
+def partition_subsequences_ignoring_same_positions(first_order_diff_lst: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False) -> Tuple[NDArray, NDArray]:
     """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
      
     NOTE: This helps "ignore" false-positive direction changes for bins with spatially-nearby (stationary) positions that happen to be offset in the wrong direction.
@@ -124,10 +124,10 @@ def partition_subsequences_ignoring_same_positions(lst: List, same_thresh: float
         from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import partition_subsequences_ignoring_same_positions
 
         lst1 = [0, 3.80542, -3.80542, -19.0271, 0, -19.0271]
-        list_parts1, list_split_indicies1 = partition_subsequences(lst=lst1) # [[0, 3.80542, -3.80542, 0, -19.0271]]
+        list_parts1, list_split_indicies1 = partition_subsequences_ignoring_same_positions(lst=lst1) # [[0, 3.80542, -3.80542, 0, -19.0271]]
 
         lst2 = [0, 3.80542, 5.0, -3.80542, -19.0271, 0, -19.0271]
-        list_parts2, list_split_indicies2 = partition_subsequences(lst=lst2) # [[0, 3.80542, -3.80542], [-19.0271, 0, -19.0271]]
+        list_parts2, list_split_indicies2 = partition_subsequences_ignoring_same_positions(lst=lst2) # [[0, 3.80542, -3.80542], [-19.0271, 0, -19.0271]]
 
 
     """
@@ -139,7 +139,7 @@ def partition_subsequences_ignoring_same_positions(lst: List, same_thresh: float
     prev_accum_dir = None # sentinal value
     prev_accum = []
 
-    for i, v in enumerate(lst):
+    for i, v in enumerate(first_order_diff_lst):
         curr_dir = np.sign(v)
         did_accum_dir_change: bool = (prev_accum_dir != curr_dir)# and (prev_accum_dir is not None) and (prev_accum_dir != 0)
         if debug_print:
@@ -164,8 +164,8 @@ def partition_subsequences_ignoring_same_positions(lst: List, same_thresh: float
                 prev_accum = [] # zero the accumulator part
                 # prev_accum_dir = None # reset the accum_dir
 
-                ## accumulate the new entry, and potentially the change direction
-                prev_accum.append(v)
+            ## accumulate the new entry, and potentially the change direction
+            prev_accum.append(v)
 
 
         else:
@@ -184,8 +184,10 @@ def partition_subsequences_ignoring_same_positions(lst: List, same_thresh: float
         list_parts.append(prev_accum)
 
     list_split_indicies = np.array(list_split_indicies) + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
+
+
     list_parts = [np.array(l) for l in list_parts]
-    return (list_parts, list_split_indicies)
+    return (list_parts, list_split_indicies, )
 
 
 
@@ -291,7 +293,7 @@ class HeuristicReplayScoring:
 
     @classmethod
     @function_attributes(short_name='continuous_seq_sort', tags=['bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
-    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh: float=4) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
         - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
@@ -350,9 +352,16 @@ class HeuristicReplayScoring:
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
         # Calculate the signs of the differences
-        a_first_order_diff_sign = np.sign(a_first_order_diff)
+        # a_first_order_diff_sign = np.sign(a_first_order_diff)
         # Calculate where the sign changes occur (non-zero after taking diff of signs)
-        sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
+        # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
+
+        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
+        list_parts1, sign_change_indices = partition_subsequences_ignoring_same_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
+
+        
+
+
 
         # sign_change_indices = np.where(np.abs(np.diff(a_first_order_diff_sign.astype(float))) > 0.0)[0] + 1  # Add 1 because np.diff reduces the index by 1 -- Oh no, is this right when I preserve length?
 
@@ -393,11 +402,9 @@ class HeuristicReplayScoring:
         longest_sequence = split_most_likely_positions_arrays[longest_sequence_start_idx]
         longest_sequence_diff = split_first_order_diff_arrays[longest_sequence_start_idx]
 
-        longest_sequence
+        # longest_sequence
 
 
-        
-        
         ## 
         max_ignore_bins: int = 2
         (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, continuous_sequence_lengths, longest_sequence_start_idx=longest_sequence_start_idx, max_ignore_bins=max_ignore_bins)
@@ -427,6 +434,9 @@ class HeuristicReplayScoring:
         # total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
         ## RETURNS: ratio_bins_higher_than_diffusion_across_time
         # return ratio_bins_higher_than_diffusion_across_time
+        return longest_sequence_length_ratio
+    
+
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 08:00', related_items=[])
@@ -451,7 +461,8 @@ class HeuristicReplayScoring:
             _out_new_scores
 
         """
-        
+        same_thresh: float = kwargs.pop('same_thresh', 4.0)
+
 
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
@@ -525,7 +536,12 @@ class HeuristicReplayScoring:
             # an_effective_first_order_diff_sign[effectively_same_indicies] = 0.0
 
             # Calculate where the sign changes occur (non-zero after taking diff of signs)
-            sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
+            # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
+
+            ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
+            list_parts1, sign_change_indices = partition_subsequences_ignoring_same_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
+
+
             num_direction_changes: int = len(sign_change_indices)
             direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
 
