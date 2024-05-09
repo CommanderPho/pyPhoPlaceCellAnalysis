@@ -127,7 +127,8 @@ def _compute_integral_second_derivative(arr, dx=1) -> float:
      from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _compute_integral_second_derivative
       
     """
-    return np.nansum(np.diff(arr, n=2))/dx
+    return (np.nansum((np.diff(arr, n=2) ** 2.0))/dx) 
+
 
 
 def _compute_stddev_of_diff(arr) -> float:
