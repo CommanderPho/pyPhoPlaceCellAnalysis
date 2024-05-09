@@ -113,6 +113,81 @@ def _compute_diffusion_value(a_p_x_given_n: NDArray) -> float:
     return uniform_diffusion_prob
 
 
+def partition_subsequences_ignoring_same_positions(lst: List, same_thresh: float = 4.0, debug_print=False):
+    """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
+     
+    NOTE: This helps "ignore" false-positive direction changes for bins with spatially-nearby (stationary) positions that happen to be offset in the wrong direction.
+        It does not "bridge" discontiguous subsequences like `_compute_sequences_spanning_ignored_intrusions` was intended to do, that's a different problem.
+
+        
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import partition_subsequences_ignoring_same_positions
+
+        lst1 = [0, 3.80542, -3.80542, -19.0271, 0, -19.0271]
+        list_parts1, list_split_indicies1 = partition_subsequences(lst=lst1) # [[0, 3.80542, -3.80542, 0, -19.0271]]
+
+        lst2 = [0, 3.80542, 5.0, -3.80542, -19.0271, 0, -19.0271]
+        list_parts2, list_split_indicies2 = partition_subsequences(lst=lst2) # [[0, 3.80542, -3.80542], [-19.0271, 0, -19.0271]]
+
+
+    """
+
+    list_parts = []
+    list_split_indicies = []
+    prev_i = None
+    prev_v = None
+    prev_accum_dir = None # sentinal value
+    prev_accum = []
+
+    for i, v in enumerate(lst):
+        curr_dir = np.sign(v)
+        did_accum_dir_change: bool = (prev_accum_dir != curr_dir)# and (prev_accum_dir is not None) and (prev_accum_dir != 0)
+        if debug_print:
+            print(f'i: {i}, v: {v}, curr_dir: {curr_dir}, prev_accum_dir: {prev_accum_dir}')
+
+        if (np.abs(v) > same_thresh) and did_accum_dir_change:
+            ## sign changed, split here.
+            should_split: bool = True # (prev_accum_dir is None)
+            if (curr_dir != 0):
+                # only for non-zero directions should we set the prev_accum_dir, otherwise leave it what it was (or blank)
+                if prev_accum_dir is None:
+                    should_split = False # don't split for the first direction change (since it's a change from None/0.0
+                if debug_print:
+                    print(f'\t accum_dir changing! {prev_accum_dir} -> {curr_dir}')
+                prev_accum_dir = curr_dir
+                
+            if should_split:
+                if debug_print:
+                    print(f'\t splitting.')
+                list_parts.append(prev_accum)
+                list_split_indicies.append(i)
+                prev_accum = [] # zero the accumulator part
+                # prev_accum_dir = None # reset the accum_dir
+
+                ## accumulate the new entry, and potentially the change direction
+                prev_accum.append(v)
+
+
+        else:
+            ## continue accumulating
+            prev_accum.append(v)
+            # if curr_dir != 0:
+            #     # only for non-zero directions should we set the prev_accum_dir, otherwise leave it what it was (or blank)
+            #     prev_accum_dir = curr_dir
+
+        ## update prev variables
+        prev_i = i
+        prev_v = v
+        
+    if len(prev_accum) > 0:
+        # finish up with any points remaining
+        list_parts.append(prev_accum)
+
+    list_split_indicies = np.array(list_split_indicies) + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
+    list_parts = [np.array(l) for l in list_parts]
+    return (list_parts, list_split_indicies)
+
+
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
 class HeuristicReplayScoring:
@@ -428,10 +503,27 @@ class HeuristicReplayScoring:
             epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
             # epoch_change_direction
 
+            # a_result
+
+            # a_track_length: float = 170.0
+            # effectively_same_location_size = 0.1 * a_track_length # 10% of the track length
+            # effectively_same_location_num_bins: int = np.rint(effectively_same_location_size)
+            # effectively_same_location_num_bins: int = 4
+
+            # non_same_indicies = (np.abs(a_first_order_diff) > float(effectively_same_location_num_bins))
+            # effectively_same_indicies = np.logical_not(non_same_indicies)
+
+            # an_effective_change_first_order_diff = deepcopy(a_first_order_diff)
+            # an_effective_change_first_order_diff[effectively_same_location_num_bins] = 0.0 # treat as non-changing
+
 
             # Now split the array at each point where a direction change occurs
             # Calculate the signs of the differences
             a_first_order_diff_sign = np.sign(a_first_order_diff)
+
+            # an_effective_first_order_diff_sign = deepcopy(a_first_order_diff_sign)
+            # an_effective_first_order_diff_sign[effectively_same_indicies] = 0.0
+
             # Calculate where the sign changes occur (non-zero after taking diff of signs)
             sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
             num_direction_changes: int = len(sign_change_indices)
