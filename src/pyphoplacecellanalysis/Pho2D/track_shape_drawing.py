@@ -1574,7 +1574,7 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     return fig, ax, (_output_dict, _output_by_aclu_dict)
 
 
-@function_attributes(short_name=None, tags=['remap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
+@function_attributes(short_name='bidir_track_remap', tags=['remap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
 def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds, active_context=None, perform_write_to_file_callback=None, defer_render: bool=False, **kwargs):    
     """ 
     Usage:
@@ -1598,8 +1598,8 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_directional_pf_peaks_dfs
 
     if active_context is not None:
-            display_context = active_context.adding_context('display_fn', display_fn_name='plot_quantile_diffs')
-            
+            display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
+        
     with mpl.rc_context({'figure.figsize': (10, 4), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
         # Create a FigureCollector instance
         with FigureCollector(name='plot_bidirectional_track_remapping_diagram', base_context=display_context) as collector:
