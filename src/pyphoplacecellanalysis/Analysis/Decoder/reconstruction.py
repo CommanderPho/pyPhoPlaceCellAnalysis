@@ -420,22 +420,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     
 
     def __repr__(self):
-        """ 2024-01-11 - Renders only the fields and their sizes
-            DecodedFilterEpochsResult(decoding_time_bin_size: float,
-                filter_epochs: neuropy.core.epoch.Epoch,
-                num_filter_epochs: int,
-                most_likely_positions_list: list | shape (n_epochs),
-                p_x_given_n_list: list | shape (n_epochs),
-                marginal_x_list: list | shape (n_epochs),
-                marginal_y_list: list | shape (n_epochs),
-                most_likely_position_indicies_list: list | shape (n_epochs),
-                spkcount: list | shape (n_epochs),
-                nbins: numpy.ndarray | shape (n_epochs),
-                time_bin_containers: list | shape (n_epochs),
-                time_bin_edges: list | shape (n_epochs),
-                epoch_description_list: list | shape (n_epochs)
-            )
-        """
+        """ 2024-01-11 - Renders only the fields and their sizes  """
         from pyphocorehelpers.print_helpers import strip_type_str_to_classname
         # content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
         # return f"{type(self).__name__}({content}\n)"
@@ -450,7 +435,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
     
-
+    @function_attributes(short_name=None, tags=['image', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
     def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True):
         """ gets the posterior as a colormapped image 
         
@@ -472,6 +457,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization)
 
 
+    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
     def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=100, desired_width=None, skip_img_normalization=True):
         """ saves the posterior to disk
         

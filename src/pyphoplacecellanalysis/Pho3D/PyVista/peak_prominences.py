@@ -13,7 +13,7 @@ from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_point_labels, _perf
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList # used to wrap _render_peak_prominence_2d_results_on_pyvista_plotter's outputs
 from pyphocorehelpers.function_helpers import function_attributes
 
-
+@function_attributes(short_name=None, tags=['peak_prominence'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-09 05:29', related_items=[])
 def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, promenence_plot_threshold = 1.0, included_level_indicies=[1], debug_print=False):
     """
     
@@ -95,6 +95,7 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
     # return peak_locations, colors, prominence_array, is_included_array
     
 
+@function_attributes(short_name=None, tags=['peak_prominence', 'pyvista'], input_requires=[], output_provides=[], uses=['_perform_plot_point_labels'], used_by=['render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter'], creation_date='2024-05-09 05:28', related_items=[])
 def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=2, render=True, debug_print=True, **kwargs):
     """
     
@@ -274,7 +275,7 @@ out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors
 """
 
 
-@function_attributes(short_name=None, tags=['display', '3D', 'pf', 'peaks', 'promienence', 'ratemap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-18 14:32', related_items=[])
+@function_attributes(short_name=None, tags=['display', '3D', 'pf', 'peaks', 'promienence', 'ratemap'], input_requires=[], output_provides=[], uses=['_render_peak_prominence_2d_results_on_pyvista_plotter'], used_by=[], creation_date='2023-09-18 14:32', related_items=[])
 def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, debug_print=False, **kwargs):
     """
     Computes the appropriate contour/peaks/rectangle/etc components for each neuron_id using the active_peak_prominence_2d_results and uses them to create new:
