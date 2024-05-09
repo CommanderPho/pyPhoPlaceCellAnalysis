@@ -657,39 +657,38 @@ class HeuristicReplayScoring:
             # split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.split_indicies)
             split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.diff_split_indicies)
 
-            # continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
-            # if debug_print:
-            #     print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
-            # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-            # if debug_print:
-            #     print("Longest sequence of time bins without a direction change:", longest_sequence_length)
-            # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-            # longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
+            # Pre-2024-05-09 Sequence Determination ______________________________________________________________________________ #
+            continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
+            if debug_print:
+                print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
+            longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
+            if debug_print:
+                print("Longest sequence of time bins without a direction change:", longest_sequence_length)
+            longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
+            longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
             
-            # longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
 
 
-            # longest_sequence
-            split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
-            no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, partition_result.low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
-            num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays])
-            num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies])
+            # 2024-05-09 Sequence Determination with ignored repeats (not yet working) ___________________________________________ #
+            # split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
+            # no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, partition_result.low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
+            # num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays])
+            # num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies])
 
-            total_num_subsequence_bins = np.sum(num_subsequence_bins)
-            total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
+            # total_num_subsequence_bins = np.sum(num_subsequence_bins)
+            # total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
             
-            longest_sequence_length_no_repeats: int = np.nanmax(num_subsequence_bins_no_repeats) # Now find the length of the longest non-changing sequence
-            # longest_sequence_no_repeats_start_idx: int = np.nanargmax(num_subsequence_bins_no_repeats)
+            # longest_sequence_length_no_repeats: int = np.nanmax(num_subsequence_bins_no_repeats) # Now find the length of the longest non-changing sequence
+            # # longest_sequence_no_repeats_start_idx: int = np.nanargmax(num_subsequence_bins_no_repeats)
             
-            longest_sequence_length = longest_sequence_length_no_repeats
+            # longest_sequence_length = longest_sequence_length_no_repeats
 
-            ## Compensate for repeating bins, not counting them towards the score but also not against.
-            if total_num_subsequence_bins_no_repeats > 0:
-                longest_sequence_length_ratio: float = float(longest_sequence_length_no_repeats) /  float(total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
-            else:
-                longest_sequence_length_ratio: float = 0.0 # zero it out if they are all repeats
-
-
+            # ## Compensate for repeating bins, not counting them towards the score but also not against.
+            # if total_num_subsequence_bins_no_repeats > 0:
+            #     longest_sequence_length_ratio: float = float(longest_sequence_length_no_repeats) /  float(total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            # else:
+            #     longest_sequence_length_ratio: float = 0.0 # zero it out if they are all repeats
 
 
             contiguous_total_change_quantity = [np.nansum(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
