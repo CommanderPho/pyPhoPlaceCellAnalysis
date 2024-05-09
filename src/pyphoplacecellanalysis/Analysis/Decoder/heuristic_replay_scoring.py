@@ -113,7 +113,38 @@ def _compute_diffusion_value(a_p_x_given_n: NDArray) -> float:
     return uniform_diffusion_prob
 
 
-def partition_subsequences_ignoring_repeated_similar_positions(first_order_diff_lst: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False) -> Tuple[NDArray, NDArray]:
+@define(slots=False)
+class SubsequencesPartitioningResult:
+    """ returned by `partition_subsequences_ignoring_repeated_similar_positions` 
+
+    diff_index_subsequence_indicies = np.split(np.arange(n_diff_bins), list_split_indicies)
+    no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, low_magnitude_change_indicies, invert=True)] for v in diff_index_subsequence_indicies] # get the list of indicies for each subsequence without the low-magnitude ones
+    num_subsequence_bins: List[int] = [len(v) for v in diff_index_subsequence_indicies]
+    num_subsequence_bins_no_repeats: List[int] = [len(v) for v in no_low_magnitude_diff_index_subsequence_indicies]
+
+    total_num_subsequence_bins = np.sum(num_subsequence_bins)
+    total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
+
+    """
+    first_order_diff_lst: List = field() # the original list
+    list_parts: List = field() # factory=list
+    diff_split_indicies: NDArray = field() # for the 1st-order diff array
+    split_indicies: NDArray = field() # for the original array
+    low_magnitude_change_indicies: NDArray = field() # specified in diff indicies
+
+    @property
+    def n_diff_bins(self) -> int:
+        return len(self.first_order_diff_lst)
+
+
+    @property
+    def subsequence_index_lists_omitting_repeats(self):
+        """The subsequence_index_lists_omitting_repeats property."""
+        return np.array_split(len(self.split_indicies), self.split_indicies)
+
+
+@function_attributes(short_name=None, tags=['partition'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-05-09 02:47', related_items=[])
+def partition_subsequences_ignoring_repeated_similar_positions(first_order_diff_lst: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False) -> "SubsequencesPartitioningResult":
     """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
      
     NOTE: This helps "ignore" false-positive direction changes for bins with spatially-nearby (stationary) positions that happen to be offset in the wrong direction.
@@ -123,17 +154,25 @@ def partition_subsequences_ignoring_repeated_similar_positions(first_order_diff_
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import partition_subsequences_ignoring_repeated_similar_positions
 
-        lst1 = [0, 3.80542, -3.80542, -19.0271, 0, -19.0271]
-        list_parts1, list_split_indicies1 = partition_subsequences_ignoring_repeated_similar_positions(lst=lst1) # [[0, 3.80542, -3.80542, 0, -19.0271]]
+        # lst1 = [0, 3.80542, -3.80542, -19.0271, 0, -19.0271]
+        # list_parts1, list_split_indicies1 = partition_subsequences_ignoring_repeated_similar_positions(lst=lst1) # [[0, 3.80542, -3.80542, 0, -19.0271]]
 
-        lst2 = [0, 3.80542, 5.0, -3.80542, -19.0271, 0, -19.0271]
-        list_parts2, list_split_indicies2 = partition_subsequences_ignoring_repeated_similar_positions(lst=lst2) # [[0, 3.80542, -3.80542], [-19.0271, 0, -19.0271]]
+        # lst2 = [0, 3.80542, 5.0, -3.80542, -19.0271, 0, -19.0271]
+        # list_parts2, list_split_indicies2 = partition_subsequences_ignoring_repeated_similar_positions(lst=lst2) # [[0, 3.80542, -3.80542], [-19.0271, 0, -19.0271]]
 
+        
+        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
+        partition_result1: SubsequencesPartitioningResult = partition_subsequences_ignoring_repeated_similar_positions(lst1, same_thresh=4)
 
     """
+    n_diff_bins: int = len(first_order_diff_lst)
+    n_original_bins: int = n_diff_bins + 1
+
 
     list_parts = []
     list_split_indicies = []
+    low_magnitude_change_indicies = []
+
     prev_i = None
     prev_v = None
     prev_accum_dir = None # sentinal value
@@ -171,6 +210,8 @@ def partition_subsequences_ignoring_repeated_similar_positions(first_order_diff_
         else:
             ## continue accumulating
             prev_accum.append(v)
+            low_magnitude_change_indicies.append(i)
+
             # if curr_dir != 0:
             #     # only for non-zero directions should we set the prev_accum_dir, otherwise leave it what it was (or blank)
             #     prev_accum_dir = curr_dir
@@ -183,11 +224,31 @@ def partition_subsequences_ignoring_repeated_similar_positions(first_order_diff_
         # finish up with any points remaining
         list_parts.append(prev_accum)
 
-    list_split_indicies = np.array(list_split_indicies) + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
 
+    diff_split_indicies = np.array(list_split_indicies)
+    list_split_indicies = diff_split_indicies + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
+    low_magnitude_change_indicies = np.array(low_magnitude_change_indicies)
 
     list_parts = [np.array(l) for l in list_parts]
-    return (list_parts, list_split_indicies, )
+
+    # split_diff_index_subsequence_index_arrays = np.split(np.arange(n_diff_bins), diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
+    # no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
+    # num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays])
+    # num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies])
+
+    # total_num_subsequence_bins = np.sum(num_subsequence_bins)
+    # total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
+    
+    # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_diff_index_subsequence_index_arrays])
+    # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
+    # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
+
+    # longest_sequence_length_no_repeats: int = np.nanmax(num_subsequence_bins_no_repeats) # Now find the length of the longest non-changing sequence
+    # longest_sequence_no_repeats_start_idx: int = np.nanargmax(num_subsequence_bins_no_repeats)
+
+    # return (list_parts, list_split_indicies, )
+    _result = SubsequencesPartitioningResult(first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=low_magnitude_change_indicies)
+    return _result
 
 
 
@@ -357,14 +418,8 @@ class HeuristicReplayScoring:
         # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        list_parts1, sign_change_indices = partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
-
-        
-
-
-
+        partition_result: SubsequencesPartitioningResult = partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
         # sign_change_indices = np.where(np.abs(np.diff(a_first_order_diff_sign.astype(float))) > 0.0)[0] + 1  # Add 1 because np.diff reduces the index by 1 -- Oh no, is this right when I preserve length?
-
 
         total_first_order_change: float = np.nansum(a_first_order_diff[1:]) # this is very susceptable to misplaced bins
         epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
@@ -390,32 +445,56 @@ class HeuristicReplayScoring:
 
         # Split the array at each index where a sign change occurs
         relative_indicies_arr = np.arange(n_pos_bins)
-        split_relative_indicies = np.split(relative_indicies_arr, sign_change_indices)
-        split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, sign_change_indices)
-        split_first_order_diff_arrays = np.split(a_first_order_diff, sign_change_indices)
+        split_relative_indicies = np.split(relative_indicies_arr, partition_result.split_indicies)
+        split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, partition_result.split_indicies)
+        # split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.split_indicies)
+        split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.diff_split_indicies)
 
-        continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays])
-        longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-        longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
+        
+        # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays])
+        # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
+        # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
 
-        longest_sequence_indicies = split_relative_indicies[longest_sequence_start_idx]
-        longest_sequence = split_most_likely_positions_arrays[longest_sequence_start_idx]
-        longest_sequence_diff = split_first_order_diff_arrays[longest_sequence_start_idx]
+        # longest_sequence_indicies = split_relative_indicies[longest_sequence_start_idx]
+        # longest_sequence = split_most_likely_positions_arrays[longest_sequence_start_idx]
+        # longest_sequence_diff = split_first_order_diff_arrays[longest_sequence_start_idx]
 
         # longest_sequence
+        split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
+        no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, partition_result.low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
+        num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays])
+        num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies])
 
+        total_num_subsequence_bins = np.sum(num_subsequence_bins)
+        total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
+        
+        # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_diff_index_subsequence_index_arrays])
+        # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
+        # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
 
+        longest_sequence_length_no_repeats: int = np.nanmax(num_subsequence_bins_no_repeats) # Now find the length of the longest non-changing sequence
+        longest_sequence_no_repeats_start_idx: int = np.nanargmax(num_subsequence_bins_no_repeats)
+        
         ## 
         max_ignore_bins: int = 2
-        (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, continuous_sequence_lengths, longest_sequence_start_idx=longest_sequence_start_idx, max_ignore_bins=max_ignore_bins)
+        # (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, continuous_sequence_lengths, longest_sequence_start_idx=longest_sequence_start_idx, max_ignore_bins=max_ignore_bins)
+        (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, num_subsequence_bins_no_repeats, longest_sequence_start_idx=longest_sequence_no_repeats_start_idx, max_ignore_bins=max_ignore_bins)
+
         
         ## alternatively can determine the direction of momentum by building an array of direction vectors between each bin.
         # change in position over change in time. Applied at point t.
 
 
 
-        longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+        # longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
 
+        ## Compensate for repeating bins, not counting them towards the score but also not against.
+        if total_num_subsequence_bins_no_repeats > 0:
+            longest_sequence_length_ratio: float = float(longest_sequence_length_no_repeats) /  float(total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+        else:
+            longest_sequence_length_ratio: float = 0.0 # zero it out if they are all repeats
+
+        
 
         # cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per time bin.
         
@@ -539,10 +618,8 @@ class HeuristicReplayScoring:
             # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
             ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-            list_parts1, sign_change_indices = partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
-
-
-            num_direction_changes: int = len(sign_change_indices)
+            partition_result: SubsequencesPartitioningResult = partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)
+            num_direction_changes: int = len(partition_result.split_indicies)
             direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
 
             if debug_print:
@@ -550,19 +627,44 @@ class HeuristicReplayScoring:
                 print(f'direction_change_bin_ratio: {direction_change_bin_ratio}')
 
             # Split the array at each index where a sign change occurs
-            split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, sign_change_indices)
-            split_first_order_diff_arrays = np.split(a_first_order_diff, sign_change_indices)
+            split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, partition_result.split_indicies)
+            # split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.split_indicies)
+            split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.diff_split_indicies)
 
-            continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
-            if debug_print:
-                print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
-            longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-            if debug_print:
-                print("Longest sequence of time bins without a direction change:", longest_sequence_length)
-            longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-            longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
+            # continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
+            # if debug_print:
+            #     print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
+            # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
+            # if debug_print:
+            #     print("Longest sequence of time bins without a direction change:", longest_sequence_length)
+            # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
+            # longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
             
-            longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            # longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+
+
+            # longest_sequence
+            split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
+            no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, partition_result.low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
+            num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays])
+            num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies])
+
+            total_num_subsequence_bins = np.sum(num_subsequence_bins)
+            total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
+            
+            longest_sequence_length_no_repeats: int = np.nanmax(num_subsequence_bins_no_repeats) # Now find the length of the longest non-changing sequence
+            # longest_sequence_no_repeats_start_idx: int = np.nanargmax(num_subsequence_bins_no_repeats)
+            
+            longest_sequence_length = longest_sequence_length_no_repeats
+
+            ## Compensate for repeating bins, not counting them towards the score but also not against.
+            if total_num_subsequence_bins_no_repeats > 0:
+                longest_sequence_length_ratio: float = float(longest_sequence_length_no_repeats) /  float(total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            else:
+                longest_sequence_length_ratio: float = 0.0 # zero it out if they are all repeats
+
+
+
 
             contiguous_total_change_quantity = [np.nansum(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
             if debug_print:
