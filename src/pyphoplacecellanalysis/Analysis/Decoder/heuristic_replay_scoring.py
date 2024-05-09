@@ -113,7 +113,7 @@ def _compute_diffusion_value(a_p_x_given_n: NDArray) -> float:
     return uniform_diffusion_prob
 
 
-def partition_subsequences_ignoring_same_positions(first_order_diff_lst: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False) -> Tuple[NDArray, NDArray]:
+def partition_subsequences_ignoring_repeated_similar_positions(first_order_diff_lst: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False) -> Tuple[NDArray, NDArray]:
     """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
      
     NOTE: This helps "ignore" false-positive direction changes for bins with spatially-nearby (stationary) positions that happen to be offset in the wrong direction.
@@ -121,13 +121,13 @@ def partition_subsequences_ignoring_same_positions(first_order_diff_lst: Union[L
 
         
     Usage:
-        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import partition_subsequences_ignoring_same_positions
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import partition_subsequences_ignoring_repeated_similar_positions
 
         lst1 = [0, 3.80542, -3.80542, -19.0271, 0, -19.0271]
-        list_parts1, list_split_indicies1 = partition_subsequences_ignoring_same_positions(lst=lst1) # [[0, 3.80542, -3.80542, 0, -19.0271]]
+        list_parts1, list_split_indicies1 = partition_subsequences_ignoring_repeated_similar_positions(lst=lst1) # [[0, 3.80542, -3.80542, 0, -19.0271]]
 
         lst2 = [0, 3.80542, 5.0, -3.80542, -19.0271, 0, -19.0271]
-        list_parts2, list_split_indicies2 = partition_subsequences_ignoring_same_positions(lst=lst2) # [[0, 3.80542, -3.80542], [-19.0271, 0, -19.0271]]
+        list_parts2, list_split_indicies2 = partition_subsequences_ignoring_repeated_similar_positions(lst=lst2) # [[0, 3.80542, -3.80542], [-19.0271, 0, -19.0271]]
 
 
     """
@@ -357,7 +357,7 @@ class HeuristicReplayScoring:
         # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        list_parts1, sign_change_indices = partition_subsequences_ignoring_same_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
+        list_parts1, sign_change_indices = partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
 
         
 
@@ -539,7 +539,7 @@ class HeuristicReplayScoring:
             # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
             ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-            list_parts1, sign_change_indices = partition_subsequences_ignoring_same_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
+            list_parts1, sign_change_indices = partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
 
 
             num_direction_changes: int = len(sign_change_indices)
