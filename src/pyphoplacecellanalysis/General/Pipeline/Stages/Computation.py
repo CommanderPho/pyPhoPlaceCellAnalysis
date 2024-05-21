@@ -673,7 +673,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         if contains_any_global_functions:
             assert np.all([v.is_global for v in active_computation_functions]), 'ERROR: cannot mix global and non-global functions in a single call to perform_specific_computation'
 
-            if self.global_computation_results is None or (not isinstance(self.global_computation_results, ComputationResult)):
+            if (self.global_computation_results is None) or (not isinstance(self.global_computation_results, ComputationResult)):
                 print(f'global_computation_results is None. Building initial global_computation_results...')
                 self.global_computation_results = None # clear existing results
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
@@ -681,7 +681,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
         if contains_any_global_functions:
             # global computation functions:
-            if self.global_computation_results is None or (not isinstance(self.global_computation_results, ComputationResult)):
+            if (self.global_computation_results is None) or (not isinstance(self.global_computation_results, ComputationResult)):
                 print(f'global_computation_results is None or not a `ComputationResult` object. Building initial global_computation_results...') #TODO 2024-01-10 15:12: - [ ] Check that `self.global_computation_results.keys()` are empty
                 self.global_computation_results = None # clear existing results
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
@@ -768,7 +768,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         return output_result
 
     @staticmethod
-    def _execute_computation_functions(active_computation_functions, previous_computation_result=None, computation_kwargs_list=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
+    def _execute_computation_functions(active_computation_functions, previous_computation_result=None, computation_kwargs_list=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False) -> ComputationResult:
         """ actually performs the provided computations in active_computation_functions """
         if computation_kwargs_list is None:
             computation_kwargs_list = [{} for _ in active_computation_functions]
@@ -938,6 +938,12 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 # ==================================================================================================================== #
 class PipelineWithComputedPipelineStageMixin:
     """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Computed stage. """
+    # @property
+    # def stage(self) -> ComputedPipelineStage:
+    #     """The stage property."""
+    #     return self._stage
+    
+
     ## Computed Properties:
     @property
     def is_computed(self) -> bool:
@@ -1095,6 +1101,7 @@ class PipelineWithComputedPipelineStageMixin:
         # return self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, ... # TODO: refactor to use new layout
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
+
     def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
         """ perform a specific computation (specified in computation_functions_name_includelist) in a minimally destructive manner using the previously recomputed results:
         Passthrough wrapper to self.stage.perform_specific_computation(...) with the same arguments.
@@ -1105,6 +1112,7 @@ class PipelineWithComputedPipelineStageMixin:
         # self.stage is of type ComputedPipelineStage
         return self.stage.perform_specific_computation(active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
+
     # Utility/Debugging Functions:
     def perform_drop_entire_computed_config(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
         """ Loops through all the configs and drops all results of the specified configs
