@@ -1,6 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 from attrs import define, field, Factory
 import attrs # used for several things
 import matplotlib.pyplot as plt
@@ -1042,8 +1042,11 @@ def old_score_posterior(posterior, n_jobs:int=8):
 
 
 def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[float]=16.0, n_neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True,
-                         t0: Optional[float]=None, x0: Optional[float]=None):
+                         t0: Optional[Union[float, List, Tuple, NDArray]]=None, x0: Optional[float]=None):
         """ 2023-05-25 - Radon Transform to fit line to decoded replay epoch posteriors. Gives score, velocity, and intercept. 
+
+         t0: Optional[Union[float, List, Tuple, NDArray]] - usually a list of start times of the same length as posterior, with one for each decoded posterior
+
 
         Usage:
             from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
@@ -1058,7 +1061,6 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
             pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept})
             
         """
-        
 
         if posteriors is None:
             assert posterior is not None, "No posteriors found"
@@ -1071,9 +1073,9 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
         if t0 is not None:
             if isinstance(t0, (list, tuple, NDArray)):
                 t0s = t0 # multiple posteriors, okay
-                assert len(t0s) == len(posteriors)
+                assert len(t0s) == len(posteriors), f"len(t0s): {len(t0s)} == len(posteriors): {len(posteriors)}"
             else:
-                # a single posterior, wrap in a list:
+                # a single time bin, wrap in a list:
                 t0s = [t0,]
         else:
             t0s = [None] * len(posteriors) # a list of all Nones
@@ -1095,7 +1097,11 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
             print(f'WARNING: n_jobs > 1 (n_jobs: {n_jobs}) but _allow_parallel_run_general == False, so parallel computation will not be performed.')
         if run_parallel:
             from joblib import Parallel, delayed
+            if enable_return_neighbors_arr:
+                print(f'WARN: using enable_return_neighbors_arr=True in parallel mode seems to cause deadlocks. Setting `enable_return_neighbors_arr=False` and continuing.')
+                enable_return_neighbors_arr = False
             results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=a_t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s))
+
         else:
             results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=a_t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s)]
 
