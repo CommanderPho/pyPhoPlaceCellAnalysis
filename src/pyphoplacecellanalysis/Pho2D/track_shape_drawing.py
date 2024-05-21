@@ -1224,8 +1224,8 @@ def add_napari_track_shapes_layer(viewer, long_rect_items, short_rect_items):
 
 
 
-@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=[], creation_date='2024-02-22 11:12', related_items=[])
-def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=True, enable_adjust_overlapping_text: bool=False, debug_print=False, **kwargs):
+@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
+def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, debug_print=False, **kwargs):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
     🔝🖼️🎨
@@ -1442,7 +1442,6 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     # ACLU Point Text Labels _____________________________________________________________________________________________ #
     if draw_point_aclu_labels:
         
-
         text_kwargs = dict(color=aclu_labels_text_color, fontsize=aclu_labels_fontsize, ha='center', va='center')
         # Add text labels to scatter points
         for i, aclu_val in enumerate(active_aclus):
@@ -1582,7 +1581,7 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     return fig, ax, (_output_dict, _output_by_aclu_dict)
 
 
-@function_attributes(short_name='bidir_track_remap', tags=['figure', 'remap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
+@function_attributes(short_name='bidir_track_remap', tags=['figure', 'remap'], input_requires=[], output_provides=[], uses=['_get_directional_pf_peaks_dfs', '_plot_track_remapping_diagram'], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
 def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds, active_context=None, perform_write_to_file_callback=None, defer_render: bool=False, **kwargs):    
     """ 
     Usage:
