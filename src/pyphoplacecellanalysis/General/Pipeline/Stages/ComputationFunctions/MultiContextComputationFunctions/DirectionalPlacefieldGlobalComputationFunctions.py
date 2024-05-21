@@ -10,7 +10,10 @@ from datetime import datetime, date, timedelta
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
 from typing_extensions import TypeAlias
 from nptyping import NDArray
+from typing import NewType
 import neuropy.utils.type_aliases as types
+# DecoderName = NewType('DecoderName', str)
+
 from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphocorehelpers.function_helpers import function_attributes
@@ -292,7 +295,78 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
             return aclu_num_peaks_df
 
 
+    @function_attributes(short_name=None, tags=['WORKING', 'peak', 'multi-peak', 'decoder', 'pfs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-09 00:36', related_items=[])
+    def get_directional_pf_peaks_dfs(self, drop_aclu_if_missing_long_or_short: bool = True) -> Tuple[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+        """ 
+        # 2024-04-09 00:36: - [X] Could be refactored into TrackTemplates
 
+        Usage:
+
+            (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_peaks_dfs(drop_aclu_if_missing_long_or_short=False)
+
+            AnyDir_decoder_aclu_MAX_peak_maps_df
+            LR_only_decoder_aclu_MAX_peak_maps_df
+            RL_only_decoder_aclu_MAX_peak_maps_df
+
+
+        """
+        # drop_aclu_if_missing_long_or_short: bool = True ## default=True; Drop entire row if either long/short is missing a value
+        # drop_aclu_if_missing_long_or_short: bool = False
+        from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
+        from neuropy.utils.indexing_helpers import unwrap_single_item
+
+
+        ## Split into LR/RL groups to get proper peak differences:
+        # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        LR_decoder_names = self.get_LR_decoder_names() # ['long_LR', 'short_LR']
+        RL_decoder_names = self.get_RL_decoder_names() # ['long_RL', 'short_RL']
+
+        ## Only the maximums (height=1 items), guaranteed to be a single (or None) location:
+        decoder_aclu_MAX_peak_maps_dict: Dict[types.DecoderName, Dict[types.aclu_index, Optional[float]]] = {types.DecoderName(a_name):{k:unwrap_single_item(v) for k, v in deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.get_tuning_curve_peak_positions(peak_mode='peaks', height=1)))).items()} for a_name, a_decoder in self.get_decoders_dict().items()}
+        # decoder_aclu_MAX_peak_maps_dict
+        AnyDir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in (LR_decoder_names + RL_decoder_names)}) # either direction decoder
+
+        ## Splits by direction:
+        LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in LR_decoder_names})
+        RL_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in RL_decoder_names})
+
+        ## Drop entire row if either long/short is missing a value:
+        if drop_aclu_if_missing_long_or_short:
+            LR_only_decoder_aclu_MAX_peak_maps_df = LR_only_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any')
+            RL_only_decoder_aclu_MAX_peak_maps_df = RL_only_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any')
+
+            AnyDir_decoder_aclu_MAX_peak_maps_df = AnyDir_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any') # might need to think this through a little better. Currently only using the `AnyDir_*` result with `drop_aclu_if_missing_long_or_short == False`
+
+        ## Compute the difference between the Long/Short peaks: I don't follow this:
+        LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'] = LR_only_decoder_aclu_MAX_peak_maps_df.diff(axis='columns').to_numpy()[:, -1]
+        RL_only_decoder_aclu_MAX_peak_maps_df['peak_diff'] = RL_only_decoder_aclu_MAX_peak_maps_df.diff(axis='columns').to_numpy()[:, -1]
+
+        AnyDir_decoder_aclu_MAX_peak_maps_df['peak_diff_LR'] = AnyDir_decoder_aclu_MAX_peak_maps_df[list(LR_decoder_names)].diff(axis='columns').to_numpy()[:, -1]
+        AnyDir_decoder_aclu_MAX_peak_maps_df['peak_diff_RL'] = AnyDir_decoder_aclu_MAX_peak_maps_df[list(RL_decoder_names)].diff(axis='columns').to_numpy()[:, -1]
+
+        # ## UNUSED BLOCK:
+        # # maximal_peak_only_decoder_aclu_peak_location_df_merged = deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged['long_LR_peak_height'] == 1.0]
+
+        # LR_height_column_names = ['long_LR_peak_height', 'short_LR_peak_height']
+
+        # # [decoder_aclu_peak_location_df_merged[a_name] == 1.0 for a_name in LR_height_column_names]
+
+        # LR_max_peak_dfs = [deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged[a_name] == 1.0].drop(columns=['subpeak_idx', 'series_idx', 'LR_peak_diff', 'RL_peak_diff', a_name]) for a_name in LR_height_column_names]
+
+        # aclus_with_LR_peaks = intersection_of_arrays(*[a_df.aclu.unique() for a_df in LR_max_peak_dfs])
+        # aclus_with_LR_peaks
+
+        # ## Align them now:
+        # LR_max_peak_dfs = [a_df[a_df.aclu.isin(aclus_with_LR_peaks)] for a_df in LR_max_peak_dfs]
+        # LR_max_peak_dfs
+
+        # maximal_peak_only_decoder_aclu_peak_location_df_merged = deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged[LR_height_column_names] == 1.0]
+        # maximal_peak_only_decoder_aclu_peak_location_df_merged
+
+        # OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
+        return (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df
+
+            
 
 
     ## WARNING 2024-02-07 - The following all use .peak_tuning_curve_center_of_masses: .get_decoder_aclu_peak_maps, get_decoder_aclu_peak_map_dict, get_decoder_aclu_peak_map_dict

@@ -118,6 +118,7 @@ def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window,
 
 ## INPUTS: track_templates, drop_aclu_if_missing_long_or_short: bool = True
 
+@function_attributes(short_name=None, tags=['peak', 'pfs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-09 00:36', related_items=[])
 def _get_directional_pf_peaks_dfs(track_templates,  drop_aclu_if_missing_long_or_short: bool = True):
     """ 
     #TODO 2024-04-09 00:36: - [ ] Could be refactored into TrackTemplates
@@ -155,9 +156,10 @@ def _get_directional_pf_peaks_dfs(track_templates,  drop_aclu_if_missing_long_or
     LR_decoder_names = track_templates.get_LR_decoder_names() # ['long_LR', 'short_LR']
     RL_decoder_names = track_templates.get_RL_decoder_names() # ['long_RL', 'short_RL']
 
-    ## Only the maximums, guaranteed to be a single (or None) location:
+    ## Only the maximums (height=1 items), guaranteed to be a single (or None) location:
     decoder_aclu_MAX_peak_maps_dict: Dict[DecoderName, Dict[types.aclu_index, Optional[float]]] = {DecoderName(a_name):{k:unwrap_single_item(v) for k, v in deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.get_tuning_curve_peak_positions(peak_mode='peaks', height=1)))).items()} for a_name, a_decoder in track_templates.get_decoders_dict().items()}
     # decoder_aclu_MAX_peak_maps_dict
+    AnyDir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in (LR_decoder_names + RL_decoder_names)}) # either direction decoder
 
     ## Splits by direction:
     LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in LR_decoder_names})
@@ -168,9 +170,14 @@ def _get_directional_pf_peaks_dfs(track_templates,  drop_aclu_if_missing_long_or
         LR_only_decoder_aclu_MAX_peak_maps_df = LR_only_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any')
         RL_only_decoder_aclu_MAX_peak_maps_df = RL_only_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any')
 
-    ## Compute the difference between the Long/Short peaks:
+        AnyDir_decoder_aclu_MAX_peak_maps_df = AnyDir_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any') # might need to think this through a little better. Currently only using the `AnyDir_*` result with `drop_aclu_if_missing_long_or_short == False`
+
+    ## Compute the difference between the Long/Short peaks: I don't follow this:
     LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'] = LR_only_decoder_aclu_MAX_peak_maps_df.diff(axis='columns').to_numpy()[:, -1]
     RL_only_decoder_aclu_MAX_peak_maps_df['peak_diff'] = RL_only_decoder_aclu_MAX_peak_maps_df.diff(axis='columns').to_numpy()[:, -1]
+
+    AnyDir_decoder_aclu_MAX_peak_maps_df['peak_diff_LR'] = AnyDir_decoder_aclu_MAX_peak_maps_df[list(LR_decoder_names)].diff(axis='columns').to_numpy()[:, -1]
+    AnyDir_decoder_aclu_MAX_peak_maps_df['peak_diff_RL'] = AnyDir_decoder_aclu_MAX_peak_maps_df[list(RL_decoder_names)].diff(axis='columns').to_numpy()[:, -1]
 
 
     # ## UNUSED BLOCK:
@@ -194,7 +201,7 @@ def _get_directional_pf_peaks_dfs(track_templates,  drop_aclu_if_missing_long_or
 
 
     # OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
-    return LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
+    return (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df
 
 
 @function_attributes(short_name=None, tags=['batch', 'matlab_mat_file', 'multi-session', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-10 07:41', related_items=[])
