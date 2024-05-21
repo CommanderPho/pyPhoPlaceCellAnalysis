@@ -1,5 +1,7 @@
 from copy import deepcopy
 import sys
+from typing import List
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 
@@ -12,7 +14,7 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 
@@ -604,15 +606,17 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
 
-def compute_radon_transforms(decoder, decoder_result, nlines=8192, margin=16, jump_stat=None, n_jobs=1) -> pd.DataFrame:
+def compute_radon_transforms(decoder: "BasePositionDecoder", decoder_result: "DecodedFilterEpochsResult", nlines:int=8192, margin=16, jump_stat=None, n_jobs:int=1) -> pd.DataFrame:
     """ 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import perform_compute_radon_transforms
 
     """
     active_posterior = decoder_result.p_x_given_n_list # one for each epoch
     
-    xbin_centers = deepcopy(decoder_result.xbin_centers)
-    t_bin_centers = deepcopy(decoder_result.t_bin_centers)
+    xbin_centers = deepcopy(decoder.xbin_centers) # the same for all xbins
+    t_bin_centers: List[NDArray] = deepcopy(decoder_result.time_window_centers) # list of the time_bin_centers for each decoded time bin in each decoded epoch (list of length n_epochs)
+    t0s_list: List[float] = [float(a_t_bin_centers[0]) for a_t_bin_centers in t_bin_centers] # the first time for each decoded posterior.
+
 
     # the size of the x_bin in [cm]
     if decoder.pf.bin_info is not None:
@@ -621,7 +625,7 @@ def compute_radon_transforms(decoder, decoder_result, nlines=8192, margin=16, ju
         ## if the bin_info is for some reason not accessible, just average the distance between the bin centers.
         pos_bin_size = np.diff(decoder.pf.xbin_centers).mean()
 
-    return perform_compute_radon_transforms(active_posterior=active_posterior, x0=float(xbin_centers[0]), t0=float(t_bin_centers[0]), decoding_time_bin_duration=decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs)
+    return perform_compute_radon_transforms(active_posterior=active_posterior, x0=float(xbin_centers[0]), t0=t0s_list, decoding_time_bin_duration=decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs)
 
 
 
