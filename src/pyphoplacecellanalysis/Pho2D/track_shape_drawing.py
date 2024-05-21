@@ -1574,7 +1574,7 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     return fig, ax, (_output_dict, _output_by_aclu_dict)
 
 
-@function_attributes(short_name='bidir_track_remap', tags=['remap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
+@function_attributes(short_name='bidir_track_remap', tags=['figure', 'remap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
 def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds, active_context=None, perform_write_to_file_callback=None, defer_render: bool=False, **kwargs):    
     """ 
     Usage:
