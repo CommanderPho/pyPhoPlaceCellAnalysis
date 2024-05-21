@@ -1,4 +1,4 @@
-from typing import Callable, List, Dict, Optional
+from typing import Any, Callable, List, Dict, Optional, Union
 from types import ModuleType
 import dataclasses
 from dataclasses import dataclass
@@ -39,9 +39,13 @@ from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_obj
 from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
 
 
-def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_original:bool=False, backup_minimum_difference_MB:int=5):
+def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, backup_file_if_smaller_than_original:bool=False, backup_minimum_difference_MB:int=5):
     """ saves the output data in a way that doesn't corrupt it if the pickling fails and the original file is retained.
     
+    Saves `db` to a temporary pickle file (with the '.tmp' additional extension), which overwrites an existing pickle IFF saving completes successfully
+
+
+    db: the data to be saved
     backup_file_if_smaller_than_original:bool - if True, creates a backup of the old file if the new file is smaller.
     backup_minimum_difference_MB:int = 5 # don't backup for an increase of 5MB or less, ignored unless backup_file_if_smaller_than_original==True
     """
@@ -63,7 +67,7 @@ def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_
         is_temporary_file_used = True # this is the only condition where this is true
             
     # Save reloaded pipeline out to pickle for future loading
-    with ProgressMessagePrinter(_desired_final_pickle_path, f"Saving (file mode '{_desired_final_pickle_path}')", 'saved session pickle file'):
+    with ProgressMessagePrinter(_desired_final_pickle_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
         try:
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
@@ -86,7 +90,7 @@ def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_
                 print(f"\tmoving new output at '{pkl_path}' -> to desired location: '{_desired_final_pickle_path}'")
                 shutil.move(pkl_path, _desired_final_pickle_path) # move the temporary file to the desired destination, overwriting it
 
-        except Exception as e:
+        except BaseException as e:
             print(f"pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!\nException: {e}")
             # delete the incomplete pickle file
             if is_temporary_file_used:
@@ -144,7 +148,7 @@ def loadData(pkl_path, debug_print=False, **kwargs):
     db = None
     active_move_modules_list: Dict = kwargs.pop('move_modules_list', global_move_modules_list)
     
-    with ProgressMessagePrinter(pkl_path, 'Loading', 'loaded session pickle file'):
+    with ProgressMessagePrinter(pkl_path, action='Computing', contents_description='loaded session pickle file'):
         
         with open(pkl_path, 'rb') as dbfile:
             try:
