@@ -1225,7 +1225,7 @@ def add_napari_track_shapes_layer(viewer, long_rect_items, short_rect_items):
 
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=[], creation_date='2024-02-22 11:12', related_items=[])
-def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=True, debug_print=False, **kwargs):
+def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=True, enable_adjust_overlapping_text: bool=False, debug_print=False, **kwargs):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
     🔝🖼️🎨
@@ -1366,7 +1366,7 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
 
     ##########################
 
-    ## Plot the tracks:
+    # Draw the long/short track shapes: __________________________________________________________________________________ #
     long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
     ax.add_patch(long_patch)
 
@@ -1390,19 +1390,24 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     # color = 'white'
 
     random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
+    # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.1
     # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
 
     long_y = (np.full_like(long_peak_x, 0.1)+random_y_jitter) * base_1D_height
     short_y = (np.full_like(short_peak_x, 0.75)+random_y_jitter) * base_1D_height
 
-    _out_long_points = ax.scatter(long_peak_x, y=long_y, c=color, alpha=0.9, label='long_peak_x', picker=True)
-    _out_short_points = ax.scatter(short_peak_x, y=short_y, c=color, alpha=0.9, label='short_peak_x', picker=True)
+    # Draw the circle points _____________________________________________________________________________________________ #
+    # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=30.0, c=color)
+    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=25.0, edgecolors=color, c='#AAAAAA33', marker='o')
+
+    _out_long_points = ax.scatter(long_peak_x, y=long_y, label='long_peak_x', **circle_points_kwargs)
+    _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
 
     ## OUTPUT Variables:
     _output_dict = {'long_scatter': _out_long_points, 'short_scatter': _out_short_points}
     _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
 
-    # Draw arrows from the first set of points to the second set
+    # Draw arrows from the first set of points to the second set _________________________________________________________ #
     # for idx in range(len(long_peak_x)):
     for idx, aclu_val in enumerate(active_aclus):
         aclu_val: int = int(aclu_val)
@@ -1434,8 +1439,9 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
             _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = None
 
 
+    # ACLU Point Text Labels _____________________________________________________________________________________________ #
     if draw_point_aclu_labels:
-        from adjustText import adjust_text
+        
 
         text_kwargs = dict(color=aclu_labels_text_color, fontsize=aclu_labels_fontsize, ha='center', va='center')
         # Add text labels to scatter points
@@ -1457,21 +1463,23 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
             _output_by_aclu_dict[aclu_val]['long_text'] = a_long_text
             _output_by_aclu_dict[aclu_val]['short_text'] = a_short_text
 
-        # Call adjust_text function to adjust the positions of text labels
-        # adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()], ax=ax)
-        # adjust_text([v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax)
+        if enable_adjust_overlapping_text:
+            from adjustText import adjust_text
+            # Call adjust_text function to adjust the positions of text labels
+            adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()], ax=ax)
+            adjust_text([v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax)
 
-        adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()] + [v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax,
-                    #  expand=(1.2, 2), # expand text bounding boxes by 1.2 fold in x direction and 2 fold in y direction
-                    arrowprops=dict(arrowstyle='-', color='gray', alpha=.5), # ensure the labeling is clear by adding arrows
-                    # avoid_self=False,
-                    force_text=(0.5, 0),# Since the movements are so contrained, high force speeds up the process a lot
-                    expand=(1, 1), # We want them to be quite compact, so reducing expansion makes sense
-                    # only_move='x-', #Only allow movement to the left
-                    # only_move='y', #Only allow movement on y
-                    # max_move=None,
-                    # autoalign=True
-        )
+            # adjust_text([v['long_text'] for v in _output_by_aclu_dict.values()] + [v['short_text'] for v in _output_by_aclu_dict.values()], ax=ax,
+            #             #  expand=(1.2, 2), # expand text bounding boxes by 1.2 fold in x direction and 2 fold in y direction
+            #             arrowprops=dict(arrowstyle='-', color='gray', alpha=.5), # ensure the labeling is clear by adding small arrows indicating which point a text lable belongs to (these are different than the remapping arrows)
+            #             # avoid_self=False,
+            #             # force_text=(0.5, 0),# Since the movements are so contrained, high force speeds up the process a lot
+            #             # expand=(1, 1), # We want them to be quite compact, so reducing expansion makes sense
+            #             # only_move='x-', #Only allow movement to the left
+            #             # only_move='y', #Only allow movement on y
+            #             # max_move=None,
+            #             # autoalign=True
+            # )
 
 
         
