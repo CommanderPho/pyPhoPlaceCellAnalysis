@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>250</width>
+    <width>645</width>
     <height>716</height>
    </rect>
   </property>
@@ -25,7 +25,12 @@ background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
 border-color: rgb(0, 0, 0);
 QHeaderView::section { background-color: red };
-</string>
+/* Tooltip Specific Styling */
+QToolTip {
+    background-color: rgb(14, 14, 14); /* Black background */
+    color: rgb(211, 211, 211); /* Light grey text */
+    border: 1px solid white; /* Optional: white border */
+}</string>
   </property>
   <layout class="QGridLayout" name="gridLayout" rowstretch="1,0">
    <property name="leftMargin">
@@ -50,6 +55,14 @@ QHeaderView::section { background-color: red };
        <horstretch>1</horstretch>
        <verstretch>1</verstretch>
       </sizepolicy>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">/* Tooltip Specific Styling */
+QToolTip {
+    background-color: rgb(0, 0, 0); /* Black background */
+    color: rgb(211, 211, 211); /* Light grey text */
+    border: 1px solid white; /* Optional: white border */
+}</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2" rowstretch="0" columnstretch="0">
       <property name="leftMargin">
@@ -107,7 +120,13 @@ QHeaderView::section { background-color: red };
           </size>
          </property>
          <property name="styleSheet">
-          <string notr="true">background-color: rgb(0, 0, 0);</string>
+          <string notr="true">background-color: rgb(0, 0, 0);
+/* Tooltip Specific Styling */
+QToolTip {
+    background-color: rgb(0, 0, 0); /* Black background */
+    color: rgb(211, 211, 211); /* Light grey text */
+    border: 1px solid white; /* Optional: white border */
+}</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_3">
           <item row="0" column="0">
@@ -119,7 +138,13 @@ QHeaderView::section { background-color: red };
              </sizepolicy>
             </property>
             <property name="styleSheet">
-             <string notr="true">QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255)) }</string>
+             <string notr="true">QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255)) }
+/* Tooltip Specific Styling */
+QToolTip {
+    background-color: rgb(0, 0, 0); /* Black background */
+    color: rgb(211, 211, 211); /* Light grey text */
+    border: 1px solid white; /* Optional: white border */
+}</string>
             </property>
             <property name="selectionMode">
              <enum>QAbstractItemView::NoSelection</enum>

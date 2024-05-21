@@ -43,6 +43,7 @@ class LauncherWidget(QWidget):
 
      """
     _curr_active_pipeline_ref = None #  : Optional[Plot]
+    debug_print = False
 
     @property
     def treeWidget(self):
@@ -64,40 +65,90 @@ class LauncherWidget(QWidget):
     #     return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self._pipeline_reference.registered_display_function_dict.items()}
 
 
-    def __init__(self, parent=None):
+    def __init__(self, debug_print=False, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self._curr_active_pipeline_ref = None
+        self.debug_print = debug_print
+        
         self.initUI()
         self.show() # Show the GUI
 
     def initUI(self):
+
         # Connect the itemDoubleClicked signal to the on_tree_item_double_clicked slot
         self.treeWidget.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
+        # Enable mouse tracking to receive itemEntered events
+        self.treeWidget.setMouseTracking(True)
+
+        # Signal: itemEntered - fired when mouse hovers over an item
+        self.treeWidget.itemEntered.connect(self.on_tree_item_hovered)
+
         
 
     def get_display_function_items(self) -> Dict[str,DisplayFunctionItem]:
         assert self._curr_active_pipeline_ref is not None
         return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self.curr_active_pipeline.registered_display_function_dict.items()}
 
+
+    def get_display_function_item(self, a_fn_name: str) -> Optional[DisplayFunctionItem]:
+        return self.get_display_function_items().get(a_fn_name, None)
+    
+
     # Define a function to be executed when a tree widget item is double-clicked
     # @QtCore.Slot(object, int)
     @pyqtExceptionPrintingSlot(object)
     def on_tree_item_double_clicked(self, item, column):
-        print(f"Item double-clicked: {item}, column: {column}\n\t", item.text(column))
+        if self.debug_print:
+            print(f"Item double-clicked: {item}, column: {column}\n\t", item.text(column))
         # print(f'\titem.data: {item.data}')
         # raise NotImplementedError
         # item_data = item.data(column, 0) # ItemDataRole 
         item_data = item.data(column, 0) # ItemDataRole 
-        print(f'\titem_data: {item_data}')
-        display_function_items = self.get_display_function_items()
-        a_disp_fn_item = display_function_items[item_data]
-        # a_disp_fn_item = self.display_function_items[item_data]
-        print(f'\ta_disp_fn_item: {a_disp_fn_item}')
-        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data)
+        if self.debug_print:
+            print(f'\titem_data: {item_data}')
+        assert item_data is not None, f"item_Data is None"
+        assert isinstance(item_data, str), f"item_data is not a string! type(item_data): {type(item_data)}, item_data: {item_data}"
+        a_fcn_name: str = item_data
+
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name) #display_function_items[item_data]
+        if self.debug_print:
+            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
+
+        assert a_disp_fn_item is not None, f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"'
+
+        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data) # find matching item in the pipleine's .plot attributes
         # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.fn_callable)
         a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.name)
+        assert a_fn_handle is not None
         return a_fn_handle()
+
+
+    @pyqtExceptionPrintingSlot(object, int)
+    def on_tree_item_hovered(self, item, column):
+        if self.debug_print:
+            print(f"Item hovered: {item}, column: {column}\n\t", item.text(column))
+        # print(f'\titem.data: {item.data}')
+        # raise NotImplementedError
+        # item_data = item.data(column, 0) # ItemDataRole 
+        item_data = item.data(column, 0) # ItemDataRole 
+        if self.debug_print:
+            print(f'\titem_data: {item_data}')
+        assert item_data is not None
+        assert isinstance(item_data, str)
+        a_fcn_name: str = item_data
+
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+        if self.debug_print:
+            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
+        # tooltip_text = item.toolTip(column)
+        if a_disp_fn_item is not None:
+            # self.docPanelTextBrowser.setText(a_disp_fn_item.longform_description)
+            self.docPanelTextBrowser.setHtml(a_disp_fn_item.longform_description_formatted_html)
+
+        else:
+            print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
+        
         
 
     def build_for_pipeline(self, curr_active_pipeline):
@@ -111,6 +162,14 @@ class LauncherWidget(QWidget):
         display_function_items = self.get_display_function_items() # {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in curr_active_pipeline.registered_display_function_dict.items()}
         # display_function_items
 
+        # displayFunctionTreeItem_prefab_fns = QtWidgets.QTreeWidgetItem(["Prefab Functions"])
+        displayFunctionTreeItem_global_fns = QtWidgets.QTreeWidgetItem(["Global Functions"])
+        displayFunctionTreeItem_non_global_fns = QtWidgets.QTreeWidgetItem(["Non-Global Functions"])
+
+        # self.treeWidget.addTopLevelItem(displayFunctionTreeItem_prefab_fns)
+        self.treeWidget.addTopLevelItem(displayFunctionTreeItem_global_fns)
+        self.treeWidget.addTopLevelItem(displayFunctionTreeItem_non_global_fns)
+
         # for a_fcn_name, a_fcn in curr_active_pipeline.registered_display_function_dict.items():
         for a_fcn_name, a_disp_fn_item in display_function_items.items():
             # extract the info from the function:
@@ -119,8 +178,19 @@ class LauncherWidget(QWidget):
             # else:
             #     active_name = a_fcn_name
 
-            active_name: str = a_disp_fn_item.name
-            print(f'adding {active_name}')
+            # active_name: str = a_disp_fn_item.name
+
+
+            should_use_nice_display_names: bool = False # currently broken
+
+            if should_use_nice_display_names:
+                active_name: str = a_disp_fn_item.best_display_name
+            else:
+                active_name: str = a_disp_fn_item.name # function name
+
+
+            if self.debug_print:
+                print(f'adding {active_name}')
             childDisplayFunctionTreeItem = QtWidgets.QTreeWidgetItem([active_name])
             # childDisplayFunctionTreeItem.setText(0, active_name)
             # Set the tooltip for the item
@@ -135,10 +205,18 @@ class LauncherWidget(QWidget):
             # childDisplayFunctionTreeItem.setIcon(0, QtGui.QIcon("child_1_icon.png"))
             # childDisplayFunctionTreeItem
             # displayFunctionTreeItem.addChild(childDisplayFunctionTreeItem)
-            self.treeWidget.addTopLevelItem(childDisplayFunctionTreeItem) # add top level
+            # self.treeWidget.addTopLevelItem(childDisplayFunctionTreeItem) # add top level
+
+            if a_disp_fn_item.is_global:
+                displayFunctionTreeItem_global_fns.addChild(childDisplayFunctionTreeItem)
+            else:
+                # non-global
+                displayFunctionTreeItem_non_global_fns.addChild(childDisplayFunctionTreeItem)
 
         # self.treeWidget.addTopLevelItem(displayFunctionTreeItem)
-
+        displayFunctionTreeItem_global_fns.setExpanded(True)
+        displayFunctionTreeItem_non_global_fns.setExpanded(True)
+        
 
 
 ## Start Qt event loop

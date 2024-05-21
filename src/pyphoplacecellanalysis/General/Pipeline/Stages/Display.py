@@ -27,6 +27,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContex
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import LongShortTrackComparingDisplayFunctions
 
 
+def has_good_str_value(a_str_val) -> bool:
+    return ((a_str_val is not None) and (len(a_str_val) > 0))
+
 @define(slots=False)
 class DisplayFunctionItem:
     """ for helping to render a UI display function tree.
@@ -49,7 +52,57 @@ class DisplayFunctionItem:
             docs=a_fn.__doc__)
         return _obj
 
+    @property
+    def best_display_name(self) -> str:
+        """ returns the best name for display """
+        if has_good_str_value(self.short_name):
+            return self.short_name
+        else:
+            return self.name
+        
 
+    @property
+    def longform_description(self) -> str:
+        """The longform_description property."""
+        out_str_arr = []
+
+        if has_good_str_value(self.short_name):
+            out_str_arr.append(f"short_name: {self.short_name}") # short name first, then
+            out_str_arr.append(f"name: {self.name}") # full name
+        else:
+            out_str_arr.append(f"name: {self.name}") # just name
+
+        if has_good_str_value(self.docs):
+            out_str_arr.append(f"docs: {self.docs}")
+
+        out_str = '\n'.join(out_str_arr)
+        return out_str
+    
+    @property
+    def longform_description_formatted_html(self) -> str:
+        """HTML-formatted (with bold labels) longform text for use in QTextBrowser via .setHtml(...) 
+        
+        # <b style='color:red;'>bold and red</b>
+
+        """
+        out_str_arr = []
+
+        if has_good_str_value(self.short_name):
+            out_str_arr.append(f"<b style='color:white;'>short_name</b>: {self.short_name}") # short name first, then
+            out_str_arr.append(f"<b style='color:white;'>name</b>: {self.name}") # full name
+        else:
+            out_str_arr.append(f"<b style='color:white;'>name</b>: {self.name}") # just name
+
+        if has_good_str_value(self.docs):
+            out_str_arr.append(f"<b style='color:white;'>docs</b>: {self.docs}")
+
+        out_str = '<br>'.join(out_str_arr) # linebreaks with HTML's <br>
+        return out_str
+    
+
+
+
+    
 
 
 class Plot:
