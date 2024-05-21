@@ -677,12 +677,24 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             assert n_epoch_timebins == actual_n_epoch_timebins, f"n_epoch_timebins: {n_epoch_timebins} != actual_n_epoch_timebins: {actual_n_epoch_timebins} from np.shape(a_posterior_p_x_given_n) ({np.shape(a_posterior_p_x_given_n)})"
         else:
             a_posterior_p_x_given_n = np.atleast_2d(a_posterior_p_x_given_n).T # (57, 1)
-            required_n_y_bins: int = len(self.ybin_centers)
+            required_n_y_bins: int = len(self.ybin_centers) # passing an arbitrary amount of y-bins? Currently it's 6, which I don't get. Oh, I guess that comes from the 2D decoder that's passed in.
             n_xbins, n_ybins = np.shape(a_posterior_p_x_given_n) # (5, 312)
 
-            ## for a 1D posterior, fill solid across all y-bins
+            ## for a 1D posterior
             if (n_ybins < required_n_y_bins) and (n_ybins == 1):
-                a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, required_n_y_bins)) # (57, 6)
+                
+                # fill solid across all y-bins
+                # a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, required_n_y_bins)) # (57, 6)
+                
+                ## fill only middle 2 bins.
+                a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, required_n_y_bins)) # (57, 6) start ny filling all
+
+                # find middle bin:
+                # mid_bin_idx = np.rint(float(required_n_y_bins) / 2.0)
+                a_posterior_p_x_given_n[:, 1:] = np.nan
+                # a_posterior_p_x_given_n[:, 3:-1] = np.nan
+                
+
                 n_xbins, n_ybins = np.shape(a_posterior_p_x_given_n) # update again with new matrix
 
         assert n_xbins == np.shape(self.xbin_centers)[0], f"n_xbins: {n_xbins} != np.shape(xbin_centers)[0]: {np.shape(self.xbin_centers)}"
