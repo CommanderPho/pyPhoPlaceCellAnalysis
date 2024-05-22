@@ -115,7 +115,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             curr_batch_script_rundir = output_directory
 
         # Create two separate scripts:
-        # Create the Execution Python script
+        # Run Script _________________________________________________________________________________________________________ #
         python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_context}.py')
         with open(python_script_path, 'wb') as script_file:
             script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
@@ -127,7 +127,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             script_file.write(script_content.encode())
         # output_python_scripts.append(python_script_path)
 
-
+        # Figures Script _____________________________________________________________________________________________________ #
         python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_context}.py')
         with open(python_figures_script_path, 'wb') as script_file:
             script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
