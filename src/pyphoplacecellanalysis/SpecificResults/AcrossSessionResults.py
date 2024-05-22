@@ -2395,7 +2395,9 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     
     figure_context_dict = {'main_plot_mode': main_plot_mode}
 
-    
+    # variable_name: str = 'P_Long'
+    variable_name: str = 'P_Short'
+
     barmode='overlay'
     # barmode='stack'
     histogram_kwargs = dict(barmode=barmode)
@@ -2447,8 +2449,8 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         
         # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': column_titles}
         sp_make_subplots_kwargs = {'rows': 1, 'cols': num_cols, 'column_widths': column_widths, 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': list(np.array(column_titles)[is_col_included])}
-        # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
-        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+        # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
         
         # px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability'}
         
@@ -2456,7 +2458,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         # main_plot_mode: str = 'separate_facet_row_per_session'
         raise NotImplementedError(f"DOES NOT WORK")
         sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
-        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
+        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
                             'facet_row': 'session_name', 'facet_row_spacing': 0.04, # 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
                             'height': (num_unique_sessions*200), 'width': 1024,
                             'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
@@ -2481,7 +2483,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
                                     'row_titles': session_titles,
                                     'subplot_titles': subplot_titles,
                                     }
-        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': 'P_Long', 'color': 'time_bin_size', 'range_y': [0.0, 1.0],
+        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'range_y': [0.0, 1.0],
                             'height': (num_unique_sessions*200), 'width': 1024,
                             'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
         # px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability'}
@@ -2538,7 +2540,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
                 row_index: int = a_session_i + 1 # 1-indexed
                 is_first_item: bool = ((row_index == 1) and (scatter_column == 1))
                 a_session_data_results_df: pd.DataFrame = data_results_df[data_results_df['session_name'] == a_session_name]
-                #  fig.add_scatter(x=a_session_data_results_df['delta_aligned_start_t'], y=a_session_data_results_df['P_Long'], row=row_index, col=2, name=a_session_name)
+                #  fig.add_scatter(x=a_session_data_results_df['delta_aligned_start_t'], y=a_session_data_results_df[variable_name], row=row_index, col=2, name=a_session_name)
                 scatter_fig = px.scatter(a_session_data_results_df, **px_scatter_kwargs, title=f"{a_session_name}")
                 for a_trace in scatter_fig.data:
                     if (not is_first_item):
