@@ -1986,7 +1986,7 @@ class AcrossSessionsVisualizations:
         
         """
         # _out2 = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=defer_render, save_figure=save_figure)
-
+        from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
 
         # Plot long|short firing rate index:
@@ -1997,8 +1997,8 @@ class AcrossSessionsVisualizations:
         # active_context = long_short_fr_indicies_analysis_results['active_context']
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
         active_context = global_multi_session_context
-        final_context = active_context.adding_context('display_fn', display_fn_name='display_long_short_laps')
-        
+        final_context = active_context.adding_context('display_fn', display_fn_name='across_sessions_firing_rate_index')
+        final_context = DisplaySpecifyingIdentifyingContext.init_from_context(final_context, display_dict={})
 
         scatter_plot_kwargs = dict()
         if 'has_pf_color' in long_short_fr_indicies_analysis_results:
