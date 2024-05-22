@@ -13,7 +13,7 @@ class SpecificComputationResultsSpecification:
     	@function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields('], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
 		    results_specification = SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders']),
 		    provides_global_keys = ['DirectionalMergedDecoders'],
-		validate_computation_test=DirectionalMergedDecodersResult.validate_has_directional_merged_placefields, is_global=True)
+		validate_computation_test=DirectionalPseudo2DDecodersResult.validate_has_directional_merged_placefields, is_global=True)
         def a_fn(...
             ...
             

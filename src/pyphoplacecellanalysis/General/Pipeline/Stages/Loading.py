@@ -140,6 +140,8 @@ global_move_modules_list:Dict={
 	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
 	'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.SingleNeuronPlottingExtended':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig.SingleNeuronPlottingExtended',
 	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
+    'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalMergedDecodersResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult',
+    'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersDecodedResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult',
 }
 
 

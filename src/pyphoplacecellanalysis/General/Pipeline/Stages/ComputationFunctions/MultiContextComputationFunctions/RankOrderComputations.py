@@ -43,7 +43,7 @@ from neuropy.core.epoch import NamedTimerange
 from scipy import stats # _recover_samples_per_sec_from_laps_df
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DirectionalMergedDecodersResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DirectionalPseudo2DDecodersResult
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult # used in TrackTemplates
 
@@ -1774,7 +1774,7 @@ class RankOrderAnalyses:
             [LR, RL], {'LR': 0, 'RL': 1}
             odd (LR) = 0, even (RL) = 1
         """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalMergedDecodersResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
 
         # ODD: 0, EVEN: 1
         _LR_INDEX = 0
@@ -1812,7 +1812,7 @@ class RankOrderAnalyses:
             ## 2024-01-04 - DirectionalMergedDecoders version:
             # NOTE: ripple_most_likely_direction_from_decoder comes with with more epochs than the already filtered `rank_order_results.ripple_combined_epoch_stats_df` version. We'll get only the active indicies from `rank_order_results.ripple_combined_epoch_stats_df.index`
             # needs: rank_order_results, ripple_most_likely_direction_from_decoder, ripple_directional_all_epoch_bins_marginal, 
-            ripple_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
+            ripple_marginals = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
             ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = ripple_marginals
 
             combined_best_direction_indicies = deepcopy(ripple_most_likely_direction_from_decoder) # .shape (611,)
@@ -1883,7 +1883,7 @@ class RankOrderAnalyses:
             ## 2024-01-04 - DirectionalMergedDecoders version:
             # NOTE: laps_most_likely_direction_from_decoder comes with with more epochs than the already filtered `rank_order_results.laps_combined_epoch_stats_df` version. We'll get only the active indicies from `rank_order_results.ripple_combined_epoch_stats_df.index`
             # needs: rank_order_results, laps_most_likely_direction_from_decoder, laps_directional_all_epoch_bins_marginal, 
-            laps_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+            laps_marginals = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
             laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = laps_marginals
 
             combined_best_direction_indicies = deepcopy(laps_most_likely_direction_from_decoder) # .shape (611,)

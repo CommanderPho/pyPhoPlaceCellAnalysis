@@ -232,7 +232,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
     from pyphocorehelpers.print_helpers import get_now_day_str
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalMergedDecodersResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
     # Export CSVs:
@@ -338,8 +338,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         return df
 
     ## Single decode:
-    def _try_single_decode(owning_pipeline_reference, directional_merged_decoders_result: DirectionalMergedDecodersResult, use_single_time_bin_per_epoch: bool,
-                            desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None) -> DirectionalMergedDecodersResult:
+    def _try_single_decode(owning_pipeline_reference, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, use_single_time_bin_per_epoch: bool,
+                            desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None) -> DirectionalPseudo2DDecodersResult:
         """ decodes laps and ripples for a single bin size. 
         
         desired_laps_decoding_time_bin_size
@@ -457,8 +457,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     # DirectionalMergedDecoders: Get the result after computation:
     ## Copy the default result:
-    directional_merged_decoders_result: DirectionalMergedDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
-    alt_directional_merged_decoders_result: DirectionalMergedDecodersResult = deepcopy(directional_merged_decoders_result)
+    directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+    alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
 
     # out_path_basename_str: str = f"{now_day_str}_{active_context}_time_bin_size-{laps_decoding_time_bin_size}_{data_identifier_str}"
     # out_path_basename_str: str = f"{now_day_str}_{active_context}_time_bin_size_sweep_results"
@@ -480,7 +480,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     laps_df = laps_obj.to_dataframe()
     assert 'maze_id' in laps_df.columns, f"laps_df is still missing the 'maze_id' column after calling `laps_obj.update_maze_id_if_needed(...)`. laps_df.columns: {print(list(laps_df.columns))}"
     # Uses: session_ctxt_key, all_param_sweep_options
-    output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalMergedDecodersResult] = {} # empty dict
+    output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalPseudo2DDecodersResult] = {} # empty dict
     output_laps_decoding_accuracy_results_dict = {} # empty dict
     output_extracted_result_tuples = {}
 
@@ -546,7 +546,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = [out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple]
 
     if return_full_decoding_results:
-        # output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalMergedDecodersResult]
+        # output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalPseudo2DDecodersResult]
         across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'].append(output_alt_directional_merged_decoders_result) # append the real full results
         ## Save out the laps peformance result
         if save_hdf:
@@ -557,9 +557,9 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             #     print(f'a_sweep_dict: {a_sweep_dict}')
             #     # Convert parameters to string because Parquet supports metadata as string
             #     a_sweep_str_params = {key: str(value) for key, value in a_sweep_dict.items() if value is not None}
-            #     a_directional_merged_decoders_result: DirectionalMergedDecodersResult = output_alt_directional_merged_decoders_result[a_sweep_tuple]
+            #     a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = output_alt_directional_merged_decoders_result[a_sweep_tuple]
 
-            #     # 2024-04-03 `DirectionalMergedDecodersResult` is actually missing a `to_hdf` implementation, so no dice.
+            #     # 2024-04-03 `DirectionalPseudo2DDecodersResult` is actually missing a `to_hdf` implementation, so no dice.
 
         #     output_alt_directional_merged_decoders_result.to_hdf(out_path, key=f'{session_ctxt_key}/alt_directional_merged_decoders_result')
         across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = tuple(across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'])
@@ -583,7 +583,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'ripple_all_scores_merged_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
+@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'ripple_all_scores_merged_df'], input_requires=['DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """
     Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation

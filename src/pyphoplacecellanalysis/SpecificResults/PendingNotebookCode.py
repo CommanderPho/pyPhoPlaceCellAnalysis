@@ -262,13 +262,13 @@ from neuropy.analyses.placefields import PfND
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalMergedDecodersResult, _check_result_laps_epochs_df_performance
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult, _check_result_laps_epochs_df_performance
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CompleteDecodedContextCorrectness
 
-def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result: DirectionalMergedDecodersResult):
+def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult):
     """    takes 'laps_df' and 'result_laps_epochs_df' to add the ground_truth and the decoded posteriors:
 
-        a_directional_merged_decoders_result: DirectionalMergedDecodersResult = alt_directional_merged_decoders_result
+        a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = alt_directional_merged_decoders_result
 
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_groundtruth_information
@@ -311,10 +311,10 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
     return result_laps_epochs_df
 
 
-@function_attributes(short_name=None, tags=['laps', 'groundtruth', 'context-decoding', 'context-discrimination'], input_requires=[], output_provides=[], uses=[], used_by=['perform_sweep_lap_groud_truth_performance_testing'], creation_date='2024-04-05 18:40', related_items=['DirectionalMergedDecodersResult'])
+@function_attributes(short_name=None, tags=['laps', 'groundtruth', 'context-decoding', 'context-discrimination'], input_requires=[], output_provides=[], uses=[], used_by=['perform_sweep_lap_groud_truth_performance_testing'], creation_date='2024-04-05 18:40', related_items=['DirectionalPseudo2DDecodersResult'])
 def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeline_reference,
                                                                     desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: Optional[float] = None, use_single_time_bin_per_epoch: bool=False,
-                                                                    included_neuron_ids: Optional[NDArray]=None) -> Tuple[DirectionalMergedDecodersResult, pd.DataFrame, CompleteDecodedContextCorrectness]:
+                                                                    included_neuron_ids: Optional[NDArray]=None) -> Tuple[DirectionalPseudo2DDecodersResult, pd.DataFrame, CompleteDecodedContextCorrectness]:
     """ 2024-01-17 - Pending refactor from ReviewOfWork_2024-01-17.ipynb 
 
     Makes a copy of the 'DirectionalMergedDecoders' result and does the complete process of re-calculation for the provided time bin sizes. Finally computes the statistics about correctly computed contexts from the laps.
@@ -334,8 +334,8 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
 
     ## Copy the default result:
-    directional_merged_decoders_result: DirectionalMergedDecodersResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalMergedDecoders']
-    alt_directional_merged_decoders_result: DirectionalMergedDecodersResult = deepcopy(directional_merged_decoders_result)
+    directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalMergedDecoders']
+    alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
 
     if included_neuron_ids is not None:
         # prune the decoder by the provided `included_neuron_ids`

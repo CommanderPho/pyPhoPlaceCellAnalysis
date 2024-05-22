@@ -33,7 +33,7 @@ from neuropy.utils.mixins.HDF5_representable import HDFMixin
 from neuropy.utils.indexing_helpers import PandasHelpers
  
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalMergedDecodersResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalPseudo2DDecodersResult
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 
 import scipy.stats
@@ -1117,8 +1117,13 @@ def validate_has_directional_laps(curr_active_pipeline, computation_filter_name=
 
 
 @define(slots=False, repr=False)
-class DirectionalMergedDecodersResult(ComputedResult):
+class DirectionalPseudo2DDecodersResult(ComputedResult):
     """ a container for holding information regarding the computation of merged (pseudo2D) directional placefields.
+
+    #TODO 2024-05-22 17:26: - [ ] 'DirectionalMergedDecodersResult' -> 'DirectionalPseudo2DDecodersResult'
+
+    {'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalMergedDecodersResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult'}
+
 
     ## Get the result after computation:
     directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
@@ -1286,9 +1291,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
         if not isinstance(laps_epochs_df, pd.DataFrame):
             laps_epochs_df = laps_epochs_df.to_dataframe()
         
-        self.laps_directional_marginals_tuple = DirectionalMergedDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        self.laps_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
-        self.laps_track_identity_marginals_tuple = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        self.laps_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
 
         ## Simple Scatterplot:
@@ -1299,9 +1304,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         ## Decode Ripples:
         ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
-        self.ripple_directional_marginals_tuple = DirectionalMergedDecodersResult.determine_directional_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
+        self.ripple_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
         ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
-        self.ripple_track_identity_marginals_tuple = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
+        self.ripple_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
         ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
 
         ## Simple Scatterplot:
@@ -1532,7 +1537,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
         determine_directional_likelihoods
 
-        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decode, is_most_likely_direction_LR_dir = DirectionalMergedDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decode, is_most_likely_direction_LR_dir = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
 
         0: LR
         1: RL
@@ -1555,7 +1560,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
     def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result):
         """ 
         
-        laps_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        laps_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
         track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
         
         0: Long
@@ -1696,9 +1701,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
         if not isinstance(laps_epochs_df, pd.DataFrame):
             laps_epochs_df = laps_epochs_df.to_dataframe()
         
-        laps_directional_marginals_tuple = DirectionalMergedDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        laps_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
-        laps_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        laps_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
         track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
         laps_decoding_time_bin_size_str: str = f"{round(self.laps_decoding_time_bin_size, ndigits=5)}"
         
@@ -1726,9 +1731,9 @@ class DirectionalMergedDecodersResult(ComputedResult):
         ## Ripples:
         ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
         all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = self.all_directional_ripple_filter_epochs_decoder_result
-        ripple_marginals = DirectionalMergedDecodersResult.determine_directional_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
+        ripple_marginals = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
         ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = ripple_marginals
-        ripple_track_identity_marginals = DirectionalMergedDecodersResult.determine_long_short_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
+        ripple_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
         ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals
         ripple_decoding_time_bin_size_str: str = f"{round(self.ripple_decoding_time_bin_size, ndigits=5)}"
 
@@ -1900,7 +1905,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         Updates: ['maze_id', 'is_LR_dir', 'is_most_likely_track_identity_Long', 'is_most_likely_direction_LR']
 
         Usage:
-            a_directional_merged_decoders_result: DirectionalMergedDecodersResult = directional_merged_decoders_result
+            a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = directional_merged_decoders_result
             result_laps_epochs_df: pd.DataFrame = a_directional_merged_decoders_result.add_groundtruth_information(curr_active_pipeline)
             result_laps_epochs_df
 
@@ -1926,7 +1931,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
         Updates: ['maze_id', 'is_LR_dir', 'is_most_likely_track_identity_Long', 'is_most_likely_direction_LR']
 
         Usage:
-            a_directional_merged_decoders_result: DirectionalMergedDecodersResult = directional_merged_decoders_result
+            a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = directional_merged_decoders_result
             result_laps_epochs_df: pd.DataFrame = a_directional_merged_decoders_result.add_groundtruth_information(curr_active_pipeline)
             result_laps_epochs_df
 
@@ -1949,7 +1954,7 @@ class DirectionalMergedDecodersResult(ComputedResult):
 
 def validate_has_directional_merged_placefields(curr_active_pipeline, computation_filter_name='maze'):
     """ 
-        DirectionalMergedDecodersResult.validate_has_directional_merged_placefields
+        DirectionalPseudo2DDecodersResult.validate_has_directional_merged_placefields
     """
     # Unpacking:
     directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
@@ -1974,19 +1979,27 @@ def validate_has_directional_merged_placefields(curr_active_pipeline, computatio
 
 
 @define(slots=False, repr=False)
-class DirectionalDecodersDecodedResult(ComputedResult):
-    """ a container containing a dict containing the four pf1D_Decoders and a Dict that can be used to cache the results of decoding across all time-bins (continuously) for each decoder in the dict.
+class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
+    """ a container used to cache the results of decoding across all time-bins (continuously) for multiple decoders, and at varying time_bin_sizes
+    Also holds the four pf1D_Decoders and the merged Pseudo2D decoder.
     
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersDecodedResult
+    Used by: `_decode_continuous_using_directional_decoders` to hold the result of continuous decoding
+    #TODO 2024-05-22 17:21: - [ ] This class is very poorly named. It holds a continuous decoding at multiple time_bin_sizes. Strangely it doesn't seemed to be used in the batch function that actually sweeps the time bins, only the continuous decoding computation fn. 
 
-    ## Get the result after computation:
-    directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-    all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-    pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
-    # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-    time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
-    print(f'time_bin_size: {time_bin_size}')
-    continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+    #TODO 2024-05-22 17:26: - [ ] 'DirectionalDecodersDecodedResult' -> 'DirectionalDecodersContinuouslyDecodedResult'
+    'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersDecodedResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult',
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+
+        ## Get the result after computation:
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+        # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+        print(f'time_bin_size: {time_bin_size}')
+        continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
     
         
     """
@@ -1997,8 +2010,9 @@ class DirectionalDecodersDecodedResult(ComputedResult):
     spikes_df: pd.DataFrame = serialized_field(default=None, metadata={'field_added': "2024.01.22_0"}) # global
     
     # Posteriors computed via the all_directional decoder:
-    continuously_decoded_result_cache_dict: Dict[float, Dict[str, DecodedFilterEpochsResult]] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"}) # key is the t_bin_size in seconds
+    continuously_decoded_result_cache_dict: Dict[float, Dict[types.DecoderName, DecodedFilterEpochsResult]] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"}) # key is the t_bin_size in seconds
     
+
     @property
     def most_recent_decoding_time_bin_size(self) -> Optional[float]:
         """Gets the last cached continuously_decoded_dict property."""
@@ -2024,7 +2038,7 @@ class DirectionalDecodersDecodedResult(ComputedResult):
     def validate_has_directional_decoded_continuous_epochs(cls, curr_active_pipeline, computation_filter_name='maze') -> bool:
         """ Validates that the decoding is complete
         """
-        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
         if pseudo2D_decoder is None:
@@ -2052,7 +2066,7 @@ class DirectionalDecodersDecodedResult(ComputedResult):
 def _workaround_validate_has_directional_decoded_continuous_epochs(curr_active_pipeline, computation_filter_name='maze') -> bool:
     """ Validates that the decoding is complete
     """
-    directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+    directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
     all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
     pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
     if pseudo2D_decoder is None:
@@ -2078,7 +2092,7 @@ def _workaround_validate_has_directional_decoded_continuous_epochs(curr_active_p
 
 @define(slots=False, repr=False)
 class DecoderDecodedEpochsResult(ComputedResult):
-    """ Contains Decoded Epochs (such as laps, ripple) for a given Decoder.
+    """ Contains Decoded Epochs (such as laps, ripple) for a each of the Decoders.
 
     2024-02-15 - Computed by `_decode_and_evaluate_epochs_using_directional_decoders`
     
@@ -2090,8 +2104,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
     ripple_decoding_time_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
     laps_decoding_time_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
 
-    decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = serialized_field(default=None)
-    decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = serialized_field(default=None)
+    decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field(default=None)
+    decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field(default=None)
 
     decoder_laps_radon_transform_df_dict: Dict = serialized_field(default=None)
     decoder_ripple_radon_transform_df_dict: Dict = serialized_field(default=None)
@@ -2647,7 +2661,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         return export_files_dict
 
 
-    @function_attributes(short_name=None, tags=['export', 'CSV'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-15 10:13', related_items=[])
+    @function_attributes(short_name=None, tags=['export', 'CSV'], input_requires=[], output_provides=['ripple_all_scores_merged_df.csv'], uses=['self.perform_export_dfs_dict_to_csvs', 'self.build_complete_all_scores_merged_df'], used_by=[], creation_date='2024-03-15 10:13', related_items=[])
     def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
         """ export as separate .csv files. 
         active_context = curr_active_pipeline.get_session_context()
@@ -3939,7 +3953,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
 
-    @function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields'], used_by=[], creation_date='2023-10-25 09:33', related_items=['DirectionalMergedDecodersResult'],
+    @function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields'], used_by=[], creation_date='2023-10-25 09:33', related_items=['DirectionalPseudo2DDecodersResult'],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'],
         validate_computation_test=validate_has_directional_merged_placefields, is_global=True)
     def _build_merged_directional_placefields(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
@@ -3960,7 +3974,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalMergedDecoders']['computed_base_epoch_names']
 
 
-                directional_merged_decoders_result: "DirectionalMergedDecodersResult" = global_computation_results.computed_data['DirectionalMergedDecoders']
+                directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult" = global_computation_results.computed_data['DirectionalMergedDecoders']
 
         """
         from neuropy.analyses.placefields import PfND
@@ -4009,7 +4023,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # takes 6.3 seconds
 
         ## Get or update the global directional_merged_decoders_result:
-        directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data.get('DirectionalMergedDecoders', DirectionalMergedDecodersResult(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
+        directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data.get('DirectionalMergedDecoders', DirectionalPseudo2DDecodersResult(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
                                                       long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
                                                       short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder))
 
@@ -4047,7 +4061,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
          # Validate Laps:
         try:
             laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = directional_merged_decoders_result.laps_directional_marginals_tuple
-            percent_laps_estimated_correctly = DirectionalMergedDecodersResult.validate_lap_dir_estimations(unfiltered_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
+            percent_laps_estimated_correctly = DirectionalPseudo2DDecodersResult.validate_lap_dir_estimations(unfiltered_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
             print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
         except (AssertionError, ValueError) as err:
             print(F'fails due to some types thing?')
@@ -4067,9 +4081,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         return global_computation_results
     
 
-    @function_attributes(short_name='directional_decoders_decode_continuous', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-17 09:05', related_items=[],
+    @function_attributes(short_name='directional_decoders_decode_continuous', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D', 'continuous'], input_requires=[], output_provides=[], uses=['DirectionalDecodersContinuouslyDecodedResult'], used_by=[], creation_date='2024-01-17 09:05', related_items=[],
         requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersDecoded'],
-        # validate_computation_test=DirectionalDecodersDecodedResult.validate_has_directional_decoded_continuous_epochs,
+        # validate_computation_test=DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs,
         validate_computation_test=_workaround_validate_has_directional_decoded_continuous_epochs,
         is_global=True, computation_precidence=(1002.0))
     def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None):
@@ -4085,9 +4099,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalDecodersDecoded']['continuously_decoded_result_cache_dict']
 
 
-                from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersDecodedResult
+                from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
 
-                directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+                directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
                 all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
                 pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
 
@@ -4106,7 +4120,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 
         should_disable_cache: bool = True # when True, always recomputes and does not attempt to use the cache.
         
-        # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
+        # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
         # Store all_directional_pf1D_Decoder_dict, all_directional_continuously_decoded_dict
         
         ## Create or update the global directional_decoders_decode_result:            
@@ -4128,7 +4142,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         
         if (not had_existing_DirectionalDecodersDecoded_result):
             ## Build a new result
-            print(f'\thad_existing_DirectionalDecodersDecoded_result == False. New DirectionalDecodersDecodedResult will be built...')
+            print(f'\thad_existing_DirectionalDecodersDecoded_result == False. New DirectionalDecodersContinuouslyDecodedResult will be built...')
             # # Unpack all directional variables:
             long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
             # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
@@ -4174,8 +4188,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False)
             all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
             continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict} # result is a single time_bin_size
-            print(f'\t computation done. Creating new DirectionalDecodersDecodedResult....')
-            directional_decoders_decode_result = DirectionalDecodersDecodedResult(pseudo2D_decoder=pseudo2D_decoder, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, spikes_df=deepcopy(global_spikes_df), continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict)
+            print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
+            directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pseudo2D_decoder=pseudo2D_decoder, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, spikes_df=deepcopy(global_spikes_df), continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict)
 
         else:
             # had_existing_DirectionalDecodersDecoded_result == True
@@ -4216,9 +4230,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         """ Usage:
         
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersDecodedResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
 
-        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
@@ -4353,7 +4367,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             return laps_radon_transform_df, laps_radon_transform_extras, ripple_radon_transform_df, ripple_radon_transform_extras
 
 
-        def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "DirectionalMergedDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_df_dict: Dict[str, pd.DataFrame], decoder_ripple_df_dict: Dict[str, pd.DataFrame], active_df_columns = ['wcorr']):
+        def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_df_dict: Dict[str, pd.DataFrame], decoder_ripple_df_dict: Dict[str, pd.DataFrame], active_df_columns = ['wcorr']):
             """ Called one for each specific score metric (e.g. (Radon Transform, WCorr, PearsonR)) after it is computed to compute its merged dataframes and dataframe dicts. 
             
             Generalized to work with any result dfs not just Radon Transforms
@@ -4362,7 +4376,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             Usage:
 
             # DirectionalMergedDecoders: Get the result after computation:
-            directional_merged_decoders_result: DirectionalMergedDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+            directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
 
             (laps_radon_transform_merged_df, ripple_radon_transform_merged_df), (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = _compute_complete_df_metrics(track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                                                                                                                     decoder_laps_df_dict=deepcopy(decoder_laps_radon_transform_df_dict), decoder_ripple_df_dict=deepcopy(decoder_ripple_radon_transform_df_dict), active_df_columns = ['score', 'velocity', 'intercept', 'speed'])
@@ -4408,7 +4422,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             return (laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
 
         # @function_attributes(short_name=None, tags=['weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=['_compute_complete_df_metrics', '_compute_weighted_correlations', '_compute_epoch_decoding_radon_transform_for_decoder', '_compute_matching_best_indicies'], used_by=[], creation_date='2024-02-15 19:55', related_items=[])
-        def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalMergedDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]], spikes_df: pd.DataFrame, should_skip_radon_transform=False):
+        def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]], spikes_df: pd.DataFrame, should_skip_radon_transform=False):
             """ computes for all score metrics (Radon Transform, WCorr, PearsonR) and adds them appropriately. 
             
             spikes_df is needed for Simple Correlation Score calculation.
@@ -4526,7 +4540,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         # Calls `_perform_compute_custom_epoch_decoding`, `_compute_all_df_score_metrics`
 
-        # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
+        # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
         
         # spikes_df = curr_active_pipeline.sess.spikes_df
         rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
@@ -4538,7 +4552,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # print(f'included_qclu_values: {included_qclu_values}')
 
         # DirectionalMergedDecoders: Get the result after computation:
-        directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
+        directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
         ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
         laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
         pos_bin_size: float = track_templates.get_decoders()[0].pos_bin_size
@@ -4557,7 +4571,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         #TODO 2024-02-16 13:46: - [ ] Currently always replace
         ## Create or update the global directional_merged_decoders_result:
-        # directional_decoders_epochs_decode_result: DirectionalMergedDecodersResult = global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+        # directional_decoders_epochs_decode_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
         # if directional_decoders_epochs_decode_result is not None:
         # directional_decoders_epochs_decode_result.__dict__.update(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
         #                                               long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
@@ -4675,7 +4689,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # print(f'included_qclu_values: {included_qclu_values}')
 
         # DirectionalMergedDecoders: Get the result after computation:
-        directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
+        directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
         ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
         laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
 
@@ -4690,7 +4704,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         #TODO 2024-02-16 13:46: - [ ] Currently always replace
         ## Create or update the global directional_merged_decoders_result:
-        # directional_decoders_epochs_decode_result: DirectionalMergedDecodersResult = global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+        # directional_decoders_epochs_decode_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
         # if directional_decoders_epochs_decode_result is not None:
         # directional_decoders_epochs_decode_result.__dict__.update(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
         #                                               long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
@@ -5560,7 +5574,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         
 
         defer_render = kwargs.pop('defer_render', False)
-        directional_merged_decoders_result: DirectionalMergedDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
+        directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
         active_merged_pf_plots_data_dict = {} #empty dict
         
         if plot_all_directions:
@@ -5760,7 +5774,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
                             global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
                             name='Directional_Posterior',
-                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_non_marginalized_raw_posteriors(filter_epochs_decoder_result),
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
                             _mod_plot_kwargs=dict(final_context=_main_context),
@@ -5776,7 +5790,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
                             global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
                             name='Directional_Marginal_LAPS',
-                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
                             _mod_plot_kwargs=dict(final_context=_main_context),
@@ -5792,7 +5806,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             global_replays, directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result,
                             global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
                             name='Directional_Marginal_Ripples',
-                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
                             _mod_plot_kwargs=dict(final_context=_main_context),
@@ -5808,7 +5822,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             global_any_laps_epochs_obj, directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result,
                             global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
                             name='TrackIdentity_Marginal_LAPS',
-                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
                             _mod_plot_kwargs=dict(final_context=_main_context),
@@ -5825,7 +5839,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             global_replays, directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result,
                             global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
                             name='TrackIdentity_Marginal_Ripples',
-                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
                             _mod_plot_kwargs=dict(final_context=_main_context),
@@ -5955,7 +5969,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
 
         ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
-        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
@@ -5987,7 +6001,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             if active_2d_plot is None:
                 raise ValueError("active_2d_plot is None!")
 
-            return DirectionalDecodersDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
+            return DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
             
         except Exception as e:
             print(f'Exception {e} occured in validate_can_display(), returning False')
@@ -6079,7 +6093,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
 
         ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
-        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
         
         # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
@@ -6125,7 +6139,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             if active_2d_plot is None:
                 raise ValueError("active_2d_plot is None!")
 
-            return DirectionalDecodersDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
+            return DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
             
         except Exception as e:
             print(f'Exception {e} occured in validate_can_display(), returning False')
@@ -6213,7 +6227,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
                                                 CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey))))
 
         ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
-        directional_decoders_decode_result: DirectionalDecodersDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
         # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
@@ -6226,9 +6240,9 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
         # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
         pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = most_recent_continuously_decoded_dict.get('pseudo2D', None)
         assert len(pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list) == 1
-        non_marginalized_raw_result = DirectionalMergedDecodersResult.build_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
-        marginal_over_direction = DirectionalMergedDecodersResult.build_custom_marginal_over_direction(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
-        marginal_over_track_ID = DirectionalMergedDecodersResult.build_custom_marginal_over_long_short(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        non_marginalized_raw_result = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        marginal_over_direction = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
         # non_marginalized_raw_result.shape # (4, 128672)
         # marginal_over_direction.shape # (2, 128672)
         # marginal_over_track_ID.shape # (2, 128672)
