@@ -840,7 +840,8 @@ def write_test_script(custom_user_completion_function_template_code: str, script
 
 
 def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path, override_custom_user_completion_functions_dict: Optional[Dict]=None):
-    """ 
+    """ Gets the python code template string that will be inserted into the produced python scripts.
+    
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import MAIN_get_template_string
     
 
