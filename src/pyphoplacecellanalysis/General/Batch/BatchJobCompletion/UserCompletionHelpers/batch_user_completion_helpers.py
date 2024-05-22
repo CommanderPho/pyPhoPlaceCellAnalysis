@@ -116,7 +116,7 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['marginal', 'across-sessions', 'CSV'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:22', related_items=[])
+@function_attributes(short_name=None, tags=['marginal', 'across-sessions', 'CSV'], input_requires=[], output_provides=[], uses=['directional_merged_decoders_result.compute_and_export_marginals_df_csvs'], used_by=[], creation_date='2024-04-27 21:22', related_items=[])
 def compute_and_export_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -206,7 +206,7 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['CSV', 'time_bin_sizes', 'marginals'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:24', related_items=[])
+@function_attributes(short_name=None, tags=['CSV', 'time_bin_sizes', 'marginals'], input_requires=['DirectionalMergedDecoders'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:24', related_items=[])
 def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_hdf=True, save_csvs=True, return_full_decoding_results:bool=False, 
                                                                              custom_all_param_sweep_options=None,
@@ -396,6 +396,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
                 print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_ripple_decoding_time_bin_size}', end='\t') 
 
             print(f'{post_drop_n_epochs} remain.')
+            # returns a `DecodedFilterEpochsResult`
             directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = directional_merged_decoders_result.all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=replay_epochs_df,
                                                                                                                                                                                             decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
 
@@ -582,7 +583,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
+@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'ripple_all_scores_merged_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """
     Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
@@ -666,7 +667,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
     if (not _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline)):
         print(f'\tmissing heuristic columns. Recomputing:')
         directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
-        print(f'done recomputing heuristics.')
+        print(f'\tdone recomputing heuristics.')
 
     print(f'\tComputation complete. Exporting .CSVs...')
 
