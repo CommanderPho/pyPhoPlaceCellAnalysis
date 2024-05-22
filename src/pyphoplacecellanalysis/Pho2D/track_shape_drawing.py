@@ -1270,6 +1270,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     import matplotlib.colors as mcolors
     import matplotlib.cm as cm
     from matplotlib.transforms import Affine2D
+    import matplotlib.patheffects as path_effects
 
     from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
 
@@ -1284,6 +1285,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     aclus_y_offset_mode_POSSIBLE_OPTIONS = ['random_jitter', 'count_based']
     assert aclus_y_offset_mode.value in aclus_y_offset_mode_POSSIBLE_OPTIONS, f"aclus_y_offset_mode must be in {aclus_y_offset_mode_POSSIBLE_OPTIONS} but aclus_y_offset_mode: {aclus_y_offset_mode}"
 
+    enable_single_y_point_arrows: bool = True # if True all arrows are started from the top aclu for long and bottom/baseline for short. If False each arrow starts from its correct aclu dot, which can appear more busy.
+    # enable_single_y_point_arrows: bool = False
 
     base_1D_height: float = 1.0
     # base_1D_height: float = 0.5
@@ -1292,14 +1295,38 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     long_height_multiplier: float = 1.0
     # long_height_multiplier: float = 0.5 # this renders the long track half-height
 
-    long_y_baseline: float = 0.1
-    short_y_baseline: float = 0.75
+    # long_y_baseline: float = 0.1
+    # short_y_baseline: float = 0.75
+
+    ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
+    top_bottom_padding: float = 0.025
+    intra_track_y_spacing: float = 0.05 # spacing in between the long/short tracks
+
+    total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
+    track_y_height: float = total_track_y_space / 2.0
+
+    long_y_baseline: float = top_bottom_padding
+    short_y_baseline: float = long_y_baseline + track_y_height + intra_track_y_spacing
+
+    # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
+    # short_y_top: float = (1.0-0.1) # 0.9
     
+
+    scatter_point_size: float = 15.0
 
     # Text label options:
     aclu_labels_text_color='black'
     # aclu_labels_fontsize = 6
     aclu_labels_fontsize = 3
+    aclu_labels_text_path_effects = [path_effects.Stroke(linewidth=0.1, foreground='darkgrey'), path_effects.Normal()]
+
+    ## Selection (only for interactivity)
+    selection_color = (1, 0, 0, 1)  # Red color in RGBA format
+    scatter_point_selected_size: float = scatter_point_size + 2.0
+    scatter_edgecolors_selection_color = (0.35, 0, 0, 1)  # Red color in RGBA format
+
+    selection_text_path_effects = [path_effects.Stroke(linewidth=0.2, foreground='red'), path_effects.Normal()]
+
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     ## Get the track configs for the colors:
@@ -1375,8 +1402,11 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # long_transformation = Affine2D().scale(1, -0.5).translate(0, long_y_baseline)
     # short_transformation = Affine2D().scale(1, 0.5).translate(0, short_y_baseline)
     track_to_baseline_padding: float = 0.05
-    long_transformation = Affine2D().scale(1, 1.0).translate(0, long_y_baseline-track_to_baseline_padding)
-    short_transformation = Affine2D().scale(1, 1.0).translate(0, short_y_baseline-track_to_baseline_padding)
+    # long_transformation = Affine2D().scale(1, 1.0).translate(0, long_y_baseline-track_to_baseline_padding)
+    # short_transformation = Affine2D().scale(1, 1.0).translate(0, short_y_baseline-track_to_baseline_padding)
+
+    long_transformation = Affine2D().scale(1, track_y_height).translate(0, (long_y_baseline-track_to_baseline_padding))
+    short_transformation = Affine2D().scale(1, track_y_height).translate(0, (short_y_baseline-track_to_baseline_padding))
 
     # Apply the transformation to the Path
     long_path = long_path.transformed(long_transformation)
@@ -1423,9 +1453,6 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     ## constant:
     # color = 'white'
 
-    
-
-
     ## Count-based offsets: If there are three aclus sharing a bin, offset the repeated aclus by a scaled y-factor:
     if (aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value):
         offset_scaling_factor: float = 0.1
@@ -1434,14 +1461,26 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).cumcount()
         a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
 
+        # a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).agg(['cumcount', ''])
+        # a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
+
+        # Use `transform` to broadcast the maximum count to all rows in the original DataFrame
+        a_dir_decoder_aclu_MAX_peak_maps_df['long_MaxRepeat'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name)['long_repeated_count'].transform('max')
+        a_dir_decoder_aclu_MAX_peak_maps_df['short_MaxRepeat'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name)['short_repeated_count'].transform('max')
+
+
         long_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'].to_numpy() * offset_scaling_factor
         short_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'].to_numpy() * offset_scaling_factor
 
-        long_y_arrow_val = (np.full_like(long_peak_x, long_y_baseline)) * base_1D_height
+        # long arrows should start at the top of the stack (maximum y)
+        long_y_arrow_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_MaxRepeat'].to_numpy() * offset_scaling_factor
+        # long_y_arrow_val = (np.full_like(long_peak_x, long_y_baseline)) * base_1D_height
+        long_y_arrow_val = (np.full_like(long_peak_x, long_y_baseline) + long_y_arrow_offsets) * base_1D_height
+        # short arrows should end at the bottom of the stack (minimum y)
         short_y_arrow_val = (np.full_like(short_peak_x, short_y_baseline)) * base_1D_height
 
-        long_y = (np.full_like(long_peak_x, long_y_baseline)+ long_y_offsets) * base_1D_height
-        short_y = (np.full_like(short_peak_x, short_y_baseline)+ short_y_offsets) * base_1D_height
+        long_y = (np.full_like(long_peak_x, long_y_baseline) + long_y_offsets) * base_1D_height
+        short_y = (np.full_like(short_peak_x, short_y_baseline) + short_y_offsets) * base_1D_height
 
     elif (aclus_y_offset_mode.value == AclusYOffsetMode.RandomJitter.value):
         ## Random Jitter-based offsets:
@@ -1459,7 +1498,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # Draw the circle points _____________________________________________________________________________________________ #
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=30.0, c=color)
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=25.0, edgecolors=color, c='#AAAAAA33', marker='o', plotnonfinite=False)
-    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=15.0, edgecolors=color, facecolors=(['#CCCCCC33'] * len(active_aclus)), marker='o', plotnonfinite=False)
+    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full_like(active_aclus, fill_value=scatter_point_size), edgecolors=color, facecolors=(['#CCCCCC33'] * len(active_aclus)), marker='o', plotnonfinite=False)
 
     _out_long_points = ax.scatter(long_peak_x, y=long_y, label='long_peak_x', **circle_points_kwargs)
     _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
@@ -1469,7 +1508,12 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     _output_by_aclu_dict = {} # keys are integer aclus, values are dictionaries of returned graphics objects:
 
     # Draw arrows from the first set of points to the second set _________________________________________________________ #
-    # for idx in range(len(long_peak_x)):
+    # arrowprops_kwargs = dict(arrowstyle="->", alpha=0.6)
+    # arrowprops_kwargs = dict(arrowstyle="simple", alpha=0.7)
+    arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.6)
+    # , mutation_scale=10
+
+
     for idx, aclu_val in enumerate(active_aclus):
         aclu_val: int = int(aclu_val)
         if aclu_val not in _output_by_aclu_dict:
@@ -1486,7 +1530,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             end_y = short_y[idx]
 
             ## override the y-positions to ensure that all arrows neatly attach only to the bottom point when using `(aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value)` mode
-            if (aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value):
+            if ((aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value) and enable_single_y_point_arrows):
                 start_y = long_y_arrow_val[idx]
                 end_y = short_y_arrow_val[idx]
 
@@ -1498,7 +1542,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             arrow_color = scalar_map.to_rgba(active_aclus[idx])
             
             # Annotate the plot with arrows; adjust the properties according to your needs
-            _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(arrowstyle="->", color=arrow_color, alpha=0.6))
+            _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color=arrow_color))
             # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrowprops: {'arrowstyle': '->', 'color': (0.267004, 0.004874, 0.329415, 1.0), 'alpha': 0.6}
             # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrow_patch # mpl.patches.FancyArrowPatch
             # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrow_patch.set_color('')
@@ -1516,11 +1560,13 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
             if aclu_val not in appearing_long_to_short_aclus:
                 a_long_text = ax.text(long_peak_x[i], long_y[i], str(aclu_val), **text_kwargs)
+                a_long_text.set_path_effects(aclu_labels_text_path_effects)
             else:
                 a_long_text = None
 
             if aclu_val not in disappearing_long_to_short_aclus:
                 a_short_text = ax.text(short_peak_x[i], short_y[i], str(aclu_val), **text_kwargs)
+                a_short_text.set_path_effects(aclu_labels_text_path_effects)
             else:
                 a_short_text = None
 
@@ -1559,18 +1605,21 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             active_aclus = np.array(active_aclus)
 
         index_is_selected = np.full_like(active_aclus, fill_value=False, dtype=bool)
-        selection_color = (1, 0, 0, 1)  # Red color in RGBA format
+        
 
         # if did_reclick_same_selection:
 
         def _perform_update_scatter_point_color(_out_points, an_index: int, new_color):
             # _out_points._facecolors[an_index] = new_color # scalar_map.to_rgba(active_aclus[index])
             _out_points._edgecolors[an_index] = new_color
+            
 
         def _perform_update_aclu_is_selected(an_index: int, an_aclu: int, is_selected: bool):
             """ Updates the selection state for the specific aclu
 
-            captures: _out_long_points, _out_short_points, _output_by_aclu_dict, selection_color, aclu_labels_fontsize, scalar_map
+            captures: _out_long_points, _out_short_points, _output_by_aclu_dict, 
+                scatter_edgecolors_selection_color, selection_color, aclu_labels_fontsize, scalar_map,
+                aclu_labels_text_path_effects, selection_text_path_effects
             
             _perform_update_scatter_point_is_selected(an_index=an_index, an_aclu=active_aclus[an_index], is_selected=True)
             """
@@ -1578,24 +1627,41 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
                 # selected
                 original_color = scalar_map.to_rgba(an_aclu)
                 active_color = original_color
-                # active_color = selection_color
+                # active_color = scatter_edgecolors_selection_color
+
+                active_arrow_color = selection_color
                 active_aclu_labels_text_color = selection_color
-                active_aclu_labels_fontsize = (aclu_labels_fontsize+1)
+                active_aclu_labels_fontsize = (aclu_labels_fontsize+0.1)
+                active_aclu_labels_text_path_effects = selection_text_path_effects
+                active_scatter_point_size = scatter_point_selected_size
+                
             else:
                 # not-selected
                 original_color = scalar_map.to_rgba(an_aclu)
                 active_color = original_color
+                active_arrow_color = original_color
                 active_aclu_labels_text_color = aclu_labels_text_color
                 active_aclu_labels_fontsize = aclu_labels_fontsize
+                active_aclu_labels_text_path_effects = aclu_labels_text_path_effects
+                active_scatter_point_size = scatter_point_size
 
-            _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=active_color)
-            _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=active_color)
+
+            # _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=active_color)
+            # _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=active_color)
+
+            for _out_points in [_out_long_points, _out_short_points]:
+                _perform_update_scatter_point_color(_out_points, an_index=an_index, new_color=active_color)
+                _out_points._sizes[an_index] = active_scatter_point_size
+
+            # _out_long_points.get_paths()[an_index].set_path_effects(active_aclu_labels_text_path_effects)
+            # _out_short_points.get_paths()[an_index].set_path_effects(active_aclu_labels_text_path_effects)
+
 
             # Change the arrow selection:
             a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(an_aclu, {}).get('long_to_short_arrow', None)
             if a_paired_arrow_container_Text_obj is not None:
                 a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
-                a_paired_arrow.set_color(active_color)  # Change arrow color to blue
+                a_paired_arrow.set_color(active_arrow_color)  # Change arrow color to blue
 
             if draw_point_aclu_labels:
                 _output_by_aclu_dict[an_aclu]['long_text'].set_color(active_aclu_labels_text_color)
@@ -1604,6 +1670,9 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
                 _output_by_aclu_dict[an_aclu]['long_text'].set_fontsize(active_aclu_labels_fontsize)
                 _output_by_aclu_dict[an_aclu]['short_text'].set_fontsize(active_aclu_labels_fontsize)
     
+                _output_by_aclu_dict[an_aclu]['long_text'].set_path_effects(active_aclu_labels_text_path_effects)
+                _output_by_aclu_dict[an_aclu]['short_text'].set_path_effects(active_aclu_labels_text_path_effects)
+
                 if not is_selected:
                     _output_by_aclu_dict[an_aclu]['long_text'].set_zorder(10)  # Choose a z-order value higher than other objects
                     _output_by_aclu_dict[an_aclu]['short_text'].set_zorder(10)
@@ -1625,7 +1694,6 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
                 # print(f'\t not intended for this ax. Skipping.')
                 return
 
-
             if len(newly_selected_ind)>1:
                 print(f'WARN: multiple indicies selected: {newly_selected_ind} -- selecting only the first item.')
                 newly_selected_ind = np.array([newly_selected_ind[0]]) # only get the first item if multiple are selected.
@@ -1634,14 +1702,15 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             # did_reclick_same_selection: bool = np.all(newly_selected_ind == previous_selected_indices) # lists are the same
             index_is_selected[newly_selected_ind] = np.logical_not(index_is_selected[newly_selected_ind]) # negate the selection
             any_changed_idxs = np.union1d(previous_selected_indices, newly_selected_ind)
-            
-            print(f'previous_selected_indices: {previous_selected_indices}')
-            print(f'newly_selected_ind: {newly_selected_ind}')
-            print(f'any_changed_idxs: {any_changed_idxs}')
+            if debug_print:
+                print(f'\tprevious_selected_indices: {previous_selected_indices}')
+                print(f'\tnewly_selected_ind: {newly_selected_ind}')
+                print(f'\tany_changed_idxs: {any_changed_idxs}')
 
             for an_index in any_changed_idxs:
                 an_index: int = int(an_index)
-                print(f'\tan_index: {an_index}, type(an_index): {type(an_index)}, active_aclus: {active_aclus}, type(active_aclus): {type(active_aclus)} ')
+                if debug_print:
+                    print(f'\tan_index: {an_index}, type(an_index): {type(an_index)}, active_aclus: {active_aclus}, type(active_aclus): {type(active_aclus)} ')
                 aclu_changed: int = int(active_aclus[an_index])
                 if debug_print:
                     print(f'\taclu_changed: {aclu_changed}')
