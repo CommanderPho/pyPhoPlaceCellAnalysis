@@ -38,7 +38,10 @@ from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.axes
-from matplotlib.path import Path
+# from matplotlib.path import Path
+import matplotlib.path as mpl_path
+
+
 import matplotlib.patches as patches # for matplotlib version of the plot
 from matplotlib.collections import PatchCollection
 
@@ -1024,7 +1027,7 @@ def add_track_shapes(grid_bin_bounds, ax=None, include_long:bool=True, include_s
 
 
 
-def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float = 70.0, track_1D_height: float = 1.0, platform_1D_height: float = 1.1, track_center_midpoint_x = 135.0, track_center_midpoint_y = 0.0, debug_print=False) -> Path:
+def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float = 70.0, track_1D_height: float = 1.0, platform_1D_height: float = 1.1, track_center_midpoint_x = 135.0, track_center_midpoint_y = 0.0, debug_print=False) -> mpl_path.Path:
     """ 2023-10-12 - a hyper-simplified 1D plot of the linear track using info from Kamran about the actual midpoint of the track (x=135.0).
 
     COMPLETELY INDEPENDENT OF ALL OTHER VERSIONS ABOVE.
@@ -1038,7 +1041,9 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
     
         import matplotlib.pyplot as plt
         import matplotlib.patches as patches
-        from matplotlib.path import Path
+        # from matplotlib.path import Path
+        import matplotlib.path as mpl_path
+
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _build_track_1D_verticies
         
         path = _build_track_1D_verticies(platform_length=22.0, track_length=70.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=135.0, track_center_midpoint_y=0.0, debug_print=True)
@@ -1097,10 +1102,10 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
     ## Matplotlib-specific part here:	
     verts = np.array(_all_point_tuples)
     num_verticies = np.shape(verts)[0]
-    codes = np.full(num_verticies, Path.LINETO, dtype=int)
-    codes[0] = Path.MOVETO
-    codes[-1] = Path.CLOSEPOLY
-    path = Path(verts, codes)
+    codes = np.full(num_verticies, mpl_path.Path.LINETO, dtype=int)
+    codes[0] = mpl_path.Path.MOVETO
+    codes[-1] = mpl_path.Path.CLOSEPOLY
+    path = mpl_path.Path(verts, codes)
 
     return path
 
@@ -1221,8 +1226,11 @@ def add_napari_track_shapes_layer(viewer, long_rect_items, short_rect_items):
     return long_rectangles_poly_shapes_layer, short_rectangles_poly_shapes_layer
 
 
+from enum import Enum
 
-
+class AclusYOffsetMode(Enum):
+    RandomJitter = "random_jitter"
+    CountBased = "count_based"
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
 def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, debug_print=False, **kwargs):
@@ -1257,14 +1265,24 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
     """
     # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
+    import matplotlib as mpl
     import matplotlib.patches as patches
     import matplotlib.colors as mcolors
     import matplotlib.cm as cm
+    from matplotlib.transforms import Affine2D
 
     from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
 
     from pyphocorehelpers.geometry_helpers import BoundsRect
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+    aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.CountBased
+    # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter
+    # aclus_y_offset_mode = 'random_jitter'
+    # aclus_y_offset_mode = 'count_based'
+
+    aclus_y_offset_mode_POSSIBLE_OPTIONS = ['random_jitter', 'count_based']
+    assert aclus_y_offset_mode.value in aclus_y_offset_mode_POSSIBLE_OPTIONS, f"aclus_y_offset_mode must be in {aclus_y_offset_mode_POSSIBLE_OPTIONS} but aclus_y_offset_mode: {aclus_y_offset_mode}"
 
 
     base_1D_height: float = 1.0
@@ -1273,6 +1291,10 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
     long_height_multiplier: float = 1.0
     # long_height_multiplier: float = 0.5 # this renders the long track half-height
+
+    long_y_baseline: float = 0.1
+    short_y_baseline: float = 0.75
+    
 
     # Text label options:
     aclu_labels_text_color='black'
@@ -1348,6 +1370,18 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=(platform_1D_height * long_height_multiplier), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
     short_path = _build_track_1D_verticies(platform_length=22.0, track_length=short_track_dims.track_length, track_1D_height=track_1D_height, platform_1D_height=platform_1D_height, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=debug_print)
 
+    
+    # Define the transformation: squish along y-axis by 0.5 and translate up by 0.5 units
+    # long_transformation = Affine2D().scale(1, -0.5).translate(0, long_y_baseline)
+    # short_transformation = Affine2D().scale(1, 0.5).translate(0, short_y_baseline)
+    track_to_baseline_padding: float = 0.05
+    long_transformation = Affine2D().scale(1, 1.0).translate(0, long_y_baseline-track_to_baseline_padding)
+    short_transformation = Affine2D().scale(1, 1.0).translate(0, short_y_baseline-track_to_baseline_padding)
+
+    # Apply the transformation to the Path
+    long_path = long_path.transformed(long_transformation)
+    short_path = short_path.transformed(short_transformation)
+
     ## Create the remapping figure:
     # fig, ax = plt.subplots()
 
@@ -1389,30 +1423,43 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     ## constant:
     # color = 'white'
 
-    # Add a new column with the count of repeated entries
-    a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).cumcount()
-    a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
+    
 
-    ## Random Jitter-based offsets:
-    # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
-    # # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.1
-    # # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
-    # long_y = (np.full_like(long_peak_x, 0.1)+random_y_jitter) * base_1D_height
-    # short_y = (np.full_like(short_peak_x, 0.75)+random_y_jitter) * base_1D_height
 
     ## Count-based offsets: If there are three aclus sharing a bin, offset the repeated aclus by a scaled y-factor:
-    offset_scaling_factor: float = 0.1
-    long_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'].to_numpy() * offset_scaling_factor
-    short_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'].to_numpy() * offset_scaling_factor
+    if (aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value):
+        offset_scaling_factor: float = 0.1
 
-    long_y = (np.full_like(long_peak_x, 0.1)+ long_y_offsets) * base_1D_height
-    short_y = (np.full_like(short_peak_x, 0.75)+ short_y_offsets) * base_1D_height
+        # Add a new column with the count of repeated entries
+        a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).cumcount()
+        a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
+
+        long_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'].to_numpy() * offset_scaling_factor
+        short_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'].to_numpy() * offset_scaling_factor
+
+        long_y_arrow_val = (np.full_like(long_peak_x, long_y_baseline)) * base_1D_height
+        short_y_arrow_val = (np.full_like(short_peak_x, short_y_baseline)) * base_1D_height
+
+        long_y = (np.full_like(long_peak_x, long_y_baseline)+ long_y_offsets) * base_1D_height
+        short_y = (np.full_like(short_peak_x, short_y_baseline)+ short_y_offsets) * base_1D_height
+
+    elif (aclus_y_offset_mode.value == AclusYOffsetMode.RandomJitter.value):
+        ## Random Jitter-based offsets:
+        random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
+        # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.1
+        # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
+        long_y = (np.full_like(long_peak_x, long_y_baseline)+random_y_jitter) * base_1D_height
+        short_y = (np.full_like(short_peak_x, short_y_baseline)+random_y_jitter) * base_1D_height
+    else:
+        raise NotImplementedError(f"aclus_y_offset_mode: {aclus_y_offset_mode} not implemented.")
+    
+
 
 
     # Draw the circle points _____________________________________________________________________________________________ #
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=30.0, c=color)
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=25.0, edgecolors=color, c='#AAAAAA33', marker='o', plotnonfinite=False)
-    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=15.0, edgecolors=color, c='#CCCCCC33', marker='o', plotnonfinite=False)
+    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=15.0, edgecolors=color, facecolors=(['#CCCCCC33'] * len(active_aclus)), marker='o', plotnonfinite=False)
 
     _out_long_points = ax.scatter(long_peak_x, y=long_y, label='long_peak_x', **circle_points_kwargs)
     _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
@@ -1437,6 +1484,12 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             end_x = short_peak_x[idx]
             # end_y = 0.75 + random_y_jitter[idx]
             end_y = short_y[idx]
+
+            ## override the y-positions to ensure that all arrows neatly attach only to the bottom point when using `(aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value)` mode
+            if (aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value):
+                start_y = long_y_arrow_val[idx]
+                end_y = short_y_arrow_val[idx]
+
             # Calculate the change in x and y for the arrow
             # dx = end_x - start_x
             # dy = end_y - start_y
@@ -1502,14 +1555,69 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         ## Build the interactivity callbacks:
         previous_selected_indices = []
 
+        if not isinstance(active_aclus, NDArray):
+            active_aclus = np.array(active_aclus)
+
+        index_is_selected = np.full_like(active_aclus, fill_value=False, dtype=bool)
+        selection_color = (1, 0, 0, 1)  # Red color in RGBA format
+
+        # if did_reclick_same_selection:
+
+        def _perform_update_scatter_point_color(_out_points, an_index: int, new_color):
+            # _out_points._facecolors[an_index] = new_color # scalar_map.to_rgba(active_aclus[index])
+            _out_points._edgecolors[an_index] = new_color
+
+        def _perform_update_aclu_is_selected(an_index: int, an_aclu: int, is_selected: bool):
+            """ Updates the selection state for the specific aclu
+
+            captures: _out_long_points, _out_short_points, _output_by_aclu_dict, selection_color, aclu_labels_fontsize, scalar_map
+            
+            _perform_update_scatter_point_is_selected(an_index=an_index, an_aclu=active_aclus[an_index], is_selected=True)
+            """
+            if is_selected:
+                # selected
+                original_color = scalar_map.to_rgba(an_aclu)
+                active_color = original_color
+                # active_color = selection_color
+                active_aclu_labels_text_color = selection_color
+                active_aclu_labels_fontsize = (aclu_labels_fontsize+1)
+            else:
+                # not-selected
+                original_color = scalar_map.to_rgba(an_aclu)
+                active_color = original_color
+                active_aclu_labels_text_color = aclu_labels_text_color
+                active_aclu_labels_fontsize = aclu_labels_fontsize
+
+            _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=active_color)
+            _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=active_color)
+
+            # Change the arrow selection:
+            a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(an_aclu, {}).get('long_to_short_arrow', None)
+            if a_paired_arrow_container_Text_obj is not None:
+                a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
+                a_paired_arrow.set_color(active_color)  # Change arrow color to blue
+
+            if draw_point_aclu_labels:
+                _output_by_aclu_dict[an_aclu]['long_text'].set_color(active_aclu_labels_text_color)
+                _output_by_aclu_dict[an_aclu]['short_text'].set_color(active_aclu_labels_text_color)
+
+                _output_by_aclu_dict[an_aclu]['long_text'].set_fontsize(active_aclu_labels_fontsize)
+                _output_by_aclu_dict[an_aclu]['short_text'].set_fontsize(active_aclu_labels_fontsize)
+    
+                if not is_selected:
+                    _output_by_aclu_dict[an_aclu]['long_text'].set_zorder(10)  # Choose a z-order value higher than other objects
+                    _output_by_aclu_dict[an_aclu]['short_text'].set_zorder(10)
+                
+
+
         def on_scatter_point_pick(event):
             """ 
-            Captures: active_aclus, scalar_map, _out_long_points, _out_short_points, _output_by_aclu_dict, 
+            Captures: active_aclus, scalar_map, _out_long_points, _out_short_points, _output_by_aclu_dict, long_peak_x, long_y, selection_color, aclu_labels_fontsize
             """
-            nonlocal previous_selected_indices
-            ind = event.ind
+            nonlocal previous_selected_indices, index_is_selected
+            newly_selected_ind = event.ind
             if debug_print:
-                print(f'onpick3 scatter(event: {event}):\n\t', ind, long_peak_x[ind], long_y[ind])
+                print(f'on_scatter_point_pick(event: {event}):\n\t', newly_selected_ind, long_peak_x[newly_selected_ind], long_y[newly_selected_ind])
             # Check which subplot the event originated from
             artist = event.artist
             if event.artist not in ax.collections:  # Check if the event originated from the scatter plot in ax1
@@ -1518,61 +1626,95 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
                 return
 
 
-            if len(ind)>1:
-                ind = np.array([ind[0]]) # only get the first item if multiple are selected.
+            if len(newly_selected_ind)>1:
+                print(f'WARN: multiple indicies selected: {newly_selected_ind} -- selecting only the first item.')
+                newly_selected_ind = np.array([newly_selected_ind[0]]) # only get the first item if multiple are selected.
 
-            selection_color = (1, 0, 0, 1)  # Red color in RGBA format
 
-            # Restore color of previously selected points
-            for index in previous_selected_indices:
-                # deselected aclus:
-                aclu_deselected: int = int(active_aclus[index])
-                if debug_print:
-                    print(f'\taclu_deselected: {aclu_deselected}')
-                original_color = scalar_map.to_rgba(active_aclus[index])
-
-                _out_long_points._facecolors[index] = original_color # scalar_map.to_rgba(active_aclus[index])
-                _out_short_points._facecolors[index] = original_color # scalar_map.to_rgba(active_aclus[index])
-                # restore arrow color:
-                a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_deselected, {}).get('long_to_short_arrow', None)
-                if a_paired_arrow_container_Text_obj is not None:
-                    a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
-                    a_paired_arrow.set_color(original_color)  # Change arrow color to blue
+            # did_reclick_same_selection: bool = np.all(newly_selected_ind == previous_selected_indices) # lists are the same
+            index_is_selected[newly_selected_ind] = np.logical_not(index_is_selected[newly_selected_ind]) # negate the selection
+            any_changed_idxs = np.union1d(previous_selected_indices, newly_selected_ind)
             
-                if draw_point_aclu_labels:
-                    _output_by_aclu_dict[aclu_deselected]['long_text'].set_color(aclu_labels_text_color)
-                    _output_by_aclu_dict[aclu_deselected]['short_text'].set_color(aclu_labels_text_color)
+            print(f'previous_selected_indices: {previous_selected_indices}')
+            print(f'newly_selected_ind: {newly_selected_ind}')
+            print(f'any_changed_idxs: {any_changed_idxs}')
 
-                    _output_by_aclu_dict[aclu_deselected]['long_text'].set_fontsize(aclu_labels_fontsize)
-                    _output_by_aclu_dict[aclu_deselected]['short_text'].set_fontsize(aclu_labels_fontsize)
-
-                    _output_by_aclu_dict[aclu_deselected]['long_text'].set_zorder(10)  # Choose a z-order value higher than other objects
-                    _output_by_aclu_dict[aclu_deselected]['short_text'].set_zorder(10)
-
-            # Change color of currently selected points to red
-            for index in ind:
-                # selected aclus:
-                aclu_selected: int = int(active_aclus[index])
+            for an_index in any_changed_idxs:
+                an_index: int = int(an_index)
+                print(f'\tan_index: {an_index}, type(an_index): {type(an_index)}, active_aclus: {active_aclus}, type(active_aclus): {type(active_aclus)} ')
+                aclu_changed: int = int(active_aclus[an_index])
                 if debug_print:
-                    print(f'\taclu_selected: {aclu_selected}')
-                _out_long_points._facecolors[index] = selection_color  # Red color in RGBA format
-                _out_short_points._facecolors[index] = selection_color  # Red color in RGBA format
-                # Change the arrow selection:
-                a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_selected, {}).get('long_to_short_arrow', None)
-                if a_paired_arrow_container_Text_obj is not None:
-                    a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
-                    a_paired_arrow.set_color(selection_color)  # Change arrow color to blue
+                    print(f'\taclu_changed: {aclu_changed}')
+                _perform_update_aclu_is_selected(an_index=an_index, an_aclu=aclu_changed, is_selected=index_is_selected[an_index])
 
-                if draw_point_aclu_labels:
-                    _output_by_aclu_dict[aclu_selected]['long_text'].set_color(selection_color)
-                    _output_by_aclu_dict[aclu_selected]['short_text'].set_color(selection_color)
 
-                    _output_by_aclu_dict[aclu_selected]['long_text'].set_fontsize(aclu_labels_fontsize+2)
-                    _output_by_aclu_dict[aclu_selected]['short_text'].set_fontsize(aclu_labels_fontsize+2)
+            # index_is_selected
+
+            # # Restore color of previously selected points
+            # for an_index in previous_selected_indices:
+            #     # deselected aclus:
+            #     aclu_deselected: int = int(active_aclus[an_index])
+            #     if debug_print:
+            #         print(f'\taclu_deselected: {aclu_deselected}')
+            #     original_color = scalar_map.to_rgba(active_aclus[an_index])
+
+            #     _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=original_color)
+            #     _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=original_color)
+
+            #     # _out_long_points._facecolors[an_index] = original_color # scalar_map.to_rgba(active_aclus[an_index])
+            #     # _out_short_points._facecolors[an_index] = original_color # scalar_map.to_rgba(active_aclus[an_index])
+            #     # restore arrow color:
+            #     a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_deselected, {}).get('long_to_short_arrow', None)
+            #     if a_paired_arrow_container_Text_obj is not None:
+            #         a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
+            #         a_paired_arrow.set_color(original_color)  # Change arrow color to blue
+            
+            #     if draw_point_aclu_labels:
+            #         _output_by_aclu_dict[aclu_deselected]['long_text'].set_color(aclu_labels_text_color)
+            #         _output_by_aclu_dict[aclu_deselected]['short_text'].set_color(aclu_labels_text_color)
+
+            #         _output_by_aclu_dict[aclu_deselected]['long_text'].set_fontsize(aclu_labels_fontsize)
+            #         _output_by_aclu_dict[aclu_deselected]['short_text'].set_fontsize(aclu_labels_fontsize)
+
+            #         _output_by_aclu_dict[aclu_deselected]['long_text'].set_zorder(10)  # Choose a z-order value higher than other objects
+            #         _output_by_aclu_dict[aclu_deselected]['short_text'].set_zorder(10)
+
+
+            # # if did_reclick_same_selection:
+            #     # don't re-select the deselected points, we want to toggle their selections
+
+
+            # # Change color of currently selected points to red
+            # for an_index in newly_selected_ind:
+            #     # selected aclus:
+            #     aclu_selected: int = int(active_aclus[an_index])
+            #     if debug_print:
+            #         print(f'\taclu_selected: {aclu_selected}')
+            #     # _out_long_points._facecolors[an_index] = selection_color  # Red color in RGBA format
+            #     # _out_short_points._facecolors[an_index] = selection_color  # Red color in RGBA format
+
+            #     _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=selection_color)
+            #     _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=selection_color)
+
+            #     # Change the arrow selection:
+            #     a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_selected, {}).get('long_to_short_arrow', None)
+            #     if a_paired_arrow_container_Text_obj is not None:
+            #         a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
+            #         a_paired_arrow.set_color(selection_color)  # Change arrow color to blue
+
+            #     if draw_point_aclu_labels:
+            #         _output_by_aclu_dict[aclu_selected]['long_text'].set_color(selection_color)
+            #         _output_by_aclu_dict[aclu_selected]['short_text'].set_color(selection_color)
+
+            #         _output_by_aclu_dict[aclu_selected]['long_text'].set_fontsize(aclu_labels_fontsize+1)
+            #         _output_by_aclu_dict[aclu_selected]['short_text'].set_fontsize(aclu_labels_fontsize+1)
                 
 
             # Update the list of previously selected indices
-            previous_selected_indices = ind
+            # previous_selected_indices = newly_selected_ind
+
+            previous_selected_indices = np.nonzero(index_is_selected==True)
+
             plt.draw()  # Update the plot
 
         _mpl_pick_event_handle_idx: int = fig.canvas.mpl_connect('pick_event', on_scatter_point_pick)
