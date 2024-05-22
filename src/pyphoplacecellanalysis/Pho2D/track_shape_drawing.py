@@ -1225,7 +1225,7 @@ def add_napari_track_shapes_layer(viewer, long_rect_items, short_rect_items):
 
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
-def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, debug_print=False, **kwargs):
+def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, debug_print=False, **kwargs):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
     🔝🖼️🎨
@@ -1276,8 +1276,8 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
 
     # Text label options:
     aclu_labels_text_color='black'
-    aclu_labels_fontsize = 6
-
+    # aclu_labels_fontsize = 6
+    aclu_labels_fontsize = 3
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     ## Get the track configs for the colors:
@@ -1292,9 +1292,9 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     # short_track_color = dict(facecolor='green')
 
     ## Extract the quantities needed from the DF passed
-    active_aclus = LR_only_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
-    long_peak_x = LR_only_decoder_aclu_MAX_peak_maps_df[long_column_name].to_numpy()
-    short_peak_x = LR_only_decoder_aclu_MAX_peak_maps_df[short_column_name].to_numpy()
+    active_aclus = a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
+    long_peak_x = a_dir_decoder_aclu_MAX_peak_maps_df[long_column_name].to_numpy()
+    short_peak_x = a_dir_decoder_aclu_MAX_peak_maps_df[short_column_name].to_numpy()
     # peak_x_diff = LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'].to_numpy()
 
     assert (len(long_peak_x) == len(short_peak_x)), f"len(long_peak_x): {len(long_peak_x)} != len(short_peak_x): {len(short_peak_x)}"
@@ -1389,16 +1389,30 @@ def _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df: pd.Data
     ## constant:
     # color = 'white'
 
-    random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
-    # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.1
-    # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
+    # Add a new column with the count of repeated entries
+    a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(long_column_name).cumcount()
+    a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'] = a_dir_decoder_aclu_MAX_peak_maps_df.groupby(short_column_name).cumcount()
 
-    long_y = (np.full_like(long_peak_x, 0.1)+random_y_jitter) * base_1D_height
-    short_y = (np.full_like(short_peak_x, 0.75)+random_y_jitter) * base_1D_height
+    ## Random Jitter-based offsets:
+    # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.05
+    # # random_y_jitter = np.random.ranf((np.shape(active_aclus)[0], )) * 0.1
+    # # random_y_jitter = np.zeros((np.shape(active_aclus)[0], )) # no jitter
+    # long_y = (np.full_like(long_peak_x, 0.1)+random_y_jitter) * base_1D_height
+    # short_y = (np.full_like(short_peak_x, 0.75)+random_y_jitter) * base_1D_height
+
+    ## Count-based offsets: If there are three aclus sharing a bin, offset the repeated aclus by a scaled y-factor:
+    offset_scaling_factor: float = 0.1
+    long_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['long_repeated_count'].to_numpy() * offset_scaling_factor
+    short_y_offsets = a_dir_decoder_aclu_MAX_peak_maps_df['short_repeated_count'].to_numpy() * offset_scaling_factor
+
+    long_y = (np.full_like(long_peak_x, 0.1)+ long_y_offsets) * base_1D_height
+    short_y = (np.full_like(short_peak_x, 0.75)+ short_y_offsets) * base_1D_height
+
 
     # Draw the circle points _____________________________________________________________________________________________ #
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=30.0, c=color)
-    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=25.0, edgecolors=color, c='#AAAAAA33', marker='o')
+    # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=25.0, edgecolors=color, c='#AAAAAA33', marker='o', plotnonfinite=False)
+    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=15.0, edgecolors=color, c='#CCCCCC33', marker='o', plotnonfinite=False)
 
     _out_long_points = ax.scatter(long_peak_x, y=long_y, label='long_peak_x', **circle_points_kwargs)
     _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
@@ -1602,7 +1616,9 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
     from matplotlib.gridspec import GridSpec
     from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_directional_pf_peaks_dfs
+
+    use_separate_plot_for_each_direction: bool = True
+
 
     if active_context is not None:
             display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
@@ -1636,22 +1652,36 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
 
 
             # BEGIN FUNCTION BODY
-            LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df = _get_directional_pf_peaks_dfs(track_templates, drop_aclu_if_missing_long_or_short=True)
+            drop_aclu_if_missing_long_or_short = True
+            # LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df = _get_directional_pf_peaks_dfs(track_templates, drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
+            # drop_aclu_if_missing_long_or_short =False
+            (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
+
 
             ## Make a single figure for both LR/RL remapping cells:
-            kwargs = {}
+            kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False)
 
-            fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
-            assert len(axs) == 2, f"{len(axs)}"
-            ax_dict = {'ax_LR': axs[0], 'ax_RL': axs[1]}
+            if use_separate_plot_for_each_direction:
+                fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
+                assert len(axs) == 2, f"{len(axs)}"
+                ax_dict = {'ax_LR': axs[0], 'ax_RL': axs[1]}
 
-            fig, ax_LR, _outputs_tuple_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax_dict['ax_LR'], defer_render=defer_render, **kwargs)
-            perform_update_title_subtitle(fig=fig, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
-            fig, ax_RL, _outputs_tuple_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_RL', short_column_name='short_RL', ax=ax_dict['ax_RL'], defer_render=defer_render, **kwargs)
-            perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+                fig, ax_LR, _outputs_tuple_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax_dict['ax_LR'], defer_render=defer_render, **kwargs)
+                perform_update_title_subtitle(fig=fig, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+                fig, ax_RL, _outputs_tuple_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_RL', short_column_name='short_RL', ax=ax_dict['ax_RL'], defer_render=defer_render, **kwargs)
+                perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} aclus")
 
-            setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
-            
+                setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
+            else:
+                fig, axs = collector.subplots(nrows=1, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
+                # assert len(axs) == 1, f"{len(axs)}"
+                ax = axs
+
+                fig, ax, _outputs_tuple = _plot_track_remapping_diagram(AnyDir_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax, defer_render=defer_render, **kwargs)
+                perform_update_title_subtitle(fig=fig, ax=ax, title_string=None, subtitle_string=f"LR+RL Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+
+                setup_common_after_creation(collector, fig=fig, axes=[ax, ], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
+
 
 
     return collector
