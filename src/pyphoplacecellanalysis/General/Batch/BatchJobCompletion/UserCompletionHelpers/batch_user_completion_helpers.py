@@ -1,5 +1,8 @@
 from copy import deepcopy
-from typing import List, Dict, Tuple, Optional, Callable
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 
 from pathlib import Path
 import inspect
@@ -226,6 +229,11 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from copy import deepcopy
     import numpy as np
     import pandas as pd
+    from typing_extensions import TypeAlias
+    from typing import NewType
+    from nptyping import NDArray
+
+    import neuropy.utils.type_aliases as types
     from neuropy.utils.indexing_helpers import PandasHelpers
     from neuropy.utils.debug_helpers import parameter_sweeps
     from neuropy.core.laps import Laps
@@ -234,6 +242,10 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+
+
+    DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 
     # Export CSVs:
     def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str, parent_output_path: Path, active_context):
@@ -409,9 +421,11 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         directional_merged_decoders_result.perform_compute_marginals()
         return directional_merged_decoders_result
         
+    
+
 
     def _try_all_templates_decode(owning_pipeline_reference, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, use_single_time_bin_per_epoch: bool,
-                            desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None) -> Dict[str, DirectionalPseudo2DDecodersResult]:
+                            desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None) -> Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]: #-> Dict[str, DirectionalPseudo2DDecodersResult]:
         """ decodes laps and ripples for a single bin size but for each of the four track templates. 
         
         desired_laps_decoding_time_bin_size
@@ -448,8 +462,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             laps_decoding_time_bin_size = None
 
             
-        # directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = directional_merged_decoders_result.all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=laps_epochs_df,
-        #                                                                                                                                                 decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+        directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = directional_merged_decoders_result.all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=laps_epochs_df,
+                                                                                                                                                        decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
 
         ## Decode Ripples: ripples are kinda optional (if `desired_ripple_decoding_time_bin_size is None` they are not computed.
         if desired_ripple_decoding_time_bin_size is not None:
@@ -478,32 +492,36 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
             print(f'{post_drop_n_epochs} remain.')
 
-            # # returns a `DecodedFilterEpochsResult`
-            # directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = directional_merged_decoders_result.all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=replay_epochs_df,
-            #                                                                                                                                                                                 decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+            # returns a `DecodedFilterEpochsResult`
+            directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = directional_merged_decoders_result.all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=replay_epochs_df,
+                                                                                                                                                                                            decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
 
 
-        directional_merged_decoders_result_dict: Dict[str, DirectionalPseudo2DDecodersResult] = {}
-        # decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {}
-        # decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]] = {}
+        directional_merged_decoders_result.perform_compute_marginals() # this only works for the pseudo2D decoder, not the individual 1D ones
+
+
+        # directional_merged_decoders_result_dict: Dict[types.DecoderName, DirectionalPseudo2DDecodersResult] = {}
+
+        decoder_laps_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict = {}
+        decoder_ripple_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict = {}
         
         for a_name, a_decoder in track_templates.get_decoders_dict().items():
             # external-function way:
-            # decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
+            decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
 
-            # this function's way:
-            directional_merged_decoders_result_dict[a_name] = deepcopy(directional_merged_decoders_result)
+            # # this function's way:
+            # directional_merged_decoders_result_dict[a_name] = deepcopy(directional_merged_decoders_result)
             
-            directional_merged_decoders_result_dict[a_name].all_directional_laps_filter_epochs_decoder_result = a_decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=deepcopy(laps_epochs_df),
-                                                                                                                                                decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
-            if ripple_decoding_time_bin_size is not None:
-                directional_merged_decoders_result_dict[a_name].all_directional_ripple_filter_epochs_decoder_result = a_decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=deepcopy(replay_epochs_df),
-                                                                                                                                                                                            decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+            # directional_merged_decoders_result_dict[a_name].all_directional_laps_filter_epochs_decoder_result = a_decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=deepcopy(laps_epochs_df),
+            #                                                                                                                                     decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+            # if ripple_decoding_time_bin_size is not None:
+            #     directional_merged_decoders_result_dict[a_name].all_directional_ripple_filter_epochs_decoder_result = a_decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=deepcopy(replay_epochs_df),
+            #                                                                                                                                                                                 decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
 
-             directional_merged_decoders_result_dict[a_name].perform_compute_marginals()
+            # directional_merged_decoders_result_dict[a_name].perform_compute_marginals() # this only works for the pseudo2D decoder, not the individual 1D ones
 
 
-        return directional_merged_decoders_result_dict
+        return directional_merged_decoders_result, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
         
 
 
@@ -548,6 +566,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         return result_laps_epochs_df
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+    should_output_lap_decoding_performance_info: bool = False
+
     assert self.collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
     CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
@@ -608,60 +628,10 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     laps_df = laps_obj.to_dataframe()
     assert 'maze_id' in laps_df.columns, f"laps_df is still missing the 'maze_id' column after calling `laps_obj.update_maze_id_if_needed(...)`. laps_df.columns: {print(list(laps_df.columns))}"
 
-    # BEGIN BLOCK ________________________________________________________________________________________________________ #
-
-    # Uses: session_ctxt_key, all_param_sweep_options
-    output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalPseudo2DDecodersResult] = {} # empty dict
-    output_laps_decoding_accuracy_results_dict = {} # empty dict
-    output_extracted_result_tuples = {}
-
-    for a_sweep_dict in all_param_sweep_options:
-        a_sweep_tuple = frozenset(a_sweep_dict.items())
-        print(f'a_sweep_dict: {a_sweep_dict}')
-        # Convert parameters to string because Parquet supports metadata as string
-        a_sweep_str_params = {key: str(value) for key, value in a_sweep_dict.items() if value is not None}
-        
-        output_alt_directional_merged_decoders_result[a_sweep_tuple] = _try_single_decode(curr_active_pipeline, alt_directional_merged_decoders_result, **a_sweep_dict)
-
-        laps_time_bin_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].laps_time_bin_marginals_df.copy()
-        laps_all_epoch_bins_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].laps_all_epoch_bins_marginals_df.copy()
-        
-        ## Ripples:
-        ripple_time_bin_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].ripple_time_bin_marginals_df.copy()
-        ripple_all_epoch_bins_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].ripple_all_epoch_bins_marginals_df.copy()
-
-        session_name = curr_session_name
-        curr_session_t_delta = t_delta
-        
-        for a_df, a_time_bin_column_name in zip((laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df), ('t_bin_center', 'lap_start_t', 't_bin_center', 'ripple_start_t')):
-            ## Add the session-specific columns:
-            a_df = add_session_df_columns(a_df, session_name, curr_session_t_delta, a_time_bin_column_name)
-
-        ## Build the output tuple:
-        output_extracted_result_tuples[a_sweep_tuple] = (laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df)
-        
-        # desired_laps_decoding_time_bin_size_str: str = a_sweep_str_params.get('desired_laps_decoding_time_bin_size', None)
-        laps_decoding_time_bin_size: float = output_alt_directional_merged_decoders_result[a_sweep_tuple].laps_decoding_time_bin_size
-        # ripple_decoding_time_bin_size: float = output_alt_directional_merged_decoders_result[a_sweep_tuple].ripple_decoding_time_bin_size
-        actual_laps_decoding_time_bin_size_str: str = str(laps_decoding_time_bin_size)
-        if save_hdf and (actual_laps_decoding_time_bin_size_str is not None):
-            laps_time_bin_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_laps_decoding_time_bin_size_str}/laps_time_bin_marginals_df', format='table', data_columns=True)
-            laps_all_epoch_bins_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_laps_decoding_time_bin_size_str}/laps_all_epoch_bins_marginals_df', format='table', data_columns=True)
-
-        ## TODO: output ripple .h5 here if desired.
-            
-
-        # get the current lap object and determine the percentage correct:
-        result_laps_epochs_df: pd.DataFrame = _update_result_laps(a_result=output_alt_directional_merged_decoders_result[a_sweep_tuple], laps_df=laps_df)
-        (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
-        output_laps_decoding_accuracy_results_dict[laps_decoding_time_bin_size] = (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
-        
-
-    # # BEGIN BLOCK 2 - modernizing from `_perform_compute_custom_epoch_decoding`  ________________________________________________________________________________________________________ #
-    # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_lap_and_ripple_epochs_decoding_for_decoder, _perform_compute_custom_epoch_decoding, _compute_all_df_score_metrics
+    # # BEGIN BLOCK ________________________________________________________________________________________________________ #
 
     # # Uses: session_ctxt_key, all_param_sweep_options
-    # output_alt_directional_merged_decoders_result: Dict[Tuple, Dict[str, DirectionalPseudo2DDecodersResult]] = {} # empty dict
+    # output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalPseudo2DDecodersResult] = {} # empty dict
     # output_laps_decoding_accuracy_results_dict = {} # empty dict
     # output_extracted_result_tuples = {}
 
@@ -671,26 +641,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     #     # Convert parameters to string because Parquet supports metadata as string
     #     a_sweep_str_params = {key: str(value) for key, value in a_sweep_dict.items() if value is not None}
         
-
-    #     ## Decode epochs for all four decoders:
-
-    #     # decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result, track_templates) # Dict[str, Optional[DecodedFilterEpochsResult]]
-
-    #     # ## Recompute the epoch scores/metrics such as radon transform and wcorr:
-    #     # (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(directional_merged_decoders_result, track_templates,
-    #     #                                                                                                                                                                                     decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict,
-    #     #                                                                                                                                                                                     spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df),
-    #     #                                                                                                                                                                                     should_skip_radon_transform=True)
-        
-    #     # laps_radon_transform_merged_df, ripple_radon_transform_merged_df, laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df, laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df = merged_df_outputs_tuple
-    #     # decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_extras_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict = raw_dict_outputs_tuple
-
-
-    #     # for a_name, a_decoder in track_templates.get_decoders_dict().items():
-    #     #     decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
-
-
-    #     output_alt_directional_merged_decoders_result[a_sweep_tuple] = _try_all_templates_decode(curr_active_pipeline, alt_directional_merged_decoders_result, **a_sweep_dict) # type: ignore
+    #     output_alt_directional_merged_decoders_result[a_sweep_tuple] = _try_single_decode(curr_active_pipeline, alt_directional_merged_decoders_result, **a_sweep_dict)
 
     #     laps_time_bin_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].laps_time_bin_marginals_df.copy()
     #     laps_all_epoch_bins_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].laps_all_epoch_bins_marginals_df.copy()
@@ -719,27 +670,144 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     #     ## TODO: output ripple .h5 here if desired.
             
-
     #     # get the current lap object and determine the percentage correct:
     #     result_laps_epochs_df: pd.DataFrame = _update_result_laps(a_result=output_alt_directional_merged_decoders_result[a_sweep_tuple], laps_df=laps_df)
     #     (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
     #     output_laps_decoding_accuracy_results_dict[laps_decoding_time_bin_size] = (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
         
 
+    # BEGIN BLOCK 2 - modernizing from `_perform_compute_custom_epoch_decoding`  ________________________________________________________________________________________________________ #
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_lap_and_ripple_epochs_decoding_for_decoder, _perform_compute_custom_epoch_decoding, _compute_all_df_score_metrics
+
+    # Uses: session_ctxt_key, all_param_sweep_options
+    # output_alt_directional_merged_decoders_result: Dict[Tuple, Dict[types.DecoderName, DirectionalPseudo2DDecodersResult]] = {} # empty dict
+
+    output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalPseudo2DDecodersResult] = {} # empty dict
+    # output_alt_directional_merged_decoders_result: Dict[Tuple, Dict[types.DecoderName, DirectionalPseudo2DDecodersResult]] = {} # empty dict
+
+    # Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]
+    output_directional_decoders_epochs_decode_results_dict: Dict[Tuple, DecoderDecodedEpochsResult] = {} # `_decode_and_evaluate_epochs_using_directional_decoders`-style output
+
+    output_laps_decoding_accuracy_results_dict = {} # empty dict
+    output_extracted_result_tuples = {}
+
+
+    for a_sweep_dict in all_param_sweep_options:
+        a_sweep_tuple = frozenset(a_sweep_dict.items())
+        print(f'a_sweep_dict: {a_sweep_dict}')
+        # Convert parameters to string because Parquet supports metadata as string
+        # a_sweep_str_params = {key: str(value) for key, value in a_sweep_dict.items() if value is not None}
+        
+
+
+        # for a_name, a_decoder in track_templates.get_decoders_dict().items():
+        #     decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
+
+
+        # output_alt_directional_merged_decoders_result[a_sweep_tuple] = _try_all_templates_decode(curr_active_pipeline, alt_directional_merged_decoders_result, **a_sweep_dict) # type: ignore
+
+
+        output_alt_directional_merged_decoders_result[a_sweep_tuple], (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = _try_all_templates_decode(curr_active_pipeline, alt_directional_merged_decoders_result, **a_sweep_dict)
+        an_alt_dir_Pseudo2D_decoders_result = output_alt_directional_merged_decoders_result[a_sweep_tuple]
+
+
+        ## Decode epochs for all four decoders:
+
+
+        ## This function post-compute:
+
+        # for k, an_alt_dir_Pseudo2D_decoders_result in output_alt_directional_merged_decoders_result[a_sweep_tuple].items():
+
+        laps_time_bin_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.laps_time_bin_marginals_df.copy()
+        laps_all_epoch_bins_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.laps_all_epoch_bins_marginals_df.copy()
+        
+        ## Ripples:
+        ripple_time_bin_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.ripple_time_bin_marginals_df.copy()
+        ripple_all_epoch_bins_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.ripple_all_epoch_bins_marginals_df.copy()
+
+        session_name = curr_session_name
+        curr_session_t_delta = t_delta
+        
+        for a_df, a_time_bin_column_name in zip((laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df), ('t_bin_center', 'lap_start_t', 't_bin_center', 'ripple_start_t')):
+            ## Add the session-specific columns:
+            a_df = add_session_df_columns(a_df, session_name, curr_session_t_delta, a_time_bin_column_name)
+
+        ## Build the output tuple:
+        output_extracted_result_tuples[a_sweep_tuple] = (laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df) # output tuples are extracted here, where changes are needed I think
+        
+        ## Laps:
+        # desired_laps_decoding_time_bin_size_str: str = a_sweep_str_params.get('desired_laps_decoding_time_bin_size', None)
+        laps_decoding_time_bin_size: float = an_alt_dir_Pseudo2D_decoders_result.laps_decoding_time_bin_size
+        # ripple_decoding_time_bin_size: float = v.ripple_decoding_time_bin_size
+        actual_laps_decoding_time_bin_size_str: str = str(laps_decoding_time_bin_size)
+        if save_hdf and (actual_laps_decoding_time_bin_size_str is not None):
+            laps_time_bin_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_laps_decoding_time_bin_size_str}/laps_time_bin_marginals_df', format='table', data_columns=True)
+            laps_all_epoch_bins_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_laps_decoding_time_bin_size_str}/laps_all_epoch_bins_marginals_df', format='table', data_columns=True)
+
+        ## TODO: output ripple .h5 here if desired.
+        
+        # get the current lap object and determine the percentage correct:
+        if should_output_lap_decoding_performance_info:
+            result_laps_epochs_df: pd.DataFrame = _update_result_laps(a_result=an_alt_dir_Pseudo2D_decoders_result, laps_df=laps_df)
+            (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
+            output_laps_decoding_accuracy_results_dict[laps_decoding_time_bin_size] = (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
+
+
+
+        # `_decode_and_evaluate_epochs_using_directional_decoders` post compute ______________________________________________ #
+
+        # decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result, track_templates) # Dict[str, Optional[DecodedFilterEpochsResult]]
+
+        ## Recompute the epoch scores/metrics such as radon transform and wcorr:
+        (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(an_alt_dir_Pseudo2D_decoders_result, track_templates,
+                                                                                                                                                                                            decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict,
+                                                                                                                                                                                            spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df),
+                                                                                                                                                                                            should_skip_radon_transform=True)
+        
+        laps_radon_transform_merged_df, ripple_radon_transform_merged_df, laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df, laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df = merged_df_outputs_tuple
+        decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_extras_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict = raw_dict_outputs_tuple
+
+
+        #TODO 2024-02-16 13:46: - [ ] Currently always replace
+        ## Create or update the global directional_merged_decoders_result:
+        # directional_decoders_epochs_decode_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+        # if directional_decoders_epochs_decode_result is not None:
+        # directional_decoders_epochs_decode_result.__dict__.update(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
+        #                                               long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
+        #                                               short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder)
+        ripple_decoding_time_bin_size = an_alt_dir_Pseudo2D_decoders_result.ripple_decoding_time_bin_size
+        laps_decoding_time_bin_size = an_alt_dir_Pseudo2D_decoders_result.laps_decoding_time_bin_size
+        pos_bin_size = an_alt_dir_Pseudo2D_decoders_result.all_directional_pf1D_Decoder.pos_bin_size
+
+        curr_sweep_directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = DecoderDecodedEpochsResult(is_global=True, **{'pos_bin_size': pos_bin_size, 'ripple_decoding_time_bin_size':ripple_decoding_time_bin_size, 'laps_decoding_time_bin_size':laps_decoding_time_bin_size,
+                                                                                                'decoder_laps_filter_epochs_decoder_result_dict':decoder_laps_filter_epochs_decoder_result_dict,
+            'decoder_ripple_filter_epochs_decoder_result_dict':decoder_ripple_filter_epochs_decoder_result_dict, 'decoder_laps_radon_transform_df_dict':decoder_laps_radon_transform_df_dict, 'decoder_ripple_radon_transform_df_dict':decoder_ripple_radon_transform_df_dict,
+            'decoder_laps_radon_transform_extras_dict': decoder_laps_radon_transform_extras_dict, 'decoder_ripple_radon_transform_extras_dict': decoder_ripple_radon_transform_extras_dict,
+            'laps_weighted_corr_merged_df': laps_weighted_corr_merged_df, 'ripple_weighted_corr_merged_df': ripple_weighted_corr_merged_df, 'decoder_laps_weighted_corr_df_dict': decoder_laps_weighted_corr_df_dict, 'decoder_ripple_weighted_corr_df_dict': decoder_ripple_weighted_corr_df_dict,
+            'laps_simple_pf_pearson_merged_df': laps_simple_pf_pearson_merged_df, 'ripple_simple_pf_pearson_merged_df': ripple_simple_pf_pearson_merged_df,
+            })
+        output_directional_decoders_epochs_decode_results_dict[a_sweep_tuple] = curr_sweep_directional_decoders_epochs_decode_result
+    
+    # END FOR a_sweep_dict in all_param_sweep_options
+
 
 
     # END BLOCK __________________________________________________________________________________________________________ #
 
-    ## Output the performance:
-    output_laps_decoding_accuracy_results_df: pd.DataFrame = pd.DataFrame(output_laps_decoding_accuracy_results_dict.values(), index=output_laps_decoding_accuracy_results_dict.keys(), 
-                    columns=['percent_laps_track_identity_estimated_correctly',
-                            'percent_laps_direction_estimated_correctly',
-                            'percent_laps_estimated_correctly'])
-    output_laps_decoding_accuracy_results_df.index.name = 'laps_decoding_time_bin_size'
-    ## Save out the laps peformance result
-    if save_hdf:
-        output_laps_decoding_accuracy_results_df.to_hdf(out_path, key=f'{session_ctxt_key}/laps_decoding_accuracy_results', format='table', data_columns=True)
+    if should_output_lap_decoding_performance_info:
+        ## Output the performance:
+        output_laps_decoding_accuracy_results_df: pd.DataFrame = pd.DataFrame(output_laps_decoding_accuracy_results_dict.values(), index=output_laps_decoding_accuracy_results_dict.keys(), 
+                        columns=['percent_laps_track_identity_estimated_correctly',
+                                'percent_laps_direction_estimated_correctly',
+                                'percent_laps_estimated_correctly'])
+        output_laps_decoding_accuracy_results_df.index.name = 'laps_decoding_time_bin_size'
+        ## Save out the laps peformance result
+        if save_hdf:
+            output_laps_decoding_accuracy_results_df.to_hdf(out_path, key=f'{session_ctxt_key}/laps_decoding_accuracy_results', format='table', data_columns=True)
+    else:
+        output_laps_decoding_accuracy_results_df = None
 
+    
     ## Call the subfunction to process the time_bin_size swept result and produce combined output dataframes:
     combined_multi_timebin_outputs_tuple = _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context=curr_active_pipeline.get_session_context())
     # Unpacking:    
@@ -752,6 +820,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     if return_full_decoding_results:
         # output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalPseudo2DDecodersResult]
         across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'].append(output_alt_directional_merged_decoders_result) # append the real full results
+        across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'].append(output_directional_decoders_epochs_decode_results_dict) # append the real full results
+
         ## Save out the laps peformance result
         if save_hdf:
             ## figure out how to save the actual dict out to HDF

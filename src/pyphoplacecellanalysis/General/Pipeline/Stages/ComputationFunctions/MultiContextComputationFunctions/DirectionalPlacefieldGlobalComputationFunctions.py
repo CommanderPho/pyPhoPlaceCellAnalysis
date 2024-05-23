@@ -1396,7 +1396,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
 
-            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
+            assert curr_array_shape[1] == 4, f"curr_array_shape: {curr_array_shape} but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
 
             out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
             out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 2, :]) # LR_marginal = long_LR + short_LR
@@ -3745,7 +3745,7 @@ def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame
 
 
 
-def _update_decoder_result_active_filter_epoch_columns(a_result_obj, a_score_result_df, columns=['score', 'velocity', 'intercept', 'speed']):
+def _update_decoder_result_active_filter_epoch_columns(a_result_obj: DecodedFilterEpochsResult, a_score_result_df: pd.DataFrame, columns=['score', 'velocity', 'intercept', 'speed']):
     """ Joins the radon-transform result into the `a_result_obj.filter_epochs` dataframe.
     
     decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_radon_transform_df=decoder_laps_radon_transform_df_dict[a_name])
@@ -3753,7 +3753,7 @@ def _update_decoder_result_active_filter_epoch_columns(a_result_obj, a_score_res
     
     """
     # assert a_result_obj.active_filter_epochs.n_epochs == np.shape(a_radon_transform_df)[0]
-    assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0]
+    assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0], f"a_result_obj.num_filter_epochs: {a_result_obj.num_filter_epochs} != np.shape(a_score_result_df)[0]: {np.shape(a_score_result_df)[0]}" # #TODO 2024-05-23 02:19: - [ ] I don't know the full purpose of this assert, I'm guessing it's to make sure were operating on the same epochs
     if isinstance(a_result_obj.filter_epochs, pd.DataFrame):
         a_result_obj.filter_epochs.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
         a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df) # add the newly computed columns to the Epochs object
