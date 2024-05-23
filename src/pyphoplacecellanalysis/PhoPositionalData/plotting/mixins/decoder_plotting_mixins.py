@@ -479,6 +479,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
+from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels
+
 
 @define(slots=False)
 class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
@@ -515,6 +517,8 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
     plotActors_CenterLabels = field(default=None)
     data_dict_CenterLabels = field(default=None)
 
+    active_plot_fn: Callable = field(default=plot_3d_stem_points) # like [plot_3d_binned_bars, plot_3d_stem_points]
+
 
     def build_ui(self):
         """ builds the slider vtk widgets 
@@ -534,8 +538,24 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         
 
         if self.slider_epoch is None:
+            def _on_slider_value_did_change_epoch_idx(value):
+                """ only called when the value actually changes from the previous one (or there wasn't a previous one). """
+                self.on_update_slider_epoch_idx(int(value))
+
+
+            def _on_slider_callback_epoch_idx(value):
+                """ checks whether the value has changed from the previous one before re-updating. 
+                """
+                if not hasattr(_on_slider_callback_epoch_idx, "last_value"):
+                    _on_slider_callback_epoch_idx.last_value = value
+                if value != _on_slider_callback_epoch_idx.last_value:
+                    _on_slider_value_did_change_epoch_idx(value)
+                    _on_slider_callback_epoch_idx.last_value = value
+
+
             self.slider_epoch = self.p.add_slider_widget(
-                callback=lambda value: self.on_update_slider_epoch_idx(int(value)), #storage_engine('epoch', int(value)), # triggering .__call__(self, param='epoch', value)....
+                # callback=lambda value: self.on_update_slider_epoch_idx(int(value)), #storage_engine('epoch', int(value)), # triggering .__call__(self, param='epoch', value)....
+                callback=lambda value: _on_slider_callback_epoch_idx(int(value)),
                 rng=[0, num_filter_epochs-1],
                 value=0,
                 title="Epoch Idx",
@@ -549,8 +569,23 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
         if not self.enable_plot_all_time_bins_in_epoch_mode:
             if self.slider_epoch_time_bin is None:
+                def _on_slider_value_did_change_epoch_time_bin(value):
+                    """ only called when the value actually changes from the previous one (or there wasn't a previous one). """
+                    self.on_update_slider_epoch_time_bin(int(value))
+
+
+                def _on_slider_callback_epoch_time_bin(value):
+                    """ checks whether the value has changed from the previous one before re-updating. This might not be the best approach because it should be forcibly re-updated when the epoch_idx changes even if the time_bin_idx stays the same (like it's sitting at 0 while scrolling through epochs)
+                    """
+                    if not hasattr(_on_slider_callback_epoch_time_bin, "last_value"):
+                        _on_slider_callback_epoch_time_bin.last_value = value
+                    if value != _on_slider_callback_epoch_time_bin.last_value:
+                        _on_slider_value_did_change_epoch_time_bin(value)
+                        _on_slider_callback_epoch_time_bin.last_value = value
+
                 self.slider_epoch_time_bin = self.p.add_slider_widget(
-                    callback=lambda value: self.on_update_slider_epoch_time_bin(int(value)), #storage_engine('time_bin', value),
+                    # callback=lambda value: self.on_update_slider_epoch_time_bin(int(value)), #storage_engine('time_bin', value),
+                    callback=lambda value: _on_slider_callback_epoch_time_bin(int(value)),
                     rng=[0, curr_num_epoch_time_bins-1],
                     value=0,
                     title="Timebin IDX",
@@ -586,6 +621,10 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             print(f'\tdone.')
 
 
+
+
+
+
     def on_update_slider_epoch_idx(self, value: int):
         """ called when the epoch_idx slider changes. 
         """
@@ -604,6 +643,13 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         else:
             ## otherwise default to a range
             self.perform_update_plot_epoch_time_bin_range(self.curr_time_bin_index)
+
+        ## shouldn't be here:
+        # update_plot_fn = self.data_dict.get('plot_3d_binned_bars[55.63197815967686]', {}).get('update_plot_fn', None)
+        update_plot_fn = self.data_dict.get('plot_3d_stem_points_P_x_given_n', {}).get('update_plot_fn', None)
+        if update_plot_fn is not None:
+            update_plot_fn(self.curr_time_bin_index)
+
 
 
     def on_update_slider_epoch_time_bin(self, value: int):
@@ -628,7 +674,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
         (self.plotActors, self.data_dict), (self.plotActors_CenterLabels, self.data_dict_CenterLabels) = DecoderRenderingPyVistaMixin.perform_plot_posterior_bars(self.p,
                                                                                                 xbin=self.xbin, ybin=self.ybin, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers,
-                                                                                                posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels)
+                                                                                                posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels, active_plot_fn=self.active_plot_fn)
         
 
     @function_attributes(short_name=None, tags=['main_plot_update', 'multi_time_bins', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-25 02:04', related_items=[])
@@ -647,7 +693,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
         (self.plotActors, self.data_dict), (self.plotActors_CenterLabels, self.data_dict_CenterLabels) = DecoderRenderingPyVistaMixin.perform_plot_posterior_bars(self.p,
                                                                                                 xbin=self.xbin, ybin=self.ybin, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers,
-                                                                                                time_bin_centers=a_time_bin_centers, posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels)
+                                                                                                time_bin_centers=a_time_bin_centers, posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels, active_plot_fn=self.active_plot_fn)
 
     def perform_clear_existing_decoded_trajectory_plots(self):
         ## remove existing actors
@@ -676,22 +722,27 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             n_xbins, n_ybins, actual_n_epoch_timebins = np.shape(a_posterior_p_x_given_n) # (5, 312)
             assert n_epoch_timebins == actual_n_epoch_timebins, f"n_epoch_timebins: {n_epoch_timebins} != actual_n_epoch_timebins: {actual_n_epoch_timebins} from np.shape(a_posterior_p_x_given_n) ({np.shape(a_posterior_p_x_given_n)})"
         else:
-            a_posterior_p_x_given_n = np.atleast_2d(a_posterior_p_x_given_n).T # (57, 1)
+            a_posterior_p_x_given_n = np.atleast_2d(a_posterior_p_x_given_n) #.T # (57, 1) ## There was an error being induced by the transpose for non 1D matricies passed in. Transpose seems like it should only be done for the (N, 1) case.
+
+            if np.shape(a_posterior_p_x_given_n)[0] == 1:
+                a_posterior_p_x_given_n = a_posterior_p_x_given_n.T 
+
             required_n_y_bins: int = len(self.ybin_centers) # passing an arbitrary amount of y-bins? Currently it's 6, which I don't get. Oh, I guess that comes from the 2D decoder that's passed in.
             n_xbins, n_ybins = np.shape(a_posterior_p_x_given_n) # (5, 312)
 
             ## for a 1D posterior
             if (n_ybins < required_n_y_bins) and (n_ybins == 1):
-                
+                print(f'building 2D plotting data from 1D posterior.')
+
                 # fill solid across all y-bins
-                # a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, required_n_y_bins)) # (57, 6)
+                a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, required_n_y_bins)) # (57, 6)
                 
                 ## fill only middle 2 bins.
-                a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, required_n_y_bins)) # (57, 6) start ny filling all
+                # a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, required_n_y_bins)) # (57, 6) start ny filling all
 
                 # find middle bin:
                 # mid_bin_idx = np.rint(float(required_n_y_bins) / 2.0)
-                a_posterior_p_x_given_n[:, 1:] = np.nan
+                # a_posterior_p_x_given_n[:, 1:] = np.nan
                 # a_posterior_p_x_given_n[:, 3:-1] = np.nan
                 
 
@@ -819,7 +870,7 @@ class DecoderRenderingPyVistaMixin:
         return self.params['decoded_trajectory_pyvista_plotter']
 
 
-    def add_decoded_posterior_bars(self, a_result: DecodedFilterEpochsResult, xbin: NDArray, xbin_centers: NDArray, ybin: Optional[NDArray], ybin_centers: Optional[NDArray], enable_plot_all_time_bins_in_epoch_mode:bool=True):
+    def add_decoded_posterior_bars(self, a_result: DecodedFilterEpochsResult, xbin: NDArray, xbin_centers: NDArray, ybin: Optional[NDArray], ybin_centers: Optional[NDArray], enable_plot_all_time_bins_in_epoch_mode:bool=True, active_plot_fn=None):
         """ adds the decoded posterior to the PyVista plotter
          
           
@@ -829,7 +880,8 @@ class DecoderRenderingPyVistaMixin:
 
         """
         
-        a_decoded_trajectory_pyvista_plotter: DecodedTrajectoryPyVistaPlotter = DecodedTrajectoryPyVistaPlotter(a_result=a_result, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers, p=self.p, curr_epoch_idx=0, curr_time_bin_index=0, enable_plot_all_time_bins_in_epoch_mode=enable_plot_all_time_bins_in_epoch_mode)
+        a_decoded_trajectory_pyvista_plotter: DecodedTrajectoryPyVistaPlotter = DecodedTrajectoryPyVistaPlotter(a_result=a_result, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers, p=self.p, curr_epoch_idx=0, curr_time_bin_index=0, enable_plot_all_time_bins_in_epoch_mode=enable_plot_all_time_bins_in_epoch_mode,
+                                                                                                                active_plot_fn=active_plot_fn)
         a_decoded_trajectory_pyvista_plotter.build_ui()
         self.params['decoded_trajectory_pyvista_plotter'] = a_decoded_trajectory_pyvista_plotter
         return a_decoded_trajectory_pyvista_plotter
@@ -866,17 +918,30 @@ class DecoderRenderingPyVistaMixin:
 
 
     @classmethod
-    def perform_plot_posterior_bars(cls, p, xbin, ybin, xbin_centers, ybin_centers, posterior_p_x_given_n, time_bin_centers=None, enable_point_labels: bool = True, point_labeling_function=None, point_masking_function=None, posterior_name='P_x_given_n'):
+    def perform_plot_posterior_bars(cls, p, xbin, ybin, xbin_centers, ybin_centers, posterior_p_x_given_n, time_bin_centers=None, enable_point_labels: bool = True, point_labeling_function=None, point_masking_function=None, posterior_name='P_x_given_n', active_plot_fn=None):
         """ called to perform the mesh generation and add_mesh calls
         
         """
+        from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels
+
+        if active_plot_fn is None:
+            active_plot_fn = plot_3d_binned_bars
+            # active_plot_fn = plot_3d_stem_points
         
+        if active_plot_fn.__name__ == plot_3d_stem_points.__name__:
+            active_xbins = xbin_centers
+            active_ybins = ybin_centers
+        else:
+            # required for `plot_3d_binned_bars`
+            active_xbins = xbin
+            active_ybins = ybin
+
         is_single_time_bin_posterior_plot: bool = (np.ndim(posterior_p_x_given_n) < 3)
-
         if is_single_time_bin_posterior_plot:
-            from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_point_labels
+        
+            # plotActors, data_dict = active_plot_fn(p, xbin, ybin, posterior_p_x_given_n, drop_below_threshold=1E-6, name=posterior_name, opacity=0.75)
+            plotActors, data_dict = active_plot_fn(p, active_xbins, active_ybins, posterior_p_x_given_n, drop_below_threshold=1E-6, name=posterior_name, opacity=0.75)
 
-            plotActors, data_dict = plot_3d_binned_bars(p, xbin, ybin, posterior_p_x_given_n, drop_below_threshold=1E-6, name=posterior_name, opacity=0.75)
             # , **({'drop_below_threshold': 1e-06, 'name': 'Occupancy', 'opacity': 0.75} | kwargs)
 
             if point_labeling_function is None:
@@ -901,8 +966,10 @@ class DecoderRenderingPyVistaMixin:
             ## multi-time bin plot:
             from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars_timeseries
 
-            plotActors, data_dict = plot_3d_binned_bars_timeseries(p=p, xbin=xbin, ybin=ybin, t_bins=time_bin_centers, data=posterior_p_x_given_n,
-                                           drop_below_threshold=1E-6, name=posterior_name, opacity=0.75)
+            assert np.ndim(posterior_p_x_given_n) == 3
+
+            plotActors, data_dict = plot_3d_binned_bars_timeseries(p=p, xbin=active_xbins, ybin=active_ybins, t_bins=time_bin_centers, data=posterior_p_x_given_n,
+                                           drop_below_threshold=1E-6, name=posterior_name, opacity=0.75, active_plot_fn=active_plot_fn)
             
             if enable_point_labels:
                 print(f'WARN: enable_point_labels is not currently implemented for multi-time-bin plotting mode.')

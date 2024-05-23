@@ -305,10 +305,11 @@ def plot_3d_stem_points(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
     # print(f'name: {plot_name}')    
 
     ## override heatmp
-    kwargs['cmap'] = 'hot'
+    # kwargs['cmap'] = 'hot'
+    kwargs['cmap'] = 'fire'
 
-    plotActor = p.add_mesh(point_cloud, render_points_as_spheres=True, point_size=10, scalars='colors', cmap=kwargs.pop('cmap','hot'),
-                            **({'nan_opacity': 0.0, 'smooth_shading': False, 'show_scalar_bar': False, 'render': True, 'reset_camera': False} | kwargs) # 'scalars': 'colors', 'opacity': 1.0, 'use_transparency': False, 'show_edges': True, 'edge_color': 'k', 
+    plotActor = p.add_mesh(point_cloud, render_points_as_spheres=True, point_size=10, scalars='colors', cmap=kwargs.pop('cmap','fire'),
+                            **({'nan_opacity': 0.0, 'smooth_shading': False, 'show_scalar_bar': True, 'render': True, 'reset_camera': False} | kwargs) # 'scalars': 'colors', 'opacity': 1.0, 'use_transparency': False, 'show_edges': True, 'edge_color': 'k', 
                           )
 
     # Add stems
@@ -325,10 +326,26 @@ def plot_3d_stem_points(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
         nonlocal recency
 
         # Update the z values and recency
-        z = active_data[:, :, time_bin].flatten()
-        if time_bin > 0:
-            changes = active_data[:, :, time_bin] != active_data[:, :, time_bin - 1]
-            recency[changes] = 1
+        # z = active_data[:, :, time_bin].flatten()
+        # if time_bin > 0:
+        #     changes = active_data[:, :, time_bin] != active_data[:, :, time_bin - 1]
+        #     recency[changes] = 1
+
+
+        if len(np.shape(active_data)) == 3:
+            z = active_data[:, :, time_bin].flatten()
+            if time_bin > 0:
+                changes = active_data[:, :, time_bin] != active_data[:, :, time_bin - 1]
+                recency[changes] = 1
+                
+        elif len(np.shape(active_data)) == 2:
+            z = active_data[:, :].flatten()
+            if time_bin > 0:
+                changes = active_data[:, time_bin] != active_data[:, time_bin - 1] # #TODO 2024-05-23 08:16: - [ ] Does this 2D mode have a time-bin index? How else could it work?
+                recency[changes] = 1
+        else:
+            raise NotImplementedError(np.shape(data))
+        
         recency *= 0.95  # Cooling effect
 
         # Update point cloud
