@@ -95,6 +95,25 @@ class LauncherWidget(QWidget):
         return self.get_display_function_items().get(a_fn_name, None)
     
 
+    def _perform_get_display_function_code(self, a_fcn_name: str):
+        """ gets the actual display function to be executed"""
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name) #display_function_items[item_data]
+        if self.debug_print:
+            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
+
+        assert a_disp_fn_item is not None, f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"'
+
+        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data) # find matching item in the pipleine's .plot attributes
+        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.fn_callable)
+        a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.name)
+        return a_fn_handle
+    
+    def _perform_execute_display_function(self, a_fcn_name: str):
+        """ gets the display function to execute and executes it """
+        a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
+        assert a_fn_handle is not None
+        return a_fn_handle()
+    
     # Define a function to be executed when a tree widget item is double-clicked
     # @QtCore.Slot(object, int)
     @pyqtExceptionPrintingSlot(object)
@@ -110,18 +129,7 @@ class LauncherWidget(QWidget):
         assert item_data is not None, f"item_Data is None"
         assert isinstance(item_data, str), f"item_data is not a string! type(item_data): {type(item_data)}, item_data: {item_data}"
         a_fcn_name: str = item_data
-
-        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name) #display_function_items[item_data]
-        if self.debug_print:
-            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
-
-        assert a_disp_fn_item is not None, f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"'
-
-        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data) # find matching item in the pipleine's .plot attributes
-        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.fn_callable)
-        a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.name)
-        assert a_fn_handle is not None
-        return a_fn_handle()
+        return self._perform_execute_display_function(a_fcn_name=a_fcn_name)
 
 
     @pyqtExceptionPrintingSlot(object, int)
