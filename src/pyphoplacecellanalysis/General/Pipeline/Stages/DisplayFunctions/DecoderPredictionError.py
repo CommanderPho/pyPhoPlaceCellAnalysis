@@ -27,6 +27,8 @@ from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
 
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import DecoderResultDisplayingPlot2D
 
@@ -61,10 +63,10 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
             # Simple plot type 1:
             plotted_variable_name = kwargs.get('variable_name', 'p_x_given_n') # Tries to get the user-provided variable name, otherwise defaults to 'p_x_given_n'
-            _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, time_binned_position_df=time_binned_position_df, variable_name=plotted_variable_name) # Works
+            _out: MatplotlibRenderPlots = _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, time_binned_position_df=time_binned_position_df, variable_name=plotted_variable_name) # Works
             # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n') # Works
             # _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev')
-            return # end
+            return _out # end
 
     @function_attributes(short_name='decoder_result', tags=['display', 'untested','decoder'], input_requires=[], output_provides=[], uses=['DecoderResultDisplayingPlot2D'], creation_date='2023-03-23 15:49')
     def _display_decoder_result(computation_result, active_config, **kwargs):
@@ -588,7 +590,9 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
 
     
 # MAIN IMPLEMENTATION FUNCTION:
-def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, time_binned_position_df: pd.DataFrame, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None):
+@function_attributes(short_name=None, tags=['two_step', 'display', 'matplotlib', 'animated', 'slider'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-23 14:33', related_items=[],
+    validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
+def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, time_binned_position_df: pd.DataFrame, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None) -> MatplotlibRenderPlots:
     """Matplotlib-based imshow plot with interactive slider for displaying two-step bayesian decoding results
 
     Called from the display function '_display_two_step_decoder_prediction_error_2D' defined above to implement its core functionality
@@ -612,6 +616,9 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
         _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, active_computed_data.extended_stats.time_binned_position_df, variable_name=plotted_variable_name) # Works
 
     """
+    
+
+
     if override_variable_value is None:
         try:
             variable_value = active_two_step_decoder[variable_name]
@@ -668,7 +675,6 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
             measured_positions_scatter.set_xdata(measured_point[0])
             measured_positions_scatter.set_ydata(measured_point[1])
     
-    
     # for 'x == horizontal orientation':
     ax.set_xlabel('x')
     ax.set_ylabel('y')
@@ -676,28 +682,48 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
     # ax.axis("off")
     plt.title(f'debug_two_step: {variable_name}')
 
+    # Control Slider _____________________________________________________________________________________________________ #
     axcolor = 'lightgoldenrodyellow'
     axframe = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
     sframe = Slider(axframe, 'Frame', 0, num_frames-1, valinit=2, valfmt='%d') # MATPLOTLIB Slider
 
-    def update(val):
-        new_frame = int(np.around(sframe.val))
+    def draw_update(new_frame: int):
+        """ captures: variable_value, measured_positions_scatter, im_out"""
         # print(f'new_frame: {new_frame}')
+        _out_artists = []
+
         curr_val = variable_value[:,:,new_frame] # untranslated output:
         curr_val = np.swapaxes(curr_val, 0, 1) # x_horizontal_matrix: swap the first two axes while leaving the last intact. Returns a view into the matrix so it doesn't modify the value
         im_out.set_data(curr_val)
+        _out_artists.append(im_out)
+
+
         # ax.relim()
         # ax.autoscale_view()
         if plot_measured_animal_position:
             _update_measured_animal_position_point(new_frame, ax=ax)
-        
+            _out_artists.append(measured_positions_scatter)
+
         if update_callback_function is not None:
             update_callback_function(new_frame, ax=ax)
+
+        # plt.draw()
+
+        return tuple(_out_artists) 
+
+
+
+    def update(val):
+        new_frame = int(np.around(sframe.val))
+        # new_frame = int(np.around(val))
+        _out_artists = draw_update(new_frame=new_frame)
         plt.draw()
 
     sframe.on_changed(update)
     plt.draw()
     # plt.show()
+
+    return MatplotlibRenderPlots(name='two_step_plots_animated', figures=[fig], axes=[ax], context=None, plot_data={'num_frames': num_frames, 'im_out': im_out, 'update_fn': update, 'draw_update_fn': draw_update})
     
 
 # ==================================================================================================================== #

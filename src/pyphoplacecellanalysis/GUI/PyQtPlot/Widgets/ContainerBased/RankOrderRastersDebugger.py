@@ -799,7 +799,7 @@ class RankOrderRastersDebugger:
 
 
 
-    @function_attributes(short_name=None, tags=['figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-21 19:49', related_items=[])
+    @function_attributes(short_name=None, tags=['figure', 'export', 'slider', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-21 19:49', related_items=[])
     def export_figure_all_slider_values(self, export_path: Union[str,Path]):
         """ sweeps the rank_order_event_raster_debugger through its various slider values, exporting all four of its plots as images for each value. 
 
