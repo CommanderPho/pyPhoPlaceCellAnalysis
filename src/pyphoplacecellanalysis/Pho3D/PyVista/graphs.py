@@ -161,8 +161,8 @@ def prepare_binned_data_for_3d_bars(xbin, ybin, data, mask2d=None):
     modified_ybin = modified_ybin[1:-1]
     # there should be precisely double the number of bins in each direction as there are data
     # print(f'np.shape(data): {np.shape(data)}, np.shape(modified_xbin): {np.shape(modified_xbin)}, np.shape(modified_ybin): {np.shape(modified_ybin)}')
-    assert (np.shape(data)[0] * 2) == np.shape(modified_xbin)[0], "There shoud be double the number of xbins in the modified array as there are data points in the array."
-    assert (np.shape(data)[1] * 2) == np.shape(modified_ybin)[0], "There shoud be double the number of ybins in the modified array as there are data points in the array."
+    assert (np.shape(data)[0] * 2) == np.shape(modified_xbin)[0], f"There shoud be double the number of xbins in the modified array as there are data points in the array but (np.shape(data)[0] * 2): {(np.shape(data)[0] * 2)} != np.shape(modified_xbin)[0]: {np.shape(modified_xbin)[0]}."
+    assert (np.shape(data)[1] * 2) == np.shape(modified_ybin)[0], f"There shoud be double the number of ybins in the modified array as there are data points in the array but (np.shape(data)[1] * 2): {(np.shape(data)[1] * 2)} != np.shape(modified_ybin)[0]: {np.shape(modified_ybin)[0]}."
     
     modified_data = np.repeat(data, 2, axis=0)
     modified_data = np.repeat(modified_data, 2, axis=1)
@@ -219,12 +219,151 @@ def plot_3d_binned_bars(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
         }
     }
     return plotActors, data_dict
+
+
+
+def plot_3d_stem_points(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_threshold: float=None, enable_drawing_stem_lines:bool=False, **kwargs):
+    """ Plots a 3D stem-plots with points. I'd like colored dots for each point in a 2D matrix, with their height (z-axis) representing the value and their color to reflect how recently they were updated.
+
+    Usage:
+        from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_stem_points
+        plotActors, data_dict = plot_3d_stem_points(pActiveTuningCurvesPlotter, active_epoch_placefields2D.ratemap.xbin, active_epoch_placefields2D.ratemap.ybin, active_epoch_placefields2D.ratemap.occupancy)
+    """
+    debug_print: bool = kwargs.pop('debug_print', False)
+
+    if drop_below_threshold is not None:
+        # print(f'drop_below_threshold: {drop_below_threshold}')
+        # active_data[np.where(active_data < drop_below_threshold)] = np.nan
+        data_mask = (data.copy() < drop_below_threshold)
+    else:
+        data_mask = None
+    
+    if debug_print:
+        print(f'np.shape(data): {np.shape(data)}')
+
+    if len(np.shape(data)) == 3:
+        n_xbins, n_ybins, n_tbins = np.shape(data)
+    elif len(np.shape(data)) == 2:
+        n_xbins, n_ybins = np.shape(data)
+    else:
+        raise NotImplementedError(np.shape(data))
+
+    # modified_xbin, modified_ybin, modified_data, modified_mask2d = prepare_binned_data_for_3d_bars(xbin.copy(), ybin.copy(), data.copy(), mask2d=data_mask)
+
+    # # build a structured grid out of the bins
+    # twoDimGrid_x, twoDimGrid_y = np.meshgrid(modified_xbin, modified_ybin)
+    # active_data = deepcopy(modified_data[:,:].T) # A single tuning curve
+    # # active_data = modified_data[:,:].copy() # A single tuning curve
+    active_data = deepcopy(data)
+    
+    data = active_data
+    # mesh = pv.StructuredGrid(twoDimGrid_x, twoDimGrid_y, active_data)
+    # mesh["Elevation"] = (active_data.ravel(order="F") * zScalingFactor)
+
+
+    # Initialize recency colors
+    recency = np.zeros((n_xbins, n_ybins))
+
+    # Coordinates
+    # twoDimGrid_x, twoDimGrid_y = np.meshgrid(np.arange(n_ybins), np.arange(n_xbins))
+    # twoDimGrid_x, twoDimGrid_y = np.meshgrid(np.arange(n_xbins), np.arange(n_ybins))
+    # twoDimGrid_x, twoDimGrid_y = np.meshgrid(xbin[1:], ybin[1:])
+
+    assert (len(xbin) == n_xbins), f"len(xbin): {len(xbin)} != n_xbins: {n_xbins}! Pass in xbin_center and ybin_center for this function instead of xbin/ybin."
+
+    twoDimGrid_x, twoDimGrid_y = np.meshgrid(xbin, ybin)
+    
+    # twoDimGrid_x, twoDimGrid_y = np.meshgrid(np.squeeze(xbin), np.squeeze(ybin))
+
+
+    points = np.column_stack((twoDimGrid_x.flatten(), twoDimGrid_y.flatten()))
+
+    if debug_print:
+        print(f'n_xbins: {n_xbins}, n_ybins: {n_ybins}')
+        print(f'xbin: {np.shape(xbin)}, ybin: {np.shape(ybin)}')
+        print(f'twoDimGrid_x: {np.shape(twoDimGrid_x)}, twoDimGrid_y: {np.shape(twoDimGrid_y)}')
+        print(f'points: {np.shape(points)}')
+    
+
+    # Initialize the point cloud
+    if len(np.shape(active_data)) == 3:
+        z = active_data[:, :, 0].flatten()
+    elif len(np.shape(active_data)) == 2:
+        z = active_data[:, :].flatten()
+    else:
+        raise NotImplementedError(np.shape(data))
+
+    if debug_print:   
+        print(f'z: {np.shape(z)}')
+
+    point_cloud = pv.PolyData(np.column_stack((points, z))) # ValueError: all the input array dimensions for the concatenation axis must match exactly, but along dimension 0, the array at index 0 has size 399 and the array at index 1 has size 336
+    point_cloud['colors'] = recency.flatten()
+
+
+    plot_name = kwargs.pop('plot_name', build_3d_plot_identifier_name('plot_3d_stem_points', kwargs.get('name', ''))) # if 'plot_name' is provided, use that as the full name without modifications
+    kwargs['name'] = plot_name # this is the only one to overwrite in kwargs
+    # print(f'name: {plot_name}')    
+
+    ## override heatmp
+    kwargs['cmap'] = 'hot'
+
+    plotActor = p.add_mesh(point_cloud, render_points_as_spheres=True, point_size=10, scalars='colors', cmap=kwargs.pop('cmap','hot'),
+                            **({'nan_opacity': 0.0, 'smooth_shading': False, 'show_scalar_bar': False, 'render': True, 'reset_camera': False} | kwargs) # 'scalars': 'colors', 'opacity': 1.0, 'use_transparency': False, 'show_edges': True, 'edge_color': 'k', 
+                          )
+
+    # Add stems
+    lines = []
+    if enable_drawing_stem_lines:
+        for i in range(points.shape[0]):
+            line = pv.Line([points[i, 0], points[i, 1], 0], [points[i, 0], points[i, 1], z[i]])
+            _out = p.add_mesh(line, color='black', name=f'stem_{i}')
+            lines.append(line)
+
+
+    def update_plot(value):
+        time_bin = int(value)
+        nonlocal recency
+
+        # Update the z values and recency
+        z = active_data[:, :, time_bin].flatten()
+        if time_bin > 0:
+            changes = active_data[:, :, time_bin] != active_data[:, :, time_bin - 1]
+            recency[changes] = 1
+        recency *= 0.95  # Cooling effect
+
+        # Update point cloud
+        new_points = np.column_stack((points, z))
+        point_cloud.points = new_points
+        point_cloud['colors'] = recency.flatten()
+
+        # Update stems
+        for i, line in enumerate(lines):
+            new_line = pv.Line([points[i, 0], points[i, 1], 0], [points[i, 0], points[i, 1], z[i]])
+            p.remove_actor(f'stem_{i}')
+            p.add_mesh(new_line, color='black', name=f'stem_{i}')
+            lines[i] = new_line
+
+        p.update_scalars(recency.flatten(), mesh=point_cloud)
+
+
+    # p.enable_depth_peeling() # this fixes bug where it appears transparent even when opacity is set to 1.00
+    
+    plotActors = {plot_name: {'main': plotActor}}
+    data_dict = {plot_name: { 
+            'name':plot_name,
+            'point_cloud': point_cloud, 
+            'twoDimGrid_x':twoDimGrid_x, 'twoDimGrid_y':twoDimGrid_y, 
+            'active_data': active_data,
+            'update_plot_fn': update_plot,
+        }
+    }
+    return plotActors, data_dict
     
 
 
 
 
-def plot_3d_binned_bars_timeseries(p, xbin, ybin, t_bins, data, zScalingFactor=1.0, drop_below_threshold: float=None, **kwargs):
+def plot_3d_binned_bars_timeseries(p, xbin, ybin, t_bins, data, zScalingFactor=1.0, drop_below_threshold: float=None, active_plot_fn=plot_3d_stem_points, **kwargs):
     """ Plots a a series of 3D bar-graphs representing data over time
     Usage:
         plotActors, data_dict = plot_3d_binned_data(pActiveTuningCurvesPlotter, active_epoch_placefields2D.ratemap.xbin, active_epoch_placefields2D.ratemap.ybin, active_epoch_placefields2D.ratemap.occupancy)
@@ -247,7 +386,7 @@ def plot_3d_binned_bars_timeseries(p, xbin, ybin, t_bins, data, zScalingFactor=1
         
     for t_bin_idx, t_value in enumerate(t_bins):
         a_plot_name: str = f"plot_3d_binned_bars[{t_value}]"
-        a_plotActors, a_data_dict = plot_3d_binned_bars(p=p, xbin=xbin, ybin=ybin, data=np.squeeze(data[:, :, t_bin_idx]),
+        a_plotActors, a_data_dict = active_plot_fn(p=p, xbin=xbin, ybin=ybin, data=np.squeeze(data[:, :, t_bin_idx]),
                                                         zScalingFactor=zScalingFactor, drop_below_threshold=drop_below_threshold, plot_name=a_plot_name, 
                                                         **{'render': False,
                                                         #    'opacity': 1.0, #'use_transparency': True,
