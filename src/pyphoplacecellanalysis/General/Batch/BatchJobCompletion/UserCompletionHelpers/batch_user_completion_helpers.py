@@ -349,7 +349,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
         return df
 
-    ## Single decode:
+    ## Merged-only decode:
     def _try_single_decode(owning_pipeline_reference, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, use_single_time_bin_per_epoch: bool,
                             desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None) -> DirectionalPseudo2DDecodersResult:
         """ decodes laps and ripples for a single bin size. 
@@ -423,11 +423,13 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         
     
 
-
+    ## All templates AND merged decode:
     def _try_all_templates_decode(owning_pipeline_reference, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, use_single_time_bin_per_epoch: bool,
                             desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None) -> Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]: #-> Dict[str, DirectionalPseudo2DDecodersResult]:
         """ decodes laps and ripples for a single bin size but for each of the four track templates. 
         
+        Added 2024-05-23 04:23 
+
         desired_laps_decoding_time_bin_size
         desired_ripple_decoding_time_bin_size
         minimum_event_duration: if provided, excludes all events shorter than minimum_event_duration
