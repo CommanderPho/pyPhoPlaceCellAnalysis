@@ -39,6 +39,214 @@ DecoderName = NewType('DecoderName', str)
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin # for NotableTrackPositions
 
 # ==================================================================================================================== #
+# 2024-05-24 - Shuffling to show wcorr exceeds shuffles                                                                #
+# ==================================================================================================================== #
+
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+from typing import NewType
+
+import neuropy.utils.type_aliases as types
+from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
+from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
+
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+
+DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
+ShuffleIdx = NewType('ShuffleIdx', int)
+
+
+def shuffle_pf1D_decoder(a_pf1D_Decoder, shuffle_IDXs, shuffle_aclus):
+    ## Shuffle the neuron_ids for a `alt_directional_merged_decoders_result` - `DirectionalPseudo2DDecodersResult `:
+    a_shuffled_decoder = deepcopy(a_pf1D_Decoder)
+    # restrict the shuffle_acus to the actual aclus of the ratemap
+    is_shuffle_aclu_included = np.isin(shuffle_aclus, a_shuffled_decoder.pf.ratemap.neuron_ids)
+    shuffle_aclus = shuffle_aclus[is_shuffle_aclu_included]
+
+    ## find the correct indicies to shuffle by:
+    # shuffle_IDXs = [list(shuffle_aclus).index(aclu) for aclu in a_shuffled_decoder.pf.ratemap.neuron_ids]
+    shuffle_IDXs = [list(a_shuffled_decoder.pf.ratemap.neuron_ids).index(aclu) for aclu in shuffle_aclus]
+    a_shuffled_decoder.pf.ratemap = a_shuffled_decoder.pf.ratemap.get_by_id(shuffle_aclus)
+    neuron_indexed_field_names = ['neuron_IDs', 'neuron_IDs']
+    for a_field in neuron_indexed_field_names:
+        setattr(a_shuffled_decoder, a_field, getattr(a_shuffled_decoder, a_field)[shuffle_IDXs])
+
+    a_shuffled_decoder.F[shuffle_IDXs, :] = a_shuffled_decoder.F[shuffle_IDXs, :] # @TODO - is this needed?
+
+    return a_shuffled_decoder
+
+## All templates AND merged decode:
+def _try_all_templates_decode(spikes_df: pd.DataFrame, a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, shuffled_decoders_dict, use_single_time_bin_per_epoch: bool,
+                        override_replay_epochs_df: Optional[pd.DataFrame]=None,
+                        desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None,
+                        skip_merged_decoding=False) -> Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]: #-> Dict[str, DirectionalPseudo2DDecodersResult]:
+    """ decodes laps and ripples for a single bin size but for each of the four track templates. 
+    
+    Added 2024-05-23 04:23 
+
+    desired_laps_decoding_time_bin_size
+    desired_ripple_decoding_time_bin_size
+    minimum_event_duration: if provided, excludes all events shorter than minimum_event_duration
+
+    Uses:
+        .all_directional_pf1D_Decoder - calling `decode_specific_epochs(...)` on it
+
+    Looks like it updates:
+        .all_directional_laps_filter_epochs_decoder_result, .all_directional_ripple_filter_epochs_decoder_result, and whatever .perform_compute_marginals() updates
+
+    
+    Compared to `_compute_lap_and_ripple_epochs_decoding_for_decoder`, it looks like this only computes for the `*all*_directional_pf1D_Decoder` while `_compute_lap_and_ripple_epochs_decoding_for_decoder` is called for each separate directional pf1D decoder
+
+    Usage:
+
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, _try_all_templates_decode
+
+    """
+    ripple_decoding_time_bin_size = None
+    if desired_shared_decoding_time_bin_size is not None:
+        assert desired_laps_decoding_time_bin_size is None
+        assert desired_ripple_decoding_time_bin_size is None
+        desired_laps_decoding_time_bin_size = desired_shared_decoding_time_bin_size
+        desired_ripple_decoding_time_bin_size = desired_shared_decoding_time_bin_size
+        
+    if not skip_merged_decoding:
+        # Separate the decoder first so they're all independent:
+        a_directional_merged_decoders_result = deepcopy(a_directional_merged_decoders_result)
+
+    ## Decode Laps:
+    if desired_laps_decoding_time_bin_size is not None:
+        laps_epochs_df = deepcopy(a_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
+        if not isinstance(laps_epochs_df, pd.DataFrame):
+            laps_epochs_df = laps_epochs_df.to_dataframe()
+        # global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any' (? same as global_epoch_name?)
+        min_possible_laps_time_bin_size: float = find_minimum_time_bin_duration(laps_epochs_df['duration'].to_numpy())
+        min_bounded_laps_decoding_time_bin_size: float = min(desired_laps_decoding_time_bin_size, min_possible_laps_time_bin_size) # 10ms # 0.002
+        if desired_laps_decoding_time_bin_size < min_bounded_laps_decoding_time_bin_size:
+            print(f'WARN: desired_laps_decoding_time_bin_size: {desired_laps_decoding_time_bin_size} < min_bounded_laps_decoding_time_bin_size: {min_bounded_laps_decoding_time_bin_size}... hopefully it works.')
+        laps_decoding_time_bin_size: float = desired_laps_decoding_time_bin_size # allow direct use
+        if use_single_time_bin_per_epoch:
+            laps_decoding_time_bin_size = None
+
+
+        if not skip_merged_decoding:
+            a_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = a_directional_merged_decoders_result.all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=laps_epochs_df,
+                                                                                                                                                            decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+
+    ## Decode Ripples: ripples are kinda optional (if `desired_ripple_decoding_time_bin_size is None` they are not computed.
+    if desired_ripple_decoding_time_bin_size is not None:
+        if override_replay_epochs_df is not None:
+            replay_epochs_df = deepcopy(override_replay_epochs_df)
+        else:
+            # global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay))
+            replay_epochs_df = deepcopy(a_directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
+        
+        if not isinstance(replay_epochs_df, pd.DataFrame):
+            replay_epochs_df = replay_epochs_df.to_dataframe()
+        ripple_decoding_time_bin_size: float = desired_ripple_decoding_time_bin_size # allow direct use            
+        ## Drop those less than the time bin duration
+        print(f'DropShorterMode:')
+        pre_drop_n_epochs = len(replay_epochs_df)
+        if minimum_event_duration is not None:                
+            replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] >= minimum_event_duration]
+            post_drop_n_epochs = len(replay_epochs_df)
+            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
+        else:
+            replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > desired_ripple_decoding_time_bin_size]
+            post_drop_n_epochs = len(replay_epochs_df)
+            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_ripple_decoding_time_bin_size}', end='\t') 
+
+        print(f'{post_drop_n_epochs} remain.')
+
+        if not skip_merged_decoding:
+            # returns a `DecodedFilterEpochsResult`
+            a_directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = a_directional_merged_decoders_result.all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=replay_epochs_df,
+                                                                                                                                                                                            decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+
+    if not skip_merged_decoding:
+        a_directional_merged_decoders_result.perform_compute_marginals() # this only works for the pseudo2D decoder, not the individual 1D ones
+
+    # directional_merged_decoders_result_dict: Dict[types.DecoderName, DirectionalPseudo2DDecodersResult] = {}
+
+    decoder_laps_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict = {}
+    decoder_ripple_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict = {}
+    
+    ## This does the single 1D versions
+    for a_name, a_decoder in shuffled_decoders_dict.items():
+        # external-function way:
+        # decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
+        a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(deepcopy(spikes_df), filter_epochs=deepcopy(replay_epochs_df), decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+        decoder_laps_filter_epochs_decoder_result_dict[a_name] = None
+        decoder_ripple_filter_epochs_decoder_result_dict[a_name] = a_directional_ripple_filter_epochs_decoder_result
+
+    if skip_merged_decoding:
+       a_directional_merged_decoders_result = None
+
+    return a_directional_merged_decoders_result, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
+    
+
+def shuffle_and_decode_wcorrs(curr_active_pipeline, track_templates, alt_directional_merged_decoders_result, all_templates_decode_kwargs, num_shuffles: int = 2):
+    """
+    
+    Usage:
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import shuffle_and_decode_wcorrs
+
+    num_shuffles: int = 10
+    _updated_output_extracted_result_wcorrs_list = shuffle_and_decode_wcorrs(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, all_templates_decode_kwargs=all_templates_decode_kwargs, num_shuffles=num_shuffles)
+
+
+    """
+
+
+    # ==================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                  #
+    # ==================================================================================================================== #
+
+    ## INPUTS: num_shuffles
+    
+
+    ## INPUTS: alt_directional_merged_decoders_result, num_shuffles, 
+    ## Requires: `output_extracted_result_wcorrs_list`
+    # output_extracted_result_wcorrs_list = [] 
+    _updated_output_extracted_result_wcorrs_list = []
+
+    shuffled_aclus, shuffle_IDXs = build_shuffled_ids(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs, num_shuffles=num_shuffles, seed=None)
+
+    ## FOR EACH SHUFFLE:
+    for i, a_shuffle_IDXs, a_shuffle_aclus in zip(np.arange(num_shuffles), shuffle_IDXs, shuffled_aclus):
+        print(f'a_shuffle_IDXs: {a_shuffle_IDXs}, a_shuffle_aclus: {a_shuffle_aclus}')
+
+        ## Shuffle the neuron_ids for a `alt_directional_merged_decoders_result` - `DirectionalPseudo2DDecodersResult `:
+        alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = shuffle_pf1D_decoder(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=a_shuffle_aclus)
+
+        shuffled_decoder_specific_neuron_ids_dict = dict(zip(track_templates.get_decoder_names(), [a_shuffle_aclus[np.isin(a_shuffle_aclus, v)] for v in track_templates.decoder_neuron_IDs_list]))
+
+        ## Shuffle the four 1D decoders as well so they can be passed in.
+        shuffled_decoders_dict = {a_name:shuffle_pf1D_decoder(a_decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=shuffled_decoder_specific_neuron_ids_dict[a_name]) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+
+        ## Decode epochs for all four decoders:
+        _, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = _try_all_templates_decode(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
+                                                                                                                                                                                        skip_merged_decoding=True, **all_templates_decode_kwargs)
+        ## Weighted Correlation
+        # decoder_laps_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict))
+        decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_ripple_filter_epochs_decoder_result_dict))
+
+        ## Build the output tuple:
+        # output_extracted_result_wcorrs[i] = decoder_ripple_weighted_corr_df_dict # only wcorr
+        _updated_output_extracted_result_wcorrs_list.append(decoder_ripple_weighted_corr_df_dict)
+
+    return _updated_output_extracted_result_wcorrs_list
+
+
+# ==================================================================================================================== #
 # 2024-05-23 - Restoring 'is_user_annotated_epoch' and 'is_valid_epoch' columns                                        #
 # ==================================================================================================================== #
 
