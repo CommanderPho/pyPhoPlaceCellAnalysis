@@ -107,6 +107,10 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
     safe_save: If True, a temporary extension is added to the save path if the file already exists and the file is only overwritten if pickling doesn't throw an exception.
         This temporarily requires double the disk space.
         
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+
+        saveData('temp.pkl', db)
     """
     if safe_save:
         safeSaveData(pkl_path, db=db, should_append=should_append)
