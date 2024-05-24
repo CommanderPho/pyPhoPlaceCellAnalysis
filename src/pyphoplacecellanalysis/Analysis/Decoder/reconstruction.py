@@ -280,7 +280,7 @@ class ZhangReconstructionImplementation:
         if debug_print:
             print(f'np.shape(P_x): {np.shape(P_x)}, np.shape(F): {np.shape(F)}, np.shape(n): {np.shape(n)}')
         # np.shape(P_x): (1066, 1), np.shape(F): (1066, 66), np.shape(n): (66, 3530)
-        
+
         nCells = n.shape[0]
         nTimeBins = n.shape[1] # many time_bins
         nFlatPositionBins = np.shape(P_x)[0]
@@ -312,9 +312,20 @@ class ZhangReconstructionImplementation:
             cell_ratemap = F[cell, :][:, np.newaxis] # .shape: (nFlatPositionBins, 1)
             coeff = 1.0 / (factorial(cell_spkcnt)) # 1/factorial(n_{i}) term # .shape: (1, nTimeBins)
 
+            if np.sum(cell_ratemap) == 0:
+                ## zero ratemap for this cell encountered, replace with uniform
+                cell_ratemap[:, 0] = 1.0/float(nFlatPositionBins) # replace with uniform ratemap
+                print(f'WARN: f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}", replacing with uniform!')
+                # raise ValueError(f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}")
+
             if use_flat_computation_mode:
                 # Single-cell flat Version:
+
+                # _temp = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) 
+                # cell_prob = cell_prob * _temp
+
                 cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *=
+
                 # cell_prob.shape (nFlatPositionBins, nTimeBins)
             else:
                 # Full Version:
