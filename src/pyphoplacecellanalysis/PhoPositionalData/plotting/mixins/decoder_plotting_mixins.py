@@ -518,7 +518,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
     data_dict_CenterLabels = field(default=None)
 
     active_plot_fn: Callable = field(default=plot_3d_stem_points) # like [plot_3d_binned_bars, plot_3d_stem_points]
-
+    animation_callback_interval_ms: int = field(default=200) # 200ms per time bin
 
     def build_ui(self):
         """ builds the slider vtk widgets 
@@ -598,7 +598,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
                 )
 
             if (self.interactive_plotter is None) or (self.slider_epoch_time_bin_playback_checkbox is None):
-                self.interactive_plotter = PhoInteractivePlotter.init_from_plotter_and_slider(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.slider_epoch_time_bin, step_size=1, animation_callback_interval_ms=500) # 500ms per time bin
+                self.interactive_plotter = PhoInteractivePlotter.init_from_plotter_and_slider(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.slider_epoch_time_bin, step_size=1, animation_callback_interval_ms=self.animation_callback_interval_ms) # 500ms per time bin
                 self.slider_epoch_time_bin_playback_checkbox = self.interactive_plotter.interactive_checkbox_actor
 
 
