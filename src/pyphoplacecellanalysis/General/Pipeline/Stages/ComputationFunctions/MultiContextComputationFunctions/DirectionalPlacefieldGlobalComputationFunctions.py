@@ -1950,6 +1950,22 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         return self.laps_epochs_df
     
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+
+
 
 
 
@@ -3866,7 +3882,7 @@ def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decod
 
 
 @function_attributes(short_name=None, tags=['wcorr', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-19 18:07', related_items=[])
-def compute_weighted_correlations(decoder_decoded_epochs_result_dict, debug_print=False):
+def compute_weighted_correlations(decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], debug_print=False):
     """ 
     ## Weighted Correlation can only be applied to decoded posteriors, not spikes themselves.
     ### It works by assessing the degree to which a change in position corresponds to a change in time. For a simple diagonally increasing trajectory across the track at early timebins position will start at the bottom of the track, and as time increases the position also increases. The "weighted" part just corresponds to making use of the confidence probabilities of the decoded posterior: instead of relying on only the most-likely position we can include all information returned. Naturally will emphasize sharp decoded positions and de-emphasize diffuse ones.
