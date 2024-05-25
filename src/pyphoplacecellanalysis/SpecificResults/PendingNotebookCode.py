@@ -38,6 +38,206 @@ DecoderName = NewType('DecoderName', str)
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin # for NotableTrackPositions
 
+import matplotlib.pyplot as plt
+
+# def plot_histograms( data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str ) -> None:
+#     # get the pre-delta epochs
+#     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+#     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+
+#     descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
+    
+#     # plot pre-delta histogram
+#     pre_delta_df.hist(column='P_Long')
+#     plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
+#     plt.show()
+
+#     # plot post-delta histogram
+#     post_delta_df.hist(column='P_Long')
+#     plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
+#     plt.show()
+    
+
+def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
+    """ plots a stacked histogram of the many time-bin sizes 
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_histograms
+        # # You can use it like this:
+        # plot_histograms('Laps', 'All Sessions', all_sessions_laps_time_bin_df, "75 ms")
+        # plot_histograms('Ripples', 'All Sessions', all_sessions_ripple_time_bin_df, "75 ms")
+    """
+    assert 'delta_aligned_start_t' in data_results_df.columns
+    # get the pre-delta epochs
+    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+
+    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
+    
+    # plot pre-delta histogram
+    time_bin_sizes = pre_delta_df['time_bin_size'].unique()
+    
+    figure_identifier: str = f"{descriptor_str}_preDelta"
+    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
+    for time_bin_size in time_bin_sizes:
+        df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+        df_tbs['P_Long'].hist(alpha=0.5, label=str(time_bin_size)) 
+    
+    plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
+    plt.legend()
+    plt.show()
+
+    # plot post-delta histogram
+    time_bin_sizes = post_delta_df['time_bin_size'].unique()
+    figure_identifier: str = f"{descriptor_str}_postDelta"
+    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
+    for time_bin_size in time_bin_sizes:
+        df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
+        df_tbs['P_Long'].hist(alpha=0.5, label=str(time_bin_size)) 
+    
+    plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
+    plt.legend()
+    plt.show()
+
+
+
+
+
+# ==================================================================================================================== #
+# 2024-05-24 - Factored out stats tests from Across Session Point and YellowBlue ...                                   #
+# ==================================================================================================================== #
+
+from pyphocorehelpers.indexing_helpers import partition, partition_df, partition_df_dict
+import scipy.stats as stats
+
+
+def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_significance_alpha: float = 0.05, stats_variable_name:str='short_best_wcorr'):
+    """
+    Splits the passed df into pre and post delta periods
+    Take the difference between the pre and post delta means
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_stats_tests
+
+
+        shuffle_results, p_value, f_value, (dof1, dof2), (variance1, variance2) = _perform_stats_tests(valid_ripple_df, stats_variable_name='short_best_wcorr')
+
+    """
+    ## INPUTS: stats_variable_name, valid_ripple_df
+
+
+    # ['pre-delta', 'post-delta']
+    analysis_df = deepcopy(valid_ripple_df[["delta_aligned_start_t", "pre_post_delta_category", stats_variable_name]]).dropna(subset=["pre_post_delta_category", stats_variable_name])
+    # partition_df(analysis_df, partitionColumn='pre_post_delta_category')
+
+    # _partition_values, (_pre_delta_df, _post_delta_df) = partition(analysis_df, partitionColumn='pre_post_delta_category') # use `valid_ripple_df` instead of the original dataframe to only get those which are valid.
+    _pre_post_delta_partition_df_dict = partition_df_dict(analysis_df, partitionColumn='pre_post_delta_category')
+    _pre_delta_df = _pre_post_delta_partition_df_dict['pre-delta']
+    _post_delta_df = _pre_post_delta_partition_df_dict['post-delta']
+
+    actual_diff_means = np.nanmean(_post_delta_df[stats_variable_name].to_numpy()) - np.nanmean(_pre_delta_df[stats_variable_name].to_numpy())
+    print(f'stats_variable_name: "{stats_variable_name}" -- actual_diff_means: {actual_diff_means}')
+
+    # _pre_delta_df
+    # _post_delta_df
+    
+    # stats_variable_name: str = 'P_Short'
+
+    ## INPUTS: analysis_df, n_shuffles
+
+    shuffle_results = []
+    ## INPUT: n_shuffles, analysis_df, stats_variable_name
+    shuffled_analysis_df = deepcopy(analysis_df)
+    for i in np.arange(n_shuffles):
+        # shuffled_analysis_df[stats_variable_name] = shuffled_analysis_df[stats_variable_name].sample(frac=1).to_numpy() # .reset_index(drop=True)
+        shuffled_analysis_df['pre_post_delta_category'] = shuffled_analysis_df.sample(frac=1)['pre_post_delta_category'].to_numpy()
+        _shuffled_pre_post_delta_partition_df_dict = partition_df_dict(shuffled_analysis_df, partitionColumn='pre_post_delta_category')
+        _shuffled_pre_delta_df = _shuffled_pre_post_delta_partition_df_dict['pre-delta']
+        _shuffled_post_delta_df = _shuffled_pre_post_delta_partition_df_dict['post-delta']
+
+        _diff_mean = np.nanmean(_shuffled_post_delta_df[stats_variable_name].to_numpy()) - np.nanmean(_shuffled_pre_delta_df[stats_variable_name].to_numpy())
+        shuffle_results.append(_diff_mean)
+
+    shuffle_results = np.array(shuffle_results)
+    shuffle_results
+
+    ## OUTPUTS: shuffle_results
+
+    ## count the number which exceed the actual mean
+
+    
+    np.sum(actual_diff_means > np.abs(shuffle_results))
+    # Create the data for two groups
+    # group1 = np.random.rand(25)
+    # group2 = np.random.rand(20)
+
+    ## INPUTS: stats_variable_name
+    print(f'stats_variable_name: {stats_variable_name}')
+
+    group1 = _pre_delta_df[stats_variable_name].to_numpy()
+    group2 = _post_delta_df[stats_variable_name].to_numpy()
+
+    # perform mann whitney test 
+    stat, p_value = stats.mannwhitneyu(group1, group2) 
+    print('Statistics=%.2f, p=%.2f' % (stat, p_value)) 
+
+    # Level of significance 
+    
+    # conclusion 
+    if p_value < stats_level_of_significance_alpha: 
+        print('Reject Null Hypothesis (Significant difference between two samples)') 
+    else: 
+        print('Do not Reject Null Hypothesis (No significant difference between two samples)')
+
+    # Calculate the sample variances
+    variance1 = np.var(group1, ddof=1)
+    variance2 = np.var(group2, ddof=1)
+    
+    print('Variance 1:',variance1)
+    print('Variance 2:',variance2)
+
+    # Calculate the F-statistic
+    f_value = variance1 / variance2
+    
+    # Calculate the degrees of freedom
+    dof1 = len(group1) - 1
+    dof2 = len(group2) - 1
+    
+    # Calculate the p-value
+    p_value = stats.f.cdf(f_value, dof1, dof2)
+    
+    # Print the results
+    print('Degree of freedom 1:',dof1)
+    print('Degree of freedom 2:',dof2)
+    print("F-statistic:", f_value)
+    print("p-value:", p_value)
+
+    return shuffle_results, p_value, f_value, (dof1, dof2), (variance1, variance2) 
+
+
+    # Statistics=351933.00, p=0.00
+    # Reject Null Hypothesis (Significant difference between two samples)
+    # Variance 1: 0.017720245875104713
+    # Variance 2: 0.02501347759017487
+    # Degree of freedom 1: 1104
+    # Degree of freedom 2: 1282
+    # F-statistic: 0.7084279189577826
+    # p-value: 1.882791591520268e-09
+
+
+    # stats_variable_name: short_best_wcorr
+    # Statistics=770405.00, p=0.00
+    # Reject Null Hypothesis (Significant difference between two samples)
+    # Variance 1: 0.13962063046395118
+    # Variance 2: 0.15575146845969287
+    # Degree of freedom 1: 1108
+    # Degree of freedom 2: 1281
+    # F-statistic: 0.8964321931904211
+    # p-value: 0.030077963036698012
+
+
 # ==================================================================================================================== #
 # 2024-05-24 - Shuffling to show wcorr exceeds shuffles                                                                #
 # ==================================================================================================================== #
