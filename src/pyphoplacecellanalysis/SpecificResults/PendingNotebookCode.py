@@ -64,7 +64,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
 
-from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import shuffle_and_decode_wcorrs, _try_all_templates_decode
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import shuffle_and_decode_wcorrs, _try_all_templates_decode
 
 DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 ShuffleIdx = NewType('ShuffleIdx', int)
@@ -98,8 +98,8 @@ class WCorrShuffle:
 
 
     @classmethod
-    def init_from_templates(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, directional_decoders_epochs_decode_result, global_epoch_name):
-        """ 
+    def init_from_templates(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, global_epoch_name):
+        """
         
         """
         # ==================================================================================================================== #
