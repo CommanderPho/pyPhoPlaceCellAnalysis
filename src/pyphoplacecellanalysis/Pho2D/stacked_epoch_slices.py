@@ -672,6 +672,49 @@ class EpochSelectionsObject(SelectionsObject):
         return self
     
 
+
+## Potential Callbacks
+class ClickedCallbacks:
+    """ Potential callbacks to be performed when an epoch is clicked. 
+    
+    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import ClickedCallbacks
+
+    """
+    def copy_axis_image_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+        """ called when the user middle-clicks an epoch 
+        
+        captures: nothing
+        """
+        print(f'copy_axis_image_to_clipboard_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+        if clicked_epoch_start_stop_time is not None:
+            if len(clicked_epoch_start_stop_time) == 2:
+                start_t, end_t = clicked_epoch_start_stop_time
+                # print(f'start_t: {start_t}')
+                print(f'clicked widget at {clicked_ax}. Copying to clipboard...')
+                self.ui.mw.copy_axis_to_clipboard(an_ax=clicked_ax)
+                print(f'done.')
+
+
+    def copy_to_epoch_times_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+        """ called to copy the clicked epoch's start/end time to the clipboard
+        
+        captures: nothing
+        """
+        from pyphocorehelpers.programming_helpers import copy_to_clipboard
+        print(f'copy_to_epoch_times_to_clipboard_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+        if clicked_epoch_start_stop_time is not None:
+            if len(clicked_epoch_start_stop_time) == 2:
+                start_t, end_t = clicked_epoch_start_stop_time
+                print(f'clicked widget at {clicked_ax}. Copying to clipboard...')
+                code_string: str = f"clicked_epoch = np.array([{start_t}, {end_t}])"
+                copy_to_clipboard(code_string, message_print=True)
+                print(f'done.')
+
+
+
+
+
+
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     """2023-05-09 - A stateful class containing decoded epoch posteriors.
 
@@ -976,26 +1019,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
     def build_internal_callbacks(self):
         """ """
-        def copy_to_clipboard_on_middle_clicked_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
-            """ called when the user middle-clicks an epoch 
-            
-            captures: _out_ripple_rasters
-            """
-            print(f'copy_to_clipboard_on_middle_clicked_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
-            if clicked_epoch_start_stop_time is not None:
-                if len(clicked_epoch_start_stop_time) == 2:
-                    start_t, end_t = clicked_epoch_start_stop_time
-                    # print(f'start_t: {start_t}')
-                    print(f'clicked widget at {clicked_ax}. Copying to clipboard...')
-                    self.ui.mw.copy_axis_to_clipboard(an_ax=clicked_ax)
-                    print(f'done.')
-
-
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         if not self.params.has_attr('on_middle_click_item_callbacks'):
             self.params['on_middle_click_item_callbacks'] = {}
         
-        self.params.on_middle_click_item_callbacks['copy_to_clipboard_on_middle_clicked_callback'] = copy_to_clipboard_on_middle_clicked_callback
+        self.params.on_middle_click_item_callbacks['copy_axis_image_to_clipboard_callback'] = ClickedCallbacks.copy_axis_image_to_clipboard_callback
         # a_pagination_controller.params.on_middle_click_item_callbacks['an_alt_clicked_epoch_callback'] = an_alt_clicked_epoch_callback
 
 
