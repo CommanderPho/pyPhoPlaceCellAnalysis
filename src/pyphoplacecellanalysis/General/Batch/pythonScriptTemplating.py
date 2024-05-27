@@ -42,14 +42,13 @@ class ProcessingScriptPhases(Enum):
     final_run = "final_run"
     figure_run = "figure_run"
 
+    @property
     def is_figure_phase(self) -> bool:
         if self.value == ProcessingScriptPhases.figure_run.value:
             return True
         else:
             return False
         
-
-
     def get_custom_user_completion_functions_dict(self) -> Dict:
         """ 
         """
