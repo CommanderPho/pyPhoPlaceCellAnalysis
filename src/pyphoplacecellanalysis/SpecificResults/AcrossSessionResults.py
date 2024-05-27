@@ -2162,10 +2162,10 @@ def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_
 
 
 
-
+@function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-27 09:07', related_items=[])
 def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25, px_scatter_kwargs=None,
                                    histogram_variable_name='P_Long', hist_kwargs=None,
-                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None, **kwargs):
+                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True, **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
     
     px_scatter_kwargs: only used if out_scatter_fig is None
@@ -2324,7 +2324,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = time_delta_tuple
         # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
         delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
-        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=2, t_start=delta_relative_t_start, t_split=delta_relative_t_delta, t_end=delta_relative_t_end)
+        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=2, t_start=delta_relative_t_start, t_split=delta_relative_t_delta, t_end=delta_relative_t_end, is_dark_mode=is_dark_mode)
     else:
         _extras_output_dict = {}
 
@@ -2348,8 +2348,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     return fig, figure_context
 
 
-@function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
-def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float):
+@function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch', 'track'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
+def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True):
     """ adds shapes representing the epochs to the scatter plot at index scatter_column_index 
     
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plotly_helper_add_epoch_shapes
@@ -2362,14 +2362,24 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
     _extras_output_dict = {}
     ## Get the track configs for the colors:
     long_short_display_config_manager = LongShortDisplayConfigManager()
-    long_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.long_epoch_config.mpl_color)
-    short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config.mpl_color)
-        
+
+
+    if is_dark_mode:
+        long_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.long_epoch_config.mpl_color)
+        short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config.mpl_color)
+        y_zero_line_color = "rgba(0.2,0.2,0.2,.25)" # very dark grey
+        vertical_epoch_divider_line_color = "rgba(0,0,0,.25)"
+    else:
+        long_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.long_epoch_config_light_mode.mpl_color)
+        short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config_light_mode.mpl_color)
+        y_zero_line_color = "rgba(0.8,0.8,0.8,.25)" # very light grey
+        vertical_epoch_divider_line_color = "rgba(1,1,1,.25)" # white
+
     row_column_kwargs = dict(row='all', col=scatter_column_index)
 
     ## new methods
-    _extras_output_dict["y_zero_line"] = fig.add_hline(y=0.0, line=dict(color="rgba(0.2,0.2,0.2,.25)", width=9), **row_column_kwargs)
-    vertical_divider_line = fig.add_vline(x=0.0, line=dict(color="rgba(0,0,0,.25)", width=3, ), **row_column_kwargs)
+    _extras_output_dict["y_zero_line"] = fig.add_hline(y=0.0, line=dict(color=y_zero_line_color, width=9), **row_column_kwargs)
+    vertical_divider_line = fig.add_vline(x=0.0, line=dict(color=vertical_epoch_divider_line_color, width=3, ), **row_column_kwargs)
 
     # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
 
