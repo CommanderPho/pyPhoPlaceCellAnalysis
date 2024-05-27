@@ -79,7 +79,7 @@ class WCorrShuffle:
 
     alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = field()
     real_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = field()
-    real_decoder_ripple_weighted_corr_arr: NDArray = field()
+    real_decoder_ripple_weighted_corr_arr: NDArray = field(metadata={'shape': ('n_epochs', 'n_decoders')})
 
     all_templates_decode_kwargs: Dict = field()
 
@@ -453,7 +453,7 @@ class WCorrShuffle:
 
         n_decoders: int = 4
         
-        _out = []
+        _out_wcorr = []
         _out_shuffle_is_more_extreme = []
 
         total_n_shuffles: int = len(self.output_extracted_result_wcorrs_list)
@@ -465,14 +465,14 @@ class WCorrShuffle:
             a_shuffle_wcorr_arr = a_decoder_ripple_weighted_corr_df.to_numpy()
             a_shuffle_is_more_extreme = np.abs(a_shuffle_wcorr_arr) > np.abs(self.real_decoder_ripple_weighted_corr_arr)
             
-            _out.append(a_shuffle_wcorr_arr)
+            _out_wcorr.append(a_shuffle_wcorr_arr)
             _out_shuffle_is_more_extreme.append(a_shuffle_is_more_extreme)
 
 
         # ==================================================================================================================== #
         # Process Outputs                                                                                                      #
         # ==================================================================================================================== #
-        _out_shuffle_wcorr_arr = np.stack(_out) # .shape ## (n_shuffles, n_epochs, 4)
+        _out_shuffle_wcorr_arr = np.stack(_out_wcorr) # .shape ## (n_shuffles, n_epochs, 4)
         n_epochs: int = np.shape(_out_shuffle_wcorr_arr)[1]
         if debug_print:
             print(f'n_epochs: {n_epochs}')
