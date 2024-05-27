@@ -116,9 +116,14 @@ class WCorrShuffle:
 
     
     @classmethod
-    def init_from_templates(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, global_epoch_name):
+    def init_from_templates(cls, curr_active_pipeline, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None):
         """
-        
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import WCorrShuffle
+
+        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+                                                directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
+                                                global_epoch_name=global_epoch_name)
+
         """
         # ==================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                  #
@@ -130,6 +135,18 @@ class WCorrShuffle:
         ## Copy the default result:
         directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
         alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
+
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        if directional_decoders_epochs_decode_result is None:
+            directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+        
+        if track_templates is None:
+            directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
+            rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+
+
 
         ## INPUTS: curr_active_pipeline, global_epoch_name, track_templates
 
@@ -570,6 +587,28 @@ class WCorrShuffle:
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
         saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list))
+
+    @classmethod
+    def init_from_file(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, global_epoch_name, filepath):
+        """ loads previously saved results from a pickle file to rebuild
+        
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import WCorrShuffle
+
+        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_file(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+                                                directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
+                                                global_epoch_name=global_epoch_name, filepath='temp22.pkl')
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+
+        output_extracted_result_wcorrs_list, real_decoder_ripple_weighted_corr_arr, output_all_shuffles_decoded_results_list = loadData(filepath)
+        _obj = cls.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+                                        directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
+                                        global_epoch_name=global_epoch_name)
+        _obj.output_extracted_result_wcorrs_list = output_extracted_result_wcorrs_list
+        _obj.real_decoder_ripple_weighted_corr_arr = real_decoder_ripple_weighted_corr_arr
+        _obj.output_all_shuffles_decoded_results_list = output_all_shuffles_decoded_results_list        
+        return _obj
 
 
 
