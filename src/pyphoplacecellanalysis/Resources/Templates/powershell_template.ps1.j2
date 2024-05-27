@@ -1,0 +1,82 @@
+{% raw %}
+# Define a ScriptBlock to activate the virtual environment, change directory, and execute the Python script
+$scriptBlock = {{
+    param([string]$activatePath, [string]$pythonExec, [string]$scriptPath, [string]$parentDir)
+    try {{
+        & $activatePath | Out-Null
+        Set-Location -Path $parentDir
+        $startTime = Get-Date
+        Write-Output "Starting script: $scriptPath at time: $($startTime.ToString())" # Log which script is starting with start time
+        & $pythonExec $scriptPath | Out-Null
+        $endTime = Get-Date
+        $duration = $endTime - $startTime
+        Write-Output "Completed script: $scriptPath at time: $($endTime.ToString()) with duration: $($duration.ToString())" # Log when the script completes
+        return @{{ScriptPath=$scriptPath; StartTime=$startTime.ToString(); EndTime=$endTime.ToString(); Duration=$duration.ToString()}}
+    }} catch {{
+        Write-Error "An error occurred for script: $scriptPath"
+        return @{{ScriptPath=$scriptPath; StartTime=$startTime.ToString(); EndTime=(Get-Date).ToString(); Duration="Failed"}}
+    }}
+}}
+{% endraw %}
+
+# Initialize job queue and set the job limit
+$jobQueue = @()
+$jobLimit = {{ max_concurrent_jobs }}
+$runHistory = @()
+
+{% for script in script_paths %}
+# Job creation and queuing for {{ script }}
+{% raw %}
+# Wait until there is a free slot to run a new job
+while ($jobQueue.Count -ge $jobLimit) {{
+    $completedJobs = @($jobQueue | Where-Object {{ $_.State -eq 'Completed' }})
+    foreach ($job in $completedJobs) {{
+        # Remove completed jobs from the queue
+        $job | Remove-Job
+        Write-Output "Job $($job.Id) has been removed from the queue."
+    }}
+    $jobQueue = @($jobQueue | Where-Object {{ $_.State -ne 'Completed' }})
+    if (!$completedJobs) {{
+        # Wait for some time before checking again if no jobs were completed
+        Start-Sleep -Seconds 5
+    }}
+}}
+
+{% endraw %}
+# Add a new job to the queue
+$job = Start-Job -ScriptBlock $scriptBlock -ArgumentList '{activate_path}', '{python_executable}', '{script}', '{parent_directory}'
+$jobQueue += , $job  # Append job to the queue as an array element
+
+Write-Output "Starting Job for '{script}'"
+
+{% endfor %}
+
+
+{% raw %}
+# Finish the script with job monitoring and cleanup
+# Wait for all queued jobs to complete, logging after each completes
+while ($jobQueue.Count -gt 0) {{
+    $completedJobs = @($jobQueue | Wait-Job -Any)
+
+    # Receive and log output from completed jobs
+    foreach ($job in $completedJobs) {{
+        $jobData = Receive-Job -Job $job
+        Write-Output "Job $($job.Id) with script '$($jobData.ScriptPath)' started at $($jobData.StartTime) and took $($jobData.Duration) has completed."
+        $runHistory += New-Object -TypeName PSObject -Property $jobData
+        $jobQueue = $jobQueue | Where-Object {{ $_.Id -ne $job.Id }}
+    }}
+
+    # Clean up completed job objects
+    Remove-Job -Job $completedJobs
+}}
+
+Write-Output "All jobs have been processed."
+{% endraw %}
+
+{% raw %}
+# Export the run history to a CSV file
+Write-Output "Exporting run history to CSV file..."
+$csvPath = [System.IO.Path]::Combine($parentDir, "run_history.csv")
+$runHistory | Export-Csv -Path $csvPath -NoTypeInformation
+Write-Output "Run history has been exported to $csvPath"
+{% endraw %}
