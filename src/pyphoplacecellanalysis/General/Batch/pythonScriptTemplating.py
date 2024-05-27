@@ -29,6 +29,132 @@ from neuropy.utils.result_context import IdentifyingContext
 BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_slurm_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
 
 
+from enum import Enum
+
+class ProcessingScriptPhases(Enum):
+    """ 
+    from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import ProcessingScriptPhases
+
+
+    """
+    clean_run = "clean_run"
+    continued_run = "continued_run"
+    final_run = "final_run"
+    figure_run = "figure_run"
+
+    def is_figure_phase(self) -> bool:
+        if self.value == ProcessingScriptPhases.figure_run.value:
+            return True
+        else:
+            return False
+        
+
+
+    def get_custom_user_completion_functions_dict(self) -> Dict:
+        """ 
+        """
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_session_h5_file_completion_function, curr_runtime_context_header_template, export_rank_order_results_completion_function, figures_rank_order_results_completion_function, compute_and_export_marginals_dfs_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, reload_exported_kdiba_session_position_info_mat_completion_function
+
+        if self.value == ProcessingScriptPhases.figure_run.value:
+            phase_figure_custom_user_completion_functions_dict = {
+                                    "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
+                                    }
+            return phase_figure_custom_user_completion_functions_dict
+        else:
+            phase_any_run_custom_user_completion_functions_dict = {
+                # "export_rank_order_results_completion_function": export_rank_order_results_completion_function, # ran 2024-04-28 12:57am
+                # "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
+                # "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function, # ran 2024-05-22 12:58am
+                # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,
+                # 'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, # ran 2024-05-22 12:58am
+                # 'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, # ran 2024-05-22 12:58am
+                # 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
+                # 'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
+                }
+            return phase_any_run_custom_user_completion_functions_dict
+
+
+    def get_run_configuration(self, custom_user_completion_function_template_code=None):
+        ## Different run configurations:
+
+        phase1_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
+                                                'pfdt_computation', 'firing_rate_trends',
+            # 'pf_dt_sequential_surprise',
+            'extended_stats',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',
+            # 'ratemap_peaks_prominence2d',
+            'long_short_inst_spike_rate_groups',
+            'long_short_endcap_analysis',
+            # 'spike_burst_detection',
+            'split_to_directional_laps',
+            'merged_directional_placefields',
+            # 'rank_order_shuffle_analysis',
+            # 'directional_train_test_split',
+            # 'directional_decoders_decode_continuous',
+            # 'directional_decoders_evaluate_epochs',
+            # 'directional_decoders_epoch_heuristic_scoring',
+        ]
+
+
+        phase2_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
+                                                'pfdt_computation', 'firing_rate_trends',
+            # 'pf_dt_sequential_surprise',
+            'extended_stats',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',
+            # 'ratemap_peaks_prominence2d',
+            'long_short_inst_spike_rate_groups',
+            'long_short_endcap_analysis',
+            # 'spike_burst_detection',
+            'split_to_directional_laps',
+            'merged_directional_placefields',
+            'rank_order_shuffle_analysis',
+            # 'directional_train_test_split',
+            'directional_decoders_decode_continuous',
+            'directional_decoders_evaluate_epochs',
+            'directional_decoders_epoch_heuristic_scoring',
+        ]
+
+        phase3_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
+                                                'pfdt_computation', 'firing_rate_trends',
+            'pf_dt_sequential_surprise',
+            'extended_stats',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',
+            'ratemap_peaks_prominence2d',
+            'long_short_inst_spike_rate_groups',
+            'long_short_endcap_analysis',
+            # 'spike_burst_detection',
+            'split_to_directional_laps',
+            'merged_directional_placefields',
+            'rank_order_shuffle_analysis',
+            'directional_train_test_split',
+            'directional_decoders_decode_continuous',
+            'directional_decoders_evaluate_epochs',
+            'directional_decoders_epoch_heuristic_scoring',
+        ]
+
+        _out_run_config = {}
+        if self.value == ProcessingScriptPhases.clean_run.value:
+            clean_run = dict(should_force_reload_all=True, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase1_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            _out_run_config = clean_run
+        elif self.value == ProcessingScriptPhases.continued_run.value:
+            continued_run = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase2_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            _out_run_config = continued_run
+        elif self.value == ProcessingScriptPhases.final_run.value:
+            # final_run = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=True), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            final_run = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code) # use export_session_h5_file_completion_function instead of enable_hdf5_output=True
+            _out_run_config = final_run
+        elif self.value == ProcessingScriptPhases.figure_run.value:
+            figure_run = dict(should_perform_figure_generation_to_file=True, should_force_reload_all=False, should_freeze_pipeline_updates=True, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            _out_run_config = figure_run
+        else: 
+            raise NotImplementedError
+        
+        if (platform.system() == 'Windows'):
+            _out_run_config.update(dict(create_slurm_scripts=False, should_create_vscode_workspace=True))
+        else:
+            _out_run_config.update(dict(create_slurm_scripts=True, should_create_vscode_workspace=False))
+
+        return _out_run_config
 
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
@@ -441,9 +567,12 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
         try {{
             & $activatePath | Out-Null
             Set-Location -Path $parentDir
-            Write-Output "Starting script: $scriptPath" # Log which script is starting
+            $startTime = Get-Date
+            Write-Output "Starting script: $scriptPath at time: $($startTime.ToString())" # Log which script is starting with start time
             & $pythonExec $scriptPath | Out-Null
-            Write-Output "Completed script: $scriptPath" # Log when the script completes
+            $endTime = Get-Date
+            $duration = $endTime - $startTime
+            Write-Output "Completed script: $scriptPath at time: $($endTime.ToString()) with duration: $($duration.ToString())" # Log when the script completes
         }} catch {{
             Write-Error "An error occurred for script: $scriptPath"
         }}
@@ -452,6 +581,11 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
     # Initialize job queue and set the job limit
     $jobQueue = @()
     $jobLimit = {max_concurrent_jobs}
+    """
+
+    # Variable to hold run history
+    powershell_script += """
+    $runHistory = @()
     """
 
     # Job creation and queuing
@@ -489,8 +623,8 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
         # Receive and log output from completed jobs
         foreach ($job in $completedJobs) {{
             Receive-Job -Job $job
-            Write-Output "Job $($job.Id) has completed."
-            # Remove the completed job from the job queue
+            $jobData = Receive-Job -Job $job
+            Write-Output "Job $($job.Id) with script '$($jobData.ScriptPath)' started at $($jobData.StartTime) and took $($jobData.Duration) has completed."
             $jobQueue = $jobQueue | Where-Object {{ $_.Id -ne $job.Id }}
         }}
 
@@ -500,7 +634,6 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
 
     Write-Output "All jobs have been processed."
     """
-
 
     # Save the generated PowerShell script to a file
     with open(ps_script_path, 'w') as file:
