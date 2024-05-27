@@ -40,6 +40,311 @@ from neuropy.utils.mixins.indexing_helpers import UnpackableMixin # for NotableT
 
 import matplotlib.pyplot as plt
 
+
+
+
+# ==================================================================================================================== #
+# 2024-05-27 - WCorr Shuffle Stuff                                                                                     #
+# ==================================================================================================================== #
+
+
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+from typing import NewType
+
+import neuropy.utils.type_aliases as types
+from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
+from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
+from neuropy.core.epoch import find_data_indicies_from_epoch_times
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+
+from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import shuffle_and_decode_wcorrs, _try_all_templates_decode
+
+DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
+ShuffleIdx = NewType('ShuffleIdx', int)
+
+@define(slots=False)
+class WCorrShuffle:
+    
+    @classmethod
+    def init_from_templates(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, directional_decoders_epochs_decode_result, global_epoch_name):
+        """ 
+        
+        """
+        # def compute_z_transformed_scores(data):
+        #     mean = np.mean(data)
+        #     std_dev = np.std(data)
+        #     z_scores = [(x - mean) / std_dev for x in data]
+        #     return z_scores
+
+
+        def compute_z_score(data, real_v) -> float:
+            mean = np.mean(data)
+            std_dev = np.std(data)
+            z_scores = (real_v - mean) / std_dev
+            return z_scores
+
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
+        ## INPUTS: track_templates, directional_decoders_epochs_decode_result, 
+
+        # BEGIN BLOCK 2 - modernizing from `_perform_compute_custom_epoch_decoding`  ________________________________________________________________________________________________________ #
+
+        ## Copy the default result:
+        directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+        alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
+
+        ## INPUTS: curr_active_pipeline, global_epoch_name, track_templates
+
+        # 2024-03-04 - Filter out the epochs based on the criteria:
+        filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+
+        # all_templates_decode_kwargs = dict(desired_shared_decoding_time_bin_size=alt_directional_merged_decoders_result.ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=False, minimum_event_duration=alt_directional_merged_decoders_result.ripple_decoding_time_bin_size)
+        all_templates_decode_kwargs = dict(desired_ripple_decoding_time_bin_size=alt_directional_merged_decoders_result.ripple_decoding_time_bin_size,
+                            override_replay_epochs_df=filtered_epochs_df, ## Use the filtered epochs
+                            use_single_time_bin_per_epoch=False, minimum_event_duration=2.0 * float(alt_directional_merged_decoders_result.ripple_decoding_time_bin_size))
+
+        # ==================================================================================================================== #
+        # REAL                                                                                                                 #
+        # ==================================================================================================================== #
+        active_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+        # active_spikes_df = deepcopy(filtered_epochs_df)
+
+        real_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
+        # real_output_alt_directional_merged_decoders_result, (real_decoder_laps_filter_epochs_decoder_result_dict, real_decoder_ripple_filter_epochs_decoder_result_dict) = _try_all_templates_decode(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=real_directional_merged_decoders_result, shuffled_decoders_dict=real_directional_merged_decoders_result.all_directional_decoder_dict, **a_sweep_dict)
+        real_output_alt_directional_merged_decoders_result, (real_decoder_laps_filter_epochs_decoder_result_dict, real_decoder_ripple_filter_epochs_decoder_result_dict) = _try_all_templates_decode(spikes_df=active_spikes_df, a_directional_merged_decoders_result=real_directional_merged_decoders_result, shuffled_decoders_dict=track_templates.get_decoders_dict(), 
+                                                                                                                                                                                                    skip_merged_decoding=True, **all_templates_decode_kwargs)
+        real_decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(real_decoder_ripple_filter_epochs_decoder_result_dict))
+        real_decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in real_decoder_ripple_weighted_corr_df_dict.items()}
+        real_decoder_ripple_weighted_corr_df = pd.DataFrame(real_decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
+        real_decoder_ripple_weighted_corr_arr = real_decoder_ripple_weighted_corr_df.to_numpy()
+        print(f'real_decoder_ripple_weighted_corr_arr: {np.shape(real_decoder_ripple_weighted_corr_arr)}')
+
+        ## Adds 'is_most_likely_direction_LR', 'P_LR' to the `filtered_epochs_df` so we can determine which direction is most likely. This uses `directional_decoders_epochs_decode_result`
+        ## INPUTS: directional_decoders_epochs_decode_result
+
+        ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
+        extracted_merged_scores_df: pd.DataFrame = directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df()
+        extracted_merged_scores_df['is_most_likely_direction_LR'] = (extracted_merged_scores_df['P_LR'] > 0.5)
+
+        ## Find the correct indicies corresponding to the filtered events
+        filtered_start_times = deepcopy(filtered_epochs_df['start'].to_numpy())
+        filtered_epoch_indicies = find_data_indicies_from_epoch_times(extracted_merged_scores_df, np.squeeze(filtered_start_times), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
+        # Constrain the `extracted_merged_scores_df` to match the `filtered_epochs_df`
+        extracted_merged_scores_df['is_included_in_filtered'] = False
+        extracted_merged_scores_df['is_included_in_filtered'].iloc[filtered_epoch_indicies] = True
+        filtered_extracted_merged_scores_df = extracted_merged_scores_df[extracted_merged_scores_df['is_included_in_filtered']]
+
+        included_cols = ['P_LR', 'is_most_likely_direction_LR']
+        assert len(filtered_epochs_df) == len(filtered_extracted_merged_scores_df), f"better match in length before we add properties"
+        for a_col in included_cols:
+            filtered_epochs_df[a_col] = filtered_extracted_merged_scores_df[a_col].to_numpy()
+
+        _out_best_dir_indicies = []
+        # LR
+        _LR_indicies = [0, 2]
+        _RL_indicies = [1, 3]
+
+        for an_is_most_likely_direction_LR in filtered_epochs_df['is_most_likely_direction_LR']:
+            if an_is_most_likely_direction_LR:
+                _out_best_dir_indicies.append(_LR_indicies)
+            else:
+                _out_best_dir_indicies.append(_RL_indicies)
+
+        _out_best_dir_indicies = np.vstack(_out_best_dir_indicies)
+        # _out_best_dir_indicies
+
+        filtered_epochs_df['long_best_dir_decoder_IDX'] = _out_best_dir_indicies[:,0]
+        filtered_epochs_df['short_best_dir_decoder_IDX'] = _out_best_dir_indicies[:,1]
+
+        ## OUTPUTS: filtered_epochs_df['long_best_dir_decoder_IDX'], filtered_epochs_df['short_best_dir_decoder_IDX']
+        filtered_epochs_df
+
+
+
+## Want ## (n_shuffles, n_epochs, 4)
+# len(output_extracted_result_tuples)
+# output_extracted_result_tuples[0][-1]
+# laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df, decoder_ripple_weighted_corr_df_dict = output_extracted_result_tuples[0]
+# print(list(decoder_ripple_weighted_corr_df_dict.values()))
+
+# decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in decoder_ripple_weighted_corr_df_dict.items()}
+# # decoder_ripple_weighted_corr_dict
+# pd.DataFrame(decoder_ripple_weighted_corr_dict)
+        
+## INPUTS: output_extracted_result_wcorrs_list, real_decoder_ripple_weighted_corr_arr
+
+n_decoders: int = 4
+debug_print = True
+
+_out = []
+_out_shuffle_is_more_extreme = []
+
+total_n_shuffles: int = len(output_extracted_result_wcorrs_list)
+print(f'total_n_shuffles: {total_n_shuffles}')
+
+# for i, a_tuple in output_extracted_result_tuples.items():
+# for i, a_decoder_ripple_weighted_corr_df_dict in output_extracted_result_wcorrs.items():
+for i, a_decoder_ripple_weighted_corr_df_dict in enumerate(output_extracted_result_wcorrs_list):
+    # print(f'type(a_tuple): {type(a_tuple)}')
+    # print(a_tuple)
+    # laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df, decoder_ripple_weighted_corr_df_dict = a_tuple
+    decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in a_decoder_ripple_weighted_corr_df_dict.items()}
+    # for a_name, wcorr_vals in decoder_ripple_weighted_corr_dict.items():
+    #     # one value for each epoch
+    #     wcorr_vals
+    a_decoder_ripple_weighted_corr_df = pd.DataFrame(decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
+    a_shuffle_wcorr_arr = a_decoder_ripple_weighted_corr_df.to_numpy()
+    a_shuffle_is_more_extreme = np.abs(a_shuffle_wcorr_arr) > np.abs(real_decoder_ripple_weighted_corr_arr)
+    
+    _out.append(a_shuffle_wcorr_arr)
+    _out_shuffle_is_more_extreme.append(a_shuffle_is_more_extreme)
+
+
+    # ==================================================================================================================== #
+    # Process Outputs                                                                                                      #
+    # ==================================================================================================================== #
+    _out_shuffle_wcorr_arr = np.stack(_out) # .shape ## (n_shuffles, n_epochs, 4)
+    n_epochs: int = np.shape(_out_shuffle_wcorr_arr)[1]
+    if debug_print:
+        print(f'n_epochs: {n_epochs}')
+    assert n_epochs == len(filtered_epochs_df), f"n_epochs: {n_epochs} != len(filtered_epochs_df): {len(filtered_epochs_df)}"
+    _out_shuffle_is_more_extreme = np.stack(_out_shuffle_is_more_extreme) # .shape ## (n_shuffles, n_epochs, 4)
+    if debug_print:
+        print(f'np.shape(_out_shuffle_wcorr_arr): {np.shape(_out_shuffle_wcorr_arr)}')
+        print(f'np.shape(_out_shuffle_is_more_extreme): {np.shape(_out_shuffle_is_more_extreme)}')
+
+    total_n_shuffles_more_extreme_than_real = np.sum(_out_shuffle_is_more_extreme, axis=0) # sum only over the number of shuffles # (n_epochs, 4)
+    if debug_print:
+        print(f'np.shape(total_n_shuffles_more_extreme_than_real): {np.shape(total_n_shuffles_more_extreme_than_real)}')
+
+    valid_shuffle_indicies = np.logical_not(np.isnan(_out_shuffle_wcorr_arr)) ## (n_shuffles, n_epochs, 4)
+    n_valid_shuffles = np.sum(valid_shuffle_indicies, axis=0) # sum only over epochs to get n_shuffles for each epoch for each decoder # (n_epochs, 4)
+    if debug_print:
+        print(f'np.shape(n_valid_shuffles): {np.shape(n_valid_shuffles)}')
+
+
+    # total_n_shuffles_more_extreme_than_real_LONG = np.squeeze(total_n_shuffles_more_extreme_than_real[filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy()])
+
+    _long_short_keys = ['long', 'short']
+
+    total_n_shuffles_more_extreme_than_real_LSdict = {}
+
+    for k in _long_short_keys:
+        total_n_shuffles_more_extreme_than_real_LSdict[k] = np.array([total_n_shuffles_more_extreme_than_real[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df[f'{k}_best_dir_decoder_IDX'].to_numpy())])
+
+        # _out_shuffle_wcorr_arr
+    # total_n_shuffles_more_extreme_than_real_LONG = np.array([total_n_shuffles_more_extreme_than_real[i, decoder_idx] for i, decoder_idx in enumerate(filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy())])
+    # total_n_shuffles_more_extreme_than_real_SHORT = np.array([total_n_shuffles_more_extreme_than_real[i, decoder_idx] for i, decoder_idx in enumerate(filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())])
+
+    # _epochs_all_shuffles_wcorr = []
+    # _epochs_all_shuffles_z_scores = []
+
+    _out_shuffle_wcorr_Zscore_val = np.zeros((n_epochs, 4)) # (n_epochs, 4)
+    # _out_shuffle_wcorr_arr_ZScores = np.zeros_like(_out_shuffle_wcorr_arr)
+    # _out_shuffle_wcorr_arr_ZScores_LS = np.zeros((num_shuffles, n_epochs, 2))
+
+    # long_best_dir_decoder_IDX = filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy()
+    # short_best_dir_decoder_IDX = filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy()
+
+    for epoch_idx in np.arange(n_epochs):    
+    # for epoch_idx, decoder_idx in enumerate(zip(filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy(), filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())):
+
+        # for k in _long_short_keys:
+        #     total_n_shuffles_more_extreme_than_real_LSdict[k] = np.array([total_n_shuffles_more_extreme_than_real[i, decoder_idx] for i, decoder_idx in enumerate(filtered_epochs_df[f'{k}_best_dir_decoder_IDX'].to_numpy())])
+        # epoch_all_shuffles_wcorr = np.squeeze(_out_shuffle_wcorr_arr[:, epoch_idx, decoder_idx]) # all shuffles and decoders for this epoch
+        # epoch_z_scores = compute_z_scores(epoch_all_shuffles_wcorr)
+        
+        for decoder_idx in np.arange(n_decoders):
+            a_single_decoder_epoch_all_shuffles_wcorr = np.squeeze(_out_shuffle_wcorr_arr[:, epoch_idx, decoder_idx]) # all shuffles and decoders for this epoch
+            # a_single_decoder_epoch_z_scores = compute_z_scores(a_single_decoder_epoch_all_shuffles_wcorr)
+            a_single_decoder_epoch_z_score: float = compute_z_score(a_single_decoder_epoch_all_shuffles_wcorr, real_decoder_ripple_weighted_corr_arr[epoch_idx, decoder_idx])
+            # (n_shuffles, n_epochs, 4)
+            _out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] = a_single_decoder_epoch_z_score
+
+
+
+
+    # compute_z_scores
+    print(f'np.shape(_out_shuffle_wcorr_Zscore_val): {np.shape(_out_shuffle_wcorr_Zscore_val)}')
+    # _out_shuffle_wcorr_arr_ZScores
+
+    # _out_shuffle_wcorr_arr_ZScores_LONG = np.stack([_out_shuffle_wcorr_arr_ZScores[:, epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy())], axis=-1) # (n_shuffles, n_epochs)
+    # _out_shuffle_wcorr_arr_ZScores_SHORT = np.stack([_out_shuffle_wcorr_arr_ZScores[:, epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())], axis=-1) # (n_shuffles, n_epochs)
+
+    # print(f'np.shape(_out_shuffle_wcorr_arr_ZScores_LONG): {np.shape(_out_shuffle_wcorr_arr_ZScores_LONG)}')
+    # print(f'np.shape(_out_shuffle_wcorr_arr_ZScores_SHORT): {np.shape(_out_shuffle_wcorr_arr_ZScores_SHORT)}')
+
+
+    _out_shuffle_wcorr_ZScore_LONG = np.array([_out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy())]) # (n_epochs,)
+    _out_shuffle_wcorr_ZScore_SHORT = np.array([_out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())]) # (n_epochs,)
+
+    print(f'np.shape(_out_shuffle_wcorr_ZScore_LONG): {np.shape(_out_shuffle_wcorr_ZScore_LONG)}')
+    print(f'np.shape(_out_shuffle_wcorr_ZScore_SHORT): {np.shape(_out_shuffle_wcorr_ZScore_SHORT)}')
+
+
+    ## OUTPUTS: _out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT
+    ## OUTPUTS: _out_shuffle_wcorr_arr_ZScores_LONG, _out_shuffle_wcorr_arr_ZScores_SHORT
+
+    # _epochs_all_shuffles_wcorr = np.stack(_epochs_all_shuffles_wcorr)
+    # _epochs_all_shuffles_z_scores = np.stack(_epochs_all_shuffles_z_scores)
+    # print(f'np.shape(_epochs_all_shuffles_wcorr): {np.shape(_epochs_all_shuffles_wcorr)}')
+    # print(f'np.shape(_epochs_all_shuffles_z_scores): {np.shape(_epochs_all_shuffles_z_scores)}')
+
+    # filtered_epochs_df['long_best_dir_decoder_IDX'], filtered_epochs_df['short_best_dir_decoder_IDX']
+    # total_n_shuffles_more_extreme_than_real_LONG
+    # print(f'np.shape(total_n_shuffles_more_extreme_than_real_LONG): {np.shape(total_n_shuffles_more_extreme_than_real_LONG)}')
+    # print(f'np.shape(total_n_shuffles_more_extreme_than_real_SHORT): {np.shape(total_n_shuffles_more_extreme_than_real_SHORT)}')
+
+
+    _out_p = total_n_shuffles_more_extreme_than_real.astype('float') / n_valid_shuffles.astype('float') # (n_epochs, 4)
+    if debug_print:
+        print(f'np.shape(_out_p): {np.shape(_out_p)}') # (640, 4) - (n_shuffles, 4)
+    # _out_p
+
+    # z_scores = compute_z_scores(_out_p)
+    # # z_scores
+
+    # if debug_print:
+    #     print(f'z_scores: {np.shape(z_scores)}')
+    # print(f'total_n_shuffles_more_extreme_than_real: {total_n_shuffles_more_extreme_than_real} / total_n_shuffles: {total_n_shuffles}')
+    # _out_shuffle_is_more_extreme
+
+
+    total_n_shuffles_more_extreme_than_real_df = pd.DataFrame(total_n_shuffles_more_extreme_than_real, columns=track_templates.get_decoder_names())
+    total_n_shuffles_more_extreme_than_real_dict = dict(zip(track_templates.get_decoder_names(), total_n_shuffles_more_extreme_than_real.T))
+
+    _out_p_dict = dict(zip(track_templates.get_decoder_names(), _out_p.T))
+
+    ## INPUTS: filtered_epochs_df
+
+    epoch_start_t = filtered_epochs_df['start'].to_numpy() # ripple start time
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================== #
+# 2024-05-26 - Pre-05-27 Stuff                                                                                         #
+# ==================================================================================================================== #
+
 # def plot_histograms( data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str ) -> None:
 #     # get the pre-delta epochs
 #     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
