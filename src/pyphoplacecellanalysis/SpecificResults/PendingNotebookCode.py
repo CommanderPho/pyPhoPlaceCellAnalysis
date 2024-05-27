@@ -71,25 +71,37 @@ ShuffleIdx = NewType('ShuffleIdx', int)
 
 @define(slots=False)
 class WCorrShuffle:
+    """ Performs shufflings to test wcorr
     
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import WCorrShuffle
+
+    wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+        directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result, directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
+        global_epoch_name=global_epoch_name)
+
+
+    """
+    curr_active_pipeline = field()
+    track_templates = field()
+    
+    filtered_epochs_df: pd.DataFrame = field()
+    active_spikes_df: pd.DataFrame = field()
+
+    alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = field()
+    real_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = field()
+    
+    output_extracted_result_wcorrs_list = field()
+    real_decoder_ripple_weighted_corr_arr = field()
+
+    all_templates_decode_kwargs: Dict = field()
+
+
+
     @classmethod
     def init_from_templates(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, directional_decoders_epochs_decode_result, global_epoch_name):
         """ 
         
         """
-        # def compute_z_transformed_scores(data):
-        #     mean = np.mean(data)
-        #     std_dev = np.std(data)
-        #     z_scores = [(x - mean) / std_dev for x in data]
-        #     return z_scores
-
-
-        def compute_z_score(data, real_v) -> float:
-            mean = np.mean(data)
-            std_dev = np.std(data)
-            z_scores = (real_v - mean) / std_dev
-            return z_scores
-
         # ==================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                  #
         # ==================================================================================================================== #
@@ -126,6 +138,7 @@ class WCorrShuffle:
         real_decoder_ripple_weighted_corr_df = pd.DataFrame(real_decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
         real_decoder_ripple_weighted_corr_arr = real_decoder_ripple_weighted_corr_df.to_numpy()
         print(f'real_decoder_ripple_weighted_corr_arr: {np.shape(real_decoder_ripple_weighted_corr_arr)}')
+
 
         ## Adds 'is_most_likely_direction_LR', 'P_LR' to the `filtered_epochs_df` so we can determine which direction is most likely. This uses `directional_decoders_epochs_decode_result`
         ## INPUTS: directional_decoders_epochs_decode_result
@@ -165,167 +178,135 @@ class WCorrShuffle:
         filtered_epochs_df['short_best_dir_decoder_IDX'] = _out_best_dir_indicies[:,1]
 
         ## OUTPUTS: filtered_epochs_df['long_best_dir_decoder_IDX'], filtered_epochs_df['short_best_dir_decoder_IDX']
-        filtered_epochs_df
+
+        return cls(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+            filtered_epochs_df=filtered_epochs_df, active_spikes_df=active_spikes_df,
+            alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, real_directional_merged_decoders_result=real_directional_merged_decoders_result,
+            all_templates_decode_kwargs=all_templates_decode_kwargs)
 
 
+    @classmethod
+    def compute_z_transformed_scores(cls, data: NDArray) -> NDArray:
+        mean = np.mean(data)
+        std_dev = np.std(data)
+        z_scores = [(x - mean) / std_dev for x in data]
+        return z_scores
 
-## Want ## (n_shuffles, n_epochs, 4)
-# len(output_extracted_result_tuples)
-# output_extracted_result_tuples[0][-1]
-# laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df, decoder_ripple_weighted_corr_df_dict = output_extracted_result_tuples[0]
-# print(list(decoder_ripple_weighted_corr_df_dict.values()))
+    @classmethod
+    def compute_z_score(cls, data: NDArray, real_v: float) -> float:
+        mean = np.mean(data)
+        std_dev = np.std(data)
+        z_scores = (real_v - mean) / std_dev
+        return z_scores
 
-# decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in decoder_ripple_weighted_corr_df_dict.items()}
-# # decoder_ripple_weighted_corr_dict
-# pd.DataFrame(decoder_ripple_weighted_corr_dict)
+
+    def compute_shuffles(self, num_shuffles: int=100):
+        """ Computes new shuffles.
+
+        """
+        _updated_output_extracted_result_wcorrs_list = shuffle_and_decode_wcorrs(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
+                                                                                  alt_directional_merged_decoders_result=self.alt_directional_merged_decoders_result, all_templates_decode_kwargs=self.all_templates_decode_kwargs,
+                                                                                  num_shuffles=num_shuffles)
         
-## INPUTS: output_extracted_result_wcorrs_list, real_decoder_ripple_weighted_corr_arr
+        try:
+            output_extracted_result_wcorrs_list
+        except NameError:
+            print(f'WARNING: creating new output_extracted_result_wcorrs_list because it was undefined.')
+            output_extracted_result_wcorrs_list = []
 
-n_decoders: int = 4
-debug_print = True
-
-_out = []
-_out_shuffle_is_more_extreme = []
-
-total_n_shuffles: int = len(output_extracted_result_wcorrs_list)
-print(f'total_n_shuffles: {total_n_shuffles}')
-
-# for i, a_tuple in output_extracted_result_tuples.items():
-# for i, a_decoder_ripple_weighted_corr_df_dict in output_extracted_result_wcorrs.items():
-for i, a_decoder_ripple_weighted_corr_df_dict in enumerate(output_extracted_result_wcorrs_list):
-    # print(f'type(a_tuple): {type(a_tuple)}')
-    # print(a_tuple)
-    # laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df, decoder_ripple_weighted_corr_df_dict = a_tuple
-    decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in a_decoder_ripple_weighted_corr_df_dict.items()}
-    # for a_name, wcorr_vals in decoder_ripple_weighted_corr_dict.items():
-    #     # one value for each epoch
-    #     wcorr_vals
-    a_decoder_ripple_weighted_corr_df = pd.DataFrame(decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
-    a_shuffle_wcorr_arr = a_decoder_ripple_weighted_corr_df.to_numpy()
-    a_shuffle_is_more_extreme = np.abs(a_shuffle_wcorr_arr) > np.abs(real_decoder_ripple_weighted_corr_arr)
-    
-    _out.append(a_shuffle_wcorr_arr)
-    _out_shuffle_is_more_extreme.append(a_shuffle_is_more_extreme)
+        output_extracted_result_wcorrs_list.extend(_updated_output_extracted_result_wcorrs_list)
 
 
-    # ==================================================================================================================== #
-    # Process Outputs                                                                                                      #
-    # ==================================================================================================================== #
-    _out_shuffle_wcorr_arr = np.stack(_out) # .shape ## (n_shuffles, n_epochs, 4)
-    n_epochs: int = np.shape(_out_shuffle_wcorr_arr)[1]
-    if debug_print:
-        print(f'n_epochs: {n_epochs}')
-    assert n_epochs == len(filtered_epochs_df), f"n_epochs: {n_epochs} != len(filtered_epochs_df): {len(filtered_epochs_df)}"
-    _out_shuffle_is_more_extreme = np.stack(_out_shuffle_is_more_extreme) # .shape ## (n_shuffles, n_epochs, 4)
-    if debug_print:
-        print(f'np.shape(_out_shuffle_wcorr_arr): {np.shape(_out_shuffle_wcorr_arr)}')
-        print(f'np.shape(_out_shuffle_is_more_extreme): {np.shape(_out_shuffle_is_more_extreme)}')
 
-    total_n_shuffles_more_extreme_than_real = np.sum(_out_shuffle_is_more_extreme, axis=0) # sum only over the number of shuffles # (n_epochs, 4)
-    if debug_print:
-        print(f'np.shape(total_n_shuffles_more_extreme_than_real): {np.shape(total_n_shuffles_more_extreme_than_real)}')
+    def compute(self, debug_print:bool=True):
+        """ Called after computing some shuffles.
+        """
+        ## Want ## (n_shuffles, n_epochs, 4)
+                
+        ## INPUTS: output_extracted_result_wcorrs_list, real_decoder_ripple_weighted_corr_arr
 
-    valid_shuffle_indicies = np.logical_not(np.isnan(_out_shuffle_wcorr_arr)) ## (n_shuffles, n_epochs, 4)
-    n_valid_shuffles = np.sum(valid_shuffle_indicies, axis=0) # sum only over epochs to get n_shuffles for each epoch for each decoder # (n_epochs, 4)
-    if debug_print:
-        print(f'np.shape(n_valid_shuffles): {np.shape(n_valid_shuffles)}')
-
-
-    # total_n_shuffles_more_extreme_than_real_LONG = np.squeeze(total_n_shuffles_more_extreme_than_real[filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy()])
-
-    _long_short_keys = ['long', 'short']
-
-    total_n_shuffles_more_extreme_than_real_LSdict = {}
-
-    for k in _long_short_keys:
-        total_n_shuffles_more_extreme_than_real_LSdict[k] = np.array([total_n_shuffles_more_extreme_than_real[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df[f'{k}_best_dir_decoder_IDX'].to_numpy())])
-
-        # _out_shuffle_wcorr_arr
-    # total_n_shuffles_more_extreme_than_real_LONG = np.array([total_n_shuffles_more_extreme_than_real[i, decoder_idx] for i, decoder_idx in enumerate(filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy())])
-    # total_n_shuffles_more_extreme_than_real_SHORT = np.array([total_n_shuffles_more_extreme_than_real[i, decoder_idx] for i, decoder_idx in enumerate(filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())])
-
-    # _epochs_all_shuffles_wcorr = []
-    # _epochs_all_shuffles_z_scores = []
-
-    _out_shuffle_wcorr_Zscore_val = np.zeros((n_epochs, 4)) # (n_epochs, 4)
-    # _out_shuffle_wcorr_arr_ZScores = np.zeros_like(_out_shuffle_wcorr_arr)
-    # _out_shuffle_wcorr_arr_ZScores_LS = np.zeros((num_shuffles, n_epochs, 2))
-
-    # long_best_dir_decoder_IDX = filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy()
-    # short_best_dir_decoder_IDX = filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy()
-
-    for epoch_idx in np.arange(n_epochs):    
-    # for epoch_idx, decoder_idx in enumerate(zip(filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy(), filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())):
-
-        # for k in _long_short_keys:
-        #     total_n_shuffles_more_extreme_than_real_LSdict[k] = np.array([total_n_shuffles_more_extreme_than_real[i, decoder_idx] for i, decoder_idx in enumerate(filtered_epochs_df[f'{k}_best_dir_decoder_IDX'].to_numpy())])
-        # epoch_all_shuffles_wcorr = np.squeeze(_out_shuffle_wcorr_arr[:, epoch_idx, decoder_idx]) # all shuffles and decoders for this epoch
-        # epoch_z_scores = compute_z_scores(epoch_all_shuffles_wcorr)
+        n_decoders: int = 4
         
-        for decoder_idx in np.arange(n_decoders):
-            a_single_decoder_epoch_all_shuffles_wcorr = np.squeeze(_out_shuffle_wcorr_arr[:, epoch_idx, decoder_idx]) # all shuffles and decoders for this epoch
-            # a_single_decoder_epoch_z_scores = compute_z_scores(a_single_decoder_epoch_all_shuffles_wcorr)
-            a_single_decoder_epoch_z_score: float = compute_z_score(a_single_decoder_epoch_all_shuffles_wcorr, real_decoder_ripple_weighted_corr_arr[epoch_idx, decoder_idx])
-            # (n_shuffles, n_epochs, 4)
-            _out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] = a_single_decoder_epoch_z_score
+        _out = []
+        _out_shuffle_is_more_extreme = []
+
+        total_n_shuffles: int = len(self.output_extracted_result_wcorrs_list)
+        print(f'total_n_shuffles: {total_n_shuffles}')
+
+        for i, a_decoder_ripple_weighted_corr_df_dict in enumerate(self.output_extracted_result_wcorrs_list):
+            decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in a_decoder_ripple_weighted_corr_df_dict.items()}
+            a_decoder_ripple_weighted_corr_df = pd.DataFrame(decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
+            a_shuffle_wcorr_arr = a_decoder_ripple_weighted_corr_df.to_numpy()
+            a_shuffle_is_more_extreme = np.abs(a_shuffle_wcorr_arr) > np.abs(self.real_decoder_ripple_weighted_corr_arr)
+            
+            _out.append(a_shuffle_wcorr_arr)
+            _out_shuffle_is_more_extreme.append(a_shuffle_is_more_extreme)
+
+            # ==================================================================================================================== #
+            # Process Outputs                                                                                                      #
+            # ==================================================================================================================== #
+            _out_shuffle_wcorr_arr = np.stack(_out) # .shape ## (n_shuffles, n_epochs, 4)
+            n_epochs: int = np.shape(_out_shuffle_wcorr_arr)[1]
+            if debug_print:
+                print(f'n_epochs: {n_epochs}')
+            assert n_epochs == len(self.filtered_epochs_df), f"n_epochs: {n_epochs} != len(filtered_epochs_df): {len(self.filtered_epochs_df)}"
+            _out_shuffle_is_more_extreme = np.stack(_out_shuffle_is_more_extreme) # .shape ## (n_shuffles, n_epochs, 4)
+            if debug_print:
+                print(f'np.shape(_out_shuffle_wcorr_arr): {np.shape(_out_shuffle_wcorr_arr)}')
+                print(f'np.shape(_out_shuffle_is_more_extreme): {np.shape(_out_shuffle_is_more_extreme)}')
+
+            total_n_shuffles_more_extreme_than_real = np.sum(_out_shuffle_is_more_extreme, axis=0) # sum only over the number of shuffles # (n_epochs, 4)
+            if debug_print:
+                print(f'np.shape(total_n_shuffles_more_extreme_than_real): {np.shape(total_n_shuffles_more_extreme_than_real)}')
+
+            valid_shuffle_indicies = np.logical_not(np.isnan(_out_shuffle_wcorr_arr)) ## (n_shuffles, n_epochs, 4)
+            n_valid_shuffles = np.sum(valid_shuffle_indicies, axis=0) # sum only over epochs to get n_shuffles for each epoch for each decoder # (n_epochs, 4)
+            if debug_print:
+                print(f'np.shape(n_valid_shuffles): {np.shape(n_valid_shuffles)}')
+
+            _long_short_keys = ['long', 'short']
+
+            total_n_shuffles_more_extreme_than_real_LSdict = {}
+
+            for k in _long_short_keys:
+                total_n_shuffles_more_extreme_than_real_LSdict[k] = np.array([total_n_shuffles_more_extreme_than_real[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(self.filtered_epochs_df[f'{k}_best_dir_decoder_IDX'].to_numpy())])
+
+            _out_shuffle_wcorr_Zscore_val = np.zeros((n_epochs, 4)) # (n_epochs, 4)
+
+            for epoch_idx in np.arange(n_epochs):    
+
+                for decoder_idx in np.arange(n_decoders):
+                    a_single_decoder_epoch_all_shuffles_wcorr = np.squeeze(_out_shuffle_wcorr_arr[:, epoch_idx, decoder_idx]) # all shuffles and decoders for this epoch
+                    # a_single_decoder_epoch_z_scores = self.compute_z_scores(a_single_decoder_epoch_all_shuffles_wcorr)
+                    a_single_decoder_epoch_z_score: float = self.compute_z_score(a_single_decoder_epoch_all_shuffles_wcorr, self.real_decoder_ripple_weighted_corr_arr[epoch_idx, decoder_idx])
+                    # (n_shuffles, n_epochs, 4)
+                    _out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] = a_single_decoder_epoch_z_score
 
 
+            # compute_z_scores
+            print(f'np.shape(_out_shuffle_wcorr_Zscore_val): {np.shape(_out_shuffle_wcorr_Zscore_val)}')
 
+            _out_shuffle_wcorr_ZScore_LONG = np.array([_out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(self.filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy())]) # (n_epochs,)
+            _out_shuffle_wcorr_ZScore_SHORT = np.array([_out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(self.filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())]) # (n_epochs,)
 
-    # compute_z_scores
-    print(f'np.shape(_out_shuffle_wcorr_Zscore_val): {np.shape(_out_shuffle_wcorr_Zscore_val)}')
-    # _out_shuffle_wcorr_arr_ZScores
+            print(f'np.shape(_out_shuffle_wcorr_ZScore_LONG): {np.shape(_out_shuffle_wcorr_ZScore_LONG)}')
+            print(f'np.shape(_out_shuffle_wcorr_ZScore_SHORT): {np.shape(_out_shuffle_wcorr_ZScore_SHORT)}')
 
-    # _out_shuffle_wcorr_arr_ZScores_LONG = np.stack([_out_shuffle_wcorr_arr_ZScores[:, epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy())], axis=-1) # (n_shuffles, n_epochs)
-    # _out_shuffle_wcorr_arr_ZScores_SHORT = np.stack([_out_shuffle_wcorr_arr_ZScores[:, epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())], axis=-1) # (n_shuffles, n_epochs)
+            ## OUTPUTS: _out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT
+            ## OUTPUTS: _out_shuffle_wcorr_arr_ZScores_LONG, _out_shuffle_wcorr_arr_ZScores_SHORT
 
-    # print(f'np.shape(_out_shuffle_wcorr_arr_ZScores_LONG): {np.shape(_out_shuffle_wcorr_arr_ZScores_LONG)}')
-    # print(f'np.shape(_out_shuffle_wcorr_arr_ZScores_SHORT): {np.shape(_out_shuffle_wcorr_arr_ZScores_SHORT)}')
+            _out_p = total_n_shuffles_more_extreme_than_real.astype('float') / n_valid_shuffles.astype('float') # (n_epochs, 4)
+            if debug_print:
+                print(f'np.shape(_out_p): {np.shape(_out_p)}') # (640, 4) - (n_shuffles, 4)
 
+            total_n_shuffles_more_extreme_than_real_df: pd.DataFrame = pd.DataFrame(total_n_shuffles_more_extreme_than_real, columns=self.track_templates.get_decoder_names())
+            total_n_shuffles_more_extreme_than_real_dict = dict(zip(self.track_templates.get_decoder_names(), total_n_shuffles_more_extreme_than_real.T))
 
-    _out_shuffle_wcorr_ZScore_LONG = np.array([_out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy())]) # (n_epochs,)
-    _out_shuffle_wcorr_ZScore_SHORT = np.array([_out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())]) # (n_epochs,)
+            _out_p_dict = dict(zip(self.track_templates.get_decoder_names(), _out_p.T))
 
-    print(f'np.shape(_out_shuffle_wcorr_ZScore_LONG): {np.shape(_out_shuffle_wcorr_ZScore_LONG)}')
-    print(f'np.shape(_out_shuffle_wcorr_ZScore_SHORT): {np.shape(_out_shuffle_wcorr_ZScore_SHORT)}')
+            ## INPUTS: filtered_epochs_df
 
-
-    ## OUTPUTS: _out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT
-    ## OUTPUTS: _out_shuffle_wcorr_arr_ZScores_LONG, _out_shuffle_wcorr_arr_ZScores_SHORT
-
-    # _epochs_all_shuffles_wcorr = np.stack(_epochs_all_shuffles_wcorr)
-    # _epochs_all_shuffles_z_scores = np.stack(_epochs_all_shuffles_z_scores)
-    # print(f'np.shape(_epochs_all_shuffles_wcorr): {np.shape(_epochs_all_shuffles_wcorr)}')
-    # print(f'np.shape(_epochs_all_shuffles_z_scores): {np.shape(_epochs_all_shuffles_z_scores)}')
-
-    # filtered_epochs_df['long_best_dir_decoder_IDX'], filtered_epochs_df['short_best_dir_decoder_IDX']
-    # total_n_shuffles_more_extreme_than_real_LONG
-    # print(f'np.shape(total_n_shuffles_more_extreme_than_real_LONG): {np.shape(total_n_shuffles_more_extreme_than_real_LONG)}')
-    # print(f'np.shape(total_n_shuffles_more_extreme_than_real_SHORT): {np.shape(total_n_shuffles_more_extreme_than_real_SHORT)}')
-
-
-    _out_p = total_n_shuffles_more_extreme_than_real.astype('float') / n_valid_shuffles.astype('float') # (n_epochs, 4)
-    if debug_print:
-        print(f'np.shape(_out_p): {np.shape(_out_p)}') # (640, 4) - (n_shuffles, 4)
-    # _out_p
-
-    # z_scores = compute_z_scores(_out_p)
-    # # z_scores
-
-    # if debug_print:
-    #     print(f'z_scores: {np.shape(z_scores)}')
-    # print(f'total_n_shuffles_more_extreme_than_real: {total_n_shuffles_more_extreme_than_real} / total_n_shuffles: {total_n_shuffles}')
-    # _out_shuffle_is_more_extreme
-
-
-    total_n_shuffles_more_extreme_than_real_df = pd.DataFrame(total_n_shuffles_more_extreme_than_real, columns=track_templates.get_decoder_names())
-    total_n_shuffles_more_extreme_than_real_dict = dict(zip(track_templates.get_decoder_names(), total_n_shuffles_more_extreme_than_real.T))
-
-    _out_p_dict = dict(zip(track_templates.get_decoder_names(), _out_p.T))
-
-    ## INPUTS: filtered_epochs_df
-
-    epoch_start_t = filtered_epochs_df['start'].to_numpy() # ripple start time
+            epoch_start_t = self.filtered_epochs_df['start'].to_numpy() # ripple start time
 
 
 
