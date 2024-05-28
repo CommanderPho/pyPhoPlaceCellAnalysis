@@ -2392,8 +2392,9 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
     return _extras_output_dict
 
 
+@function_attributes(short_name=None, tags=['plotly', 'histogram'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-28 07:01', related_items=[])
 def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
-                                          enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session',
+                                          enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session', is_dark_mode: bool=True,
                                           **build_fig_kwargs):
     """ factored out of the subfunction in plot_across_sessions_scatter_results
     adds scatterplots as well
@@ -2618,7 +2619,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         #         fig.add_shape(a_shape, name=a_shape_name, row=1, col=scatter_column)
 
         ## Inputs: fig, t_start: float, t_end: float
-        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=scatter_column, t_start=earliest_delta_aligned_t_start, t_split=t_split, t_end=latest_delta_aligned_t_end)
+        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=scatter_column, t_start=earliest_delta_aligned_t_start, t_split=t_split, t_end=latest_delta_aligned_t_end, is_dark_mode=is_dark_mode)
 
 
     # Update title and height
@@ -2633,7 +2634,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         required_figure_height = 700
         
     fig.update_layout(title_text=scatter_title, width=2048, height=required_figure_height)
-    fig.update_layout(yaxis=dict(range=[0.0, 1.0]), template='plotly_dark')
+    fig.update_layout(yaxis=dict(range=[0.0, 1.0])) # , template='plotly_dark'
     # Update y-axis range for all created figures
     fig.update_yaxes(range=[0.0, 1.0])
 
