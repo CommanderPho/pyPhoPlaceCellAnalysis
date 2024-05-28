@@ -59,8 +59,7 @@ DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.Decode
 ShuffleIdx = NewType('ShuffleIdx', int)
 
 
-@define(slots=False)
-class WCorrShuffle:
+@define(slots=False, repr=False, eq=False)
     """ Performs shufflings to test wcorr
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle
