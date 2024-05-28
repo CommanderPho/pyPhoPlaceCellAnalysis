@@ -147,6 +147,9 @@ class WCorrShuffle(ComputedResult):
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
             track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
 
+
+        directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
+
         ## INPUTS: curr_active_pipeline, global_epoch_name, track_templates
 
         # 2024-03-04 - Filter out the epochs based on the criteria:
@@ -161,7 +164,7 @@ class WCorrShuffle(ComputedResult):
         # REAL                                                                                                                 #
         # ==================================================================================================================== #
         active_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
-        real_directional_merged_decoders_result, real_decoder_ripple_weighted_corr_arr = cls.build_real_result(track_templates=track_templates, directional_merged_decoders_result=directional_merged_decoders_result, active_spikes_df=active_spikes_df, all_templates_decode_kwargs=all_templates_decode_kwargs)
+        real_directional_merged_decoders_result, real_decoder_ripple_weighted_corr_arr = cls.build_real_result(track_templates=track_templates, directional_merged_decoders_result=alt_directional_merged_decoders_result, active_spikes_df=active_spikes_df, all_templates_decode_kwargs=all_templates_decode_kwargs)
         # print(f'real_decoder_ripple_weighted_corr_arr: {np.shape(real_decoder_ripple_weighted_corr_arr)}')
 
         ## Adds 'is_most_likely_direction_LR', 'P_LR' to the `filtered_epochs_df` so we can determine which direction is most likely. This uses `directional_decoders_epochs_decode_result`
@@ -481,7 +484,7 @@ class WCorrShuffle(ComputedResult):
         assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
 
         _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_full_decoded_results_list = self._shuffle_and_decode_wcorrs(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
-                                                                                  alt_directional_merged_decoders_result=deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']), all_templates_decode_kwargs=self.all_templates_decode_kwargs,
+                                                                                  alt_directional_merged_decoders_result=deepcopy(self.curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']), all_templates_decode_kwargs=self.all_templates_decode_kwargs,
                                                                                   num_shuffles=num_shuffles)
 
         self.output_extracted_result_wcorrs_list.extend(_updated_output_extracted_result_wcorrs_list)
