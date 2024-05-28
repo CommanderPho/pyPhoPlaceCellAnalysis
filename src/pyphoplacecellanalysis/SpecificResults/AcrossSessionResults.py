@@ -2605,9 +2605,6 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     if (enable_scatter_plot and enable_epoch_shading_shapes):
         
         t_split: float = 0.0
-
-
-
         #TODO 2024-02-02 04:36: - [ ] Should get the specific session t_start/t_end instead of using the general `earliest_delta_aligned_t_start`
         # _extras_output_dict = PlottingHelpers.helper_plotly_add_long_short_epoch_indicator_regions(fig, t_split=t_split, t_start=earliest_delta_aligned_t_start, t_end=latest_delta_aligned_t_end, build_only=True)
         # for a_shape_name, a_shape in _extras_output_dict.items():
