@@ -1285,6 +1285,11 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     aclus_y_offset_mode_POSSIBLE_OPTIONS = ['random_jitter', 'count_based']
     assert aclus_y_offset_mode.value in aclus_y_offset_mode_POSSIBLE_OPTIONS, f"aclus_y_offset_mode must be in {aclus_y_offset_mode_POSSIBLE_OPTIONS} but aclus_y_offset_mode: {aclus_y_offset_mode}"
 
+
+
+    unit_id_colors_map = kwargs.pop('unit_id_colors_map', None)
+
+
     enable_single_y_point_arrows: bool = True # if True all arrows are started from the top aclu for long and bottom/baseline for short. If False each arrow starts from its correct aclu dot, which can appear more busy.
     # enable_single_y_point_arrows: bool = False
 
@@ -1443,15 +1448,23 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # Define a colormap to map your unique integer indices to colors
     # colormap = plt.cm.viridis  # or any other colormap
 
-    colormap = mcolors.ListedColormap(['white'])
-    normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
-    scalar_map = cm.ScalarMappable(norm=normalize, cmap=colormap)
+    if unit_id_colors_map is None:
+        colormap = mcolors.ListedColormap(['white'])
+        normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
+        scalar_map = cm.ScalarMappable(norm=normalize, cmap=colormap)
 
-    # Create a constant colormap with only white color
+        # Create a constant colormap with only white color
 
-    color = scalar_map.to_rgba(active_aclus)
-    ## constant:
-    # color = 'white'
+        color = scalar_map.to_rgba(active_aclus)
+        ## constant:
+        # color = 'white'
+        get_aclu_color_fn = lambda an_aclu: scalar_map.to_rgba(an_aclu)
+        
+    else:
+        ## use the provided `unit_id_colors_map`:
+        color = [unit_id_colors_map[an_aclu] for an_aclu in active_aclus]
+        get_aclu_color_fn = lambda an_aclu: unit_id_colors_map[an_aclu]
+
 
     ## Count-based offsets: If there are three aclus sharing a bin, offset the repeated aclus by a scaled y-factor:
     if (aclus_y_offset_mode.value == AclusYOffsetMode.CountBased.value):
@@ -1539,7 +1552,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             # dy = end_y - start_y
 
             # Get the corresponding color for the current index using the colormap
-            arrow_color = scalar_map.to_rgba(active_aclus[idx])
+            arrow_color = get_aclu_color_fn(active_aclus[idx])
             
             # Annotate the plot with arrows; adjust the properties according to your needs
             _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color=arrow_color))
@@ -1619,13 +1632,14 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
             captures: _out_long_points, _out_short_points, _output_by_aclu_dict, 
                 scatter_edgecolors_selection_color, selection_color, aclu_labels_fontsize, scalar_map,
-                aclu_labels_text_path_effects, selection_text_path_effects
+                aclu_labels_text_path_effects, selection_text_path_effects, get_aclu_color_fn
             
             _perform_update_scatter_point_is_selected(an_index=an_index, an_aclu=active_aclus[an_index], is_selected=True)
             """
             if is_selected:
                 # selected
-                original_color = scalar_map.to_rgba(an_aclu)
+                # original_color = scalar_map.to_rgba(an_aclu)
+                original_color = get_aclu_color_fn(an_aclu)
                 active_color = original_color
                 # active_color = scatter_edgecolors_selection_color
 
@@ -1637,7 +1651,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
                 
             else:
                 # not-selected
-                original_color = scalar_map.to_rgba(an_aclu)
+                # original_color = scalar_map.to_rgba(an_aclu)
+                original_color = get_aclu_color_fn(an_aclu)
                 active_color = original_color
                 active_arrow_color = original_color
                 active_aclu_labels_text_color = aclu_labels_text_color
@@ -1681,7 +1696,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
         def on_scatter_point_pick(event):
             """ 
-            Captures: active_aclus, scalar_map, _out_long_points, _out_short_points, _output_by_aclu_dict, long_peak_x, long_y, selection_color, aclu_labels_fontsize
+            Captures: active_aclus, scalar_map, _out_long_points, _out_short_points, _output_by_aclu_dict, long_peak_x, long_y, selection_color, aclu_labels_fontsize, get_aclu_color_fn
             """
             nonlocal previous_selected_indices, index_is_selected
             newly_selected_ind = event.ind
@@ -1717,71 +1732,6 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
                 _perform_update_aclu_is_selected(an_index=an_index, an_aclu=aclu_changed, is_selected=index_is_selected[an_index])
 
 
-            # index_is_selected
-
-            # # Restore color of previously selected points
-            # for an_index in previous_selected_indices:
-            #     # deselected aclus:
-            #     aclu_deselected: int = int(active_aclus[an_index])
-            #     if debug_print:
-            #         print(f'\taclu_deselected: {aclu_deselected}')
-            #     original_color = scalar_map.to_rgba(active_aclus[an_index])
-
-            #     _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=original_color)
-            #     _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=original_color)
-
-            #     # _out_long_points._facecolors[an_index] = original_color # scalar_map.to_rgba(active_aclus[an_index])
-            #     # _out_short_points._facecolors[an_index] = original_color # scalar_map.to_rgba(active_aclus[an_index])
-            #     # restore arrow color:
-            #     a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_deselected, {}).get('long_to_short_arrow', None)
-            #     if a_paired_arrow_container_Text_obj is not None:
-            #         a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
-            #         a_paired_arrow.set_color(original_color)  # Change arrow color to blue
-            
-            #     if draw_point_aclu_labels:
-            #         _output_by_aclu_dict[aclu_deselected]['long_text'].set_color(aclu_labels_text_color)
-            #         _output_by_aclu_dict[aclu_deselected]['short_text'].set_color(aclu_labels_text_color)
-
-            #         _output_by_aclu_dict[aclu_deselected]['long_text'].set_fontsize(aclu_labels_fontsize)
-            #         _output_by_aclu_dict[aclu_deselected]['short_text'].set_fontsize(aclu_labels_fontsize)
-
-            #         _output_by_aclu_dict[aclu_deselected]['long_text'].set_zorder(10)  # Choose a z-order value higher than other objects
-            #         _output_by_aclu_dict[aclu_deselected]['short_text'].set_zorder(10)
-
-
-            # # if did_reclick_same_selection:
-            #     # don't re-select the deselected points, we want to toggle their selections
-
-
-            # # Change color of currently selected points to red
-            # for an_index in newly_selected_ind:
-            #     # selected aclus:
-            #     aclu_selected: int = int(active_aclus[an_index])
-            #     if debug_print:
-            #         print(f'\taclu_selected: {aclu_selected}')
-            #     # _out_long_points._facecolors[an_index] = selection_color  # Red color in RGBA format
-            #     # _out_short_points._facecolors[an_index] = selection_color  # Red color in RGBA format
-
-            #     _perform_update_scatter_point_color(_out_long_points, an_index=an_index, new_color=selection_color)
-            #     _perform_update_scatter_point_color(_out_short_points, an_index=an_index, new_color=selection_color)
-
-            #     # Change the arrow selection:
-            #     a_paired_arrow_container_Text_obj = _output_by_aclu_dict.get(aclu_selected, {}).get('long_to_short_arrow', None)
-            #     if a_paired_arrow_container_Text_obj is not None:
-            #         a_paired_arrow: mpl.patches.FancyArrowPatch = a_paired_arrow_container_Text_obj.arrow_patch
-            #         a_paired_arrow.set_color(selection_color)  # Change arrow color to blue
-
-            #     if draw_point_aclu_labels:
-            #         _output_by_aclu_dict[aclu_selected]['long_text'].set_color(selection_color)
-            #         _output_by_aclu_dict[aclu_selected]['short_text'].set_color(selection_color)
-
-            #         _output_by_aclu_dict[aclu_selected]['long_text'].set_fontsize(aclu_labels_fontsize+1)
-            #         _output_by_aclu_dict[aclu_selected]['short_text'].set_fontsize(aclu_labels_fontsize+1)
-                
-
-            # Update the list of previously selected indices
-            # previous_selected_indices = newly_selected_ind
-
             previous_selected_indices = np.nonzero(index_is_selected==True)
 
             plt.draw()  # Update the plot
@@ -1789,6 +1739,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         _mpl_pick_event_handle_idx: int = fig.canvas.mpl_connect('pick_event', on_scatter_point_pick)
 
 
+        _output_dict['get_aclu_color_fn'] = get_aclu_color_fn
         _output_dict['scatter_select_function'] = on_scatter_point_pick
         _output_dict['_scatter_select_mpl_pick_event_handle_idx'] = _mpl_pick_event_handle_idx
 
@@ -1827,6 +1778,8 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
     from matplotlib.gridspec import GridSpec
     from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
+    from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
 
     use_separate_plot_for_each_direction: bool = True
 
@@ -1869,8 +1822,17 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
             (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
 
 
+            # AnyDir_decoder_aclu_MAX_peak_maps_df.aclu.to_numpy()
+            neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in track_templates.get_decoders_dict().values()] # [A, B, C, D, ...]
+            # _unit_qcolors_map, unit_colors_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
+            unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
+
+            # ColorFormatConverter.Colors_NDArray_Convert_to_zero_to_one_array(np.stack([v for k, v in _unit_colors_ndarray_map.items()])) # (n_colors, 4)
+
+            _unit_colors_ndarray_map = {k:np.squeeze(ColorFormatConverter.Colors_NDArray_Convert_to_zero_to_one_array(np.array([v]))) for k, v in _unit_colors_ndarray_map.items()} # convert to 0.0-1.0 based colors
+
             ## Make a single figure for both LR/RL remapping cells:
-            kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False)
+            kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False, unit_id_colors_map=_unit_colors_ndarray_map)
 
             if use_separate_plot_for_each_direction:
                 fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
