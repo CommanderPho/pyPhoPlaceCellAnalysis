@@ -60,6 +60,7 @@ ShuffleIdx = NewType('ShuffleIdx', int)
 
 
 @define(slots=False, repr=False, eq=False)
+class WCorrShuffle(ComputedResult):
     """ Performs shufflings to test wcorr
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle
@@ -70,24 +71,43 @@ ShuffleIdx = NewType('ShuffleIdx', int)
 
 
     """
-    curr_active_pipeline = field() # required to continue computations
-    track_templates = field() # required to continue computations
+    _VersionedResultMixin_version: str = "2024.05.28_0" # to be updated in your IMPLEMENTOR to indicate its version
+
+    curr_active_pipeline = non_serialized_field(default=None, repr=False) # required to continue computations
+    track_templates = non_serialized_field(default=None, repr=False) # required to continue computations
+
+    filtered_epochs_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
+    active_spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
+
+    alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = serialized_field(default=None)
+    real_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = serialized_field(default=None)
+    real_decoder_ripple_weighted_corr_arr: NDArray = serialized_field(default=None, repr=False, metadata={'shape': ('n_epochs', 'n_decoders')})
+
+    all_templates_decode_kwargs: Dict = non_serialized_field(default=Factory(dict), repr=False)
+
+    output_extracted_result_wcorrs_list: List = serialized_field(default=Factory(list), repr=False)
+    output_all_shuffles_decoded_results_list: List[DecodedEpochsResultsDict] = serialized_field(default=Factory(list), repr=False, metadata={'description': 'optionally (depending on `enable_saving_entire_decoded_shuffle_result`) produced decoding results that can allow reuse across multiple computation types (other than wcorr). Takes MUCH more memeory.'}) ## Opt
     
-    filtered_epochs_df: pd.DataFrame = field()
-    active_spikes_df: pd.DataFrame = field()
+    enable_saving_entire_decoded_shuffle_result: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
 
-    alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = field()
-    real_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = field()
-    real_decoder_ripple_weighted_corr_arr: NDArray = field(metadata={'shape': ('n_epochs', 'n_decoders')})
+    result_version: str = serialized_attribute_field(default='2024.05.28_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
-    all_templates_decode_kwargs: Dict = field()
 
-    output_extracted_result_wcorrs_list: List = field(factory=list)
-    output_all_shuffles_decoded_results_list: List[DecodedEpochsResultsDict] = field(factory=list)
+    @property
+    def n_epochs(self):
+        """The number of epochs property."""
+        return len(self.filtered_epochs_df)
+
+
+    @property
+    def n_completed_shuffles(self):
+        """The n_completed_shuffles property."""
+        return len(self.output_extracted_result_wcorrs_list)
+
 
     
     @classmethod
-    def init_from_templates(cls, curr_active_pipeline, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None) -> "WCorrShuffle":
+    def init_from_templates(cls, curr_active_pipeline, enable_saving_entire_decoded_shuffle_result: bool=False, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None) -> "WCorrShuffle":
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle
 
@@ -186,7 +206,7 @@ ShuffleIdx = NewType('ShuffleIdx', int)
             filtered_epochs_df=filtered_epochs_df, active_spikes_df=active_spikes_df,
             alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, real_directional_merged_decoders_result=real_directional_merged_decoders_result,
             real_decoder_ripple_weighted_corr_arr=real_decoder_ripple_weighted_corr_arr,
-            all_templates_decode_kwargs=all_templates_decode_kwargs) # output_extracted_result_wcorrs_list=[], 
+            all_templates_decode_kwargs=all_templates_decode_kwargs, enable_saving_entire_decoded_shuffle_result=enable_saving_entire_decoded_shuffle_result) # output_extracted_result_wcorrs_list=[], 
 
 
     @classmethod
@@ -443,7 +463,15 @@ ShuffleIdx = NewType('ShuffleIdx', int)
         
         if (self.track_templates is None):
             if (track_templates is None):
-                raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
+                ## recover them from `curr_active_pipeline`
+                if self.curr_active_pipeline is not None:
+                    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
+                    rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
+                    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                    self.track_templates = deepcopy(track_templates)
+                else:
+                    raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
             else:
                 # non-None pipeline passed in, use for self
                 self.track_templates = track_templates
@@ -456,7 +484,8 @@ ShuffleIdx = NewType('ShuffleIdx', int)
                                                                                   num_shuffles=num_shuffles)
 
         self.output_extracted_result_wcorrs_list.extend(_updated_output_extracted_result_wcorrs_list)
-        self.output_all_shuffles_decoded_results_list.extend(_updated_output_extracted_full_decoded_results_list)
+        if self.enable_saving_entire_decoded_shuffle_result:
+            self.output_all_shuffles_decoded_results_list.extend(_updated_output_extracted_full_decoded_results_list)
 
 
     def post_compute(self, debug_print:bool=False):
@@ -555,7 +584,7 @@ ShuffleIdx = NewType('ShuffleIdx', int)
         return (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict)
 
 
-    def save(self, filepath):
+    def save_data(self, filepath):
         """ saves the important results to pickle """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
@@ -563,12 +592,12 @@ ShuffleIdx = NewType('ShuffleIdx', int)
 
 
     @classmethod
-    def init_from_file(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, global_epoch_name, filepath):
+    def init_from_data_only_file(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, global_epoch_name, filepath):
         """ loads previously saved results from a pickle file to rebuild
         
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle
 
-        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_file(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_data_only_file(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
                                                 directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
                                                 global_epoch_name=global_epoch_name, filepath='temp22.pkl')
         
@@ -617,7 +646,7 @@ class SequenceBasedComputationsContainer(ComputedResult):
 
     Usage:
 
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer, RankOrderResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer
 
         odd_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(odd_ripple_outputs)
         even_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(even_ripple_outputs)
@@ -676,11 +705,11 @@ def validate_has_sequence_based_results(curr_active_pipeline, computation_filter
 
     """
     # Unpacking:
-    rank_order_results: SequenceBasedComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['SequenceBased']
-    if rank_order_results is None:
+    seq_results: SequenceBasedComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['SequenceBased']
+    if seq_results is None:
         return False
     
-    wcorr_ripple_shuffle: WCorrShuffle = rank_order_results.wcorr_ripple_shuffle
+    wcorr_ripple_shuffle: WCorrShuffle = seq_results.wcorr_ripple_shuffle
     if wcorr_ripple_shuffle is None:
         return False
 
@@ -703,8 +732,8 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
             ['sess']
 
         Provides:
-            global_computation_results.computed_data['RankOrder']
-                ['RankOrder'].odd_ripple
+            global_computation_results.computed_data['SequenceBased']
+                ['SequenceBased'].odd_ripple
                 ['RankOrder'].even_ripple
                 ['RankOrder'].odd_laps
                 ['RankOrder'].even_laps
@@ -723,23 +752,37 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
 
         if ('SequenceBased' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'SequenceBased')):
             # initialize
-            global_computation_results.computed_data['SequenceBased'] = SequenceBasedComputationsContainer(wcorr_ripple_shuffle=None,
-                                                                                                   is_global=True)
+            global_computation_results.computed_data['SequenceBased'] = SequenceBasedComputationsContainer(wcorr_ripple_shuffle=None, is_global=True)
 
-        global_computation_results.computed_data['SequenceBased'].included_qclu_values = included_qclu_values
+        # global_computation_results.computed_data['SequenceBased'].included_qclu_values = included_qclu_values
+        if (not hasattr(global_computation_results.computed_data['SequenceBased'], 'wcorr_ripple_shuffle') or (global_computation_results.computed_data['SequenceBased'].wcorr_ripple_shuffle is None)):
+            # initialize a new wcorr result            
+            wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=owning_pipeline_reference, enable_saving_entire_decoded_shuffle_result=False)
+            global_computation_results.computed_data['SequenceBased'].wcorr_ripple_shuffle = wcorr_tool
+        else:
+            ## get the existing one:
+            wcorr_tool = global_computation_results.computed_data['SequenceBased'].wcorr_ripple_shuffle
+        
 
+        n_completed_shuffles: int = wcorr_tool.n_completed_shuffles
 
-        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=owning_pipeline_reference)
-        wcorr_tool.compute_shuffles(num_shuffles=1000)
-        (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
-        wcorr_tool.save(filepath='temp100.pkl')
+        if n_completed_shuffles < num_shuffles:   
+            print(f'n_prev_completed_shuffles: {n_completed_shuffles}.')
+            print(f'needed num_shuffles: {num_shuffles}.')
+            desired_new_num_shuffles: int = max((num_shuffles - wcorr_tool.n_completed_shuffles), 0)
+            print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
+            ## add some more shuffles to it:
+            wcorr_tool.compute_shuffles(num_shuffles=desired_new_num_shuffles)
+
+        # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
+        # wcorr_tool.save_data(filepath='temp100.pkl')
 
         global_computation_results.computed_data['SequenceBased'].wcorr_ripple_shuffle = wcorr_tool
         
 
         """ Usage:
         
-        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        wcorr_shuffle_results = curr_active_pipeline.global_computation_results.computed_data['SequenceBased']
 
         """
         return global_computation_results

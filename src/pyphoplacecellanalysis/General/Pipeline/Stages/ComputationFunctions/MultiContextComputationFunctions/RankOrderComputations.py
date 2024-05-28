@@ -2343,7 +2343,7 @@ class RankOrderAnalyses:
         return old_to_new_names
 
     @classmethod
-    @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['_subfn_calculate_correlations', 'build_stacked_arrays'], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
+    @function_attributes(short_name=None, tags=['active', 'shuffle', 'rank_order', 'main'], input_requires=[], output_provides=[], uses=['_subfn_calculate_correlations', 'build_stacked_arrays', '_subfn_build_pandas_df_based_correlation_computations_column_rename_dict'], used_by=[], creation_date='2023-12-15 14:17', related_items=[])
     def pandas_df_based_correlation_computations(cls, selected_spikes_df: pd.DataFrame, active_epochs_df: Optional[pd.DataFrame], track_templates: TrackTemplates, num_shuffles:int=1000, debug_print=True):
         """ 2023-12-15 - Absolute newest complete Rank-Order shuffle implementation. Does both Pearson and Spearman.
 

@@ -30,6 +30,8 @@ from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipel
 
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPlacefieldGlobalComputationFunctions
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsGlobalComputationFunctions
+
 
 """ 
 
@@ -37,60 +39,6 @@ filters should be checkable to express whether we want to build that one or not
 
 
 """
-
-
-# def validate_computation_test(self, curr_active_pipeline):
-#     """ *SPECIFIC* test function for a specific computation (like 'long_short_post_decoding') that tries to access the results added by the computation function to see if it's needed or ready.
-#     Throws an (AttributeError, KeyError) during its accesses if the data isn't there. 
-#     """
-#     ## Get global 'long_short_post_decoding' results:
-#     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
-#     ## Extract variables from results object:
-#     expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
-#     rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
-
-
-# def a_validate_computation_test(curr_active_pipeline):
-#     ## Get global 'long_short_post_decoding' results:
-#     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
-#     ## Extract variables from results object:
-#     expected_v_observed_result, curr_long_short_rr = curr_long_short_post_decoding.expected_v_observed_result, curr_long_short_post_decoding.rate_remapping
-#     rate_remapping_df, high_remapping_cells_only = curr_long_short_rr.rr_df, curr_long_short_rr.high_only_rr_df
-# SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', validate_computation_test=a_validate_computation_test)
-
-
-
-#TODO 2023-07-06 01:47: - [ ] IDEA: "CallbackSequence"-like object that allows the user to specify several different things to try to get a value that will continue down the list until one succeeds or no more are left.
-    # replaces the fact that Python lacks a good "switch" construct.
-    # Actually see `_execute_computation_functions` for a closer example of what I meant. It's not critical right now though.
-    # # ====================================================================================================
-    # ## Purpose is to convert complex nested try/except blocks such as these into a more readable and exhaustive format.
-    # try:
-    #     ## try method 1 here.
-    #     pass
-    # except (KeyError, AttributeError, ValueError) as e:
-    #     # predictable exception type for when criteria aren't met. Try method 2 here.
-    #     try:
-    #         ## try method 2 here.
-    #         pass
-    #     except (KeyError, AttributeError, ValueError) as e:
-    #         # predictable exception type for when criteria aren't met. Try method 2 here.
-    #         try:
-    #             ## try method 3 here.
-    #             pass
-    #         except Exception as e:
-    #             # ACTUALLY FAIL HERE. No more left to try
-    #             raise NotImplementedError
-
-    #     except Exception as e:
-    #         # Unhandled exception for method 2. Fail here.
-    #         raise e
-
-    # except Exception as e:
-    #     # Unhandled exception for method 1. Fail here.
-    #     raise e
-
-
 def get_all_batch_computation_names():
     """ Gets the hardcoded or dynamically loaded computation names
     
