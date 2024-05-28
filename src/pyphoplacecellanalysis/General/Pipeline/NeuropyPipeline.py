@@ -139,9 +139,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.session_data_type = None
         self._stage = None
 
-
         session_identifier: str = f"{name}.{session_data_type}"
-        task_id: str = build_run_log_task_identifier(session_identifier, logging_root_FQDN='pipeline') # '2024-05-01_14-05-26.Apogee.Spike3D.test'
+        # task_id: str = build_run_log_task_identifier(session_identifier, logging_root_FQDN='pipeline') # '2024-05-01_14-05-26.Apogee.Spike3D.test'
+
+        # task_id: str = build_run_log_task_identifier(run_context=self.get_session_context(), logging_root_FQDN='pipeline', include_curr_time_str=True, include_hostname=True)
+        task_id: str = build_run_log_task_identifier(run_context=self.get_session_context(), logging_root_FQDN=None, include_curr_time_str=True, include_hostname=True)
         self._logger = build_logger(full_logger_string=task_id, file_logging_dir=None, debug_print=False)
         self._logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
         
@@ -597,7 +599,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         
         # Restore unpickable properties:
-        task_id: str = build_run_log_task_identifier(self.get_session_context(), logging_root_FQDN='pipeline') # '2024-05-01_14-05-26.Apogee.Spike3D.test'
+        task_id: str = build_run_log_task_identifier(self.get_session_context(), logging_root_FQDN=None) # '2024-05-01_14-05-26.Apogee.Spike3D.test', used to have `, logging_root_FQDN='pipeline'`
         self._logger = build_logger(full_logger_string=task_id, file_logging_dir=None, debug_print=False)
         self._logger.info(f'NeuropyPipeline.__setstate__(state="{state}")') # AttributeError: 'DisplayPipelineStage' object has no attribute 'identity'
 

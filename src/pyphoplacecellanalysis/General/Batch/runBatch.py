@@ -54,7 +54,7 @@ def get_file_str_if_file_exists(v:Path)->str:
     return (str(v.resolve()) if v.exists() else '')
 
 @function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=['build_run_log_task_identifier', 'build_logger'], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
-def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), 
+def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=None, 
                             logging_root_FQDN: str = f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch',
                             include_curr_time_str: bool = True,
                             debug_print=False) -> logging.Logger:
@@ -66,7 +66,9 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
     
     History:
         Built from `pyphocorehelpers.print_helpers.build_batch_task_logger` for task building
-    
+        Default used to be `file_logging_dir=Path('EXTERNAL/TESTING/Logging')`
+
+
     Testing:
     
         module_logger.debug (f'DEBUG: module_logger: "com.PhoHale.Spike3D.notebook"')
@@ -79,7 +81,9 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
     batch_task_logger = build_batch_task_logger()
     """
     # logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] %(name)s [%(levelname)-5.5s]  %(message)s")
-    logFormatter = logging.Formatter("%(relativeCreated)d %(name)s]  [%(levelname)-5.5s]  %(message)s")
+    # logFormatter = logging.Formatter("%(relativeCreated)d %(name)s]  [%(levelname)-5.5s]  %(message)s")
+    logFormatter = logging.Formatter("%(asctime)s %(name)s]  [%(levelname)-5.5s]  %(message)s")
+
     logger_full_task: str = build_run_log_task_identifier(run_context=session_context, logging_root_FQDN=logging_root_FQDN, include_curr_time_str=include_curr_time_str,
                                                           include_hostname=True, additional_suffix=additional_suffix)
 
