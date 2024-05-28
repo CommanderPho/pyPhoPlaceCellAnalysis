@@ -586,6 +586,30 @@ class WCorrShuffle:
         return _obj
 
 
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
+        for a_non_pickleable_field in _non_pickled_fields:
+            del state[a_non_pickleable_field]
+        return state
+
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
+        for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+            if a_field_name not in state:
+                state[a_field_name] = a_default_restore_value
+
+        self.__dict__.update(state)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        super(WCorrShuffle, self).__init__() # from
+
+
+
 
 @define(slots=False, repr=False, eq=False)
 class SequenceBasedComputationsContainer(ComputedResult):
