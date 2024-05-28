@@ -79,8 +79,7 @@ class WCorrShuffle(ComputedResult):
     filtered_epochs_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
     active_spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
 
-    alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = serialized_field(default=None)
-    real_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = serialized_field(default=None)
+
     real_decoder_ripple_weighted_corr_arr: NDArray = serialized_field(default=None, repr=False, metadata={'shape': ('n_epochs', 'n_decoders')})
 
     all_templates_decode_kwargs: Dict = non_serialized_field(default=Factory(dict), repr=False)
@@ -206,7 +205,7 @@ class WCorrShuffle(ComputedResult):
 
         return cls(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
             filtered_epochs_df=filtered_epochs_df, active_spikes_df=active_spikes_df,
-            alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, real_directional_merged_decoders_result=real_directional_merged_decoders_result,
+            # alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, real_directional_merged_decoders_result=real_directional_merged_decoders_result,
             real_decoder_ripple_weighted_corr_arr=real_decoder_ripple_weighted_corr_arr,
             all_templates_decode_kwargs=all_templates_decode_kwargs, enable_saving_entire_decoded_shuffle_result=enable_saving_entire_decoded_shuffle_result) # output_extracted_result_wcorrs_list=[], 
 
@@ -482,7 +481,7 @@ class WCorrShuffle(ComputedResult):
         assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
 
         _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_full_decoded_results_list = self._shuffle_and_decode_wcorrs(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
-                                                                                  alt_directional_merged_decoders_result=self.alt_directional_merged_decoders_result, all_templates_decode_kwargs=self.all_templates_decode_kwargs,
+                                                                                  alt_directional_merged_decoders_result=deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']), all_templates_decode_kwargs=self.all_templates_decode_kwargs,
                                                                                   num_shuffles=num_shuffles)
 
         self.output_extracted_result_wcorrs_list.extend(_updated_output_extracted_result_wcorrs_list)
@@ -625,16 +624,16 @@ class WCorrShuffle(ComputedResult):
         for a_non_pickleable_field in _non_pickled_fields:
             del state[a_non_pickleable_field]
 
-        _getstate_children_fields = ['alt_directional_merged_decoders_result', 'real_directional_merged_decoders_result']
-        for a_child_field in _getstate_children_fields:
-            # Ensure __getstate__() is called on the child if it overrides it
-            a_child = state.get(a_child_field, None)
-            if a_child is not None:
-                if hasattr(state[a_child_field], '__getstate__'):
-                    print(f'found custom __getstate__ for child named "{a_child_field}". Using that.')
-                    state[a_child_field] = state[a_child_field].__getstate__()
-                else:
-                    state[a_child_field] = state[a_child_field].__dict__.copy()
+        # _getstate_children_fields = ['alt_directional_merged_decoders_result', 'real_directional_merged_decoders_result']
+        # for a_child_field in _getstate_children_fields:
+        #     # Ensure __getstate__() is called on the child if it overrides it
+        #     a_child = state.get(a_child_field, None)
+        #     if a_child is not None:
+        #         if hasattr(state[a_child_field], '__getstate__'):
+        #             print(f'found custom __getstate__ for child named "{a_child_field}". Using that.')
+        #             state[a_child_field] = state[a_child_field].__getstate__()
+        #         else:
+        #             state[a_child_field] = state[a_child_field].__dict__.copy()
 
         return state
 
