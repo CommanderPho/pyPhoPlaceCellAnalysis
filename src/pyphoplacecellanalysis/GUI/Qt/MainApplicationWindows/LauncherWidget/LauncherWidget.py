@@ -84,7 +84,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self._curr_active_pipeline_ref = None
         self.debug_print = debug_print
         # self._displayContextSelectorWidget = None
-        self.ui.displayContextSelectorWidget = None
+        # self.ui.displayContextSelectorWidget = None
 
         self.initUI()
         self.show() # Show the GUI
@@ -181,6 +181,9 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
     def build_for_pipeline(self, curr_active_pipeline):
         self._curr_active_pipeline_ref = curr_active_pipeline
         curr_active_pipeline.reload_default_display_functions()
+        
+        self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline)
+
         
         # Add root item
         displayFunctionTreeItem = QtWidgets.QTreeWidgetItem(["Display Functions"])

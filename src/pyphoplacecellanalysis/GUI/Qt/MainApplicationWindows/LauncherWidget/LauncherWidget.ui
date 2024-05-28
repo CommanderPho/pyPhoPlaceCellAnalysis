@@ -268,9 +268,9 @@ QToolTip {
          </property>
          <layout class="QVBoxLayout" name="verticalLayout">
           <item>
-           <widget class="QFrame" name="displayContextSelectorFrameContainer">
+           <widget class="IdentifyingContextSelectorWidget" name="displayContextSelectorWidget" native="true">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+             <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
               <horstretch>1</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
@@ -278,13 +278,13 @@ QToolTip {
             <property name="minimumSize">
              <size>
               <width>0</width>
-              <height>24</height>
+              <height>32</height>
              </size>
             </property>
             <property name="baseSize">
              <size>
               <width>0</width>
-              <height>24</height>
+              <height>32</height>
              </size>
             </property>
             <layout class="QGridLayout" name="gridLayout_displayContext">
@@ -308,6 +308,12 @@ QToolTip {
           </item>
           <item>
            <widget class="QFrame" name="frame">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+              <horstretch>1</horstretch>
+              <verstretch>1</verstretch>
+             </sizepolicy>
+            </property>
             <property name="frameShape">
              <enum>QFrame::StyledPanel</enum>
             </property>
@@ -465,6 +471,14 @@ QToolTip {
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>IdentifyingContextSelectorWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../../../../Resources/GuiResources.qrc"/>
   <include location="../../../../Resources/ActionIcons.qrc"/>

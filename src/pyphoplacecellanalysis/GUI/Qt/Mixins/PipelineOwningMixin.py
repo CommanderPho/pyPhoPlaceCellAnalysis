@@ -9,9 +9,13 @@ class PipelineOwningMixin:
         if hasattr(self, '_owning_pipeline') and (self._owning_pipeline is not None):
             return self._owning_pipeline
         else:
-            # No direct property, check parent
-            return self.parent().owning_pipeline
-
+            return None
+            # # No direct property, check parent
+            # if hasattr(self.parent(), '_owning_pipeline'):
+            #     return self.parent()._owning_pipeline
+            # else:
+            #     return None
+            
 
     @property
     def all_filtered_session_keys(self):
