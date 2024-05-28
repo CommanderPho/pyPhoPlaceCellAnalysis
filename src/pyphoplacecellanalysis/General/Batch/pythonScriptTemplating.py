@@ -76,7 +76,7 @@ class ProcessingScriptPhases(Enum):
             return phase_any_run_custom_user_completion_functions_dict
 
 
-    def get_run_configuration(self, custom_user_completion_function_template_code=None):
+    def get_run_configuration(self, custom_user_completion_function_template_code=None, extra_extended_computations_include_includelist: Optional[List]=None):
         ## Different run configurations:
 
         phase1_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
@@ -150,6 +150,15 @@ class ProcessingScriptPhases(Enum):
             _out_run_config = figure_run
         else: 
             raise NotImplementedError
+        
+        if extra_extended_computations_include_includelist is not None:
+            ## includes the user-provided extra run functions to the list: `extra_extended_computations_include_includelist`
+            for a_fn_name in extra_extended_computations_include_includelist:
+                if (a_fn_name not in _out_run_config['extended_computations_include_includelist']):
+                    print(f'adding extra_extended_computations_include_includelist function: "{a_fn_name}" to the `extended_computations_include_includelist`.')
+                    _out_run_config['extended_computations_include_includelist'].append(a_fn_name)
+                else:
+                    print(f'extra_extended_computations_include_includelist function: "{a_fn_name}" was already present in the default `extended_computations_include_includelist`. It will not be duplicated.')
         
         if (platform.system() == 'Windows'):
             _out_run_config.update(dict(create_slurm_scripts=False, should_create_vscode_workspace=True))
