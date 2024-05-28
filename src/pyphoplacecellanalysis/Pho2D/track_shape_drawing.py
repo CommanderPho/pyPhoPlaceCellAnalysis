@@ -1462,8 +1462,9 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         
     else:
         ## use the provided `unit_id_colors_map`:
-        color = [unit_id_colors_map[an_aclu] for an_aclu in active_aclus]
-        get_aclu_color_fn = lambda an_aclu: unit_id_colors_map[an_aclu]
+        # color = [unit_id_colors_map[an_aclu] for an_aclu in active_aclus]
+        color = [unit_id_colors_map.get(an_aclu, 'white') for an_aclu in active_aclus]
+        get_aclu_color_fn = lambda an_aclu: unit_id_colors_map.get(an_aclu, 'white')
 
 
     ## Count-based offsets: If there are three aclus sharing a bin, offset the repeated aclus by a scaled y-factor:
@@ -1505,13 +1506,12 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     else:
         raise NotImplementedError(f"aclus_y_offset_mode: {aclus_y_offset_mode} not implemented.")
     
-
-
-
+    
     # Draw the circle points _____________________________________________________________________________________________ #
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=30.0, c=color)
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=25.0, edgecolors=color, c='#AAAAAA33', marker='o', plotnonfinite=False)
-    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full_like(active_aclus, fill_value=scatter_point_size), edgecolors=color, facecolors=(['#CCCCCC33'] * len(active_aclus)), marker='o', plotnonfinite=False)
+    # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full_like(active_aclus, fill_value=scatter_point_size), edgecolors=color, facecolors=(['#CCCCCC33'] * len(active_aclus)), marker='o', plotnonfinite=False)
+    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full_like(active_aclus, fill_value=scatter_point_size), edgecolors=(['#CCCCCC33'] * len(active_aclus)), facecolors=color, marker='o', plotnonfinite=False)
 
     _out_long_points = ax.scatter(long_peak_x, y=long_y, label='long_peak_x', **circle_points_kwargs)
     _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
@@ -1825,14 +1825,22 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
             # AnyDir_decoder_aclu_MAX_peak_maps_df.aclu.to_numpy()
             neuron_IDs_lists = [deepcopy(a_decoder.neuron_IDs) for a_decoder in track_templates.get_decoders_dict().values()] # [A, B, C, D, ...]
             # _unit_qcolors_map, unit_colors_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
-            unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists)
+            unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists, return_255_array=False)
 
-            # ColorFormatConverter.Colors_NDArray_Convert_to_zero_to_one_array(np.stack([v for k, v in _unit_colors_ndarray_map.items()])) # (n_colors, 4)
+            # _by_LR = LR_only_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR'], inplace=False)
+            _by_ANY: pd.DataFrame = AnyDir_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR', 'long_RL'], inplace=False)
 
-            _unit_colors_ndarray_map = {k:np.squeeze(ColorFormatConverter.Colors_NDArray_Convert_to_zero_to_one_array(np.array([v]))) for k, v in _unit_colors_ndarray_map.items()} # convert to 0.0-1.0 based colors
+            long_peak_sorted_unit_colors_ndarray_map = dict(zip(_by_ANY.index.to_numpy(), list(_unit_colors_ndarray_map.values())))
+
+            # long_peak_sorted_unit_colors_ndarray_map_LR = dict(zip(_by_LR.index.to_numpy(), list(_unit_colors_ndarray_map.values())))
+            # long_peak_sorted_unit_colors_ndarray_map_RL = dict(zip(sorted_neuron_IDs_lists[1], list(_unit_colors_ndarray_map.values())))
+            # long_peak_sorted_unit_colors_ndarray_map_LR
+            # long_peak_sorted_unit_colors_ndarray_map_RL
+
 
             ## Make a single figure for both LR/RL remapping cells:
-            kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False, unit_id_colors_map=_unit_colors_ndarray_map)
+            # kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False, unit_id_colors_map=_unit_colors_ndarray_map)
+            kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False, unit_id_colors_map=long_peak_sorted_unit_colors_ndarray_map)
 
             if use_separate_plot_for_each_direction:
                 fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)

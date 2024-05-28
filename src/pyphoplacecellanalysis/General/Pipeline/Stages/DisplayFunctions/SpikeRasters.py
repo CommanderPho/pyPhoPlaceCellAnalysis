@@ -1254,7 +1254,7 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
 
 
 @function_attributes(short_name=None, tags=['neuron_ID', 'color'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-28 11:07', related_items=[])
-def build_shared_sorted_neuron_color_maps(neuron_IDs_lists) -> Tuple[Dict, Dict]:
+def build_shared_sorted_neuron_color_maps(neuron_IDs_lists, return_255_array: bool=True) -> Tuple[Dict, Dict]:
     """ builds the shared colors for all neuron_IDs in any of the lists. This approach lends itself to globally-unique color mapping, like would be done when wanting to compare between different spike raster plots. 
 
     Outputs:
@@ -1268,7 +1268,7 @@ def build_shared_sorted_neuron_color_maps(neuron_IDs_lists) -> Tuple[Dict, Dict]
     any_list_neuron_IDs = np.sort(union_of_arrays(*neuron_IDs_lists)) # neuron_IDs as they appear in any list
     ## build color values from these:
     any_list_n_neurons = len(any_list_neuron_IDs)
-    _neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(any_list_n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
+    _neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(any_list_n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None, return_255_array=return_255_array)
     unit_colors_ndarray_map: Dict = dict(zip(any_list_neuron_IDs, neuron_colors_ndarray.copy().T)) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
     unit_qcolors_map: Dict = dict(zip(any_list_neuron_IDs, _neuron_qcolors_list.copy())) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
     # `unit_colors_map` is main colors output
