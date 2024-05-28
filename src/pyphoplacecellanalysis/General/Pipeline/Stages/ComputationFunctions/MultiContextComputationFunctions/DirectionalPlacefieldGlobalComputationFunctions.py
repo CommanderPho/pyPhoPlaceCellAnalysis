@@ -2198,7 +2198,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
             included_qclu_values: float = rank_order_results.included_qclu_values
             track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only
         
-        
+
         # loaded_selections_context_dict = {a_name:curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name, user_annotation='selections') for a_name, a_decoder in track_templates.get_decoders_dict().items()}
         loaded_selections_context_dict = {a_name:curr_active_pipeline.sess.get_context().merging_context('display_', IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name, user_annotation='selections')) for a_name, a_decoder in track_templates.get_decoders_dict().items()} ## gets around DisplayPipelineStage being passed for `curr_active_pipeline` sometimes
 
@@ -3743,7 +3743,15 @@ class TrialByTrialActivityResult(ComputedResult):
     """ 
     Usage:
     
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+        from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+
+        directional_trial_by_trial_activity_result: TrialByTrialActivityResult = curr_active_pipeline.global_computation_results.computed_data.get('TrialByTrialActivity', None)
+        any_decoder_neuron_IDs = directional_trial_by_trial_activity_result.any_decoder_neuron_IDs
+        active_pf_dt: PfND_TimeDependent = directional_trial_by_trial_activity_result.active_pf_dt
+        directional_lap_epochs_dict: Dict[str, Epoch] = directional_trial_by_trial_activity_result.directional_lap_epochs_dict
+        directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts
+        directional_active_lap_pf_results_dicts
 
     """
     _VersionedResultMixin_version: str = "2024.05.28_0" # to be updated in your IMPLEMENTOR to indicate its version
@@ -4905,8 +4913,18 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         Usage:
 
+            from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
 
+            directional_trial_by_trial_activity_result: TrialByTrialActivityResult = curr_active_pipeline.global_computation_results.computed_data.get('TrialByTrialActivity', None)
+            any_decoder_neuron_IDs = directional_trial_by_trial_activity_result.any_decoder_neuron_IDs
+            active_pf_dt: PfND_TimeDependent = directional_trial_by_trial_activity_result.active_pf_dt
+            directional_lap_epochs_dict: Dict[str, Epoch] = directional_trial_by_trial_activity_result.directional_lap_epochs_dict
+            directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts
+            directional_active_lap_pf_results_dicts
+
+
+    
         """
         from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
         from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity

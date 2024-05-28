@@ -240,9 +240,6 @@ def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df, lap_ids, celli
 class TrialByTrialActivity:
     """ 2024-02-12 - Computes lap-by-lap placefields and helps display correlation matricies and such.
     
-    from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
-
-
     """
     active_epochs_df: pd.DataFrame = field()
     C_trial_by_trial_correlation_matrix: NDArray = field()
