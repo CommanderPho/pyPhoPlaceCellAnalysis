@@ -711,38 +711,7 @@ Start-NewJob -jobQueue ([ref]$jobQueue) -scriptBlock $scriptBlock -arguments @('
     # Finish the script with job monitoring and cleanup
     powershell_script += f"""
 # Wait for all queued jobs to complete, logging after each completes
-while ($jobQueue.Count -gt 0) {{
-    $completedJobs = @($jobQueue | Wait-Job -Any)
-
-    # Receive and log output from completed jobs
-    foreach ($job in $completedJobs) {{
-        # Receive all the outputs from the job
-        $jobOutputs = Receive-Job -Job $job
-
-        # Verify that we have received some outputs
-        if ($jobOutputs -ne $null) {{
-            # Look for the hashtable we expect among job outputs
-            $hashtable = $jobOutputs | Where-Object {{ $_ -is [System.Collections.Hashtable] }} | Select-Object -Last 1
-
-            if ($hashtable) {{
-                $runHistory += New-Object -TypeName PSObject -Property $hashtable
-                Write-Host "Job $($job.Id) with script '$($hashtable.ScriptPath)' started at $($hashtable.StartTime) and took $($hashtable.Duration) has completed."
-            }} else {{
-                Write-Error "Job $($job.Id) did not return a hashtable."
-                # Debug - Write all outputs to see what was received
-                $jobOutputs | ForEach-Object {{ Write-Host "Output: $_" }}
-            }}
-        }} else {{
-            Write-Error "Job $($job.Id) did not produce any output."
-        }}
-
-        $jobQueue = $jobQueue | Where-Object {{ $_.Id -ne $job.Id }}
-    }}
-
-    # Clean up completed job objects
-    Remove-Job -Job $completedJobs
-}}
-
+WaitForAllJobs -jobQueue ([ref]$jobQueue) -runHistory ([ref]$runHistory)
 Write-Host "All jobs have been processed."
     """
 
