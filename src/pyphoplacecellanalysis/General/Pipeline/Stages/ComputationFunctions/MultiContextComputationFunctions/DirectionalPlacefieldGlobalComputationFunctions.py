@@ -3732,6 +3732,13 @@ class TrainTestLapsSplitting:
 
 
 
+
+
+
+# ==================================================================================================================== #
+# Resume Misc Helper Functions                                                                                         #
+# ==================================================================================================================== #
+
 def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame, debug_print=True) -> CompleteDecodedContextCorrectness:
     """ 2024-01-17 - Validates the performance of the pseudo2D decoder posteriors using the laps data.
 
@@ -4544,18 +4551,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
         """
-        
-        
-
-
-        # Radon Transform / Weighted Correlation _____________________________________________________________________________ #
-
-
-
-        
-
-
-
         # ==================================================================================================================== #
         # BEGIN SUBFN                                                                                                          #
         # ==================================================================================================================== #
@@ -4837,12 +4832,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         # debug_output_hdf5_file_path = Path('output', 'laps_train_test_split.h5').resolve()
         debug_output_hdf5_file_path = None
-
-        # (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs) = compute_train_test_split_laps_decoders(directional_laps_results, track_templates)
-        # (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results=directional_laps_results, track_templates=track_templates, training_data_portion=training_data_portion,
-        #                                                                                                                             debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
-        # train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = train_lap_specific_pf1D_Decoder_dict
-
         a_train_test_result: TrainTestSplitResult = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results=directional_laps_results, track_templates=track_templates, training_data_portion=training_data_portion,
                                                                                                                                     debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
