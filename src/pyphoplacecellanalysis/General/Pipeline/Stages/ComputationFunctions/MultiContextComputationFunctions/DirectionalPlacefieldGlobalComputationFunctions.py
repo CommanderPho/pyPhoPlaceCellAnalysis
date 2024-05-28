@@ -3729,8 +3729,54 @@ class TrainTestLapsSplitting:
 
 
 
+# ==================================================================================================================== #
+# 2024-05-28 - TrialByTrialActivity                                                                                    #
+# ==================================================================================================================== #
+from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 
 
+@define(slots=False, repr=False)
+class TrialByTrialActivityResult(ComputedResult):
+    """ 
+    Usage:
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+
+    """
+    _VersionedResultMixin_version: str = "2024.05.28_0" # to be updated in your IMPLEMENTOR to indicate its version
+
+    any_decoder_neuron_IDs: NDArray = serialized_field(default=None)
+    active_pf_dt: PfND_TimeDependent = serialized_field(default=None)
+    directional_lap_epochs_dict: Dict[str, Epoch] =  serialized_field(default=None)
+    directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = serialized_field(default=None)
+
+    # test_epochs_dict: Dict[str, pd.DataFrame] = serialized_field(default=None)
+    # train_epochs_dict: Dict[str, pd.DataFrame] = serialized_field(default=None)
+    # train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+
+
+
+def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
+    """ Validates `_build_trial_by_trial_activity_metrics`
+    """
+    directional_trial_by_trial_activity_result = curr_active_pipeline.global_computation_results.computed_data.get('TrialByTrialActivity', None)
+    if directional_trial_by_trial_activity_result is None:
+        return False
+
+    any_decoder_neuron_IDs = directional_trial_by_trial_activity_result.any_decoder_neuron_IDs
+    if (any_decoder_neuron_IDs is None) or (len(any_decoder_neuron_IDs) == 0):
+        return False
+
+    directional_lap_epochs_dict = directional_trial_by_trial_activity_result.directional_lap_epochs_dict
+    if (directional_lap_epochs_dict is None) or (len(directional_lap_epochs_dict) == 0):
+        return False
+    
+    directional_active_lap_pf_results_dicts = directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts
+    if (directional_active_lap_pf_results_dicts is None) or (len(directional_active_lap_pf_results_dicts) == 0):
+        return False
+    
+    return True
 
 
 
@@ -4836,10 +4882,86 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                                                                                                                                     debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
         global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
+        return global_computation_results
 
 
+    @function_attributes(short_name='trial_by_trial_metrics', tags=['trial_by_trial', 'global_computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
+                        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['TrialByTrialActivity'],
+                        validate_computation_test=_workaround_validate_has_directional_trial_by_trial_activity_result, 
+                        is_global=True, computation_precidence=(1002.4))
+    def _build_trial_by_trial_activity_metrics(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+        """ Analyzes the trial-by-trial changes (such as the lap-to-lap correlations in the placefields for each cell
+        
+        Requires:
+            ['sess']
+
+        Provides:
+            global_computation_results.computed_data['TrialByTrialActivity']
+                ['DirectionalDecodersEpochsEvaluations']['directional_lap_specific_configs']
+                ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
+                a_train_test_result = global_computation_results.computed_data['TrialByTrialActivity']
+
+        Usage:
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+
+        """
+        from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+        from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+
+        # spikes_df = curr_active_pipeline.sess.spikes_df
+        rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
+        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        # long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = track_templates.get_decoders()
+
+        # Unpack all directional variables:
+        ## {"even": "RL", "odd": "LR"}
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [owning_pipeline_reference.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
+        
+        ## INPUTS: curr_active_pipeline, track_templates, global_epoch_name, (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)
+        any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+
+        # ## Directional Trial-by-Trial Activity:
+        # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+        # # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+        # single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        # # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
+        # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+
+        if 'pf1D_dt' not in owning_pipeline_reference.computation_results[global_epoch_name].computed_data:
+            # if `KeyError: 'pf1D_dt'` recompute
+            owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+        active_pf_1D_dt: PfND_TimeDependent = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf1D_dt'])
+        # active_pf_2D_dt: PfND_TimeDependent = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D_dt'])
+
+        active_pf_dt: PfND_TimeDependent = active_pf_1D_dt
+        # Limit only to the placefield aclus:
+        active_pf_dt = active_pf_dt.get_by_id(ids=any_decoder_neuron_IDs)
+
+        # active_pf_dt: PfND_TimeDependent = deepcopy(active_pf_2D_dt) # 2D
+        long_LR_name, long_RL_name, short_LR_name, short_RL_name = track_templates.get_decoder_names()
+
+        directional_lap_epochs_dict = dict(zip((long_LR_name, long_RL_name, short_LR_name, short_RL_name), (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)))
+        directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix(active_pf_dt=active_pf_dt, directional_lap_epochs_dict=directional_lap_epochs_dict, included_neuron_IDs=any_decoder_neuron_IDs)
+
+        ## OUTPUTS: directional_active_lap_pf_results_dicts
+        a_train_test_result: TrialByTrialActivityResult = TrialByTrialActivityResult(any_decoder_neuron_IDs=any_decoder_neuron_IDs,
+                                                                                     active_pf_dt=active_pf_dt,
+                                                                                     directional_lap_epochs_dict=directional_lap_epochs_dict,
+                                                                                     directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts,
+                                                                                     is_global=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
+
+        global_computation_results.computed_data['TrialByTrialActivity'] = a_train_test_result
 
         return global_computation_results
+    
 
 
 
