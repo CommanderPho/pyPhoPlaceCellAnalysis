@@ -1342,7 +1342,6 @@ class PipelineWithComputedPipelineStageMixin:
         curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
 
         """
-        'global_computation_results.pkl'
         ## Case 1. `override_global_pickle_path` is provided:
         if override_global_pickle_path is not None:
             ## override_global_pickle_path is provided:

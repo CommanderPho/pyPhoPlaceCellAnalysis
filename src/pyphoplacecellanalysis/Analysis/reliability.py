@@ -515,6 +515,7 @@ def _perform_calc_SI(epoch_averaged_activity_per_pos_bin, probability_normalized
     return SI
 
 
+@function_attributes(short_name=None, tags=['spatial-information'], input_requires=[], output_provides=[], uses=['_perform_calc_SI'], used_by=[], creation_date='2024-05-28 15:24', related_items=[])
 def compute_spatial_information(all_spikes_df: pd.DataFrame, an_active_pf: PfND, global_session_duration:float):
     """ Calculates the spatial information (SI) for each cell and returns all intermediates.
 
