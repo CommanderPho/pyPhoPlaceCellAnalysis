@@ -15,13 +15,14 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import Plot, DisplayFunctionItem
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 from pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'LauncherWidget.ui')
 
-class LauncherWidget(QWidget):
+class LauncherWidget(PipelineOwningMixin, QWidget):
     """ a programmatic launcher widget that displays a tree that can be programmatically updated.
     
     
@@ -50,11 +51,23 @@ class LauncherWidget(QWidget):
         """The treeWidget property."""
         return self.mainTreeWidget # QTreeWidget
     
+    
+    # @property
+    # def displayContextSelectorWidget(self) -> IdentifyingContextSelectorWidget:
+    #     """The treeWidget property."""
+    #     # return self.ui.displayContextSelectorWidget # IdentifyingContextSelectorWidget
+    #     return self._displayContextSelectorWidget # IdentifyingContextSelectorWidget
+
     @property
     def curr_active_pipeline(self):
         """The treeWidget property."""
         return self._curr_active_pipeline_ref
     
+    @property
+    def owning_pipeline(self):
+        """ PipelineOwningMixin: The owning_pipeline property."""
+        return self._curr_active_pipeline_ref
+
 
     @property
     def docPanelTextBrowser(self) -> QTextBrowser:
@@ -70,7 +83,9 @@ class LauncherWidget(QWidget):
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self._curr_active_pipeline_ref = None
         self.debug_print = debug_print
-        
+        # self._displayContextSelectorWidget = None
+        self.ui.displayContextSelectorWidget = None
+
         self.initUI()
         self.show() # Show the GUI
 
@@ -84,7 +99,11 @@ class LauncherWidget(QWidget):
         # Signal: itemEntered - fired when mouse hovers over an item
         self.treeWidget.itemEntered.connect(self.on_tree_item_hovered)
 
-        
+        # self.displayContextSelectorWidget._owning_pipeline = self.curr_active_pipeline
+        # self.ui.displayContextSelectorWidget
+
+        # self.ui.displayContextSelectorWidget = None
+        # self.ui.displayContextSelectorWidgetContainer.layout.add
 
     def get_display_function_items(self) -> Dict[str,DisplayFunctionItem]:
         assert self._curr_active_pipeline_ref is not None
