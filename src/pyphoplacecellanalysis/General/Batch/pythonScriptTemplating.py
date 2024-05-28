@@ -572,86 +572,187 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
 
     # PowerShell script preamble
     powershell_script = f"""
-    # Define a ScriptBlock to activate the virtual environment, change directory, and execute the Python script
-    $scriptBlock = {{
-        param([string]$activatePath, [string]$pythonExec, [string]$scriptPath, [string]$parentDir)
-        try {{
-            & $activatePath | Out-Null
-            Set-Location -Path $parentDir
-            $startTime = Get-Date
-            Write-Output "Starting script: $scriptPath at time: $($startTime.ToString())" # Log which script is starting with start time
-            & $pythonExec $scriptPath | Out-Null
-            $endTime = Get-Date
-            $duration = $endTime - $startTime
-            Write-Output "Completed script: $scriptPath at time: $($endTime.ToString()) with duration: $($duration.ToString())" # Log when the script completes
-            return @{{ScriptPath=$scriptPath; StartTime=$startTime.ToString(); EndTime=$endTime.ToString(); Duration=$duration.ToString()}}
-        }} catch {{
-            Write-Error "An error occurred for script: $scriptPath"
-            return @{{ScriptPath=$scriptPath; StartTime=$startTime.ToString(); EndTime=(Get-Date).ToString(); Duration="Failed"}}
-        }}
+# Define a ScriptBlock to activate the virtual environment, change directory, and execute the Python script
+$scriptBlock = {{
+    param([string]$activatePath, [string]$pythonExec, [string]$scriptPath, [string]$parentDir)
+    try {{
+        & $activatePath | Out-Null
+        Set-Location -Path $parentDir
+        $startTime = Get-Date
+        Write-Host "Starting script: $scriptPath at time: $($startTime.ToString())" # Log which script is starting with start time
+        & $pythonExec $scriptPath | Out-Null
+        $endTime = Get-Date
+        $duration = $endTime - $startTime
+        Write-Host "Completed script: $scriptPath at time: $($endTime.ToString()) with duration: $($duration.ToString())" # Log when the script completes
+        return @{{ScriptPath=$scriptPath; StartTime=$startTime.ToString(); EndTime=$endTime.ToString(); Duration=$duration.ToString()}}
+    }} catch {{
+        Write-Error "An error occurred for script: $scriptPath"
+        return @{{ScriptPath=$scriptPath; StartTime=$startTime.ToString(); EndTime=(Get-Date).ToString(); Duration="Failed"}}
     }}
+}}
 
-    # Initialize job queue and set the job limit
-    $jobQueue = @()
-    $jobLimit = {max_concurrent_jobs}
-    $runHistory = @()
-    """
+# Function to manage job queue
+function Manage-JobQueue {{
+    param (
+        [int]$jobLimit,
+        [ref]$jobQueue
+    )
 
-    # Job creation and queuing
-    for script in script_paths:
-        parent_directory = Path(script).resolve().parent  # Get the parent directory of the script
-        powershell_script += f"""
-    # Wait until there is a free slot to run a new job
-    while ($jobQueue.Count -ge $jobLimit) {{
-        $completedJobs = @($jobQueue | Where-Object {{ $_.State -eq 'Completed' }})
+    while ($jobQueue.Value.Count -ge $jobLimit) {{
+        $completedJobs = @($jobQueue.Value | Where-Object {{ $_.State -eq 'Completed' }})
         foreach ($job in $completedJobs) {{
             # Remove completed jobs from the queue
             $job | Remove-Job
-            Write-Output "Job $($job.Id) has been removed from the queue."
+            Write-Host "Job $($job.Id) has been removed from the queue."
         }}
-        $jobQueue = @($jobQueue | Where-Object {{ $_.State -ne 'Completed' }})
+        $jobQueue.Value = @($jobQueue.Value | Where-Object {{ $_.State -ne 'Completed' }})
         if (!$completedJobs) {{
             # Wait for some time before checking again if no jobs were completed
-            Start-Sleep -Seconds 5
+            Start-Sleep -Seconds 3
         }}
     }}
+}}
 
-    # Add a new job to the queue
-    $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList '{activate_path}', '{python_executable}', '{script}', '{parent_directory}'
-    $jobQueue += , $job  # Append job to the queue as an array element
+# Function to start a job and add it to the queue
+function Start-NewJob {{
+    param (
+        [ref]$jobQueue,
+        [scriptblock]$scriptBlock,
+        [string[]]$arguments
+    )
 
-    Write-Output "Starting Job for '{script}'"
-    """
+    $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $arguments
+    $jobQueue.Value += $job  # Append job to the queue as an array element
+    Write-Host "Starting Job for '$($arguments[-1])'"
+}}
 
-    # Finish the script with job monitoring and cleanup
-    powershell_script += f"""
-    # Wait for all queued jobs to complete, logging after each completes
-    while ($jobQueue.Count -gt 0) {{
-        $completedJobs = @($jobQueue | Wait-Job -Any)
+# Function to wait for all queued jobs to complete and log their outputs
+function WaitForAllJobs {{
+    param (
+        [ref]$jobQueue,
+        [ref]$runHistory
+    )
+
+    while ($jobQueue.Value.Count -gt 0) {{
+        $completedJobs = @($jobQueue.Value | Wait-Job -Any)
 
         # Receive and log output from completed jobs
         foreach ($job in $completedJobs) {{
-            $jobData = Receive-Job -Job $job
-            Write-Output "Job $($job.Id) with script '$($jobData.ScriptPath)' started at $($jobData.StartTime) and took $($jobData.Duration) has completed."
-            $runHistory += New-Object -TypeName PSObject -Property $jobData
-            $jobQueue = $jobQueue | Where-Object {{ $_.Id -ne $job.Id }}
+            # Receive all the outputs from the job
+            $jobOutputs = Receive-Job -Job $job
+
+            # Verify that we have received some outputs
+            if ($jobOutputs -ne $null) {{
+                # Look for the hashtable we expect among job outputs
+                $hashtable = $jobOutputs | Where-Object {{ $_ -is [System.Collections.Hashtable] }} | Select-Object -Last 1
+
+                if ($hashtable) {{
+                    $runHistory.Value += New-Object -TypeName PSObject -Property $hashtable
+                    Write-Host "Job $($job.Id) with script '$($hashtable.ScriptPath)' started at $($hashtable.StartTime) and took $($hashtable.Duration) has completed."
+                }} else {{
+                    Write-Error "Job $($job.Id) did not return a hashtable."
+                    # Debug - Write all outputs to see what was received
+                    $jobOutputs | ForEach-Object {{ Write-Host "Output: $_" }}
+                }}
+            }} else {{
+                Write-Error "Job $($job.Id) did not produce any output."
+            }}
+
+            $jobQueue.Value = $jobQueue.Value | Where-Object {{ $_.Id -ne $job.Id }}
         }}
 
         # Clean up completed job objects
         Remove-Job -Job $completedJobs
     }}
+}}
 
-    Write-Output "All jobs have been processed."
+# Initialize job queue and set the job limit
+$jobQueue = @()
+$jobLimit = {max_concurrent_jobs}
+$runHistory = @()
+    """
+
+    # Job creation and queuing
+    for script in script_paths:
+        parent_directory = Path(script).resolve().parent  # Get the parent directory of the script
+
+
+
+        powershell_script += f"""
+# Wait until there is a free slot to run a new job
+Manage-JobQueue -jobLimit $jobLimit -jobQueue ([ref]$jobQueue)
+Start-NewJob -jobQueue ([ref]$jobQueue) -scriptBlock $scriptBlock -arguments @('{activate_path}', '{python_executable}', '{script}', '{parent_directory}')
+"""
+
+
+    #     powershell_script += f"""
+    # # Wait until there is a free slot to run a new job
+    # while ($jobQueue.Count -ge $jobLimit) {{
+    #     $completedJobs = @($jobQueue | Where-Object {{ $_.State -eq 'Completed' }})
+    #     foreach ($job in $completedJobs) {{
+    #         # Remove completed jobs from the queue
+    #         $job | Remove-Job
+    #         Write-Host "Job $($job.Id) has been removed from the queue."
+    #     }}
+    #     $jobQueue = @($jobQueue | Where-Object {{ $_.State -ne 'Completed' }})
+    #     if (!$completedJobs) {{
+    #         # Wait for some time before checking again if no jobs were completed
+    #         Start-Sleep -Seconds 5
+    #     }}
+    # }}
+
+    # # Add a new job to the queue
+    # $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList '{activate_path}', '{python_executable}', '{script}', '{parent_directory}'
+    # $jobQueue += , $job  # Append job to the queue as an array element
+
+    # Write-Host "Starting Job for '{script}'"
+    # """
+
+    # Finish the script with job monitoring and cleanup
+    powershell_script += f"""
+# Wait for all queued jobs to complete, logging after each completes
+while ($jobQueue.Count -gt 0) {{
+    $completedJobs = @($jobQueue | Wait-Job -Any)
+
+    # Receive and log output from completed jobs
+    foreach ($job in $completedJobs) {{
+        # Receive all the outputs from the job
+        $jobOutputs = Receive-Job -Job $job
+
+        # Verify that we have received some outputs
+        if ($jobOutputs -ne $null) {{
+            # Look for the hashtable we expect among job outputs
+            $hashtable = $jobOutputs | Where-Object {{ $_ -is [System.Collections.Hashtable] }} | Select-Object -Last 1
+
+            if ($hashtable) {{
+                $runHistory += New-Object -TypeName PSObject -Property $hashtable
+                Write-Host "Job $($job.Id) with script '$($hashtable.ScriptPath)' started at $($hashtable.StartTime) and took $($hashtable.Duration) has completed."
+            }} else {{
+                Write-Error "Job $($job.Id) did not return a hashtable."
+                # Debug - Write all outputs to see what was received
+                $jobOutputs | ForEach-Object {{ Write-Host "Output: $_" }}
+            }}
+        }} else {{
+            Write-Error "Job $($job.Id) did not produce any output."
+        }}
+
+        $jobQueue = $jobQueue | Where-Object {{ $_.Id -ne $job.Id }}
+    }}
+
+    # Clean up completed job objects
+    Remove-Job -Job $completedJobs
+}}
+
+Write-Host "All jobs have been processed."
     """
 
     # Export the run history to a CSV file
     powershell_script += """
-    Write-Output "Exporting run history to CSV file..."
-    $csvPath = [System.IO.Path]::Combine($parentDir, "run_history.csv")
-    $runHistory | Export-Csv -Path $csvPath -NoTypeInformation
-    Write-Output "Run history has been exported to $csvPath"
+Write-Host "Exporting run history to CSV file..."
+$csvPath = [System.IO.Path]::Combine($parentDir, "run_history.csv")
+$runHistory | Export-Csv -Path $csvPath -NoTypeInformation
+Write-Host "Run history has been exported to $csvPath"
     """
-
 
     # Save the generated PowerShell script to a file
     with open(ps_script_path, 'w') as file:
