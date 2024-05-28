@@ -92,6 +92,7 @@ class WCorrShuffle(ComputedResult):
 
     result_version: str = serialized_attribute_field(default='2024.05.28_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
+    
 
     @property
     def n_epochs(self):
@@ -592,12 +593,12 @@ class WCorrShuffle(ComputedResult):
 
 
     @classmethod
-    def init_from_data_only_file(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, global_epoch_name, filepath):
+    def init_from_data_only_file(cls, filepath, curr_active_pipeline, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None):
         """ loads previously saved results from a pickle file to rebuild
         
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle
 
-        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_data_only_file(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_data_only_file(filepath=filepath, curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
                                                 directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
                                                 global_epoch_name=global_epoch_name, filepath='temp22.pkl')
         
@@ -622,6 +623,18 @@ class WCorrShuffle(ComputedResult):
         _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
         for a_non_pickleable_field in _non_pickled_fields:
             del state[a_non_pickleable_field]
+
+        _getstate_children_fields = ['alt_directional_merged_decoders_result', 'real_directional_merged_decoders_result']
+        for a_child_field in _getstate_children_fields:
+            # Ensure __getstate__() is called on the child if it overrides it
+            a_child = state.get(a_child_field, None)
+            if a_child is not None:
+                if hasattr(state[a_child_field], '__getstate__'):
+                    print(f'found custom __getstate__ for child named "{a_child_field}". Using that.')
+                    state[a_child_field] = state[a_child_field].__getstate__()
+                else:
+                    state[a_child_field] = state[a_child_field].__dict__.copy()
+
         return state
 
 
@@ -725,7 +738,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
     @function_attributes(short_name='wcorr_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'session', 'pf1D'], input_requires=['DirectionalLaps', 'RankOrder'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['RankOrder'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
-    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2], skip_laps=False):
+    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=10):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Requires:
@@ -783,7 +796,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
         """ Usage:
         
         wcorr_shuffle_results = curr_active_pipeline.global_computation_results.computed_data['SequenceBased']
-
+        wcorr_tool = wcorr_shuffle_results.
         """
         return global_computation_results
     
