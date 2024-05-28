@@ -49,7 +49,7 @@ class ProcessingScriptPhases(Enum):
         else:
             return False
         
-    def get_custom_user_completion_functions_dict(self) -> Dict:
+    def get_custom_user_completion_functions_dict(self, extra_run_functions=None) -> Dict:
         """ 
         """
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_session_h5_file_completion_function, curr_runtime_context_header_template, export_rank_order_results_completion_function, figures_rank_order_results_completion_function, compute_and_export_marginals_dfs_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, reload_exported_kdiba_session_position_info_mat_completion_function
@@ -70,6 +70,9 @@ class ProcessingScriptPhases(Enum):
                 # 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
                 # 'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                 }
+            if extra_run_functions is not None:
+                phase_any_run_custom_user_completion_functions_dict = (phase_any_run_custom_user_completion_functions_dict | extra_run_functions)
+
             return phase_any_run_custom_user_completion_functions_dict
 
 
@@ -80,7 +83,7 @@ class ProcessingScriptPhases(Enum):
                                                 'pfdt_computation', 'firing_rate_trends',
             # 'pf_dt_sequential_surprise',
             'extended_stats',
-            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding',
             # 'ratemap_peaks_prominence2d',
             'long_short_inst_spike_rate_groups',
             'long_short_endcap_analysis',
@@ -99,7 +102,7 @@ class ProcessingScriptPhases(Enum):
                                                 'pfdt_computation', 'firing_rate_trends',
             # 'pf_dt_sequential_surprise',
             'extended_stats',
-            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding',
             # 'ratemap_peaks_prominence2d',
             'long_short_inst_spike_rate_groups',
             'long_short_endcap_analysis',
@@ -117,7 +120,7 @@ class ProcessingScriptPhases(Enum):
                                                 'pfdt_computation', 'firing_rate_trends',
             'pf_dt_sequential_surprise',
             'extended_stats',
-            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 
             'ratemap_peaks_prominence2d',
             'long_short_inst_spike_rate_groups',
             'long_short_endcap_analysis',
