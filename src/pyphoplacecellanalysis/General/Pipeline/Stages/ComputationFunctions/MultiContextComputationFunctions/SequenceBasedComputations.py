@@ -88,13 +88,11 @@ class WCorrShuffle:
 
     
     @classmethod
-    def init_from_templates(cls, curr_active_pipeline, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None):
+    def init_from_templates(cls, curr_active_pipeline, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None) -> "WCorrShuffle":
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle
 
-        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
-                                                directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
-                                                global_epoch_name=global_epoch_name)
+        wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result, global_epoch_name=global_epoch_name)
 
         """
         # ==================================================================================================================== #
@@ -433,9 +431,27 @@ class WCorrShuffle:
     #     return _updated_output_extracted_result_wcorrs_list
     
 
-    def compute_shuffles(self, num_shuffles: int=100) -> List:
+    def compute_shuffles(self, num_shuffles: int=100, curr_active_pipeline=None, track_templates=None) -> List:
         """ Computes new shuffles and adds them to `self.output_extracted_result_wcorrs_list`
         """
+        if (self.curr_active_pipeline is None):
+            if (curr_active_pipeline is None):
+                raise NotImplementedError(f"cannot compute because self.curr_active_pipeline is missing and no curr_active_pipeline were provided as kwargs!")
+            else:
+                # non-None pipeline passed in, use for self
+                self.curr_active_pipeline = curr_active_pipeline
+
+        
+        if (self.track_templates is None):
+            if (track_templates is None):
+                raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
+            else:
+                # non-None pipeline passed in, use for self
+                self.track_templates = track_templates
+
+
+        assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
+
         _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_full_decoded_results_list = self._shuffle_and_decode_wcorrs(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
                                                                                   alt_directional_merged_decoders_result=self.alt_directional_merged_decoders_result, all_templates_decode_kwargs=self.all_templates_decode_kwargs,
                                                                                   num_shuffles=num_shuffles)
@@ -545,6 +561,7 @@ class WCorrShuffle:
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
         saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list))
+
 
     @classmethod
     def init_from_file(cls, curr_active_pipeline, track_templates, directional_decoders_epochs_decode_result, global_epoch_name, filepath):
@@ -672,16 +689,16 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
 
         """
         if include_includelist is not None:
-            print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
+            print(f'WARN: perform_wcorr_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
-        print(f'perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
+        print(f'perform_wcorr_shuffle_analysis(..., num_shuffles={num_shuffles})')
 
         # Needs to store the parameters
         # num_shuffles:int=1000
         # minimum_inclusion_fr_Hz:float=12.0
         # included_qclu_values=[1,2]
 
-        if ('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')):
+        if ('SequenceBased' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'SequenceBased')):
             # initialize
             global_computation_results.computed_data['SequenceBased'] = SequenceBasedComputationsContainer(wcorr_ripple_shuffle=None,
                                                                                                    is_global=True)
