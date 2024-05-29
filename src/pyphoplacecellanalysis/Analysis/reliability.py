@@ -474,10 +474,13 @@ class TrialByTrialActivity:
 
         ## Directional
         directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict = napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts, include_trial_by_trial_correlation_matrix=include_trial_by_trial_correlation_matrix)
-
+    
+        for a_decoder_name, a_result in directional_active_lap_pf_results_dicts.items():
+            ## Global:
+            viewer, image_layer_dict = napari_trial_by_trial_activity_viz(a_result.z_scored_tuning_map_matrix, a_result.C_trial_by_trial_correlation_matrix, title=f'Trial-by-trial Correlation Matrix C - Decoder {a_decoder_name}', axis_labels=('aclu', 'lap', 'xbin')) # GLOBAL
+            
         ## Global:
-        viewer, image_layer_dict = napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin')) # GLOBAL
-
+        # viewer, image_layer_dict = napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin')) # GLOBAL
 
         return (directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict)
 
@@ -655,6 +658,7 @@ def permutation_test(position_data, rate_maps, occupancy_maps, n_permutations=10
     return np.where(true_si_scores > threshold)  # Return indices where true SI scores exceed 95 percentile
 
 
+@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=['compute_spatially_binned_activity'], creation_date='2024-01-31 00:00', related_items=[])
 def compute_activity_by_lap_by_position_bin_matrix(a_spikes_df: pd.DataFrame, lap_id_to_matrix_IDX_map: Dict, n_xbins: int): # , an_active_pf: Optional[PfND] = None
     """ 2024-01-31 - Note that this does not take in position tracking information, so it cannot compute real occupancy. 
     
@@ -696,6 +700,8 @@ def compute_activity_by_lap_by_position_bin_matrix(a_spikes_df: pd.DataFrame, la
     # “calculated the occupancy (number of imaging samples) in each bin on each trial, and divided this by the total number of samples in each trial to get an occupancy probability per position bin per trial” 
     return a_spikes_bin_counts_mat
 
+
+@function_attributes(short_name=None, tags=['spatial_information', 'binned', 'pos'], input_requires=[], output_provides=[], uses=['compute_activity_by_lap_by_position_bin_matrix'], used_by=[], creation_date='2024-01-31 00:00', related_items=[])
 def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_epochs_obj
     """ 
         from pyphoplacecellanalysis.Analysis.reliability import compute_spatially_binned_activity
