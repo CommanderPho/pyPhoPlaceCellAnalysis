@@ -960,11 +960,34 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     @function_attributes(short_name='decode_specific_epochs', tags=['decode', 'epochs', 'specific'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'], used_by=['decode_using_new_decoders'], related_items=['get_proper_global_spikes_df'])
     def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
-        """ 
+        """
+        History:
+            Split `perform_decode_specific_epochs` into two subfunctions: `_build_decode_specific_epochs_result_shell` and `_perform_decoding_specific_epochs`
+
         Uses:
             BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...)
         """
+
+        pre_built_epochs_decoding_result = self.pre_build_epochs_decoding_result(spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        return self.perform_pre_built_specific_epochs_decoding(filter_epochs_decoder_result=pre_built_epochs_decoding_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        ## Equivalent:
         return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+    
+
+    def pre_build_epochs_decoding_result(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DynamicContainer:
+        """
+        History:
+            Split from `self.decode_specific_epochs` to allow reuse of the epochs for efficiency
+        """
+        return self._build_decode_specific_epochs_result_shell(neuron_IDs=self.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+    
+    def perform_pre_built_specific_epochs_decoding(self, filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+        """
+        History:
+            Split from `self.decode_specific_epochs` to allow reuse of the epochs for efficiency
+        """
+        return self._perform_decoding_specific_epochs(active_decoder=self, filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+    
 
 	# ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
@@ -1133,7 +1156,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
 
     @classmethod
-    def _build_decode_specific_epochs_result_shell(cls, neuron_IDs, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DynamicContainer:
+    def _build_decode_specific_epochs_result_shell(cls, neuron_IDs: NDArray, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DynamicContainer:
         """Precomputes the time_binned spikes for the filter epochs since this is the slowest part of `perform_decode_specific_epochs`
 
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
@@ -1218,7 +1241,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         
         """
         # Looks like we're iterating over each epoch in filter_epochs:
-        for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers_list):
+        for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
             filter_epochs_decoder_result.time_bin_edges.append(np.atleast_1d(curr_filter_epoch_time_bin_container.edges))
             if use_single_time_bin_per_epoch:
@@ -1240,15 +1263,15 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
             filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
         ## end for
-        invalid_indicies_list = np.where([len(tc.centers) != len(xs) for tc, xs in zip(filter_epochs_decoder_result.time_bin_containers_list, filter_epochs_decoder_result.most_likely_positions_list)])[0]
+        invalid_indicies_list = np.where([len(tc.centers) != len(xs) for tc, xs in zip(filter_epochs_decoder_result.time_bin_containers, filter_epochs_decoder_result.most_likely_positions_list)])[0]
         if len(invalid_indicies_list) > 0:
             for invalid_idx in invalid_indicies_list:
                 ## find non matching indicies
                 # recompute the centers
-                filter_epochs_decoder_result.time_bin_containers_list[invalid_idx].setup_from_edges(filter_epochs_decoder_result.time_bin_containers_list[invalid_idx].edges)
-            assert (len(filter_epochs_decoder_result.time_bin_containers_list[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers_list[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers_list[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
+                filter_epochs_decoder_result.time_bin_containers[invalid_idx].setup_from_edges(filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges)
+            assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
 
-        assert np.all([(len(filter_epochs_decoder_result.most_likely_positions_list[i]) == len(filter_epochs_decoder_result.time_bin_containers_list[i].centers)) for i, a_n_bins in enumerate(filter_epochs_decoder_result.nbins)])
+        assert np.all([(len(filter_epochs_decoder_result.most_likely_positions_list[i]) == len(filter_epochs_decoder_result.time_bin_containers[i].centers)) for i, a_n_bins in enumerate(filter_epochs_decoder_result.nbins)])
 
         return DecodedFilterEpochsResult(**filter_epochs_decoder_result.to_dict()) # dump the dynamic dict as kwargs into the class
     
@@ -1258,25 +1281,12 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     def perform_decode_specific_epochs(cls, active_decoder, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
         """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
 
-        NOTE: Uses active_decoder.decode(...) to actually do the decoding
-        
-        Args:
-            new_2D_decoder (_type_): _description_
-            spikes_df (_type_): _description_
-            filter_epochs (_type_): _description_
-            decoding_time_bin_size (float, optional): _description_. Defaults to 0.05.
-            debug_print (bool, optional): _description_. Defaults to False.
-
-        Returns:
-            DecodedFilterEpochsResult: _description_
-
         History:
             Split `perform_decode_specific_epochs` into two subfunctions: `_build_decode_specific_epochs_result_shell` and `_perform_decoding_specific_epochs`
         """
         # build output result object:
         filter_epochs_decoder_result = cls._build_decode_specific_epochs_result_shell(neuron_IDs=active_decoder.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
-
-        return cls._perform_decoding_specific_epochs(filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        return cls._perform_decoding_specific_epochs(active_decoder=active_decoder, filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
     
     
     @classmethod
