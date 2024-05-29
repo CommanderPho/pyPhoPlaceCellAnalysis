@@ -820,10 +820,10 @@ class WCorrShuffle(ComputedResult):
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
         try:
-            all_shuffles_wcorr_array = self.get_all_shuffles_wcorr_array()
+            # all_shuffles_wcorr_array = self.get_all_shuffles_wcorr_array()
             (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), all_shuffles_wcorr_array = self.post_compute()
 
-        except BaseException:
+        except (BaseException, AssertionError):
             all_shuffles_wcorr_array = []
 
         saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array))
