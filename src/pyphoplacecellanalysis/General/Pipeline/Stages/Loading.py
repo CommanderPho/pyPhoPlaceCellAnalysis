@@ -67,7 +67,7 @@ def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, 
         is_temporary_file_used = True # this is the only condition where this is true
             
     # Save reloaded pipeline out to pickle for future loading
-    with ProgressMessagePrinter(_desired_final_pickle_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
+    with ProgressMessagePrinter(filepath=_desired_final_pickle_path, action=f"Saving (file mode '{file_mode}')", contents_description='session pickle file', finished_message='saved session pickle file', returns_string=False):
         try:
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
@@ -91,7 +91,7 @@ def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, 
                 shutil.move(pkl_path, _desired_final_pickle_path) # move the temporary file to the desired destination, overwriting it
 
         except BaseException as e:
-            print(f"pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!\nException: {e}")
+            print(f"ERROR: pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!\nException: {e}")
             # delete the incomplete pickle file
             if is_temporary_file_used:
                 pkl_path.unlink(missing_ok=True) # removes the incomplete file. The user's file located at _desired_final_pickle_path is still intact.
@@ -122,7 +122,7 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
         if not isinstance(pkl_path, Path):
             pkl_path = Path(pkl_path).resolve()
             
-        with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
+        with ProgressMessagePrinter(filepath=pkl_path, action=f"Saving (file mode '{file_mode}')", contents_description='session pickle file', finished_message='saved session pickle file', returns_string=False):
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
                 # pickle.dump(db, dbfile)
