@@ -625,30 +625,22 @@ class WCorrShuffle(ComputedResult):
         for a_non_pickleable_field in _non_pickled_fields:
             del state[a_non_pickleable_field]
 
-        # _getstate_children_fields = ['alt_directional_merged_decoders_result', 'real_directional_merged_decoders_result']
-        # for a_child_field in _getstate_children_fields:
-        #     # Ensure __getstate__() is called on the child if it overrides it
-        #     a_child = state.get(a_child_field, None)
-        #     if a_child is not None:
-        #         if hasattr(state[a_child_field], '__getstate__'):
-        #             print(f'found custom __getstate__ for child named "{a_child_field}". Using that.')
-        #             state[a_child_field] = state[a_child_field].__getstate__()
-        #         else:
-        #             state[a_child_field] = state[a_child_field].__dict__.copy()
-
         return state
 
 
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+        
         _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
         for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
             if a_field_name not in state:
                 state[a_field_name] = a_default_restore_value
 
         self.__dict__.update(state)
-        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        super(WCorrShuffle, self).__init__() # from
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(WCorrShuffle, self).__init__() # from
 
 
 
@@ -690,22 +682,30 @@ class SequenceBasedComputationsContainer(ComputedResult):
 
     # Utility Methods ____________________________________________________________________________________________________ #
 
-    def to_dict(self) -> Dict:
-        # return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
-        return {k:v for k, v in self.__dict__.items() if k not in ['is_global']}
+    # def to_dict(self) -> Dict:
+    #     # return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
+    #     return {k:v for k, v in self.__dict__.items() if k not in ['is_global']}
     
-    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, **kwargs):
-        """ Saves the object to key in the hdf5 file specified by file_path
-        enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.
+    # def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, **kwargs):
+    #     """ Saves the object to key in the hdf5 file specified by file_path
+    #     enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.
 
 
-        Usage:
-            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
-            _pfnd_obj: PfND = long_one_step_decoder_1D.pf
-            _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
-        """
-        super().to_hdf(file_path, key=key, debug_print=debug_print, enable_hdf_testing_mode=enable_hdf_testing_mode, **kwargs)
-        # handle custom properties here
+    #     Usage:
+    #         hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+    #         _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+    #         _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+    #     """
+    #     super().to_hdf(file_path, key=key, debug_print=debug_print, enable_hdf_testing_mode=enable_hdf_testing_mode, **kwargs)
+    #     # handle custom properties here
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+
+        self.__dict__.update(state)
 
 
 

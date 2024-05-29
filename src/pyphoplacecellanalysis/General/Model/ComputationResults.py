@@ -300,8 +300,11 @@ class ComputedResult(VersionedResultMixin, HDFMixin, AttrsBasedClassHelperMixin)
         self._VersionedResultMixin__setstate__(state)
 
         self.__dict__.update(state)
+
+
+        ## Disabled 2024-05-28 22:11 
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        super(ComputedResult, self).__init__()
+        # super(ComputedResult, self).__init__()
 
 
 
