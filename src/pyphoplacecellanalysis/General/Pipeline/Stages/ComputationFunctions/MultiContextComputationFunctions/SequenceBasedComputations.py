@@ -668,12 +668,37 @@ class WCorrShuffle(ComputedResult):
             self.output_all_shuffles_decoded_results_list.extend(_updated_output_extracted_full_decoded_results_list)
 
 
-    def post_compute(self, debug_print:bool=False):
+    def post_compute(self, curr_active_pipeline=None, debug_print:bool=False):
         """ Called after computing some shuffles.
         """
         ## Want ## (n_shuffles, n_epochs, 4)
                 
         ## INPUTS: output_extracted_result_wcorrs_list, real_decoder_ripple_weighted_corr_arr
+        if (self.curr_active_pipeline is None):
+            if (curr_active_pipeline is None):
+                raise NotImplementedError(f"cannot compute because self.curr_active_pipeline is missing and no curr_active_pipeline were provided as kwargs!")
+            else:
+                # non-None pipeline passed in, use for self
+                self.curr_active_pipeline = curr_active_pipeline
+
+        
+        if (self.track_templates is None):
+            if (track_templates is None):
+                ## recover them from `curr_active_pipeline`
+                if self.curr_active_pipeline is not None:
+                    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
+                    rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
+                    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                    self.track_templates = deepcopy(track_templates)
+                else:
+                    raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
+            else:
+                # non-None pipeline passed in, use for self
+                self.track_templates = track_templates
+
+        assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
+
 
         n_decoders: int = 4
         
@@ -682,6 +707,8 @@ class WCorrShuffle(ComputedResult):
 
         total_n_shuffles: int = len(self.output_extracted_result_wcorrs_list)
         print(f'total_n_shuffles: {total_n_shuffles}')
+
+        ## USES: self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr
 
         for i, a_decoder_ripple_weighted_corr_df_dict in enumerate(self.output_extracted_result_wcorrs_list):
             decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in a_decoder_ripple_weighted_corr_df_dict.items()}
