@@ -91,8 +91,6 @@ class WCorrShuffle(ComputedResult):
 
     result_version: str = serialized_attribute_field(default='2024.05.28_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
-    
-
     @property
     def n_epochs(self):
         """The number of epochs property."""
@@ -696,8 +694,6 @@ class SequenceBasedComputationsContainer(ComputedResult):
         # return asdict(self, filter=attrs.filters.exclude((self.__attrs_attrs__.is_global))) #  'is_global'
         return {k:v for k, v in self.__dict__.items() if k not in ['is_global']}
     
-
-
     def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path
         enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.

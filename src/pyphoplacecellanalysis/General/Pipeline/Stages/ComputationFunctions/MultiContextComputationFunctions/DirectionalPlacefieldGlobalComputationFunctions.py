@@ -3738,9 +3738,14 @@ from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 
 
-@define(slots=False, repr=False)
+@define(slots=False, repr=False, eq=False)
 class TrialByTrialActivityResult(ComputedResult):
     """ 
+
+
+    #TODO 2024-05-28 19:14: - [ ] Not yet picklable, and I think it just needs a recurrsive __getstate__(...) function
+
+    
     Usage:
     
         from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
