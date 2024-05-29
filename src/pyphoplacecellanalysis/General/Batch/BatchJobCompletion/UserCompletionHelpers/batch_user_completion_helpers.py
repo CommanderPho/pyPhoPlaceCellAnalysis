@@ -1090,6 +1090,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     """
     import sys
     from datetime import timedelta, datetime
+    from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
@@ -1098,7 +1099,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     print(f'compute_and_export_session_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
 
-    desired_total_num_shuffles: int = 2000
+    desired_total_num_shuffles: int = 1000
     allow_update_global_result: bool = False
     
     if ('SequenceBased' not in curr_active_pipeline.global_computation_results.computed_data) or (not hasattr(curr_active_pipeline.global_computation_results.computed_data, 'SequenceBased')):
@@ -1141,7 +1142,12 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
     ## standalone saving:
     standalone_filename = 'standalone_wcorr_shuffles_data_only.pkl'
+    # wcorr_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
     wcorr_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
+    standalone_filename: str = f'{get_now_day_str()}_standalone_wcorr_ripple_shuffle_data_only_{a_sequence_computation_container.wcorr_ripple_shuffle.n_completed_shuffles}.pkl'
+    standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
+    print(f'standalone_filepath: {standalone_filepath}')
+
     err = None
 
     try:
@@ -1155,7 +1161,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         if self.fail_on_exception:
             raise err.exc
 
-    (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_shuffles.post_compute()
+    # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_shuffles.post_compute()
 
 
     callback_outputs = {

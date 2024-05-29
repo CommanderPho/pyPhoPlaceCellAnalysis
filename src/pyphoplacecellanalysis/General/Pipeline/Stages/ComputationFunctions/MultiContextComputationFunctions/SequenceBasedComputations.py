@@ -668,6 +668,21 @@ class WCorrShuffle(ComputedResult):
             self.output_all_shuffles_decoded_results_list.extend(_updated_output_extracted_full_decoded_results_list)
 
 
+    def get_all_shuffles_wcorr_array(self) -> NDArray:
+        """The wcorrs for each shuffle. .shape: (n_shuffles, n_epochs, 4) """
+        _out_wcorr = []
+        total_n_shuffles: int = len(self.output_extracted_result_wcorrs_list)
+        assert total_n_shuffles > 0
+
+        ## USES: self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr
+        for a_decoder_ripple_weighted_corr_df_dict in self.output_extracted_result_wcorrs_list:
+            decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in a_decoder_ripple_weighted_corr_df_dict.items()}
+            a_decoder_ripple_weighted_corr_df = pd.DataFrame(decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
+            a_shuffle_wcorr_arr = a_decoder_ripple_weighted_corr_df.to_numpy()            
+            _out_wcorr.append(a_shuffle_wcorr_arr)
+        return np.stack(_out_wcorr) # .shape ## (n_shuffles, n_epochs, 4)
+    
+
     def post_compute(self, curr_active_pipeline=None, debug_print:bool=False):
         """ Called after computing some shuffles.
         """
@@ -804,7 +819,14 @@ class WCorrShuffle(ComputedResult):
         """ saves the important results to pickle """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
-        saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list))
+        try:
+            all_shuffles_wcorr_array = self.get_all_shuffles_wcorr_array()
+            (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), all_shuffles_wcorr_array = self.post_compute()
+
+        except BaseException:
+            all_shuffles_wcorr_array = []
+
+        saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array))
 
 
     @classmethod
