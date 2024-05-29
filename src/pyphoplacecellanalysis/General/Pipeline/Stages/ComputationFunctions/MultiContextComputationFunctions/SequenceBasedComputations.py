@@ -117,7 +117,7 @@ class WCorrShuffle(ComputedResult):
     
 
     @classmethod
-    def init_from_templates(cls, curr_active_pipeline, enable_saving_entire_decoded_shuffle_result: bool=False, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None) -> "WCorrShuffle":
+    def init_from_templates(cls, curr_active_pipeline, enable_saving_entire_decoded_shuffle_result: bool=False, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None, debug_print=False) -> "WCorrShuffle":
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle
 
@@ -151,18 +151,8 @@ class WCorrShuffle(ComputedResult):
         ## INPUTS: curr_active_pipeline, global_epoch_name, track_templates
 
         # 2024-03-04 - Filter out the epochs based on the criteria:
-        filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+        filtered_epochs_df, filtered_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
 
-        # all_templates_decode_kwargs = dict(desired_shared_decoding_time_bin_size=alt_directional_merged_decoders_result.ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=False, minimum_event_duration=alt_directional_merged_decoders_result.ripple_decoding_time_bin_size)
-        all_templates_decode_kwargs = dict(desired_ripple_decoding_time_bin_size=alt_directional_merged_decoders_result.ripple_decoding_time_bin_size,
-                            override_replay_epochs_df=filtered_epochs_df, ## Use the filtered epochs
-                            use_single_time_bin_per_epoch=False, minimum_event_duration=2.0 * float(alt_directional_merged_decoders_result.ripple_decoding_time_bin_size))
-
-        # ==================================================================================================================== #
-        # REAL                                                                                                                 #
-        # ==================================================================================================================== #
-        active_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
-        real_directional_merged_decoders_result, real_decoder_ripple_weighted_corr_arr = cls.build_real_result(track_templates=track_templates, directional_merged_decoders_result=alt_directional_merged_decoders_result, active_spikes_df=active_spikes_df, all_templates_decode_kwargs=all_templates_decode_kwargs)
         # print(f'real_decoder_ripple_weighted_corr_arr: {np.shape(real_decoder_ripple_weighted_corr_arr)}')
 
         ## Adds 'is_most_likely_direction_LR', 'P_LR' to the `filtered_epochs_df` so we can determine which direction is most likely. This uses `directional_decoders_epochs_decode_result`
@@ -204,8 +194,51 @@ class WCorrShuffle(ComputedResult):
 
         ## OUTPUTS: filtered_epochs_df['long_best_dir_decoder_IDX'], filtered_epochs_df['short_best_dir_decoder_IDX']
 
+        ## Filter the epochs by minimum duration:
+        replay_epochs_df: pd.DataFrame = deepcopy(filtered_epochs_df)
+        desired_ripple_decoding_time_bin_size: float = alt_directional_merged_decoders_result.ripple_decoding_time_bin_size
+        minimum_event_duration: float = 2.0 * float(alt_directional_merged_decoders_result.ripple_decoding_time_bin_size)
+        ## Drop those less than the time bin duration
+        if debug_print:
+            print(f'DropShorterMode:')
+        pre_drop_n_epochs = len(replay_epochs_df)
+        if minimum_event_duration is not None:                
+            replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] >= minimum_event_duration]
+            post_drop_n_epochs = len(replay_epochs_df)
+            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            if debug_print:
+                print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
+        else:
+            replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > desired_ripple_decoding_time_bin_size]
+            post_drop_n_epochs = len(replay_epochs_df)
+            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            if debug_print:
+                print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_ripple_decoding_time_bin_size}', end='\t') 
+
+
+        # all_templates_decode_kwargs = dict(desired_shared_decoding_time_bin_size=alt_directional_merged_decoders_result.ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=False, minimum_event_duration=alt_directional_merged_decoders_result.ripple_decoding_time_bin_size)
+        all_templates_decode_kwargs = dict(desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size,
+                            override_replay_epochs_df=replay_epochs_df, ## Use the filtered epochs
+                            use_single_time_bin_per_epoch=False, minimum_event_duration=minimum_event_duration)
+        
+
+        # ==================================================================================================================== #
+        # REAL                                                                                                                 #
+        # ==================================================================================================================== #
+        active_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+        real_directional_merged_decoders_result, real_decoder_ripple_weighted_corr_arr = cls.build_real_result(track_templates=track_templates, directional_merged_decoders_result=alt_directional_merged_decoders_result, active_spikes_df=active_spikes_df, all_templates_decode_kwargs=all_templates_decode_kwargs)
+
+
+        # laps_pre_computed_filter_epochs_dict, ripple_pre_computed_filter_epochs_dict = cls._pre_build_all_templates_decoding_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df),
+        #                                                                                                                             a_directional_merged_decoders_result=alt_directional_merged_decoders_result,
+        #                                                                                                                             shuffled_decoders_dict=deepcopy(track_templates.get_decoders_dict()),
+        #                                                                                                                             **all_templates_decode_kwargs)
+
+
+
+
         return cls(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
-            filtered_epochs_df=filtered_epochs_df, active_spikes_df=active_spikes_df,
+            filtered_epochs_df=replay_epochs_df, active_spikes_df=active_spikes_df,
             # alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, real_directional_merged_decoders_result=real_directional_merged_decoders_result,
             real_decoder_ripple_weighted_corr_arr=real_decoder_ripple_weighted_corr_arr,
             all_templates_decode_kwargs=all_templates_decode_kwargs, enable_saving_entire_decoded_shuffle_result=enable_saving_entire_decoded_shuffle_result) # output_extracted_result_wcorrs_list=[], 
@@ -465,12 +498,6 @@ class WCorrShuffle(ComputedResult):
         decoder_laps_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict = {}
         decoder_ripple_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict = {}
         
-        
-        filter_epochs_decoder_result = cls._build_decode_specific_epochs_result_shell(neuron_IDs=a_decoder.neuron_IDs, spikes_df=spikes_df, filter_epochs=deepcopy(replay_epochs_df), decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
-        
-        cls._perform_decoding_specific_epochs(filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
-
-
         ## This does the single 1D versions
         for a_name, a_decoder in shuffled_decoders_dict.items():
             # external-function way:
@@ -534,8 +561,9 @@ class WCorrShuffle(ComputedResult):
             # _, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
             #                                                                                                                                                                                 skip_merged_decoding=True, **all_templates_decode_kwargs)
 
-            decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = cls._all_templates_perform_pre_built_specific_epochs_decoding(laps_pre_computed_filter_epochs_dict=deepcopy(laps_pre_computed_filter_epochs_dict), ripple_pre_computed_filter_epochs_dict=deepcopy(ripple_pre_computed_filter_epochs_dict),
-                                                                                                                                                                                   shuffled_decoders_dict=shuffled_decoders_dict, **all_templates_decode_kwargs)
+            decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = cls._all_templates_perform_pre_built_specific_epochs_decoding(laps_pre_computed_filter_epochs_dict=deepcopy(laps_pre_computed_filter_epochs_dict),
+                                                                                                                                                                              ripple_pre_computed_filter_epochs_dict=deepcopy(ripple_pre_computed_filter_epochs_dict),
+                                                                                                                                                                              shuffled_decoders_dict=shuffled_decoders_dict, **all_templates_decode_kwargs)
             
             
             ## Weighted Correlation
@@ -615,7 +643,8 @@ class WCorrShuffle(ComputedResult):
         assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
 
         _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_full_decoded_results_list = self._shuffle_and_decode_wcorrs(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
-                                                                                  alt_directional_merged_decoders_result=deepcopy(self.curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']), all_templates_decode_kwargs=self.all_templates_decode_kwargs,
+                                                                                  alt_directional_merged_decoders_result=deepcopy(self.curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']),
+                                                                                  all_templates_decode_kwargs=self.all_templates_decode_kwargs,
                                                                                   num_shuffles=num_shuffles)
 
         self.output_extracted_result_wcorrs_list.extend(_updated_output_extracted_result_wcorrs_list)
