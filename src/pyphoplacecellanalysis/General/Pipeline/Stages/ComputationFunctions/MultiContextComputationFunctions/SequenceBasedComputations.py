@@ -251,7 +251,7 @@ class WCorrShuffle(ComputedResult):
     def _try_all_templates_decode(cls, spikes_df: pd.DataFrame, a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, shuffled_decoders_dict, use_single_time_bin_per_epoch: bool,
                             override_replay_epochs_df: Optional[pd.DataFrame]=None,
                             desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None,
-                            skip_merged_decoding=False) -> Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]: #-> Tuple[None, Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, DecodedFilterEpochsResult]]]:
+                            skip_merged_decoding=False, debug_print: bool = False) -> Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]: #-> Tuple[None, Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, DecodedFilterEpochsResult]]]:
         """ decodes laps and ripples for a single bin size but for each of the four track templates. 
         
         Added 2024-05-23 04:23 
@@ -316,20 +316,24 @@ class WCorrShuffle(ComputedResult):
                 replay_epochs_df = replay_epochs_df.to_dataframe()
             ripple_decoding_time_bin_size: float = desired_ripple_decoding_time_bin_size # allow direct use            
             ## Drop those less than the time bin duration
-            print(f'DropShorterMode:')
+            if debug_print:
+                print(f'DropShorterMode:')
             pre_drop_n_epochs = len(replay_epochs_df)
             if minimum_event_duration is not None:                
                 replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] >= minimum_event_duration]
                 post_drop_n_epochs = len(replay_epochs_df)
                 n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
-                print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
+                if debug_print:
+                    print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
             else:
                 replay_epochs_df = replay_epochs_df[replay_epochs_df['duration'] > desired_ripple_decoding_time_bin_size]
                 post_drop_n_epochs = len(replay_epochs_df)
                 n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
-                print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_ripple_decoding_time_bin_size}', end='\t') 
+                if debug_print:
+                    print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_ripple_decoding_time_bin_size}', end='\t') 
 
-            print(f'{post_drop_n_epochs} remain.')
+            if debug_print:
+                print(f'{post_drop_n_epochs} remain.')
 
             if not skip_merged_decoding:
                 # returns a `DecodedFilterEpochsResult`
