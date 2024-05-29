@@ -79,7 +79,6 @@ class WCorrShuffle(ComputedResult):
     filtered_epochs_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
     active_spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
 
-
     real_decoder_ripple_weighted_corr_arr: NDArray = serialized_field(default=None, repr=False, metadata={'shape': ('n_epochs', 'n_decoders')})
 
     all_templates_decode_kwargs: Dict = non_serialized_field(default=Factory(dict), repr=False)
@@ -101,6 +100,24 @@ class WCorrShuffle(ComputedResult):
     def n_completed_shuffles(self):
         """The n_completed_shuffles property."""
         return len(self.output_extracted_result_wcorrs_list)
+
+    @property
+    def all_shuffles_wcorr_array(self) -> NDArray:
+        """The wcorrs for each shuffle. .shape: (n_shuffles, n_epochs, 4) """
+        _out_wcorr = []
+        total_n_shuffles: int = len(self.output_extracted_result_wcorrs_list)
+        assert total_n_shuffles > 0
+
+        ## USES: self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr
+        for a_decoder_ripple_weighted_corr_df_dict in self.output_extracted_result_wcorrs_list:
+            decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in a_decoder_ripple_weighted_corr_df_dict.items()}
+            a_decoder_ripple_weighted_corr_df = pd.DataFrame(decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
+            a_shuffle_wcorr_arr = a_decoder_ripple_weighted_corr_df.to_numpy()            
+            _out_wcorr.append(a_shuffle_wcorr_arr)
+        return np.stack(_out_wcorr) # .shape ## (n_shuffles, n_epochs, 4)
+
+
+
 
     @classmethod
     def build_real_result(cls, track_templates, directional_merged_decoders_result, active_spikes_df, all_templates_decode_kwargs) -> Tuple[DirectionalPseudo2DDecodersResult, NDArray]:
@@ -638,7 +655,6 @@ class WCorrShuffle(ComputedResult):
             else:
                 # non-None pipeline passed in, use for self
                 self.track_templates = track_templates
-
 
         assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
 
