@@ -700,7 +700,7 @@ class SequenceBasedComputationsContainer(ComputedResult):
     #     # handle custom properties here
 
     def __setstate__(self, state):
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # Restore instance attributes
 
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)

@@ -1297,6 +1297,7 @@ class PipelineWithComputedPipelineStageMixin:
         return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
 
     ## Global Computation Result Persistance Hacks:
+    @function_attributes(short_name=None, tags=['save'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 08:20', related_items=[])
     def save_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
         Usage:
@@ -1331,13 +1332,17 @@ class PipelineWithComputedPipelineStageMixin:
         return global_computation_results_pickle_path
 
 
-    @function_attributes(short_name=None, tags=['split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=[])
+    @function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['load_split_pickled_global_computation_results'])
     def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, debug_print:bool=True):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
+
+        Reciprocal:
+            load_pickled_global_computation_results
+
         Usage:
             split_save_folder, split_save_paths, split_save_output_types, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
             
-        #TODO 2023-11-22 18:54: - [ ] One major is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
+        #TODO 2023-11-22 18:54: - [ ] One major issue is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
         # Update result with correct type:
         curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
 
@@ -1405,6 +1410,7 @@ class PipelineWithComputedPipelineStageMixin:
             print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
         return split_save_folder, split_save_paths, split_save_output_types, failed_keys
 
+    
     def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
         TODO: shouldn't replace newer values without prompting, especially if the loaded value doesn't have that computed property but the current results do
@@ -1532,6 +1538,7 @@ class PipelineWithComputedPipelineStageMixin:
 
         return loaded_global_computation_results, successfully_loaded_keys, failed_loaded_keys, found_split_paths
     
+    @function_attributes(short_name=None, tags=['load', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 08:18', related_items=['save_split_global_computation_results'])
     def load_split_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
         Reciprocal: `save_split_global_computation_results`

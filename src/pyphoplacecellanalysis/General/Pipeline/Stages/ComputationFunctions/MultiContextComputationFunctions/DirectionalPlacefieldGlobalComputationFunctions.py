@@ -448,10 +448,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
             decoder_RL_pf_peak_ranks_list: list
         )
         """
-        # content = ", ".join( [f"{a.name}={v!r}" for a in self.__attrs_attrs__ if (v := getattr(self, a.name)) != a.default] )
-        # content = ", ".join([f"{a.name}:{strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
         content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
-        # content = ", ".join([f"{a.name}" for a in self.__attrs_attrs__]) # 'TrackTemplates(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, is_good_LR_aclus, shared_RL_aclus_only_neuron_IDs, is_good_RL_aclus, decoder_LR_pf_peak_ranks_list, decoder_RL_pf_peak_ranks_list)'
         return f"{type(self).__name__}({content}\n)"
 
 
@@ -3766,10 +3763,22 @@ class TrialByTrialActivityResult(ComputedResult):
     directional_lap_epochs_dict: Dict[str, Epoch] =  serialized_field(default=None)
     directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = serialized_field(default=None)
 
-    # test_epochs_dict: Dict[str, pd.DataFrame] = serialized_field(default=None)
-    # train_epochs_dict: Dict[str, pd.DataFrame] = serialized_field(default=None)
-    # train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
 
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+    
 
 
 def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
@@ -4953,12 +4962,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
 
         # ## Directional Trial-by-Trial Activity:
-        # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
-        # # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
-        # single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
-        # # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
-        # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
-
         if 'pf1D_dt' not in owning_pipeline_reference.computation_results[global_epoch_name].computed_data:
             # if `KeyError: 'pf1D_dt'` recompute
             owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
@@ -4977,13 +4980,13 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix(active_pf_dt=active_pf_dt, directional_lap_epochs_dict=directional_lap_epochs_dict, included_neuron_IDs=any_decoder_neuron_IDs)
 
         ## OUTPUTS: directional_active_lap_pf_results_dicts
-        a_train_test_result: TrialByTrialActivityResult = TrialByTrialActivityResult(any_decoder_neuron_IDs=any_decoder_neuron_IDs,
+        a_trial_by_trial_result: TrialByTrialActivityResult = TrialByTrialActivityResult(any_decoder_neuron_IDs=any_decoder_neuron_IDs,
                                                                                      active_pf_dt=active_pf_dt,
                                                                                      directional_lap_epochs_dict=directional_lap_epochs_dict,
                                                                                      directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts,
                                                                                      is_global=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
-        global_computation_results.computed_data['TrialByTrialActivity'] = a_train_test_result
+        global_computation_results.computed_data['TrialByTrialActivity'] = a_trial_by_trial_result
 
         return global_computation_results
     
