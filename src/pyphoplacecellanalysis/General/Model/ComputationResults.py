@@ -14,7 +14,7 @@ from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr, SimpleFieldSizesReprMixin
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 ## Import with: from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
@@ -99,12 +99,15 @@ global_computation_results: pyphocorehelpers.DataStructure.dynamic_parameters.Dy
 
 
 @custom_define(slots=False)
-class ComputationResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+class ComputationResult(SimpleFieldSizesReprMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """
         The result of a single computation, on a filtered session with a specified config 
         The primary output data is stored in self.computed_data's dict
 
         Known to be used for `curr_active_pipeline.global_computation_results`
+
+
+        NOTE THAT DUE TO `AttrsBasedClassHelperMixin`, ALL `ComputationResult` subclasses MUST BE ATTRS BASED!
 
     """
     sess: DataSession = serialized_field(repr=True)
@@ -255,7 +258,7 @@ class VersionedResultMixin:
 
 
 @define(slots=False, repr=False)
-class ComputedResult(VersionedResultMixin, HDFMixin, AttrsBasedClassHelperMixin):
+class ComputedResult(SimpleFieldSizesReprMixin, VersionedResultMixin, HDFMixin, AttrsBasedClassHelperMixin):
     """ 2023-05-10 - an object to replace DynamicContainers and static dicts for holding specific computed results
     
     Usage:
@@ -294,13 +297,15 @@ class ComputedResult(VersionedResultMixin, HDFMixin, AttrsBasedClassHelperMixin)
         return state
 
     def __setstate__(self, state):
+        """ note that the __setstate__ is NOT inherited by children! They have to implement their own __setstate__ or their self.__dict__ will be used instead.
+        
+        """
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
 
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)
 
         self.__dict__.update(state)
-
 
         ## Disabled 2024-05-28 22:11 
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)

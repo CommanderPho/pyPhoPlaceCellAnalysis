@@ -255,7 +255,21 @@ class TrialByTrialActivity:
     def aclu_to_stability_score_dict(self) -> Dict[int, NDArray]:
         return dict(zip(self.neuron_ids, self.stability_score))
     
-
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+    
 
     @classmethod
     def compute_spatial_binned_activity_via_pfdt(cls, active_pf_dt: PfND_TimeDependent, epochs_df: pd.DataFrame, included_neuron_IDs=None):
