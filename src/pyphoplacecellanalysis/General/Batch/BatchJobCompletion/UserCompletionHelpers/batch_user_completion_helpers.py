@@ -1077,6 +1077,97 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
 
 
 
+def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+    """  Export the pipeline's HDF5 as 'pipeline_results.h5'
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+    
+    Results can be extracted from batch output by 
+    
+    # Extracts the callback results 'determine_session_t_delta_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+
+    """
+    import sys
+    from datetime import timedelta, datetime
+    from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
+    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_export_session_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    
+
+    desired_total_num_shuffles: int = 1000
+    allow_update_global_result: bool = False
+    
+    if ('SequenceBased' not in curr_active_pipeline.global_computation_results.computed_data) or (not hasattr(curr_active_pipeline.global_computation_results.computed_data, 'SequenceBased')):
+            # initialize
+            a_sequence_computation_container: SequenceBasedComputationsContainer = SequenceBasedComputationsContainer(wcorr_ripple_shuffle=None, is_global=True)
+    else:
+        a_sequence_computation_container: SequenceBasedComputationsContainer = deepcopy(curr_active_pipeline.global_computation_results.computed_data['SequenceBased'])
+
+
+    # global_computation_results.computed_data['SequenceBased'].included_qclu_values = included_qclu_values
+    if (not hasattr(a_sequence_computation_container, 'wcorr_ripple_shuffle') or (a_sequence_computation_container.wcorr_ripple_shuffle is None)):
+        # initialize a new wcorr result            
+        wcorr_shuffles: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=False)
+        a_sequence_computation_container.wcorr_ripple_shuffle = wcorr_shuffles
+    else:
+        ## get the existing one:
+        wcorr_shuffles = a_sequence_computation_container.wcorr_ripple_shuffle
+    
+
+    n_completed_shuffles: int = wcorr_shuffles.n_completed_shuffles
+
+    if n_completed_shuffles < desired_total_num_shuffles:   
+        print(f'n_prev_completed_shuffles: {n_completed_shuffles}.')
+        print(f'needed desired_total_num_shuffles: {desired_total_num_shuffles}.')
+        desired_new_num_shuffles: int = max((desired_total_num_shuffles - wcorr_shuffles.n_completed_shuffles), 0)
+        print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
+        ## add some more shuffles to it:
+        wcorr_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles)
+
+    # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
+    # wcorr_tool.save_data(filepath='temp100.pkl')
+
+    a_sequence_computation_container.wcorr_ripple_shuffle = wcorr_shuffles
+
+    
+    if allow_update_global_result:
+        print(f'updating global result because allow_update_global_result is True ')
+        curr_active_pipeline.global_computation_results.computed_data['SequenceBased'] = a_sequence_computation_container
+        # need to mark it as dirty?
+
+    ## standalone saving:
+    standalone_filename = 'standalone_wcorr_shuffles_data_only.pkl'
+    wcorr_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
+    err = None
+
+    try:
+        wcorr_shuffles.save_data(wcorr_shuffles_data_standalone_filepath)
+        was_write_good = True
+    except BaseException as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f"ERROR: encountered exception {err} while trying to perform wcorr_shuffles.save_data('{wcorr_shuffles_data_standalone_filepath}') for {curr_session_context}")
+        wcorr_shuffles_data_standalone_filepath = None # set to None because it failed.
+        if self.fail_on_exception:
+            raise err.exc
+
+    
+    callback_outputs = {
+     'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
+    }
+    across_session_results_extended_dict['compute_and_export_session_wcorr_shuffles_completion_function'] = callback_outputs
+    
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    return across_session_results_extended_dict
+
+
+
 
 _pre_user_completion_functions_header_template_str: str = f"""
 # ==================================================================================================================== #
