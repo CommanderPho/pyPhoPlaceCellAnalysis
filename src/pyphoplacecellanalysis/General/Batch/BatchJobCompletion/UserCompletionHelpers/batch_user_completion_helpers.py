@@ -1098,7 +1098,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     print(f'compute_and_export_session_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
 
-    desired_total_num_shuffles: int = 1000
+    desired_total_num_shuffles: int = 2000
     allow_update_global_result: bool = False
     
     if ('SequenceBased' not in curr_active_pipeline.global_computation_results.computed_data) or (not hasattr(curr_active_pipeline.global_computation_results.computed_data, 'SequenceBased')):
