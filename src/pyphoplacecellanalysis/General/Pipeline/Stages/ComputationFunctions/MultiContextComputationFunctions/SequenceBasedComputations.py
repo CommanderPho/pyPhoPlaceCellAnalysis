@@ -652,12 +652,15 @@ class SequenceBasedComputationsContainer(ComputedResult):
 
     Usage:
 
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle, SequenceBasedComputationsContainer
 
-        odd_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(odd_ripple_outputs)
-        even_ripple_rank_order_result = RankOrderResult.init_from_analysis_output_tuple(even_ripple_outputs)
-        curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(odd_ripple=odd_ripple_rank_order_result, even_ripple=even_ripple_rank_order_result, odd_laps=odd_laps_rank_order_result, even_laps=even_laps_rank_order_result)
-
+        wcorr_shuffle_results: SequenceBasedComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('SequenceBased', None)
+        if wcorr_shuffle_results is not None:    
+            wcorr_ripple_shuffle: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
+            print(f'wcorr_ripple_shuffle.n_completed_shuffles: {wcorr_ripple_shuffle.n_completed_shuffles}')
+        else:
+            print(f'SequenceBased is not computed.')
+            
     """
     _VersionedResultMixin_version: str = "2024.05.27_0" # to be updated in your IMPLEMENTOR to indicate its version
     
@@ -794,8 +797,15 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
 
         """ Usage:
         
-        wcorr_shuffle_results = curr_active_pipeline.global_computation_results.computed_data['SequenceBased']
-        wcorr_tool = wcorr_shuffle_results.
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle, SequenceBasedComputationsContainer
+
+        wcorr_shuffle_results: SequenceBasedComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('SequenceBased', None)
+        if wcorr_shuffle_results is not None:    
+            wcorr_ripple_shuffle: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
+            print(f'wcorr_ripple_shuffle.n_completed_shuffles: {wcorr_ripple_shuffle.n_completed_shuffles}')
+        else:
+            print(f'SequenceBased is not computed.')
+            
         """
         return global_computation_results
     

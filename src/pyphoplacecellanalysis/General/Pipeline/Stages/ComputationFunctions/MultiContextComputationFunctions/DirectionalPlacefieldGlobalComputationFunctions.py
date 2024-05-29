@@ -3737,23 +3737,22 @@ from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 
 @define(slots=False, repr=False, eq=False)
 class TrialByTrialActivityResult(ComputedResult):
-    """ 
-
-
-    #TODO 2024-05-28 19:14: - [ ] Not yet picklable, and I think it just needs a recurrsive __getstate__(...) function
-
-    
+    """ Holds the result computed by `_build_trial_by_trial_activity_metrics`
     Usage:
     
         from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
 
         directional_trial_by_trial_activity_result: TrialByTrialActivityResult = curr_active_pipeline.global_computation_results.computed_data.get('TrialByTrialActivity', None)
-        any_decoder_neuron_IDs = directional_trial_by_trial_activity_result.any_decoder_neuron_IDs
-        active_pf_dt: PfND_TimeDependent = directional_trial_by_trial_activity_result.active_pf_dt
-        directional_lap_epochs_dict: Dict[str, Epoch] = directional_trial_by_trial_activity_result.directional_lap_epochs_dict
-        directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts
-        directional_active_lap_pf_results_dicts
+
+        if directional_trial_by_trial_activity_result is not None:
+            any_decoder_neuron_IDs = directional_trial_by_trial_activity_result.any_decoder_neuron_IDs
+            active_pf_dt: PfND_TimeDependent = directional_trial_by_trial_activity_result.active_pf_dt
+            directional_lap_epochs_dict: Dict[str, Epoch] = directional_trial_by_trial_activity_result.directional_lap_epochs_dict
+            directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts
+            ## OUTPUTS: directional_trial_by_trial_activity_result, directional_active_lap_pf_results_dicts
+        else:
+            print(f'TrialByTrialActivity is not computed.')
 
     """
     _VersionedResultMixin_version: str = "2024.05.28_0" # to be updated in your IMPLEMENTOR to indicate its version
