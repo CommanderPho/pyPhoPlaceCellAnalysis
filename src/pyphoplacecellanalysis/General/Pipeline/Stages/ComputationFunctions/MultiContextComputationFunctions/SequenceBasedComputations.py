@@ -731,11 +731,11 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
     """ functions related to sequence-based decoding computations. """
     _computationGroupName = 'sequence_based'
     _computationGlobalResultGroupName = 'SequenceBased'
-    _computationPrecidence = 1002
+    _computationPrecidence = 1005
     _is_global = True
 
     @function_attributes(short_name='wcorr_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'session', 'pf1D'], input_requires=['DirectionalLaps', 'RankOrder'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
-        requires_global_keys=['DirectionalLaps', 'RankOrder'], provides_global_keys=['SequenceBased'],
+        requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
     def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1000):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
