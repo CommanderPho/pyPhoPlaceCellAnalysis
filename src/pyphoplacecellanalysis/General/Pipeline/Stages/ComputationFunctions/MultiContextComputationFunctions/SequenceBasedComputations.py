@@ -684,7 +684,16 @@ class WCorrShuffle(ComputedResult):
         n_epochs: int = np.shape(_out_shuffle_wcorr_arr)[1]
         if debug_print:
             print(f'n_epochs: {n_epochs}')
-        assert n_epochs == len(self.filtered_epochs_df), f"n_epochs: {n_epochs} != len(filtered_epochs_df): {len(self.filtered_epochs_df)}"
+        
+        try:
+            assert n_epochs == len(self.filtered_epochs_df), f"n_epochs: {n_epochs} != len(filtered_epochs_df): {len(self.filtered_epochs_df)}"
+        except AssertionError:
+            desired_ripple_decoding_time_bin_size: float = self.all_templates_decode_kwargs['desired_ripple_decoding_time_bin_size']
+            minimum_event_duration: float = self.all_templates_decode_kwargs['minimum_event_duration']
+            self.filtered_epochs_df = self.filtered_epochs_df[self.filtered_epochs_df['duration'] >= minimum_event_duration]
+            assert n_epochs == len(self.filtered_epochs_df), f"EVEN AFTER TRYING TO FILTER: n_epochs: {n_epochs} != len(filtered_epochs_df): {len(self.filtered_epochs_df)}"
+
+
         _out_shuffle_is_more_extreme = np.stack(_out_shuffle_is_more_extreme) # .shape ## (n_shuffles, n_epochs, 4)
         if debug_print:
             print(f'np.shape(_out_shuffle_wcorr_arr): {np.shape(_out_shuffle_wcorr_arr)}')
@@ -736,6 +745,7 @@ class WCorrShuffle(ComputedResult):
         if debug_print:
             print(f'np.shape(_out_p): {np.shape(_out_p)}') # (640, 4) - (n_shuffles, 4)
 
+        assert self.track_templates is not None
         total_n_shuffles_more_extreme_than_real_df: pd.DataFrame = pd.DataFrame(total_n_shuffles_more_extreme_than_real, columns=self.track_templates.get_decoder_names())
         total_n_shuffles_more_extreme_than_real_dict = dict(zip(self.track_templates.get_decoder_names(), total_n_shuffles_more_extreme_than_real.T))
 
@@ -744,8 +754,7 @@ class WCorrShuffle(ComputedResult):
         ## INPUTS: filtered_epochs_df
 
         # epoch_start_t = self.filtered_epochs_df['start'].to_numpy() # ripple start time
-
-        return (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict)
+        return (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr
 
 
     def save_data(self, filepath):

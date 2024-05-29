@@ -1155,7 +1155,9 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         if self.fail_on_exception:
             raise err.exc
 
-    
+    (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_shuffles.post_compute()
+
+
     callback_outputs = {
      'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
     }
