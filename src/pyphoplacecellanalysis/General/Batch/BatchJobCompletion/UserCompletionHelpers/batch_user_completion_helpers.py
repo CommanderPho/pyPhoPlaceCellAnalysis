@@ -1127,7 +1127,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         desired_new_num_shuffles: int = max((desired_total_num_shuffles - wcorr_shuffles.n_completed_shuffles), 0)
         print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
         ## add some more shuffles to it:
-        wcorr_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles)
+        wcorr_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline)
 
     # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
     # wcorr_tool.save_data(filepath='temp100.pkl')
