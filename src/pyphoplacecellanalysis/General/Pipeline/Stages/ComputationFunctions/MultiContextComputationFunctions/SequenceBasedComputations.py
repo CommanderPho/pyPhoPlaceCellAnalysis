@@ -71,7 +71,7 @@ class WCorrShuffle(ComputedResult):
 
 
     """
-    _VersionedResultMixin_version: str = "2024.05.28_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2024.05.30_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     curr_active_pipeline = non_serialized_field(default=None, repr=False) # required to continue computations
     track_templates = non_serialized_field(default=None, repr=False) # required to continue computations
@@ -88,7 +88,7 @@ class WCorrShuffle(ComputedResult):
     
     enable_saving_entire_decoded_shuffle_result: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
 
-    result_version: str = serialized_attribute_field(default='2024.05.28_0', is_computable=False, repr=False) # this field specfies the version of the result. 
+    result_version: str = serialized_attribute_field(default='2024.05.30_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
     @property
     def n_epochs(self):
@@ -534,9 +534,7 @@ class WCorrShuffle(ComputedResult):
 
         Only computes for the ripples, not the laps
 
-
         Usage:
-
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import shuffle_and_decode_wcorrs
 
             num_shuffles: int = 10
@@ -548,6 +546,8 @@ class WCorrShuffle(ComputedResult):
         # BEGIN FUNCTION BODY                                                                                                  #
         # ==================================================================================================================== #
 
+        is_pre_compute_mode: bool = False #TODO 2024-05-30 10:00: - [ ] is_pre_compute_mode seems to produce the same shuffles each time :[
+
         ## INPUTS: num_shuffles
         
         ## INPUTS: alt_directional_merged_decoders_result, num_shuffles, 
@@ -558,7 +558,8 @@ class WCorrShuffle(ComputedResult):
 
         shuffled_aclus, shuffle_IDXs = build_shuffled_ids(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs, num_shuffles=num_shuffles, seed=None)
 
-        laps_pre_computed_filter_epochs_dict, ripple_pre_computed_filter_epochs_dict = cls._pre_build_all_templates_decoding_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=deepcopy(track_templates.get_decoders_dict()), **all_templates_decode_kwargs)
+        if is_pre_compute_mode:
+            laps_pre_computed_filter_epochs_dict, ripple_pre_computed_filter_epochs_dict = cls._pre_build_all_templates_decoding_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=deepcopy(track_templates.get_decoders_dict()), **all_templates_decode_kwargs)
 
 
         ## FOR EACH SHUFFLE:
@@ -574,14 +575,18 @@ class WCorrShuffle(ComputedResult):
             shuffled_decoders_dict: Dict[str, BasePositionDecoder] = {a_name:cls._shuffle_pf1D_decoder(a_decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=shuffled_decoder_specific_neuron_ids_dict[a_name]) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
 
             ## Decode epochs for all four decoders:
-            # _, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
-            #                                                                                                                                                                                 skip_merged_decoding=True, **all_templates_decode_kwargs)
+        
 
-            decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = cls._all_templates_perform_pre_built_specific_epochs_decoding(laps_pre_computed_filter_epochs_dict=deepcopy(laps_pre_computed_filter_epochs_dict),
-                                                                                                                                                                              ripple_pre_computed_filter_epochs_dict=deepcopy(ripple_pre_computed_filter_epochs_dict),
-                                                                                                                                                                              shuffled_decoders_dict=shuffled_decoders_dict, **all_templates_decode_kwargs)
+            if is_pre_compute_mode:
+                decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = cls._all_templates_perform_pre_built_specific_epochs_decoding(laps_pre_computed_filter_epochs_dict=deepcopy(laps_pre_computed_filter_epochs_dict),
+                                                                                                                                                                                ripple_pre_computed_filter_epochs_dict=deepcopy(ripple_pre_computed_filter_epochs_dict),
+                                                                                                                                                                                shuffled_decoders_dict=shuffled_decoders_dict, **all_templates_decode_kwargs)
             
-            
+            else:
+                _, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
+                                                                                                                                                                        skip_merged_decoding=True, **all_templates_decode_kwargs)
+
+
             ## Weighted Correlation
             # decoder_laps_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict))
             decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_ripple_filter_epochs_decoder_result_dict))
