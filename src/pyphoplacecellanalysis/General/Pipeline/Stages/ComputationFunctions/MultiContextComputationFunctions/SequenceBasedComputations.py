@@ -700,21 +700,16 @@ class WCorrShuffle(ComputedResult):
                 # non-None pipeline passed in, use for self
                 self.curr_active_pipeline = curr_active_pipeline
 
-        
         if (self.track_templates is None):
-            if (track_templates is None):
-                ## recover them from `curr_active_pipeline`
-                if self.curr_active_pipeline is not None:
-                    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
-                    rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
-                    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-                    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-                    self.track_templates = deepcopy(track_templates)
-                else:
-                    raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
+            ## recover them from `curr_active_pipeline`
+            if self.curr_active_pipeline is not None:
+                directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
+                rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
+                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                self.track_templates = deepcopy(track_templates)
             else:
-                # non-None pipeline passed in, use for self
-                self.track_templates = track_templates
+                raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
 
         assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
 
