@@ -2976,7 +2976,7 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
                                           earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
                                           enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session',
                                           laps_title_prefix: str = f"Laps", ripple_title_prefix: str = f"Ripples",
-                                          save_figures=False, figure_save_extension='.png', debug_print=False):
+                                          save_figures=False, figure_save_extension='.png', is_dark_mode:bool=True, debug_print=False):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
 
     - Processes both ripple and laps
@@ -3026,14 +3026,14 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
     laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
     laps_title: str = f"{laps_title_prefix} - {laps_title_string_suffix}"
-    fig_laps, figure_laps_context = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title)
+    fig_laps, figure_laps_context = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title, is_dark_mode=is_dark_mode)
 
     # Create a bubble chart for ripples
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
     ripple_title: str = f"{ripple_title_prefix} - {ripple_title_string_suffix}"
-    fig_ripples, figure_ripples_context = _helper_build_figure(data_results_df=concatenated_ripple_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=ripple_title)
+    fig_ripples, figure_ripples_context = _helper_build_figure(data_results_df=concatenated_ripple_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=ripple_title, is_dark_mode=is_dark_mode)
 
     if save_figures:
         # Save the figures to the 'figures' subfolder
