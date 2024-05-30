@@ -1099,7 +1099,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     print(f'compute_and_export_session_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
 
-    desired_total_num_shuffles: int = 1000
+    desired_total_num_shuffles: int = 500
     allow_update_global_result: bool = False
     
     if ('SequenceBased' not in curr_active_pipeline.global_computation_results.computed_data) or (not hasattr(curr_active_pipeline.global_computation_results.computed_data, 'SequenceBased')):
@@ -1141,12 +1141,9 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         # need to mark it as dirty?
 
     ## standalone saving:
-    standalone_filename = 'standalone_wcorr_shuffles_data_only.pkl'
-    # wcorr_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
-    wcorr_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
     standalone_filename: str = f'{get_now_day_str()}_standalone_wcorr_ripple_shuffle_data_only_{a_sequence_computation_container.wcorr_ripple_shuffle.n_completed_shuffles}.pkl'
-    standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
-    print(f'standalone_filepath: {standalone_filepath}')
+    wcorr_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
+    print(f'wcorr_shuffles_data_standalone_filepath: "{wcorr_shuffles_data_standalone_filepath}"')
 
     err = None
 
