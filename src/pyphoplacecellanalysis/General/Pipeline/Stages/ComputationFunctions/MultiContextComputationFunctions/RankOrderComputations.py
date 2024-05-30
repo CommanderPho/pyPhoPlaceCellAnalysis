@@ -152,7 +152,7 @@ class Zscorer(HDFMixin, AttrsBasedClassHelperMixin):
         #     state['identity'] = type(self).get_stage_identity()
         self.__dict__.update(state)
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        super(Zscorer, self).__init__() # from
+        # super(Zscorer, self).__init__() # from
         
 
 
@@ -222,7 +222,7 @@ class LongShortStatsItem(object):
 
         self.__dict__.update(state)
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        super(LongShortStatsItem, self).__init__() # from
+        # super(LongShortStatsItem, self).__init__() # from
 
 
         self.fixup_types_if_needed()
