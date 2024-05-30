@@ -958,7 +958,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
     @function_attributes(short_name='decode_specific_epochs', tags=['decode', 'epochs', 'specific'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
-        uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'], used_by=['decode_using_new_decoders'], related_items=['get_proper_global_spikes_df'])
+        uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs', 'pre_build_epochs_decoding_result', 'perform_pre_built_specific_epochs_decoding'], used_by=['decode_using_new_decoders'], related_items=['get_proper_global_spikes_df'])
     def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
         """
         History:
@@ -967,22 +967,22 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         Uses:
             BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...)
         """
-
+        ## Equivalent:
+        # return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
         pre_built_epochs_decoding_result = self.pre_build_epochs_decoding_result(spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
         return self.perform_pre_built_specific_epochs_decoding(filter_epochs_decoder_result=pre_built_epochs_decoding_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
-        ## Equivalent:
-        return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
     
-
+    @function_attributes(short_name=None, tags=['pre-build', 'efficiency'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 00:00', related_items=['decode_specific_epochs', 'perform_pre_built_specific_epochs_decoding'])
     def pre_build_epochs_decoding_result(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DynamicContainer:
-        """
+        """ Builds the results used to call `.perform_pre_built_specific_epochs_decoding(...)`
         History:
             Split from `self.decode_specific_epochs` to allow reuse of the epochs for efficiency
         """
         return self._build_decode_specific_epochs_result_shell(neuron_IDs=self.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
     
+    @function_attributes(short_name=None, tags=['decode', 'efficiency'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 00:00', related_items=['decode_specific_epochs', 'pre_build_epochs_decoding_result'])
     def perform_pre_built_specific_epochs_decoding(self, filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
-        """
+        """ Called with the results from `.pre_build_epochs_decoding_result(...)`
         History:
             Split from `self.decode_specific_epochs` to allow reuse of the epochs for efficiency
         """

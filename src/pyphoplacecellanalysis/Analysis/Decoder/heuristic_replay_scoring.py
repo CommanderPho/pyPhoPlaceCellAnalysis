@@ -799,7 +799,7 @@ class HeuristicReplayScoring:
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_heuristic_scores
 
-        a_decoded_filter_epochs_decoder_result_dict, _out_new_scores = compute_all_heuristic_scores(a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
+        a_decoded_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
 
 
         """

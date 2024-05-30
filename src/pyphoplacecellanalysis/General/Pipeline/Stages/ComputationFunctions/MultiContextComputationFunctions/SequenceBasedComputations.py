@@ -396,9 +396,6 @@ class WCorrShuffle(ComputedResult):
         
         ## This does the single 1D versions
         for a_name, a_decoder in shuffled_decoders_dict.items():
-            # external-function way:
-            # decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
-            # a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(deepcopy(spikes_df), filter_epochs=deepcopy(replay_epochs_df), decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
             a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_decoder.perform_pre_built_specific_epochs_decoding(filter_epochs_decoder_result=deepcopy(ripple_pre_computed_filter_epochs_dict[a_name]), use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
             decoder_laps_filter_epochs_decoder_result_dict[a_name] = None
             decoder_ripple_filter_epochs_decoder_result_dict[a_name] = a_directional_ripple_filter_epochs_decoder_result
@@ -413,7 +410,9 @@ class WCorrShuffle(ComputedResult):
                             override_replay_epochs_df: Optional[pd.DataFrame]=None,
                             desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None,
                             skip_merged_decoding=False, debug_print: bool = False) -> Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]: #-> Tuple[None, Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, DecodedFilterEpochsResult]]]:
-        """ decodes laps and ripples for a single bin size but for each of the four track templates. 
+        """ MOSTLY DEPRICATED - used only for `build_real_result(...)`
+         
+        decodes laps and ripples for a single bin size but for each of the four track templates. 
         
         Added 2024-05-23 04:23 
 
