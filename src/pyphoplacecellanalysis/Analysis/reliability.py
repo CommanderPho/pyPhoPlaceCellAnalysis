@@ -243,7 +243,7 @@ class TrialByTrialActivity:
     """
     active_epochs_df: pd.DataFrame = field()
     C_trial_by_trial_correlation_matrix: NDArray = field(metadata={'shape':('n_neurons', 'n_epochs', 'n_epochs')})
-    z_scored_tuning_map_matrix: NDArray = field()
+    z_scored_tuning_map_matrix: NDArray = field(metadata={'shape':('n_epochs', 'n_neurons', 'n_pos_bins')})
     aclu_to_matrix_IDX_map: Dict = field() # factory=Factory(dict)
     neuron_ids: NDArray = field(metadata={'shape':('n_neurons',)})
     
