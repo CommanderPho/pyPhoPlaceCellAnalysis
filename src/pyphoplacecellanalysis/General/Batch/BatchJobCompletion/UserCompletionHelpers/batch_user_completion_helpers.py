@@ -1089,6 +1089,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
     """
     import sys
+    from scipy.io import savemat
+    import numpy as np
     from datetime import timedelta, datetime
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
@@ -1160,9 +1162,28 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
     # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_shuffles.post_compute()
 
+    ## MATLAB .mat format output
+    standalone_mat_filename: str = f'{get_now_rounded_time_str()}_standalone_all_shuffles_wcorr_array.mat' 
+    standalone_MAT_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
+    print(f'\tsaving .mat format to "{standalone_MAT_filepath}"...')
+    
+    try:
+        (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), all_shuffles_wcorr_array = a_sequence_computation_container.wcorr_ripple_shuffle.post_compute(curr_active_pipeline=curr_active_pipeline)
+        ## INPUTS: all_shuffles_wcorr_array
+        mat_dic = {"all_shuffles_wcorr_array": all_shuffles_wcorr_array, "n_epochs": a_sequence_computation_container.wcorr_ripple_shuffle.n_epochs, 'session': curr_active_pipeline.get_session_context().to_dict()}
+        savemat(standalone_MAT_filepath, mat_dic)
+
+    except BaseException as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f"ERROR: encountered exception {err} while trying to perform savemat('{standalone_MAT_filepath}') for {curr_session_context}")
+        standalone_MAT_filepath = None # set to None because it failed.
+        if self.fail_on_exception:
+            raise err.exc
 
     callback_outputs = {
      'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
+     'standalone_MAT_filepath': standalone_MAT_filepath,
     }
     across_session_results_extended_dict['compute_and_export_session_wcorr_shuffles_completion_function'] = callback_outputs
     
