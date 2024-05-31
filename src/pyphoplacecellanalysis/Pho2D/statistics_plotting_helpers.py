@@ -31,7 +31,7 @@ from matplotlib.gridspec import GridSpec
 
 
 @function_attributes(short_name=None, tags=['z-score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-30 17:10', related_items=[])
-def plot_histogram_for_z_scores(z_scores):
+def plot_histogram_for_z_scores(z_scores, title_suffix: str=""):
     # Conduct hypothesis test (two-tailed test)
     # Null hypothesis: the mean of z-scores is zero
     p_values = 2 * (1 - stats.norm.cdf(np.abs(z_scores)))
@@ -40,7 +40,7 @@ def plot_histogram_for_z_scores(z_scores):
     sns.histplot(z_scores, kde=True)
     plt.xlabel('Z-scores')
     plt.ylabel('Frequency')
-    plt.title('Histogram of Z-scored Values')
+    plt.title(f'Histogram of Z-scored Values{title_suffix}')
     plt.show()
 
     # Output p-values for reference

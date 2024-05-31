@@ -117,8 +117,6 @@ class WCorrShuffle(ComputedResult):
         return np.stack(_out_wcorr) # .shape ## (n_shuffles, n_epochs, 4)
 
 
-
-
     @classmethod
     def build_real_result(cls, track_templates, directional_merged_decoders_result, active_spikes_df, all_templates_decode_kwargs) -> Tuple[DirectionalPseudo2DDecodersResult, NDArray]:
         real_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
@@ -829,7 +827,7 @@ class WCorrShuffle(ComputedResult):
 
 
 
-    # def save_data_mat(self, standalone_filename: str, curr_active_pipeline):
+    # def save_data_mat(self, standalone_filename: str, curr_active_pipeline, **additional_mat_elements):
     #     """ tries to export the wcorr_ripple_shuffle results to a .mat MATLAB file.
     #     standalone_filename: str = f'{get_now_rounded_time_str()}_standalone_all_shuffles_wcorr_array.mat' 
     #     """
@@ -842,7 +840,10 @@ class WCorrShuffle(ComputedResult):
     #     print(f'saving .mat file to "{standalone_filepath}"...')
     #     # wcorr_ripple_shuffle.save_data(standalone_filepath)
     #     all_shuffles_wcorr_array: NDArray = deepcopy(self.all_shuffles_wcorr_array)
-    #     mat_dic = {"all_shuffles_wcorr_array": all_shuffles_wcorr_array, "n_epochs": self.n_epochs, 'session': curr_active_pipeline.get_session_context().to_dict()}
+    #     {'session': curr_active_pipeline.get_session_context().to_dict()}
+
+
+    #     mat_dic = {"all_shuffles_wcorr_array": all_shuffles_wcorr_array, "n_epochs": self.n_epochs, **additional_mat_elements}
 
     #     savemat(standalone_filepath, mat_dic)
     #     return mat_dic
@@ -898,6 +899,37 @@ class WCorrShuffle(ComputedResult):
         # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         # super(WCorrShuffle, self).__init__() # from
 
+
+    ## Plotting
+    def plot_histogram_figure(self, a_decoder_idx: int = 0, selected_epoch_index: int = 0):
+        """
+        
+        
+        """
+        from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_histogram_for_z_scores
+        import matplotlib.pyplot as plt
+
+        ## Get all shuffles for a single epoch:
+        ## INPUTS: all_shuffles_wcorr_array, a_decoder_idx, selected_epoch_index
+
+        ## start with one decoder:
+        # a_decoder_name: types.DecoderName = 'long_LR'
+        
+        # _single_epoch_all_shuffles_wcorr_arr = _out_shuffle_wcorr_arr[:, selected_epoch_index]
+        _single_epoch_all_shuffles_wcorr_arr = self.all_shuffles_wcorr_array[:, selected_epoch_index, a_decoder_idx]
+        print(f'np.shape(_single_epoch_all_shuffles_wcorr_arr): {np.shape(_single_epoch_all_shuffles_wcorr_arr)}') # (n_shuffles, )
+
+        _single_epoch_real_wcorr: float = self.real_decoder_ripple_weighted_corr_arr[selected_epoch_index, a_decoder_idx]
+
+        a_single_decoder_epoch_z_scored_values: NDArray = self.compute_z_transformed_scores(_single_epoch_all_shuffles_wcorr_arr)
+        a_single_decoder_epoch_z_score: float = self.compute_z_score(_single_epoch_all_shuffles_wcorr_arr, _single_epoch_real_wcorr)
+        print(f'a_single_decoder_epoch_z_score: {a_single_decoder_epoch_z_score}')
+        fig = plt.figure(num=f"histogram_for_z_scores - decoder[{a_decoder_idx}], epoch[{selected_epoch_index}]")
+        # List of z-scored values
+        z_scores = a_single_decoder_epoch_z_scored_values
+        plot_histogram_for_z_scores(z_scores, title_suffix=f': decoder[{a_decoder_idx}], epoch[{selected_epoch_index}]')
+        plt.axvline(a_single_decoder_epoch_z_score, color='red', linestyle='--', linewidth=2, label='Actual Value')
+        return fig
 
 
 
