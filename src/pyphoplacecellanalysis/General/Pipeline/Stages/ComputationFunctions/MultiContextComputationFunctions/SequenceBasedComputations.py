@@ -828,6 +828,27 @@ class WCorrShuffle(ComputedResult):
         saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array))
 
 
+
+    # def save_data_mat(self, standalone_filename: str, curr_active_pipeline):
+    #     """ tries to export the wcorr_ripple_shuffle results to a .mat MATLAB file.
+    #     standalone_filename: str = f'{get_now_rounded_time_str()}_standalone_all_shuffles_wcorr_array.mat' 
+    #     """
+    #     from scipy.io import savemat
+
+    #     assert curr_active_pipeline is not None
+
+    #     ## INPUTS: all_shuffles_wcorr_array
+    #     standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
+    #     print(f'saving .mat file to "{standalone_filepath}"...')
+    #     # wcorr_ripple_shuffle.save_data(standalone_filepath)
+    #     all_shuffles_wcorr_array: NDArray = deepcopy(self.all_shuffles_wcorr_array)
+    #     mat_dic = {"all_shuffles_wcorr_array": all_shuffles_wcorr_array, "n_epochs": self.n_epochs, 'session': curr_active_pipeline.get_session_context().to_dict()}
+
+    #     savemat(standalone_filepath, mat_dic)
+    #     return mat_dic
+    
+
+
     @classmethod
     def init_from_data_only_file(cls, filepath, curr_active_pipeline, track_templates=None, directional_decoders_epochs_decode_result=None, global_epoch_name=None):
         """ loads previously saved results from a pickle file to rebuild
