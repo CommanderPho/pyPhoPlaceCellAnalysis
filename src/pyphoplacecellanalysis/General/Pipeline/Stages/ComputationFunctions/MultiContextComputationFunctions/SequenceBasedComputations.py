@@ -643,7 +643,7 @@ class WCorrShuffle(ComputedResult):
                 self.curr_active_pipeline = curr_active_pipeline
 
         
-        if (self.track_templates is None):
+        if (self.track_templates is None) or isinstance(self.track_templates, dict):
             if (track_templates is None):
                 ## recover them from `curr_active_pipeline`
                 if self.curr_active_pipeline is not None:
