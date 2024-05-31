@@ -15,9 +15,6 @@ pio.templates.default = "draft"
 """
 
 
-
-
-
 pio.templates["draft"] = go.layout.Template(
     layout_annotations=[
         dict(

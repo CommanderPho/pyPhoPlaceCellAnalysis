@@ -71,51 +71,6 @@ def pho_jointplot(*args, **kwargs):
     return _out
 
 
-@function_attributes(short_name=None, tags=['histogram', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-30 17:17', related_items=[])
-def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
-    """ plots a stacked histogram of the many time-bin sizes 
-
-    Usage:    
-        from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_histograms
-
-        # You can use it like this:
-        _out0: "MatplotlibRenderPlots" = plot_histograms(data_type='Laps', session_spec='All Sessions', data_results_df=all_sessions_laps_time_bin_df, time_bin_duration_str="75 ms")
-        _out1: "MatplotlibRenderPlots" = plot_histograms(data_type='Ripples', session_spec='All Sessions', data_results_df=all_sessions_ripple_time_bin_df, time_bin_duration_str="75 ms")
-
-
-    """
-    # get the pre-delta epochs
-    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
-    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
-
-    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
-    
-    # plot pre-delta histogram
-    time_bin_sizes = pre_delta_df['time_bin_size'].unique()
-    
-    figure_identifier: str = f"{descriptor_str}_preDelta"
-    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
-    for time_bin_size in time_bin_sizes:
-        df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
-        df_tbs['P_Long'].hist(alpha=0.5, label=f'{float(time_bin_size):.2f}') 
-        
-
-    
-    plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
-    plt.legend()
-    plt.show()
-
-    # plot post-delta histogram
-    time_bin_sizes = post_delta_df['time_bin_size'].unique()
-    figure_identifier: str = f"{descriptor_str}_postDelta"
-    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
-    for time_bin_size in time_bin_sizes:
-        df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
-        df_tbs['P_Long'].hist(alpha=0.5, label=f'{float(time_bin_size):.2f}') 
-    
-    plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
-    plt.legend()
-    plt.show()
 
 
 def pho_plothelper(data, **kwargs):
@@ -289,52 +244,6 @@ def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_s
 #     plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
 #     plt.show()
     
-@function_attributes(short_name=None, tags=['histograms', 'old'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-26 00:00', related_items=[])
-def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
-    """ plots a stacked histogram of the many time-bin sizes 
-    
-    Usage:
-    
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_histograms
-        # # You can use it like this:
-        # plot_histograms('Laps', 'All Sessions', all_sessions_laps_time_bin_df, "75 ms")
-        # plot_histograms('Ripples', 'All Sessions', all_sessions_ripple_time_bin_df, "75 ms")
-    """
-    assert 'delta_aligned_start_t' in data_results_df.columns
-    # get the pre-delta epochs
-    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
-    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
-
-    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
-    
-    # plot pre-delta histogram
-    time_bin_sizes = pre_delta_df['time_bin_size'].unique()
-    
-    figure_identifier: str = f"{descriptor_str}_preDelta"
-    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
-    for time_bin_size in time_bin_sizes:
-        df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
-        df_tbs['P_Long'].hist(alpha=0.5, label=str(time_bin_size)) 
-    
-    plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
-    plt.legend()
-    plt.show()
-
-    # plot post-delta histogram
-    time_bin_sizes = post_delta_df['time_bin_size'].unique()
-    figure_identifier: str = f"{descriptor_str}_postDelta"
-    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
-    for time_bin_size in time_bin_sizes:
-        df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
-        df_tbs['P_Long'].hist(alpha=0.5, label=str(time_bin_size)) 
-    
-    plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
-    plt.legend()
-    plt.show()
-
-
-
-
 
 # ==================================================================================================================== #
 # 2024-01-29 - Ideal Pho Plotting Interface - UNFINISHED                                                               #
@@ -436,3 +345,165 @@ def _embed_in_subplots(scatter_fig):
     )
     return fig
 
+
+
+
+# ==================================================================================================================== #
+# 2024-01-29 - Across Session CSV Import and Plotting                                                                  #
+# ==================================================================================================================== #
+""" 
+
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import plot_across_sessions_scatter_results, plot_histograms, plot_stacked_histograms
+
+"""
+
+import matplotlib.pyplot as plt
+
+
+@function_attributes(short_name=None, tags=['histogram', 'plot', 'old'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-26 00:00', related_items=[])
+def plot_histograms(data_type: str, session_spec: str, data_results_df: pd.DataFrame, time_bin_duration_str: str) -> None:
+    """ plots a stacked histogram of the many time-bin sizes 
+
+    Usage:    
+        from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_histograms
+
+        # You can use it like this:
+        _out0: "MatplotlibRenderPlots" = plot_histograms(data_type='Laps', session_spec='All Sessions', data_results_df=all_sessions_laps_time_bin_df, time_bin_duration_str="75 ms")
+        _out1: "MatplotlibRenderPlots" = plot_histograms(data_type='Ripples', session_spec='All Sessions', data_results_df=all_sessions_ripple_time_bin_df, time_bin_duration_str="75 ms")
+
+
+    """
+    # get the pre-delta epochs
+    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+
+    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
+    
+    # plot pre-delta histogram
+    time_bin_sizes = pre_delta_df['time_bin_size'].unique()
+    
+    figure_identifier: str = f"{descriptor_str}_preDelta"
+    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
+    for time_bin_size in time_bin_sizes:
+        df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+        df_tbs['P_Long'].hist(alpha=0.5, label=f'{float(time_bin_size):.2f}') 
+    
+    plt.title(f'{descriptor_str} - pre-$\Delta$ time bins')
+    plt.legend()
+    plt.show()
+
+    # plot post-delta histogram
+    time_bin_sizes = post_delta_df['time_bin_size'].unique()
+    figure_identifier: str = f"{descriptor_str}_postDelta"
+    plt.figure(num=figure_identifier, clear=True, figsize=(6, 2))
+    for time_bin_size in time_bin_sizes:
+        df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
+        df_tbs['P_Long'].hist(alpha=0.5, label=f'{float(time_bin_size):.2f}') 
+    
+    plt.title(f'{descriptor_str} - post-$\Delta$ time bins')
+    plt.legend()
+    plt.show()
+
+
+
+@function_attributes(short_name=None, tags=['histogram', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
+def plot_histograms_across_sessions(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column='P_Long', **kwargs) -> None:
+    """ plots a set of two histograms in subplots, split at the delta for each session.
+    from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import plot_histograms_across_sessions, plot_stacked_histograms
+
+    """
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
+    layout = kwargs.pop('layout', 'none')
+    defer_show = kwargs.pop('defer_show', False)
+
+    fig = plt.figure(layout=layout, **kwargs) # layout="constrained",
+    ax_dict = fig.subplot_mosaic(
+        [
+            ["epochs_pre_delta", ".", "epochs_post_delta"],
+        ],
+        # set the height ratios between the rows
+        # height_ratios=[8, 1],
+        # height_ratios=[1, 1],
+        # set the width ratios between the columns
+        # width_ratios=[1, 8, 8, 1],
+        sharey=True,
+        gridspec_kw=dict(wspace=0.25, hspace=0.25) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+    )
+
+    histogram_kwargs = dict(orientation="horizontal", bins=25)
+    # get the pre-delta epochs
+    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+
+    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
+
+    # plot pre-delta histogram
+    pre_delta_df.hist(ax=ax_dict['epochs_pre_delta'], column=column, **histogram_kwargs)
+    ax_dict['epochs_pre_delta'].set_title(f'{descriptor_str} - pre-$\Delta$ time bins')
+
+    # plot post-delta histogram
+    post_delta_df.hist(ax=ax_dict['epochs_post_delta'], column=column, **histogram_kwargs)
+    ax_dict['epochs_post_delta'].set_title(f'{descriptor_str} - post-$\Delta$ time bins')
+    if not defer_show:
+        fig.show()
+    return MatplotlibRenderPlots(name='plot_histograms', figures=[fig], axes=ax_dict)
+
+
+
+@function_attributes(short_name=None, tags=['histogram', 'stacked', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
+def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', **kwargs) -> None:
+    """ plots a colorful stacked histogram for each of the many time-bin sizes
+    """
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
+    layout = kwargs.pop('layout', 'none')
+    defer_show = kwargs.pop('defer_show', False)
+    descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
+    figure_identifier: str = f"{descriptor_str}_PrePostDelta"
+
+    fig = plt.figure(num=figure_identifier, clear=True, figsize=(12, 2), layout=layout, **kwargs) # layout="constrained", 
+    fig.suptitle(f'{descriptor_str}')
+    
+    ax_dict = fig.subplot_mosaic(
+        [
+            # ["epochs_pre_delta", ".", "epochs_post_delta"],
+             ["epochs_pre_delta", "epochs_post_delta"],
+        ],
+        sharey=True,
+        gridspec_kw=dict(wspace=0.25, hspace=0.25) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+    )
+    
+    histogram_kwargs = dict(orientation="horizontal", bins=25)
+    
+    assert column_name in data_results_df, f"column_name: {column_name} missing from df. {list(data_results_df.columns)}"
+    time_bin_sizes: int = data_results_df['time_bin_size'].unique()
+    if (not np.all(np.isnan(time_bin_sizes))):
+        # if there's at least one non-NaN time_bin_size, drop the NaNs:
+        data_results_df = data_results_df.dropna(subset=['time_bin_size'], inplace=False)
+        time_bin_sizes = data_results_df['time_bin_size'].unique() # drop the NaN timebin size
+
+    # get the pre-delta epochs
+    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+    
+    # plot pre-delta histogram:
+    for time_bin_size in time_bin_sizes:
+        df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+        df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+    
+    ax_dict['epochs_pre_delta'].set_ylabel(f"{column_name}") # only set on the leftmost subplot
+    ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ time bins')
+    ax_dict['epochs_pre_delta'].legend()
+
+    # plot post-delta histogram:
+    time_bin_sizes: int = post_delta_df['time_bin_size'].unique()
+    for time_bin_size in time_bin_sizes:
+        df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
+        df_tbs[column_name].hist(ax=ax_dict['epochs_post_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
+    
+    ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ time bins')
+    if len(time_bin_sizes) > 1:
+        ax_dict['epochs_post_delta'].legend()
+    
+    if not defer_show:
+        fig.show()
+    return MatplotlibRenderPlots(name='plot_stacked_histograms', figures=[fig], axes=ax_dict)
