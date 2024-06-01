@@ -107,65 +107,6 @@ def recover_user_annotation_and_is_valid_columns(an_active_df, all_sessions_all_
 
 
 
-# ==================================================================================================================== #
-# 2024-04-25 - Factoring Out Helper GUI Code                                                                           #
-# ==================================================================================================================== #
-
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
-
-@function_attributes(short_name=None, tags=['raster', 'attached'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:14', related_items=[])
-def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window, track_templates, active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df):
-    """ creates a new RankOrderRastersDebugger for use by `paginated_multi_decoder_decoded_epochs_window`.
-    
-    You can middle-click on any epoch heatmap in `paginated_multi_decoder_decoded_epochs_window` to display that corresponding epoch in the RankOrderRastersDebugger
-    
-    
-
-    paginated_multi_decoder_decoded_epochs_window
-
-    Captures: paginated_multi_decoder_decoded_epochs_window
-    
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _build_attached_raster_viewer
-        _out_ripple_rasters = _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window, track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df=filtered_ripple_simple_pf_pearson_merged_df)
-    
-    
-    """
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
-    # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    # global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
-    global_spikes_df = deepcopy(active_spikes_df)
-    _out_ripple_rasters: RankOrderRastersDebugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, deepcopy(filtered_ripple_simple_pf_pearson_merged_df),
-                                                                                                    track_templates, None,
-                                                                                                        None, None,
-                                                                                                        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right']))),
-                                                                                                        )
-    _out_ripple_rasters.set_top_info_bar_visibility(False)
-    _out_ripple_rasters.set_bottom_controls_visibility(False)
-
-    ## Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior.
-    def update_attached_raster_viewer_epoch_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
-        """ Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior. 
-        called when the user middle-clicks an epoch 
-        
-        captures: _out_ripple_rasters
-        """
-        print(f'update_attached_raster_viewer_epoch_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
-        if clicked_epoch_start_stop_time is not None:
-            if len(clicked_epoch_start_stop_time) == 2:
-                start_t, end_t = clicked_epoch_start_stop_time
-                print(f'start_t: {start_t}')
-                _out_ripple_rasters.programmatically_update_epoch_IDX_from_epoch_start_time(start_t)
-
-    ## Attach the update to the pagination controllers:
-    for a_name, a_pagination_controller in paginated_multi_decoder_decoded_epochs_window.pagination_controllers.items():
-        # a_pagination_controller.params.debug_print = True
-        if not a_pagination_controller.params.has_attr('on_middle_click_item_callbacks'):
-            a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
-        a_pagination_controller.params.on_middle_click_item_callbacks['update_attached_raster_viewer_epoch_callback'] = update_attached_raster_viewer_epoch_callback
-
-        
-    return _out_ripple_rasters
 
 
 
