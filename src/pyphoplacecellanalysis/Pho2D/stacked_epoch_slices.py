@@ -1412,6 +1412,13 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             print(f'no found selections.')
             
         return new_selections
+    
+
+    def show_message(self, message: str, durationMs:int=4000):
+        """ show a toast message """
+        self.ui.mw.toast.should_position_to_parent_window = False
+        self.ui.mw.toast.show_message(message=message, durationMs=durationMs)
+
 
     
 @metadata_attributes(short_name=None, tags=['paginated', 'multi-decoder', 'epochs', 'widget', 'window', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-23 13:54', related_items=[])
@@ -2149,6 +2156,23 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     #         setattr(child, prop_name, value)
 
 
+    def show_message(self, message: str, durationMs:int=4000):
+        """ show a toast message """
+        for a_name, a_pagination_controller in self.pagination_controllers.items():
+            a_pagination_controller.show_message(message=message, durationMs=durationMs)
+
+
+    def enable_middle_click_selected_epoch_times_to_clipboard(self, is_enabled:bool=True):
+        """ sets the copying of epoch times to the clipboard """
+        for a_name, a_pagination_controller in self.pagination_controllers.items():
+            # a_pagination_controller.params.debug_print = True
+            if not a_pagination_controller.params.has_attr('on_middle_click_item_callbacks'):
+                a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
+
+            if is_enabled:
+                a_pagination_controller.params.on_middle_click_item_callbacks['copy_to_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_to_epoch_times_to_clipboard_callback
+            else:
+                a_pagination_controller.params.on_middle_click_item_callbacks.pop('copy_to_epoch_times_to_clipboard_callback')
 
 
 def interactive_good_epoch_selections(annotations_man: UserAnnotationsManager, curr_active_pipeline) -> dict:
@@ -2228,22 +2252,9 @@ def align_decoder_pagination_controller_windows(pagination_controller_dict):
         ratio_content_height = 1.0 # after the first window, 1.0 should be used since they're all the same height
 
 
-
-
-
-
-
-
-
-
-
-
-
 # ==================================================================================================================== #
 # 2024-04-25 - Factoring Out Helper GUI Code                                                                           #
 # ==================================================================================================================== #
-
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 
 @function_attributes(short_name=None, tags=['raster', 'attached'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:14', related_items=[])
 def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window, track_templates, active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df):
