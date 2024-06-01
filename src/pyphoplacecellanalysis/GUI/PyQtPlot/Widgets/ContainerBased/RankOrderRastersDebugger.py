@@ -723,6 +723,10 @@ class RankOrderRastersDebugger:
         # )
 
 
+    def setWindowTitle(self, title: str):
+        """ updates the window's title """
+        self.ui.root_dockAreaWindow.setWindowTitle(title)
+
 
     def get_ipywidget(self):
         """ Displays a slider that allows the user to select the epoch_IDX instead of having to type it and call it manually
