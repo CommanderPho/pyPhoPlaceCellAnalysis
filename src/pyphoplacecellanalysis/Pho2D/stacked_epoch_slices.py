@@ -677,7 +677,7 @@ class EpochSelectionsObject(SelectionsObject):
 class ClickActionCallbacks:
     """ Potential callbacks to be performed when an epoch is clicked. 
     
-    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import ClickedCallbacks
+    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import ClickActionCallbacks
 
     """
     def copy_axis_image_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
