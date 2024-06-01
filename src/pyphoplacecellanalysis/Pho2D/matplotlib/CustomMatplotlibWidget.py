@@ -17,12 +17,13 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
+from pyphocorehelpers.gui.Qt.widgets.toast_notification_widget import ToastWidget, ToastShowingWidgetMixin
 
 
 __all__ = ['CustomMatplotlibWidget']
 
 @metadata_attributes(short_name=None, tags=['matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 14:20')
-class CustomMatplotlibWidget(QtWidgets.QWidget):
+class CustomMatplotlibWidget(ToastShowingWidgetMixin, QtWidgets.QWidget):
     """
     Implements a Matplotlib figure inside a QWidget.
     Use getFigure() and redraw() to interact with matplotlib.
@@ -98,7 +99,8 @@ class CustomMatplotlibWidget(QtWidgets.QWidget):
 
         self.ui.statusBar = None
         # self._buildUI_setup_statusbar()
-
+        self.toast = None
+        self._init_ToastShowingWidgetMixin()
 
     def _buildUI_setup_statusbar(self):
         """ builds a status bar added to the bottom of the non-scrollable view.
