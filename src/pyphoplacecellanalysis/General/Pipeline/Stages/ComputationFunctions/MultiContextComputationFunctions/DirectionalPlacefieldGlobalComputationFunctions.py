@@ -2341,7 +2341,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['columns', 'epochs', 'IMPORTANT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-14 09:22', related_items=[])
     def add_all_extra_epoch_columns(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333, debug_print=False) -> None:
-        """ instead of filtering by the good/user-selected ripple epochs, it adds two columns: ['is_user_annotated_epoch', 'is_user_annotated_epoch'] so they can be later identified and filtered to `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs`
+        """ instead of filtering by the good/user-selected ripple epochs, it adds two columns: ['is_valid_epoch', 'is_user_annotated_epoch'] so they can be later identified and filtered to `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs`
         Updates `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs` in-place 
         """
         ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
@@ -2374,6 +2374,14 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         is_col_name_suffix_mode: bool - if True, the variable name (specified by `col_name`)
 
+        
+        Usage:
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+
+            directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+            directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
+
         """
         direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
         track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
@@ -2402,9 +2410,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
         LS_diff_col_name: str = f'{col_name}_diff'
         df[LS_diff_col_name] = df[long_best_col_name].abs() - df[short_best_col_name].abs()
 
-
         return df, (long_best_col_name, short_best_col_name, LS_diff_col_name)
-        
+
+
     @classmethod
     def get_all_scores_column_names(cls) -> Tuple:
         # Column Names _______________________________________________________________________________________________________ #
@@ -2429,17 +2437,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
         merged_conditional_prob_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
         merged_wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
 
-
-        # ScoresDataFrameColumnNames = attrs.make_class("ScoresDataFrameColumnNames", {k:field() for k in ("all_df_shared_column_names", "all_df_score_column_names", "all_df_column_names",
-        #                                                                                                   "merged_conditional_prob_column_names", "merged_wcorr_column_names", "heuristic_score_col_names")})
-        
-        # return ScoresDataFrameColumnNames(all_df_shared_column_names=all_df_shared_column_names, all_df_score_column_names=all_df_score_column_names, all_df_column_names=all_df_column_names,
-        #             merged_conditional_prob_column_names=merged_conditional_prob_column_names, merged_wcorr_column_names=merged_wcorr_column_names, heuristic_score_col_names=heuristic_score_col_names)
-
-
-        # ScoresDataFrameColumnNames = attrs.make_class("ScoresDataFrameColumnNames", {k:field() for k in ("all_df_shared_column_names", "all_df_score_column_names", "all_df_column_names",
-        #                                                                                                   "merged_conditional_prob_column_names", "merged_wcorr_column_names", "heuristic_score_col_names")})
-        
         return (all_df_shared_column_names, all_df_score_column_names, all_df_column_names,
                     merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names)
 
@@ -3957,7 +3954,7 @@ def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decod
     return a_directional_laps_filter_epochs_decoder_result, a_directional_ripple_filter_epochs_decoder_result #, (laps_radon_transform_df, ripple_radon_transform_df)
 
 
-@function_attributes(short_name=None, tags=['wcorr', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-19 18:07', related_items=[])
+@function_attributes(short_name=None, tags=['wcorr', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=['_compute_all_df_score_metrics', ''], creation_date='2024-04-19 18:07', related_items=[])
 def compute_weighted_correlations(decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], debug_print=False):
     """ 
     ## Weighted Correlation can only be applied to decoded posteriors, not spikes themselves.
@@ -4038,6 +4035,7 @@ def _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D
 
     return laps_radon_transform_df, laps_radon_transform_extras, ripple_radon_transform_df, ripple_radon_transform_extras
 
+
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=['_compute_all_df_score_metrics'], creation_date='2024-05-22 18:07', related_items=[])
 def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_df_dict: Dict[str, pd.DataFrame], decoder_ripple_df_dict: Dict[str, pd.DataFrame], active_df_columns = ['wcorr']):
     """ Called one for each specific score metric (e.g. (Radon Transform, WCorr, PearsonR)) after it is computed to compute its merged dataframes and dataframe dicts. 
@@ -4095,7 +4093,8 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
 
     return (laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
 
-@function_attributes(short_name=None, tags=['weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=['_compute_complete_df_metrics', '_compute_weighted_correlations', '_compute_epoch_decoding_radon_transform_for_decoder', '_compute_matching_best_indicies'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-02-15 19:55', related_items=[])
+
+@function_attributes(short_name=None, tags=['weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=['_compute_complete_df_metrics', 'compute_weighted_correlations', '_compute_epoch_decoding_radon_transform_for_decoder', '_compute_matching_best_indicies'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-02-15 19:55', related_items=[])
 def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]], spikes_df: pd.DataFrame, should_skip_radon_transform=False):
     """ computes for all score metrics (Radon Transform, WCorr, PearsonR) and adds them appropriately. 
     
@@ -4211,7 +4210,7 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
 
 # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=['_compute_lap_and_ripple_epochs_decoding_for_decoder'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-05-22 18:07', related_items=[])
-def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, Optional[DecodedFilterEpochsResult]]]:
+def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates: "TrackTemplates") -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, Optional[DecodedFilterEpochsResult]]]:
         """ Custom Decoder Computation:
         2024-02-15 - Appears to be best to refactor to the TrackTemplates object. __________________________________________ #
             # directional_merged_decoders_result mmakes more sense since it has the time_bin_size already
@@ -4227,7 +4226,7 @@ def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_mer
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
 
         ## Decode epochs for all four decoders:
-        decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {}
+        decoder_laps_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]] = {}
         decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]] = {}
 
         for a_name, a_decoder in track_templates.get_decoders_dict().items():

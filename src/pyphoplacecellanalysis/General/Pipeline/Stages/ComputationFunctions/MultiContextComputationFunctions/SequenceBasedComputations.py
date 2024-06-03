@@ -2,6 +2,7 @@
 # 2024-05-27 - WCorr Shuffle Stuff                                                                                     #
 # ==================================================================================================================== #
 from copy import deepcopy
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
@@ -125,8 +126,8 @@ class WCorrShuffle(ComputedResult):
                                                                                                                                                                                                     skip_merged_decoding=True, **all_templates_decode_kwargs)
         real_decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(real_decoder_ripple_filter_epochs_decoder_result_dict))
         real_decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in real_decoder_ripple_weighted_corr_df_dict.items()}
-        real_decoder_ripple_weighted_corr_df = pd.DataFrame(real_decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
-        real_decoder_ripple_weighted_corr_arr = real_decoder_ripple_weighted_corr_df.to_numpy()
+        real_decoder_ripple_weighted_corr_df: pd.DataFrame = pd.DataFrame(real_decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
+        real_decoder_ripple_weighted_corr_arr: NDArray = real_decoder_ripple_weighted_corr_df.to_numpy()
         print(f'real_decoder_ripple_weighted_corr_arr: {np.shape(real_decoder_ripple_weighted_corr_arr)}')
         return real_directional_merged_decoders_result, real_decoder_ripple_weighted_corr_arr
     
@@ -242,15 +243,10 @@ class WCorrShuffle(ComputedResult):
         # ==================================================================================================================== #
         active_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
         real_directional_merged_decoders_result, real_decoder_ripple_weighted_corr_arr = cls.build_real_result(track_templates=track_templates, directional_merged_decoders_result=alt_directional_merged_decoders_result, active_spikes_df=active_spikes_df, all_templates_decode_kwargs=all_templates_decode_kwargs)
-
-
         # laps_pre_computed_filter_epochs_dict, ripple_pre_computed_filter_epochs_dict = cls._pre_build_all_templates_decoding_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df),
         #                                                                                                                             a_directional_merged_decoders_result=alt_directional_merged_decoders_result,
         #                                                                                                                             shuffled_decoders_dict=deepcopy(track_templates.get_decoders_dict()),
         #                                                                                                                             **all_templates_decode_kwargs)
-
-
-
 
         return cls(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
             filtered_epochs_df=replay_epochs_df, active_spikes_df=active_spikes_df,
@@ -293,11 +289,17 @@ class WCorrShuffle(ComputedResult):
         a_shuffled_decoder.F[shuffle_IDXs, :] = a_shuffled_decoder.F[shuffle_IDXs, :] # @TODO - is this needed?
 
         return a_shuffled_decoder
+    
+
+
 
     @classmethod
     def _pre_build_all_templates_decoding_epochs(cls, spikes_df: pd.DataFrame, a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, shuffled_decoders_dict, use_single_time_bin_per_epoch: bool,
                             override_replay_epochs_df: Optional[pd.DataFrame]=None, desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None, debug_print: bool = False) -> Tuple[Dict[types.DecoderName, Any], Dict[types.DecoderName, Any]]: #-> Tuple[None, Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, DecodedFilterEpochsResult]]]:
         """ 
+        
+        #TODO 2024-06-03 11:07: - [ ] NOT WORKING, REVERTED TO LONG-FORM METHOD
+
         History:
             Split `_try_all_templates_decode` into `_pre_build_all_templates_decoding_epochs` and `_all_templates_perform_pre_built_specific_epochs_decoding`
 
@@ -378,6 +380,7 @@ class WCorrShuffle(ComputedResult):
         
         Split `_try_all_templates_decode` into `_pre_build_all_templates_decoding_epochs` and `_all_templates_perform_pre_built_specific_epochs_decoding`
 
+        #TODO 2024-06-03 11:07: - [ ] NOT WORKING, REVERTED TO LONG-FORM METHOD
         
         History:
             Split `perform_decode_specific_epochs` into two subfunctions: `_build_decode_specific_epochs_result_shell` and `_perform_decoding_specific_epochs`
@@ -596,41 +599,6 @@ class WCorrShuffle(ComputedResult):
 
         return _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_full_decoded_results_list
 
-
-    # @classmethod
-    # def _shuffle_decode_worker(cls, spikes_df: pd.DataFrame, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, a_shuffle_IDXs: NDArray, a_shuffle_aclus: NDArray):
-    #     """ a single parallel worker for computing the decoding for a single shuffle """
-    #     alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = cls._shuffle_pf1D_decoder(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=a_shuffle_aclus)
-
-    #     shuffled_decoder_specific_neuron_ids_dict = dict(zip(track_templates.get_decoder_names(), [a_shuffle_aclus[np.isin(a_shuffle_aclus, v)] for v in track_templates.decoder_neuron_IDs_list]))
-
-    #     shuffled_decoders_dict = {a_name: cls._shuffle_pf1D_decoder(a_decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=shuffled_decoder_specific_neuron_ids_dict[a_name]) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
-
-    #     _, (_, decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=spikes_df, a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
-    #                                                                                              skip_merged_decoding=True, **all_templates_decode_kwargs)
-    #     decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_ripple_filter_epochs_decoder_result_dict))
-
-    #     return decoder_ripple_weighted_corr_df_dict
-
-    # @classmethod
-    # def _shuffle_and_decode_wcorrs(cls, curr_active_pipeline, track_templates: "TrackTemplates", alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2):
-    #     """ We shuffle the cell idenitities and decodes new posteriors from the shuffled values. Only computes for the ripples, not the laps.
-    #     """
-    #     _updated_output_extracted_result_wcorrs_list = []
-
-    #     shuffled_aclus, shuffle_IDXs = build_shuffled_ids(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs, num_shuffles=num_shuffles, seed=None)
-
-    #     max_workers: int = os.cpu_count()
-
-    #     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-    #         futures = [executor.submit(cls._shuffle_decode_worker, deepcopy(curr_active_pipeline.sess.spikes_df), track_templates, alt_directional_merged_decoders_result, all_templates_decode_kwargs, a_shuffle_IDXs, a_shuffle_aclus)
-    #                    for a_shuffle_IDXs, a_shuffle_aclus in zip(shuffle_IDXs, shuffled_aclus)]
-
-    #         for future in as_completed(futures):
-    #             _updated_output_extracted_result_wcorrs_list.append(future.result())
-
-    #     return _updated_output_extracted_result_wcorrs_list
-    
 
     def compute_shuffles(self, num_shuffles: int=100, curr_active_pipeline=None, track_templates=None) -> List:
         """ Computes new shuffles and adds them to `self.output_extracted_result_wcorrs_list`
