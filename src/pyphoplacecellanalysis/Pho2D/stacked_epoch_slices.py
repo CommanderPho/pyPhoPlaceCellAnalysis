@@ -679,6 +679,8 @@ class ClickActionCallbacks:
     
     from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import ClickActionCallbacks
 
+    paginated_multi_decoder_decoded_epochs_window.params.on_middle_click_item_callbacks['copy_axis_image_to_clipboard_callback'] = ClickActionCallbacks.copy_axis_image_to_clipboard_callback
+
     """
     def copy_axis_image_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
         """ called when the user middle-clicks an epoch 
@@ -2161,6 +2163,21 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         for a_name, a_pagination_controller in self.pagination_controllers.items():
             a_pagination_controller.show_message(message=message, durationMs=durationMs)
 
+
+
+    def update_titles(self, window_title: str, children_titles: Optional[Dict[str, Optional[str]]] = None):
+        """ sets the suptitle and window title for the figure """
+        # Set the window title:
+        self.setWindowTitle(window_title)
+
+        ## Update embedded figures:
+        if children_titles is not None:
+            for a_name, a_pagination_controller in self.pagination_controllers.items():
+                desired_child_title = children_titles.get(a_name, None)
+                if desired_child_title is not None:
+                    a_pagination_controller.ui.mw.fig.suptitle(desired_child_title, wrap=True) # set the plot suptitle
+                    a_pagination_controller.ui.mw.draw()
+        
 
     def enable_middle_click_selected_epoch_times_to_clipboard(self, is_enabled:bool=True):
         """ sets the copying of epoch times to the clipboard """
