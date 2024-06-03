@@ -3908,7 +3908,60 @@ def get_proper_global_spikes_df(owning_pipeline_reference) -> pd.DataFrame:
     global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df).spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
     return global_spikes_df
 
-@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
+
+
+def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time_bin_size: float, minimum_event_duration: Optional[float]=None, mode:str='DropShorter', debug_print: bool = False) -> Tuple[pd.DataFrame, float]:
+    """ Either drops invalid epochs from `replay_epochs_df` or adjusts `ripple_decoding_time_bin_size` (depending on the `mode`) to ensure that no invalid epochs are passed for decoding.
+
+    DropShorterMode
+
+    replay_epochs_df, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode="DropShorter")
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_proper_filter_epochs
+
+    global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode="DropShorter")
+    global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, mode="ConstrainDecodingTimeBinSizeToMinimum")
+
+
+    """
+    if not isinstance(epochs_df, pd.DataFrame):
+        epochs_df = epochs_df.to_dataframe()
+
+    if mode == 'DropShorter':
+        ripple_decoding_time_bin_size: float = desired_decoding_time_bin_size # allow direct use            
+        ## Drop those less than the time bin duration
+        if debug_print:
+            print(f'DropShorterMode:')
+        pre_drop_n_epochs = len(epochs_df)
+        if minimum_event_duration is not None:                
+            epochs_df = epochs_df[epochs_df['duration'] >= minimum_event_duration]
+            post_drop_n_epochs = len(epochs_df)
+            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            if debug_print:
+                print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
+        else:
+            epochs_df = epochs_df[epochs_df['duration'] > desired_decoding_time_bin_size]
+            post_drop_n_epochs = len(epochs_df)
+            n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+            if debug_print:
+                print(f'\tdropping {n_dropped_epochs} that are shorter than our ripple decoding time bin size of {desired_decoding_time_bin_size}', end='\t') 
+
+        if debug_print:
+            print(f'{post_drop_n_epochs} remain.')
+        return epochs_df, ripple_decoding_time_bin_size
+    
+    elif mode == 'ConstrainDecodingTimeBinSizeToMinimum':
+        from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
+        min_possible_time_bin_size: float = find_minimum_time_bin_duration(epochs_df['duration'].to_numpy())
+        ripple_decoding_time_bin_size: float = min(desired_decoding_time_bin_size, min_possible_time_bin_size) # 10ms # 0.002
+
+        return epochs_df, ripple_decoding_time_bin_size # return the unfiltered epochs_df and the constrained 'ripple_decoding_time_bin_size'
+    else:
+        raise NotImplementedError(f"unhandled mode: '{mode}'")
+    
+
+
+@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
 def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False) -> Tuple[DecodedFilterEpochsResult, Optional[DecodedFilterEpochsResult]]:
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder for a single set of time_bin_size values
     ~12.2s per decoder.
@@ -3926,22 +3979,28 @@ def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decod
         print(f'WARNING: use_single_time_bin_per_epoch=True so time bin sizes will be ignored.')
         
     ## Decode Laps:
-    global_any_laps_epochs_obj = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any' (? same as global_epoch_name?)
-    min_possible_laps_time_bin_size: float = find_minimum_time_bin_duration(global_any_laps_epochs_obj.to_dataframe()['duration'].to_numpy())
-    laps_decoding_time_bin_size: float = min(desired_laps_decoding_time_bin_size, min_possible_laps_time_bin_size) # 10ms # 0.002
-    if use_single_time_bin_per_epoch:
-        laps_decoding_time_bin_size = None
+    if desired_laps_decoding_time_bin_size is not None:
+        global_any_laps_epochs_obj = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any' (? same as global_epoch_name?)
+        min_possible_laps_time_bin_size: float = find_minimum_time_bin_duration(global_any_laps_epochs_obj.to_dataframe()['duration'].to_numpy())
+        laps_decoding_time_bin_size: float = min(desired_laps_decoding_time_bin_size, min_possible_laps_time_bin_size) # 10ms # 0.002
+        if use_single_time_bin_per_epoch:
+            laps_decoding_time_bin_size = None
 
-    a_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
-    # laps_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result)
+        a_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+        # laps_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result)
+    else:
+        # do not decode laps:
+        a_directional_laps_filter_epochs_decoder_result = None
+
 
     ## Decode Ripples:
     if desired_ripple_decoding_time_bin_size is not None:
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-        min_possible_time_bin_size: float = find_minimum_time_bin_duration(global_replays['duration'].to_numpy())
-        ripple_decoding_time_bin_size: float = min(desired_ripple_decoding_time_bin_size, min_possible_time_bin_size) # 10ms # 0.002
+        global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode="DropShorter")
+        # global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, mode="ConstrainDecodingTimeBinSizeToMinimum")
         if use_single_time_bin_per_epoch:
             ripple_decoding_time_bin_size = None
+
         a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
         # ripple_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_ripple_filter_epochs_decoder_result)
 
