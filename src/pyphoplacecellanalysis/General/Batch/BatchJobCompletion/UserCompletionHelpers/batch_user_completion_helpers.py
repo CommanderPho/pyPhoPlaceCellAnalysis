@@ -1095,6 +1095,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
+    from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_session_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -1126,9 +1128,10 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     else:
         ## get the existing one:
         wcorr_shuffles = a_sequence_computation_container.wcorr_ripple_shuffle
-    
-    wcorr_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline) # do one more shuffle
+        wcorr_shuffles: WCorrShuffle = WCorrShuffle(**get_dict_subset(wcorr_shuffles.to_dict(), subset_excludelist=['_VersionedResultMixin_version'])) # modernize the object
 
+
+    wcorr_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline) # do one more shuffle
     ## try load
     wcorr_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
 
@@ -1141,7 +1144,6 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         across_session_results_extended_dict['compute_and_export_session_wcorr_shuffles_completion_function'] = callback_outputs
         ## EXITS HERE:
         return across_session_results_extended_dict
-
 
     if n_completed_shuffles < desired_total_num_shuffles:   
         print(f'n_prev_completed_shuffles: {n_completed_shuffles}.')
