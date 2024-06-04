@@ -77,8 +77,10 @@ class ExportedWCorrShufflesPickleFilenameParser(BaseMatchParser):
     def try_parse(self, filename: str) -> Optional[Dict]:
         # Define the regex pattern for matching the filename
         # pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<hour>0[1-9]|1[0-2])(?P<time_separator>.+)(?P<minute>00|05|10|15|20|25|30|35|40|45|50|55)(?P<meridian>AM|PM)_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)" # .pkl
-        pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM)_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)"
+        # pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM)_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)"
+        pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(?:_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM))?_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)"
         match = re.match(pattern, filename)
+
         if match is None:
             return None  # pattern did not match
         
@@ -86,27 +88,70 @@ class ExportedWCorrShufflesPickleFilenameParser(BaseMatchParser):
 
         # Construct the 'export_datetime' key based on the matched datetime components
         try:
-            export_datetime_str = f"{parsed_output_dict['year']}-{parsed_output_dict['month']}-{parsed_output_dict['day']}_{parsed_output_dict['hour']}{parsed_output_dict['minute']}{parsed_output_dict['meridian']}"
-            export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d_%I%M%p")
+            if ('hour' in parsed_output_dict) and (parsed_output_dict['hour'] is not None) and (len(parsed_output_dict['hour'])>0):
+                export_datetime_str = f"{parsed_output_dict['year']}-{parsed_output_dict['month']}-{parsed_output_dict['day']}_{parsed_output_dict['hour']}{parsed_output_dict['minute']}{parsed_output_dict['meridian']}"
+                export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d_%I%M%p")
+            else:
+                export_datetime_str = f"{parsed_output_dict['year']}-{parsed_output_dict['month']}-{parsed_output_dict['day']}"
+                export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
+
             parsed_output_dict['export_datetime'] = export_datetime
             parsed_output_dict['data_name'] = parsed_output_dict['data_name']
             parsed_output_dict['num_shuffles'] = int(parsed_output_dict['num_shuffles'])
+
         except ValueError as e:
-            print(f'ERR: Could not parse date-time string: "{export_datetime_str}"')
+            print(f'ERR: Could not parse date-time string: "{export_datetime_str}"\n\tfilename: {filename}\n')
             return None  # datetime parsing failed
 
-        # Optionally, remove individual components if not needed in the final output
-        del parsed_output_dict['year']
-        del parsed_output_dict['month']
-        del parsed_output_dict['day']
-        del parsed_output_dict['hour']
-        del parsed_output_dict['minute']
-        del parsed_output_dict['meridian']
-        # Note: Depending on use case, keep or remove 'time_separator'
+        # Optionally, remove individual components as they are already part of 'export_datetime'
+        for key in ['year', 'month', 'day', 'hour', 'minute', 'meridian']:
+            if key in parsed_output_dict:
+                del parsed_output_dict[key]
 
         return parsed_output_dict
     
 
+# from datetime import datetime
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import ExportedWCorrShufflesPickleFilenameParser
+
+# def test_ExportedWCorrShufflesPickleFilenameParser():
+#     # Instantiate the parser
+#     parser = ExportedWCorrShufflesPickleFilenameParser()
+
+#     # Define a list of tuples containing test filenames and their expected parsed results
+#     test_cases = [
+#         # Filename with date, time, and num_shuffles
+#         ("2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl",
+#          datetime(2024, 6, 4, 4, 5), "standalone_wcorr_ripple_shuffle_data_only", 1206),
+        
+#         # Filename with date and num_shuffles but no time
+#         ("2024-06-03_1035PM_standalone_wcorr_ripple_shuffle_data_only_1202.pkl",
+#          datetime(2024, 6, 3, 22, 35), "standalone_wcorr_ripple_shuffle_data_only", 1202),
+        
+#         # Filename with date and time but no num_shuffles
+#         ("2024-05-30_0755PM_standalone_wcorr_ripple_shuffle_data_only_1200.pkl",
+#          datetime(2024, 5, 30, 19, 55), "standalone_wcorr_ripple_shuffle_data_only", 1200),
+        
+#         # Filename with only the date
+#         ("2024-05-30_standalone_wcorr_ripple_shuffle_data_only_1000.pkl",
+#          datetime(2024, 5, 30), "standalone_wcorr_ripple_shuffle_data_only", 1000),
+#     ]
+
+
+
+#     # Iterate over test cases and perform assertions
+#     for filename, expected_date, expected_data_name, expected_num_shuffles in test_cases:
+#         parsed_result = parser.try_parse(filename)
+#         assert parsed_result is not None, f"Failed to parse filename: {filename}"
+#         assert parsed_result['export_datetime'] == expected_date, f"Mismatched date for filename: {filename}"
+#         assert parsed_result['data_name'] == expected_data_name, f"Mismatched data name for filename: {filename}"
+#         assert parsed_result['num_shuffles'] == expected_num_shuffles, f"Mismatched num_shuffles for filename: {filename}"
+    
+#     print("All test cases passed for 'ExportedWCorrShufflesPickleFilenameParser'.")
+
+# # Run the test function
+# test_ExportedWCorrShufflesPickleFilenameParser()
+    
     
 
 
