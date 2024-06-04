@@ -1099,8 +1099,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_session_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
-
-    desired_total_num_shuffles: int = 4096
+    # desired_total_num_shuffles: int = 4096
+    desired_total_num_shuffles: int = 1024
     allow_update_global_result: bool = False
     
     if ('SequenceBased' not in curr_active_pipeline.global_computation_results.computed_data) or (not hasattr(curr_active_pipeline.global_computation_results.computed_data, 'SequenceBased')):
@@ -1119,6 +1119,9 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         ## get the existing one:
         wcorr_shuffles = a_sequence_computation_container.wcorr_ripple_shuffle
     
+
+    ## try load
+    wcorr_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
 
     n_completed_shuffles: int = wcorr_shuffles.n_completed_shuffles
 
@@ -1142,6 +1145,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         # need to mark it as dirty?
 
     ## standalone saving:
+    # datetime.today().strftime('%Y-%m-%d')
     standalone_filename: str = f'{get_now_day_str()}_standalone_wcorr_ripple_shuffle_data_only_{a_sequence_computation_container.wcorr_ripple_shuffle.n_completed_shuffles}.pkl'
     wcorr_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
     print(f'wcorr_shuffles_data_standalone_filepath: "{wcorr_shuffles_data_standalone_filepath}"')
@@ -1167,10 +1171,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     print(f'\tsaving .mat format to "{standalone_MAT_filepath}"...')
     
     try:
-        (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), all_shuffles_wcorr_array = a_sequence_computation_container.wcorr_ripple_shuffle.post_compute(curr_active_pipeline=curr_active_pipeline)
-        ## INPUTS: all_shuffles_wcorr_array
-        mat_dic = {"all_shuffles_wcorr_array": all_shuffles_wcorr_array, "n_epochs": a_sequence_computation_container.wcorr_ripple_shuffle.n_epochs, 'session': curr_active_pipeline.get_session_context().to_dict()}
-        savemat(standalone_MAT_filepath, mat_dic)
+        wcorr_shuffles.save_data_mat(filepath=standalone_MAT_filepath, additional_mat_elements={'session': curr_active_pipeline.get_session_context().to_dict()})
 
     except BaseException as e:
         exception_info = sys.exc_info()
@@ -1179,10 +1180,27 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         standalone_MAT_filepath = None # set to None because it failed.
         if self.fail_on_exception:
             raise err.exc
+        
+
+    try:
+        active_context = curr_active_pipeline.get_session_context()
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+        session_name: str = curr_active_pipeline.session_name
+        export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
+        ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
+    except BaseException as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f"ERROR: encountered exception {err} while trying to perform wcorr_ripple_shuffle.export_csvs(parent_output_path='{self.collected_outputs_path.resolve()}', ...) for {curr_session_context}")
+        ripple_WCorrShuffle_df_export_CSV_path = None # set to None because it failed.
+        if self.fail_on_exception:
+            raise err.exc
+
 
     callback_outputs = {
      'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
      'standalone_MAT_filepath': standalone_MAT_filepath,
+     'ripple_WCorrShuffle_df_export_CSV_path': ripple_WCorrShuffle_df_export_CSV_path,
     }
     across_session_results_extended_dict['compute_and_export_session_wcorr_shuffles_completion_function'] = callback_outputs
     
