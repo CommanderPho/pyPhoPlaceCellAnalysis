@@ -1761,6 +1761,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
     @classmethod
     def convert_decoder_pagination_controller_dict_to_controlled(cls, pagination_controller_dict):
+        """
+        
+        """
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
+
+
         ## Connects the first plotter's pagination controls to the other three controllers so that they are directly driven, by the first.
         a_controlling_pagination_controller = pagination_controller_dict['long_LR'] # DecodedEpochSlicesPaginatedFigureController
         a_controlling_widget = a_controlling_pagination_controller.ui.mw # MatplotlibTimeSynchronizedWidget
@@ -1782,6 +1788,11 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 # a_controlled_widget.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
                 a_controlled_widget.ui.paginator_controller_widget.hide()
 
+                ## Enable a equally sized (ThinButtonBarWidget) placeholder widget instead:
+                a_controlled_widget.ui.thin_button_bar_widget = ThinButtonBarWidget()
+                a_controlled_widget.ui.root_vbox.addWidget(a_controlled_widget.ui.thin_button_bar_widget) # add the pagination control widget
+                a_controlled_widget.ui.thin_button_bar_widget.setFixedHeight(21)
+                
         return new_connections_dict
 
 
