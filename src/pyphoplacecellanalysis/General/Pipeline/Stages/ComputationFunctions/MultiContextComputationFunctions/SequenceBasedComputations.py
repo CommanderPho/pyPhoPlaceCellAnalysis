@@ -20,7 +20,7 @@ import neuropy.utils.type_aliases as types
 from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 from neuropy.core.epoch import find_data_indicies_from_epoch_times
-
+from neuropy.utils.result_context import IdentifyingContext
 
 from neuropy.utils.misc import build_shuffled_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 
@@ -705,33 +705,42 @@ class WCorrShuffle(ComputedResult):
         return np.stack(_out_wcorr) # .shape ## (n_shuffles, n_epochs, 4)
     
 
-    def post_compute(self, curr_active_pipeline=None, debug_print:bool=False):
+    def post_compute(self, decoder_names: Optional[List[types.DecoderName]]=None, curr_active_pipeline=None, debug_print:bool=False):
         """ Called after computing some shuffles.
+
+            (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_ripple_shuffle.post_compute(decoder_names=deepcopy(track_templates.get_decoder_names()))
+
         """
         ## Want ## (n_shuffles, n_epochs, 4)
                 
         ## INPUTS: output_extracted_result_wcorrs_list, real_decoder_ripple_weighted_corr_arr
-        if (self.curr_active_pipeline is None):
-            if (curr_active_pipeline is None):
-                raise NotImplementedError(f"cannot compute because self.curr_active_pipeline is missing and no curr_active_pipeline were provided as kwargs!")
-            else:
-                # non-None pipeline passed in, use for self
-                self.curr_active_pipeline = curr_active_pipeline
+        if decoder_names is None:
+            if (self.curr_active_pipeline is None):
+                if (curr_active_pipeline is None):
+                    raise NotImplementedError(f"cannot compute because self.curr_active_pipeline is missing and no curr_active_pipeline were provided as kwargs!")
+                else:
+                    # non-None pipeline passed in, use for self
+                    self.curr_active_pipeline = curr_active_pipeline
 
-        if (self.track_templates is None):
-            ## recover them from `curr_active_pipeline`
-            if self.curr_active_pipeline is not None:
-                directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
-                rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
-                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-                track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-                self.track_templates = deepcopy(track_templates)
-            else:
-                raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
+            if (self.track_templates is None):
+                ## recover them from `curr_active_pipeline`
+                if self.curr_active_pipeline is not None:
+                    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
+                    rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
+                    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                    self.track_templates = deepcopy(track_templates)
+                else:
+                    raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
 
-        assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
+            assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
 
-
+            ## seems like it only need: track_templates.
+            assert self.track_templates is not None
+            decoder_names: List[types.DecoderName] = deepcopy(self.track_templates.get_decoder_names())
+        else:
+            assert len(decoder_names) == 4
+        
         n_decoders: int = 4
         
         _out_wcorr = []
@@ -820,16 +829,73 @@ class WCorrShuffle(ComputedResult):
         if debug_print:
             print(f'np.shape(_out_p): {np.shape(_out_p)}') # (640, 4) - (n_shuffles, 4)
 
-        assert self.track_templates is not None
-        total_n_shuffles_more_extreme_than_real_df: pd.DataFrame = pd.DataFrame(total_n_shuffles_more_extreme_than_real, columns=self.track_templates.get_decoder_names())
-        total_n_shuffles_more_extreme_than_real_dict = dict(zip(self.track_templates.get_decoder_names(), total_n_shuffles_more_extreme_than_real.T))
+        
+        total_n_shuffles_more_extreme_than_real_df: pd.DataFrame = pd.DataFrame(total_n_shuffles_more_extreme_than_real, columns=decoder_names)
+        total_n_shuffles_more_extreme_than_real_dict = dict(zip(decoder_names, total_n_shuffles_more_extreme_than_real.T))
 
-        _out_p_dict = dict(zip(self.track_templates.get_decoder_names(), _out_p.T))
+        _out_p_dict = dict(zip(decoder_names, _out_p.T))
 
         ## INPUTS: filtered_epochs_df
 
         # epoch_start_t = self.filtered_epochs_df['start'].to_numpy() # ripple start time
         return (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr
+
+
+    def build_all_shuffles_dataframes(self, decoder_names: Optional[List[types.DecoderName]]=None):
+        """
+        
+        wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = wcorr_ripple_shuffle.build_all_shuffles_dataframes(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
+        
+        """
+        (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), all_shuffles_wcorr_array = self.post_compute(decoder_names=decoder_names)
+        n_shuffles, n_epochs, n_decoders = np.shape(all_shuffles_wcorr_array) # (1202, 136, 4)
+        n_total_elements: int = n_epochs * n_shuffles * n_decoders
+        print(f'({n_shuffles = }, {n_epochs = }, {n_decoders = }); {n_total_elements = }')
+
+        ## INPUTS: _out_wcorr_ZScore_LR_dict
+
+        # total_n_shuffles_more_extreme_than_real_df.plot.scatter(x=np.arange(wcorr_ripple_shuffle.n_epochs), y
+        x = np.arange(self.n_epochs)
+        epoch_start_t = self.filtered_epochs_df['start'].to_numpy() # ripple start time
+
+        ## OUTPUTS: _out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT
+        # _col_names = ['long', 'short']
+        real_z_wcorr_col_names = ['wcorr_z_long', 'wcorr_z_short']
+        _out_wcorr_ZScore_LR_dict = dict(zip(real_z_wcorr_col_names, (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT)))
+        wcorr_ZScore_real_LR_df: pd.DataFrame = pd.DataFrame({'start_t': epoch_start_t, **_out_wcorr_ZScore_LR_dict})
+        # wcorr_ZScore_real_LR_df
+
+        # _col_names = [*decoder_names]
+        real_wcorr_col_names = [f"wcorr_{str(n)}" for n in decoder_names]
+        real_decoder_ripple_wcorr_df: pd.DataFrame = pd.DataFrame(np.hstack([np.atleast_2d(epoch_start_t).T, self.real_decoder_ripple_weighted_corr_arr]), columns=['start_t', *real_wcorr_col_names])
+        # real_decoder_ripple_wcorr_df
+
+
+        # Create grid indices for epoch, shuffle, and decoder
+        epoch_indices = np.repeat(np.arange(n_epochs), n_shuffles * n_decoders)
+        shuffle_indices = np.tile(np.repeat(np.arange(n_shuffles), n_decoders), n_epochs)
+        decoder_indices = np.tile(np.arange(n_decoders), n_shuffles * n_epochs)
+
+        # Flatten the 3D NumPy array to a 1D array
+        flat_array = all_shuffles_wcorr_array.flatten()
+
+        # Create a DataFrame with all the required data
+        all_shuffles_wcorr_df: pd.DataFrame = pd.DataFrame({
+            'epoch_idx': epoch_indices,
+            'shuffle_idx': shuffle_indices,
+            'decoder_idx': decoder_indices,
+            'shuffle_wcorr': flat_array
+        })
+
+        # all_shuffles_wcorr_df
+
+        # Concatenate dataframes along columns
+        wcorr_ripple_shuffle_all_df: pd.DataFrame = pd.concat([deepcopy(self.filtered_epochs_df), real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df], axis=1)
+        wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.drop(columns=['start_t']) ## drop redundant column
+
+        ## OUTPUTS: wcorr_ripple_shuffle_all_df, real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, all_shuffles_wcorr_df
+        # return wcorr_ripple_shuffle_all_df, real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, all_shuffles_wcorr_df
+        return wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df
 
 
     def save_data(self, filepath):
@@ -1042,6 +1108,67 @@ class WCorrShuffle(ComputedResult):
         return fig
 
 
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_active_pipeline=None):
+        """ export as separate .csv files. 
+
+
+        Usage:
+            active_context = curr_active_pipeline.get_session_context()
+            session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+            session_name: str = curr_active_pipeline.session_name
+            export_files_dict = wcorr_ripple_shuffle.export_csvs(parent_output_path=collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
+            export_files_dict
+
+        """
+
+        if (self.curr_active_pipeline is None):
+            if (curr_active_pipeline is None):
+                raise NotImplementedError(f"cannot compute because self.curr_active_pipeline is missing and no curr_active_pipeline were provided as kwargs!")
+            else:
+                # non-None pipeline passed in, use for self
+                self.curr_active_pipeline = curr_active_pipeline
+        
+        if (self.track_templates is None) or isinstance(self.track_templates, dict):
+            ## recover them from `curr_active_pipeline`
+            if self.curr_active_pipeline is not None:
+                directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
+                rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
+                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                self.track_templates = deepcopy(track_templates)
+            else:
+                raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
+
+        assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
+
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+
+        wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = self.build_all_shuffles_dataframes(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
+
+        if 'ripple_start_t' not in wcorr_ripple_shuffle_all_df.columns:
+            wcorr_ripple_shuffle_all_df['ripple_start_t'] = wcorr_ripple_shuffle_all_df['start'].copy()
+        wcorr_ripple_shuffle_all_df['export_date'] = get_now_rounded_time_str()
+
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(self.curr_active_pipeline, track_templates=self.track_templates)
+        _, _, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = self.curr_active_pipeline.find_LongShortDelta_times()
+
+        filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(self.curr_active_pipeline, global_epoch_name, self.track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+        filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
+
+        export_df_dict = {'ripple_WCorrShuffle_df': wcorr_ripple_shuffle_all_df}
+        desired_ripple_decoding_time_bin_size: float = self.all_templates_decode_kwargs['desired_ripple_decoding_time_bin_size']
+        print(f'{desired_ripple_decoding_time_bin_size = }')
+
+        export_files_dict = DecoderDecodedEpochsResult._perform_export_dfs_dict_to_csvs(export_df_dict, parent_output_path=parent_output_path.resolve(), active_context=active_context, session_name=session_name,
+                                                                    tbin_values_dict={'laps': None, 'ripple': desired_ripple_decoding_time_bin_size},
+                                                                    curr_session_t_delta=t_delta, 
+                                                                    user_annotation_selections={'ripple': any_good_selected_epoch_times},
+                                                                    valid_epochs_selections={'ripple': filtered_valid_epoch_times},
+                                                                    )
+        # export_files_dict # {'ripple_wcorr_shuffle_all_df': WindowsPath('K:/scratch/collected_outputs/2024-06-04_0820AM-kdiba_gor01_one_2006-6-09_1-22-43-(ripple_wcorr_shuffle_all_df)_tbin-0.025.csv')}
+
+        return export_files_dict
 
 @define(slots=False, repr=False, eq=False)
 class SequenceBasedComputationsContainer(ComputedResult):
@@ -1138,7 +1265,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
     @function_attributes(short_name='wcorr_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'session', 'pf1D'], input_requires=['DirectionalLaps', 'RankOrder'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
-    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=4096):
+    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Requires:

@@ -2546,9 +2546,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
     #     return filtered_decoder_filter_epochs_decoder_result_dict, any_user_selected_epoch_times
 
-
-    def perform_export_dfs_dict_to_csvs(self, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
-        """ export as separate .csv files. 
+    @classmethod
+    def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, tbin_values_dict: Dict,
+                                        curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
+        """ Classmethod: export as separate .csv files. 
         active_context = curr_active_pipeline.get_session_context()
         curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
         CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
@@ -2566,7 +2567,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
         df
 
-
+        tbin_values_dict={'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
 
 
         """
@@ -2588,23 +2589,11 @@ class DecoderDecodedEpochsResult(ComputedResult):
             export_df.to_csv(out_path)
             return out_path 
         
-
         #TODO 2024-03-02 12:12: - [ ] Could add weighted correlation if there is a dataframe for that and it's computed:
-        tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
+        # tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
         time_col_name_dict = {'laps': 'lap_start_t', 'ripple': 'ripple_start_t'} ## default should be 't_bin_center'
-        
-
-        # ## basic filter_epochs:
-        # directional_decoders_epochs_decode_result = self.decoder_ripple_filter_epochs_decoder_result_dict
-
-        # directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
-        # extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
-        # Merge them into a single df:
-
-
-
+    
         ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
-
         export_files_dict = {}
         
         for a_df_name, a_df in extracted_dfs_dict.items():
@@ -2613,7 +2602,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
             a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
             a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
             ## Add t_bin column method
-            a_df = self.add_session_df_columns(a_df, session_name=session_name, time_bin_size=a_tbin_size, curr_session_t_delta=curr_session_t_delta, time_col=a_time_col_name)
+            a_df = cls.add_session_df_columns(a_df, session_name=session_name, time_bin_size=a_tbin_size, curr_session_t_delta=curr_session_t_delta, time_col=a_time_col_name)
             a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
             a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier 
             
@@ -2672,6 +2661,32 @@ class DecoderDecodedEpochsResult(ComputedResult):
             export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str)
             
         return export_files_dict
+    
+
+
+    def perform_export_dfs_dict_to_csvs(self, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
+        """ export as separate .csv files. 
+        active_context = curr_active_pipeline.get_session_context()
+        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+        active_context = curr_active_pipeline.get_session_context()
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+        session_name: str = curr_active_pipeline.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+        histogram_bins = 25
+        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
+        any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
+        df
+
+        """
+        return self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, tbin_values_dict={'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size},
+                                                     curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections)
+
 
 
     @function_attributes(short_name=None, tags=['export', 'CSV'], input_requires=[], output_provides=['ripple_all_scores_merged_df.csv'], uses=['self.perform_export_dfs_dict_to_csvs', 'self.build_complete_all_scores_merged_df'], used_by=[], creation_date='2024-03-15 10:13', related_items=[])
