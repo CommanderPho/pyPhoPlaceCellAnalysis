@@ -3909,25 +3909,37 @@ def get_proper_global_spikes_df(owning_pipeline_reference) -> pd.DataFrame:
     return global_spikes_df
 
 
+from enum import Enum
 
-def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time_bin_size: float, minimum_event_duration: Optional[float]=None, mode:str='DropShorter', debug_print: bool = False) -> Tuple[pd.DataFrame, float]:
+class EpochFilteringMode(Enum):
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode
+
+    
+    """
+    DropShorter = 1
+    ConstrainDecodingTimeBinSizeToMinimum = 2
+
+
+def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time_bin_size: float, minimum_event_duration: Optional[float]=None, mode:EpochFilteringMode=EpochFilteringMode.DropShorter, debug_print: bool = False) -> Tuple[pd.DataFrame, float]:
     """ Either drops invalid epochs from `replay_epochs_df` or adjusts `ripple_decoding_time_bin_size` (depending on the `mode`) to ensure that no invalid epochs are passed for decoding.
 
     DropShorterMode
 
+    Generate an enum with 2 modes: 'DropShorter', 'ConstrainDecodingTimeBinSizeToMinimum'
     replay_epochs_df, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode="DropShorter")
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_proper_filter_epochs
 
-    global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode="DropShorter")
-    global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, mode="ConstrainDecodingTimeBinSizeToMinimum")
+    global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode=EpochFilteringMode.DropShorter)
+    global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, mode=EpochFilteringMode.ConstrainDecodingTimeBinSizeToMinimum)
 
 
     """
     if not isinstance(epochs_df, pd.DataFrame):
         epochs_df = epochs_df.to_dataframe()
 
-    if mode == 'DropShorter':
+    if mode.value == EpochFilteringMode.DropShorter.value:
         ripple_decoding_time_bin_size: float = desired_decoding_time_bin_size # allow direct use            
         ## Drop those less than the time bin duration
         if debug_print:
@@ -3950,7 +3962,7 @@ def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time
             print(f'{post_drop_n_epochs} remain.')
         return epochs_df, ripple_decoding_time_bin_size
     
-    elif mode == 'ConstrainDecodingTimeBinSizeToMinimum':
+    elif mode.value == EpochFilteringMode.ConstrainDecodingTimeBinSizeToMinimum.value:
         from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
         min_possible_time_bin_size: float = find_minimum_time_bin_duration(epochs_df['duration'].to_numpy())
         ripple_decoding_time_bin_size: float = min(desired_decoding_time_bin_size, min_possible_time_bin_size) # 10ms # 0.002
@@ -3962,7 +3974,8 @@ def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time
 
 
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
-def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False) -> Tuple[DecodedFilterEpochsResult, Optional[DecodedFilterEpochsResult]]:
+def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False,
+                                                         epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> Tuple[DecodedFilterEpochsResult, Optional[DecodedFilterEpochsResult]]:
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder for a single set of time_bin_size values
     ~12.2s per decoder.
 
@@ -3996,8 +4009,9 @@ def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decod
     ## Decode Ripples:
     if desired_ripple_decoding_time_bin_size is not None:
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-        global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode="DropShorter")
-        # global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, mode="ConstrainDecodingTimeBinSizeToMinimum")
+        global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode=epochs_filtering_mode)
+        # global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode=EpochFilteringMode.DropShorter)
+        # global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, mode=EpochFilteringMode.ConstrainDecodingTimeBinSizeToMinimum)
         if use_single_time_bin_per_epoch:
             ripple_decoding_time_bin_size = None
 
@@ -4269,7 +4283,7 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
 
 # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=['_compute_lap_and_ripple_epochs_decoding_for_decoder'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-05-22 18:07', related_items=[])
-def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates: "TrackTemplates") -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, Optional[DecodedFilterEpochsResult]]]:
+def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates: "TrackTemplates", epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, Optional[DecodedFilterEpochsResult]]]:
         """ Custom Decoder Computation:
         2024-02-15 - Appears to be best to refactor to the TrackTemplates object. __________________________________________ #
             # directional_merged_decoders_result mmakes more sense since it has the time_bin_size already
@@ -4289,7 +4303,7 @@ def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_mer
         decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]] = {}
 
         for a_name, a_decoder in track_templates.get_decoders_dict().items():
-            decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
+            decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, epochs_filtering_mode=epochs_filtering_mode)
 
         # decoder_laps_radon_transform_df_dict ## ~4m
         ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_filter_epochs_decoder_result_dict, decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict
@@ -4703,7 +4717,10 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
         
-        decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(owning_pipeline_reference, directional_merged_decoders_result, track_templates) # Dict[str, Optional[DecodedFilterEpochsResult]]
+        epochs_filtering_mode: EpochFilteringMode = EpochFilteringMode.DropShorter
+        # epochs_filtering_mode: EpochFilteringMode = EpochFilteringMode.ConstrainDecodingTimeBinSizeToMinimum
+
+        decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(owning_pipeline_reference, directional_merged_decoders_result=directional_merged_decoders_result, track_templates=track_templates, epochs_filtering_mode=epochs_filtering_mode) # Dict[str, Optional[DecodedFilterEpochsResult]]
 
         ## Recompute the epoch scores/metrics such as radon transform and wcorr:
         (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(directional_merged_decoders_result, track_templates,
