@@ -1088,11 +1088,9 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
     """
     import sys
-    from scipy.io import savemat
     import numpy as np
     from datetime import timedelta, datetime
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-    from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
     from neuropy.utils.mixins.indexing_helpers import get_dict_subset
