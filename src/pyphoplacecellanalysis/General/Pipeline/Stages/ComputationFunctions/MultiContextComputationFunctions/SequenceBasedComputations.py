@@ -13,6 +13,7 @@ from attrs import asdict, define, field, Factory, astuple
 
 import numpy as np
 import pandas as pd
+from datetime import datetime, timedelta
 
 from attrs import define, field, asdict, evolve
 import neuropy.utils.type_aliases as types
@@ -58,6 +59,55 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 ShuffleIdx = NewType('ShuffleIdx', int)
+
+import re
+from pyphocorehelpers.Filesystem.path_helpers import BaseMatchParser
+
+@define(slots=False)
+class ExportedWCorrShufflesPickleFilenameParser(BaseMatchParser):
+    """ Parses basenames produced by `WCorrShuffle.save_data(...)`
+
+    test_filenames = ["2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl",
+        "2024-06-03_1035PM_standalone_wcorr_ripple_shuffle_data_only_1202.pkl",
+        "2024-05-30_0755PM_standalone_wcorr_ripple_shuffle_data_only_1200.pkl",
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import ExportedWCorrShufflesPickleFilenameParser
+
+    """
+    def try_parse(self, filename: str) -> Optional[Dict]:
+        # Define the regex pattern for matching the filename
+        # pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<hour>0[1-9]|1[0-2])(?P<time_separator>.+)(?P<minute>00|05|10|15|20|25|30|35|40|45|50|55)(?P<meridian>AM|PM)_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)" # .pkl
+        pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM)_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)"
+        match = re.match(pattern, filename)
+        if match is None:
+            return None  # pattern did not match
+        
+        parsed_output_dict = match.groupdict()
+
+        # Construct the 'export_datetime' key based on the matched datetime components
+        try:
+            export_datetime_str = f"{parsed_output_dict['year']}-{parsed_output_dict['month']}-{parsed_output_dict['day']}_{parsed_output_dict['hour']}{parsed_output_dict['minute']}{parsed_output_dict['meridian']}"
+            export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d_%I%M%p")
+            parsed_output_dict['export_datetime'] = export_datetime
+            parsed_output_dict['data_name'] = parsed_output_dict['data_name']
+            parsed_output_dict['num_shuffles'] = int(parsed_output_dict['num_shuffles'])
+        except ValueError as e:
+            print(f'ERR: Could not parse date-time string: "{export_datetime_str}"')
+            return None  # datetime parsing failed
+
+        # Optionally, remove individual components if not needed in the final output
+        del parsed_output_dict['year']
+        del parsed_output_dict['month']
+        del parsed_output_dict['day']
+        del parsed_output_dict['hour']
+        del parsed_output_dict['minute']
+        del parsed_output_dict['meridian']
+        # Note: Depending on use case, keep or remove 'time_separator'
+
+        return parsed_output_dict
+    
+
+    
 
 
 @define(slots=False, repr=False, eq=False)
@@ -783,7 +833,13 @@ class WCorrShuffle(ComputedResult):
 
 
     def save_data(self, filepath):
-        """ saves the important results to pickle """
+        """ saves the important results to pickle
+         
+          
+        2024-05-31_1015AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
+        2024-05-31_0900AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
+
+        """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
         try:
@@ -814,7 +870,94 @@ class WCorrShuffle(ComputedResult):
         savemat(filepath, mat_dic)
         # return mat_dic
         
+
+
+    def ensure_all_shuffles_unique(self):
+        """ ensures that only unique shuffles are included, dropping repeats
+        
+        Uses:
+            self.all_shuffles_wcorr_array
+
+        Updates:
+            self.output_extracted_result_wcorrs_list
+            self.output_all_shuffles_decoded_results_list
+        """
+        ## Get the unique shuffle rows:
+        unique_all_shuffles_wcorr_array, unique_indices = np.unique(self.all_shuffles_wcorr_array, axis=0, return_index=True)
+        self.output_extracted_result_wcorrs_list = [self.output_extracted_result_wcorrs_list[i] for i in unique_indices]
+        assert len(self.output_extracted_result_wcorrs_list) == len(unique_indices), f"len(wcorr_ripple_shuffle.output_extracted_result_wcorrs_list): {len(self.output_extracted_result_wcorrs_list)} != len(unique_indices): {len(unique_indices)}"
+        if self.enable_saving_entire_decoded_shuffle_result:
+            self.output_all_shuffles_decoded_results_list = [self.output_all_shuffles_decoded_results_list[i] for i in unique_indices]
+
     
+    def load_and_append_shuffle_data(self, filepath):
+        """ loads previously pickled shuffles ensuring no duplicate shuffles exist """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+        if isinstance(filepath, str):
+            filepath = Path(filepath).resolve()
+        assert filepath.exists(), f"filepath: '{filepath}' does not exist."
+        try:
+            loaded_output_extracted_result_wcorrs_list, loaded_real_decoder_ripple_weighted_corr_arr, loaded_output_all_shuffles_decoded_results_list, *loaded_results_list = loadData(filepath)
+            assert np.allclose(self.real_decoder_ripple_weighted_corr_arr, loaded_real_decoder_ripple_weighted_corr_arr, equal_nan=True), f"could not append shuffle results from loaded shuffle save at '{filepath}' because loaded_real_decoder_ripple_weighted_corr_arr != self.real_decoder_ripple_weighted_corr_arr\nloaded_real_decoder_ripple_weighted_corr_arr: {loaded_real_decoder_ripple_weighted_corr_arr}\nself.real_decoder_ripple_weighted_corr_arr: {self.real_decoder_ripple_weighted_corr_arr}\n"
+            self.output_extracted_result_wcorrs_list.extend(loaded_output_extracted_result_wcorrs_list)
+            if self.enable_saving_entire_decoded_shuffle_result:
+                self.output_all_shuffles_decoded_results_list.extend(loaded_output_all_shuffles_decoded_results_list)
+            ## #TODO 2024-06-04 03:37: - [ ] remove duplicates
+            self.ensure_all_shuffles_unique()
+
+        except (BaseException, AssertionError) as e:
+            print(f'error: {e}')
+            raise e
+
+
+    def discover_load_and_append_shuffle_data_from_directory(self, save_directory, debug_print = False):
+        """ searches the save_directory for pickled shuffle results and attempts to sequentially load them.
+        
+        
+        wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
+
+
+        """
+        from pyphocorehelpers.Filesystem.path_helpers import discover_data_files
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import ExportedWCorrShufflesPickleFilenameParser
+
+        if isinstance(save_directory, str):
+            save_directory = Path(save_directory).resolve()
+        assert save_directory.exists(), f"filepath: '{save_directory}' does not exist."
+
+        found_pickle_paths = discover_data_files(basedir=save_directory , glob_pattern='*_wcorr_ripple_shuffle_data_*.pkl', recursive=True)
+
+        a_test_parser = ExportedWCorrShufflesPickleFilenameParser()
+
+        # test_filenames = ["2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl",
+        #                   "2024-06-03_1035PM_standalone_wcorr_ripple_shuffle_data_only_1202.pkl",
+        #                   "2024-05-30_0755PM_standalone_wcorr_ripple_shuffle_data_only_1200.pkl",
+        # ]
+        valid_filepaths = []
+        parsed_metadata_dict = {}
+
+        for a_filepath in found_pickle_paths:
+            basename: str = str(a_filepath.stem)
+            a_parsed_output_dict = a_test_parser.try_parse(basename)
+            if a_parsed_output_dict is not None:
+                ## best parser, stop here
+                if debug_print:
+                    print(f'got parsed output {a_test_parser} - result: {a_parsed_output_dict}, basename: {basename}')
+                final_parsed_output_dict = a_parsed_output_dict
+                # a_valid_pkl_filepath = curr_active_pipeline.get_output_path().joinpath(a_filename).resolve()
+                a_valid_pkl_filepath = a_filepath.resolve()
+                assert a_valid_pkl_filepath.exists()
+                valid_filepaths.append(a_valid_pkl_filepath)
+                parsed_metadata_dict[a_valid_pkl_filepath] = final_parsed_output_dict
+                # return final_parsed_output_dict
+            else:
+                print(f'could not parse basename: {basename}')
+
+        for a_valid_filepath in valid_filepaths:
+            self.load_and_append_shuffle_data(filepath=a_valid_filepath)
+
+        print(f'wcorr_ripple_shuffle.n_completed_shuffles: {self.n_completed_shuffles}')
+        return parsed_metadata_dict
 
 
     @classmethod
