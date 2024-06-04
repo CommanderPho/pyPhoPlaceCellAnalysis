@@ -1178,7 +1178,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         session_name: str = curr_active_pipeline.session_name
         export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
         ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
-        print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: {ripple_WCorrShuffle_df_export_CSV_path} with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
+        print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
         callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
     except BaseException as e:
         exception_info = sys.exc_info()
