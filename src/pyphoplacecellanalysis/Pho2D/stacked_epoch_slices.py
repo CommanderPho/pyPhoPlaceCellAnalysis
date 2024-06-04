@@ -1658,7 +1658,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
 
-        assert isinstance(decoder_laps_filter_epochs_decoder_result_dict, dict), f"type(decoder_laps_filter_epochs_decoder_result_dict) is {type(decoder_laps_filter_epochs_decoder_result_dict)}, if it's TrackTemplates we forgot to update the function calls"
+        if decoder_laps_filter_epochs_decoder_result_dict is not None:
+            assert isinstance(decoder_laps_filter_epochs_decoder_result_dict, dict), f"type(decoder_laps_filter_epochs_decoder_result_dict) is {type(decoder_laps_filter_epochs_decoder_result_dict)}, if it's TrackTemplates we forgot to update the function calls"
 
         ## Choose which columns from the filter_epochs dataframe to include on the plot.
         if included_columns is None:
