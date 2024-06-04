@@ -445,6 +445,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, _try_all_templates_decode
 
         """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode
+        
         ripple_decoding_time_bin_size = None
         if desired_shared_decoding_time_bin_size is not None:
             assert desired_laps_decoding_time_bin_size is None
@@ -514,7 +516,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         
         for a_name, a_decoder in track_templates.get_decoders_dict().items():
             # external-function way:
-            decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
+            decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, epochs_filtering_mode=EpochFilteringMode.DropShorter)
 
             # # this function's way:
             # directional_merged_decoders_result_dict[a_name] = deepcopy(directional_merged_decoders_result)
