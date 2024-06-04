@@ -41,6 +41,15 @@ class ThinButtonBarWidget(QWidget):
     def initUI(self):
         self.ui.btnCopySelectedEpochs.pressed.connect(self.on_copy_selections)
         self.ui.btnRefresh.pressed.connect(self.on_perform_refresh)
+
+        all_buttons = [self.ui.btnUnusedButton, self.ui.btnCopySelectedEpochs, self.ui.btnRefresh]
+        for a_btn in all_buttons:
+            a_btn.setEnabled(False)
+            a_btn.hide()
+
+        # self.ui.horizontalSpacer.hide()
+
+        # self.ui.txtLineEdit.
         # currentTextChanged.connect(self.on_jump_combo_series_changed)
         pass
 
@@ -62,5 +71,6 @@ class ThinButtonBarWidget(QWidget):
 if __name__ == '__main__':
     app = QApplication([])
     widget = ThinButtonBarWidget()
+    widget.ui.txtLineEdit.text = "TEST TEXT LINE!"
     widget.show()
     sys.exit(app.exec_())

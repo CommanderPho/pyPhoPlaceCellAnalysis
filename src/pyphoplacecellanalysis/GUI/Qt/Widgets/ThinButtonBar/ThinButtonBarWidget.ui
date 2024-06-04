@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>180</width>
+    <width>381</width>
     <height>21</height>
    </rect>
   </property>
@@ -30,7 +30,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>PaginationControlWidget</string>
+   <string>thinButtonBarWidget</string>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(71, 58, 46);
@@ -81,7 +81,7 @@ border-color: rgb(0, 0, 0);</string>
        <height>21</height>
       </size>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0">
+     <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,1">
       <property name="topMargin">
        <number>2</number>
       </property>
@@ -98,6 +98,25 @@ border-color: rgb(0, 0, 0);</string>
         </property>
         <property name="shortcut">
          <string>Left</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="txtLineEdit">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string notr="true">BASIC TEST TEXT!</string>
+        </property>
+        <property name="frame">
+         <bool>false</bool>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -123,7 +142,8 @@ border-color: rgb(0, 0, 0);</string>
          <string>Refresh</string>
         </property>
         <property name="icon">
-         <iconset theme="user-idle"/>
+         <iconset theme="user-idle">
+          <normaloff>.</normaloff>.</iconset>
         </property>
         <property name="shortcut">
          <string>F5</string>
@@ -145,7 +165,8 @@ border-color: rgb(0, 0, 0);</string>
          <string>Copy Selections</string>
         </property>
         <property name="icon">
-         <iconset theme="edit-copy"/>
+         <iconset theme="edit-copy">
+          <normaloff>.</normaloff>.</iconset>
         </property>
         <property name="shortcut">
          <string>Ctrl+C</string>

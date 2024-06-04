@@ -119,20 +119,40 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name) #display_function_items[item_data]
         if self.debug_print:
             print(f'\ta_disp_fn_item: {a_disp_fn_item}')
-
         assert a_disp_fn_item is not None, f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"'
-
         # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data) # find matching item in the pipleine's .plot attributes
         # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.fn_callable)
         a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.name)
         return a_fn_handle
     
-    def _perform_execute_display_function(self, a_fcn_name: str):
+
+
+    def _perform_execute_display_function(self, a_fcn_name: str, *args, **kwargs):
         """ gets the display function to execute and executes it """
         a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
         assert a_fn_handle is not None
-        return a_fn_handle()
+        # args = []
+        # kwargs = {}
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+        assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
+        if a_disp_fn_item.is_global:
+            return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=None, *args, **kwargs)
+        else:
+            # non-global, needs a context:
+            current_selected_context = self.displayContextSelectorWidget.current_selected_context
+            if current_selected_context is not None:
+                # args = list(args) ## convert to list if a tuple
+                # args.insert(0, current_selected_context)
+                return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=current_selected_context, *args, **kwargs)
+            else:
+                return None
+
+        # return a_fn_handle(*args, **kwargs)
     
+
+
+
+
     # Define a function to be executed when a tree widget item is double-clicked
     # @QtCore.Slot(object, int)
     @pyqtExceptionPrintingSlot(object)

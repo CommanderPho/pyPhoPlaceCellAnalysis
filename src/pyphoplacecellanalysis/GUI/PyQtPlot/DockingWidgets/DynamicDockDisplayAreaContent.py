@@ -33,9 +33,21 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     def custom_get_colors_callback(self, value):
         self._custom_get_colors_callback_fn = value
 
-    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', custom_get_colors_callback_fn=None):
+
+
+    @property
+    def orientation(self) -> str:
+        """The orientation property."""
+        return self._orientation or 'auto'    
+    @orientation.setter
+    def orientation(self, value):
+        self._orientation = value
+
+    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', custom_get_colors_callback_fn=None, orientation=None):
         super(CustomDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
         self._custom_get_colors_callback_fn = custom_get_colors_callback_fn
+        self._orientation = orientation
+
 
     def get_colors(self, orientation, is_dim):
         if self.custom_get_colors_callback is not None:
@@ -155,8 +167,8 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
     def named_color_scheme(self, value):
         self._named_color_scheme = value
     
-    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', named_color_scheme=NamedColorScheme.red):
-        super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
+    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', orientation=None, named_color_scheme=NamedColorScheme.red):
+        super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius, orientation=orientation)
         self._named_color_scheme = named_color_scheme
 
     def get_colors(self, orientation, is_dim):
@@ -321,6 +333,12 @@ class DynamicDockDisplayAreaContentMixin:
         
         if display_config is None:
             display_config = CustomDockDisplayConfig()
+
+        if (display_config.orientation is not None):
+            if display_config.orientation == 'auto':
+                kwargs['autoOrientation'] = True
+            else:
+                kwargs['autoOrientation'] = False
             
         # {'autoOrientation':True}
         dDisplayItem = Dock(unique_identifier, size=dockSize, widget=widget, display_config=display_config, **kwargs) # add the new display item
@@ -358,6 +376,11 @@ class DynamicDockDisplayAreaContentMixin:
         # if widget is not None:
         #     dDisplayItem.addWidget(widget)
         
+
+        if (display_config.orientation is not None) and (display_config.orientation != 'auto'):
+            assert display_config.orientation in ['horizontal', 'vertical'], f"display_config.orientation should be either ['horizontal', 'vertical'] but display_config.orientation: '{display_config.orientation}'"
+            dDisplayItem.setOrientation(o=display_config.orientation, force=True)
+
         if extant_group_items is not None:
             # Item was found with this identifier, implement one of the strategies
             extant_group_items[unique_identifier] = {"dock":dDisplayItem, "widget":widget} # add the unique item to the group's dict
