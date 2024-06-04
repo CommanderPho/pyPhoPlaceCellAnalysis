@@ -2456,97 +2456,97 @@ class RankOrderAnalyses:
     
 
 def validate_has_rank_order_results(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
-        """ Returns True if the pipeline has a valid RankOrder results set of the latest version
+    """ Returns True if the pipeline has a valid RankOrder results set of the latest version
 
-        TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
+    TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
 
-        """
-        # Unpacking:
-        rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-        results_minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-        results_included_qclu_values: List[int] = rank_order_results.included_qclu_values
-        ripple_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.ripple_most_likely_result_tuple
-        laps_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.laps_most_likely_result_tuple
+    """
+    # Unpacking:
+    rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+    results_minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+    results_included_qclu_values: List[int] = rank_order_results.included_qclu_values
+    ripple_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.ripple_most_likely_result_tuple
+    laps_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.laps_most_likely_result_tuple
 
-        ## TODO: make sure result is for the current minimimum:
+    ## TODO: make sure result is for the current minimimum:
 
-        ## TODO: require same `included_qclu_values` values
-
-
-        ## Used to be `x[0] for x.long_stats_z_scorer` and `x[1] for x.short_stats_z_scorer`
-        # Extract the real spearman-values/p-values:
-        # LR_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()]) # x is LongShortStatsItem,  # AttributeError: 'dict' object has no attribute 'real_p_value'
-        # LR_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-
-        # LR_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-        # LR_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-
-        LR_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.LR_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
-        LR_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.LR_ripple.extra_info_dict.values()])
-
-        # RL_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-        # RL_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-
-        # RL_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-        # RL_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-
-        RL_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.RL_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
-        RL_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.RL_ripple.extra_info_dict.values()])
-
-        ## z-diffs:
-        LR_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-        LR_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
-        RL_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
-        RL_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+    ## TODO: require same `included_qclu_values` values
 
 
-        # `LongShortStatsItem` form (2024-01-02):
-        # LR_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
-        # RL_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
-        LR_results_long_short_z_diffs = np.array([a_result_item.long_short_z_diff for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
-        RL_results_long_short_z_diff = np.array([a_result_item.long_short_z_diff for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+    ## Used to be `x[0] for x.long_stats_z_scorer` and `x[1] for x.short_stats_z_scorer`
+    # Extract the real spearman-values/p-values:
+    # LR_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()]) # x is LongShortStatsItem,  # AttributeError: 'dict' object has no attribute 'real_p_value'
+    # LR_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+
+    # LR_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+    # LR_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+
+    LR_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.LR_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
+    LR_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.LR_ripple.extra_info_dict.values()])
+
+    # RL_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+    # RL_long_relative_real_values = np.array([x.long_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+
+    # RL_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+    # RL_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+
+    RL_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.RL_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
+    RL_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.RL_ripple.extra_info_dict.values()])
+
+    ## z-diffs:
+    LR_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+    LR_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
+    RL_long_short_z_diff = np.array([x.long_short_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
+    RL_long_short_naive_z_diff = np.array([x.long_short_naive_z_diff for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
 
 
-        laps_merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.laps_merged_complete_epoch_stats_df ## New method
-        ripple_merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.ripple_merged_complete_epoch_stats_df ## New method
-
-        if ripple_result_tuple is not None:
-            rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
-            # if rank_order_z_score_df is None:
-            #     return False # failing here
+    # `LongShortStatsItem` form (2024-01-02):
+    # LR_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+    # RL_results_real_values = np.array([(a_result_item.long_stats_z_scorer.real_value, a_result_item.short_stats_z_scorer.real_value) for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
+    LR_results_long_short_z_diffs = np.array([a_result_item.long_short_z_diff for epoch_id, a_result_item in rank_order_results.LR_ripple.ranked_aclus_stats_dict.items()])
+    RL_results_long_short_z_diff = np.array([a_result_item.long_short_z_diff for epoch_id, a_result_item in rank_order_results.RL_ripple.ranked_aclus_stats_dict.items()])
 
 
-        # 2023-12-15 - Newest method:
-        ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
-        if ripple_combined_epoch_stats_df is None:
-            return False
+    laps_merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.laps_merged_complete_epoch_stats_df ## New method
+    ripple_merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.ripple_merged_complete_epoch_stats_df ## New method
 
-        if np.isnan(rank_order_results.ripple_combined_epoch_stats_df.index).any():
-            return False # can't have dataframe index that is missing values.
+    if ripple_result_tuple is not None:
+        rank_order_z_score_df = ripple_result_tuple.rank_order_z_score_df
+        # if rank_order_z_score_df is None:
+        #     return False # failing here
 
-        assert (len(rank_order_results.ripple_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
-        
 
-        laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
-        if laps_combined_epoch_stats_df is None:
-            return False
+    # 2023-12-15 - Newest method:
+    ripple_combined_epoch_stats_df = rank_order_results.ripple_combined_epoch_stats_df
+    if ripple_combined_epoch_stats_df is None:
+        return False
 
-        assert (len(rank_order_results.laps_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
-        
+    if np.isnan(rank_order_results.ripple_combined_epoch_stats_df.index).any():
+        return False # can't have dataframe index that is missing values.
 
-        # if 'LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df:
-        #     return False
+    assert (len(rank_order_results.ripple_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
+    
 
-        if not RankOrderAnalyses.validate_has_rank_order_results_quantiles(curr_active_pipeline, computation_filter_name=computation_filter_name, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz):
-            return False
-        
-        # rank_order_results.included_qclu_values
+    laps_combined_epoch_stats_df = rank_order_results.laps_combined_epoch_stats_df
+    if laps_combined_epoch_stats_df is None:
+        return False
 
-        if minimum_inclusion_fr_Hz is not None:
-            return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
-        else:
-            #TODO 2023-11-29 08:42: - [ ] cannot validate minimum because none was passed, eventually reformulate to use parameters
-            return True
+    assert (len(rank_order_results.laps_new_output_tuple) == 5), f"new_output_tuple must be greater than length 6"
+    
+
+    # if 'LongShort_BestDir_quantile_diff' not in ripple_combined_epoch_stats_df:
+    #     return False
+
+    if not RankOrderAnalyses.validate_has_rank_order_results_quantiles(curr_active_pipeline, computation_filter_name=computation_filter_name, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz):
+        return False
+    
+    # rank_order_results.included_qclu_values
+
+    if minimum_inclusion_fr_Hz is not None:
+        return (minimum_inclusion_fr_Hz == results_minimum_inclusion_fr_Hz) # makes sure same
+    else:
+        #TODO 2023-11-29 08:42: - [ ] cannot validate minimum because none was passed, eventually reformulate to use parameters
+        return True
         
 
 
