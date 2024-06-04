@@ -2313,7 +2313,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
             return False
         any_good_selected_epoch_indicies = None
         try:
-            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=atol, not_found_action=not_found_action, debug_print=debug_print)    
+            # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=atol, not_found_action=not_found_action, debug_print=debug_print)    
+            any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(epoch_times=np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=atol)
         except BaseException as e:
             print(f'ERROR: failed with error {e} while trying to add column "{new_column_name}". Out of options.')
 
@@ -2322,7 +2323,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         # print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
         a_df[new_column_name] = False
-        a_df[new_column_name].iloc[any_good_selected_epoch_indicies] = True
+        # a_df[new_column_name].iloc[any_good_selected_epoch_indicies] = True
+        a_df[new_column_name].loc[any_good_selected_epoch_indicies] = True
+        # a_df[new_column_name].loc[a_df.index.to_numpy()[any_good_selected_epoch_indicies]] = True # IndexError: index 392 is out of bounds for axis 0 with size 390
         return True
 
 
@@ -3936,6 +3939,7 @@ class EpochFilteringMode(Enum):
     ConstrainDecodingTimeBinSizeToMinimum = 2
 
 
+@function_attributes(short_name=None, tags=['filter_epochs', 'time_bin_size'], input_requires=[], output_provides=[], uses=['EpochFilteringMode'], used_by=['_compute_lap_and_ripple_epochs_decoding_for_decoder'], creation_date='2024-06-04 06:43', related_items=[])
 def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time_bin_size: float, minimum_event_duration: Optional[float]=None, mode:EpochFilteringMode=EpochFilteringMode.DropShorter, debug_print: bool = False) -> Tuple[pd.DataFrame, float]:
     """ Either drops invalid epochs from `replay_epochs_df` or adjusts `ripple_decoding_time_bin_size` (depending on the `mode`) to ensure that no invalid epochs are passed for decoding.
 
@@ -4732,8 +4736,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
         
-        epochs_filtering_mode: EpochFilteringMode = EpochFilteringMode.DropShorter
-        # epochs_filtering_mode: EpochFilteringMode = EpochFilteringMode.ConstrainDecodingTimeBinSizeToMinimum
+        # epochs_filtering_mode: EpochFilteringMode = EpochFilteringMode.DropShorter - Matches WCorrShuffles
+        epochs_filtering_mode: EpochFilteringMode = EpochFilteringMode.ConstrainDecodingTimeBinSizeToMinimum # Pre 2024-06-03 Way 
 
         decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(owning_pipeline_reference, directional_merged_decoders_result=directional_merged_decoders_result, track_templates=track_templates, epochs_filtering_mode=epochs_filtering_mode) # Dict[str, Optional[DecodedFilterEpochsResult]]
 
