@@ -66,6 +66,10 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
             csv_buffer = StringIO()
             value.to_csv(csv_buffer, index=False)
             super().__setitem__(key, File.from_stream(csv_buffer, extension="csv"))
+
+        elif isinstance(value, (pathlib.PurePath, pathlib.Path)):
+            super().__setitem__(key, value.as_posix())
+
         else:
             super().__setitem__(key, value)
 

@@ -673,9 +673,41 @@ def plotly_plot_1D_most_likely_position_comparsions(time_window_centers_list, xb
 @function_attributes(short_name=None, tags=['Dash', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
 def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, latest_delta_aligned_t_end: float):
     """ builds an interactive Across Sessions Dash app
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _build_dash_app
 
-    app = _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _build_dash_app
+
+        app = _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
+
+
+
+
+    #TODO 2024-06-05 09:11: - [ ] Explicit listing of options for dropdown lists:
+    
+    # new_fig_ripples.get_subplot(
+    # import kaleido
+
+    # new_fig_ripples.layout
+    new_fig_ripples.layout.width
+
+    # from kaleido._version import __version__ # '0.1.0.post1'
+    # __version__
+
+    ## for dash:
+    possible_plotly_figure_option_values = {'color':['session_name','is_user_annotated_epoch', 'time_bin_size', 'pre_post_delta_category'],
+    'x': ['delta_aligned_start_t', 'ripple_start_t'],
+    'y': ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'P_Long_LR', 'score_long_LR', 'velocity_long_LR', 'intercept_long_LR', 'speed_long_LR', 'wcorr_long_LR', 'pearsonr_long_LR', 'travel_long_LR', 'coverage_long_LR', 'jump_long_LR', 'longest_sequence_length_ratio_long_LR', 'direction_change_bin_ratio_long_LR', 'congruent_dir_bins_ratio_long_LR', 'total_congruent_direction_change_long_LR', 'P_Long_RL', 'score_long_RL', 'velocity_long_RL', 'intercept_long_RL', 'speed_long_RL', 'wcorr_long_RL', 'pearsonr_long_RL', 'travel_long_RL', 'coverage_long_RL', 'jump_long_RL', 'longest_sequence_length_ratio_long_RL', 'direction_change_bin_ratio_long_RL', 'congruent_dir_bins_ratio_long_RL', 'total_congruent_direction_change_long_RL', 'P_Short_LR', 'score_short_LR', 'velocity_short_LR', 'intercept_short_LR', 'speed_short_LR', 'wcorr_short_LR', 'pearsonr_short_LR', 'travel_short_LR', 'coverage_short_LR', 'jump_short_LR', 'longest_sequence_length_ratio_short_LR', 'direction_change_bin_ratio_short_LR', 'congruent_dir_bins_ratio_short_LR', 'total_congruent_direction_change_short_LR', 'P_Short_RL', 'score_short_RL', 'velocity_short_RL', 'intercept_short_RL', 'speed_short_RL', 'wcorr_short_RL', 'pearsonr_short_RL', 'travel_short_RL', 'coverage_short_RL', 'jump_short_RL', 'longest_sequence_length_ratio_short_RL', 'direction_change_bin_ratio_short_RL', 'congruent_dir_bins_ratio_short_RL', 'total_congruent_direction_change_short_RL', 'long_best_P_decoder', 'short_best_P_decoder', 'P_decoder_diff', 'long_best_score', 'short_best_score', 'score_diff', 'long_best_velocity', 'short_best_velocity', 'velocity_diff', 'long_best_intercept', 'short_best_intercept', 'intercept_diff', 'long_best_speed', 'short_best_speed', 'speed_diff', 'long_best_wcorr', 'short_best_wcorr', 'wcorr_diff', 'long_best_pearsonr', 'short_best_pearsonr', 'pearsonr_diff', 'long_best_travel', 'short_best_travel', 'travel_diff', 'long_best_coverage', 'short_best_coverage', 'coverage_diff', 'long_best_jump', 'short_best_jump', 'jump_diff', 'long_best_longest_sequence_length_ratio', 'short_best_longest_sequence_length_ratio', 'longest_sequence_length_ratio_diff', 'long_best_direction_change_bin_ratio', 'short_best_direction_change_bin_ratio', 'direction_change_bin_ratio_diff', 'long_best_congruent_dir_bins_ratio', 'short_best_congruent_dir_bins_ratio', 'congruent_dir_bins_ratio_diff', 'long_best_total_congruent_direction_change', 'short_best_total_congruent_direction_change', 'total_congruent_direction_change_diff'],
+    }
+
+
+    color_options = ["is_user_annotated_epoch", "pre_post_delta_category"]
+
+    variable_options = {'pre_post_delta_category': ['pre-delta', 'post-delta']
+    }
+
+    concatenated_ripple_df
+
+
     """
     from dash import Dash, html,  dcc, callback, Output, Input
     from dash.dash_table import DataTable
