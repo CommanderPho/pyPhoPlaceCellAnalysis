@@ -100,10 +100,19 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     unique_sessions = data_results_df['session_name'].unique()
     num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+    figure_context_dict['num_unique_sessions'] = num_unique_sessions
 
     ## Extract the unique time bin sizes:
-    time_bin_sizes: NDArray = data_results_df['time_bin_size'].unique()
-    num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
+    num_unique_time_bin_sizes: int = data_results_df.time_bin_size.nunique(dropna=True)
+    unique_time_bin_sizes: NDArray = np.unique(data_results_df.time_bin_size.to_numpy())
+
+    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
+    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
+    if num_unique_time_bin_sizes == 1:
+        assert len(unique_time_bin_sizes) == 1
+        figure_context_dict['t_bin_size'] = unique_time_bin_sizes[0]
+    else:
+        figure_context_dict['n_unique_t_bin_sizes'] = num_unique_time_bin_sizes
 
     if px_scatter_kwargs is None:
         px_scatter_kwargs = {}
@@ -117,15 +126,15 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         main_title: str = f"Across Sessions {px_scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
 
 
-    if num_unique_time_bins > 1:
-        main_title = main_title + f" - {num_unique_time_bins} Time Bin Sizes"
-        figure_context_dict['n_tbin'] = num_unique_time_bins
+    if num_unique_time_bin_sizes > 1:
+        main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
+        figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
     else:
-        time_bin_size = time_bin_sizes[0]
+        time_bin_size: float = unique_time_bin_sizes[0]
         main_title = main_title + f" - time bin size: {time_bin_size} sec"
 
     figure_context_dict['title'] = main_title
-    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
+    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
 
     # common_plot_kwargs = dict(color="time_bin_size")
     common_plot_kwargs = dict() # color=None
@@ -149,7 +158,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     # adding first histogram
     pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title="Pre-delta")
     print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
-    # time_bin_sizes
     for a_trace in pre_delta_fig.data:
         a_trace_name = a_trace.name
         if a_trace_name in already_added_legend_entries:
