@@ -336,12 +336,18 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
 
     unique_sessions = data_results_df['session_name'].unique()
     num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+    figure_context_dict['num_unique_sessions'] = num_unique_sessions
 
     ## Extract the unique time bin sizes:
-    time_bin_sizes: int = data_results_df['time_bin_size'].unique()
-    num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
+    num_unique_time_bin_sizes: int = data_results_df.time_bin_size.nunique(dropna=True)
+    unique_time_bin_sizes: NDArray = np.unique(data_results_df.time_bin_size.to_numpy())
 
-    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
+    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
+    if num_unique_time_bin_sizes == 1:
+        assert len(unique_time_bin_sizes) == 1
+        figure_context_dict['t_bin_size'] = unique_time_bin_sizes[0]
+    else:
+        figure_context_dict['num_unique_time_bin_sizes'] = num_unique_time_bin_sizes
 
     ## Build KWARGS
     known_main_plot_modes = ['default', 'separate_facet_row_per_session', 'separate_row_per_session']
@@ -360,7 +366,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         print(f'num_cols: {num_cols}')
         is_col_included = np.array([enable_histograms, enable_scatter_plot, enable_histograms])
         column_widths = list(np.array([0.1, 0.8, 0.1])[is_col_included])
-        column_titles = ["Pre-delta", f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]
+        column_titles = ["Pre-delta", f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bin_sizes} Time Bin Sizes", "Post-delta"]
 
         # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': column_titles}
         sp_make_subplots_kwargs = {'rows': 1, 'cols': num_cols, 'column_widths': column_widths, 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': list(np.array(column_titles)[is_col_included])}
@@ -372,7 +378,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     elif (main_plot_mode == 'separate_facet_row_per_session'):
         # main_plot_mode: str = 'separate_facet_row_per_session'
         raise NotImplementedError(f"DOES NOT WORK")
-        sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes", "Post-delta"]}
+        sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': ["Pre-delta",f"{scatter_title} - Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bin_sizes} Time Bin Sizes", "Post-delta"]}
         px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0],
                             'facet_row': 'session_name', 'facet_row_spacing': 0.04, # 'facet_col_wrap': 2, 'facet_col_spacing': 0.04,
                             'height': (num_unique_sessions*200), 'width': 1024,
