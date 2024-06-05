@@ -1284,12 +1284,12 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     if is_dark_mode:
         _default_bg_color = 'white'
         _default_fg_color = 'black'
-        _default_edgecolors = '#CCCCCC33'
+        _default_edgecolors = '#CCCCCC33' # light gray
 
     else:
         _default_bg_color = 'black'
         _default_fg_color = 'white'
-        _default_edgecolors = '#CCCCCC33'
+        _default_edgecolors = '#5a5a5a33'
 
     # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.CountBased
     # aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter
@@ -1875,9 +1875,9 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
                 ax_dict = {'ax_LR': axs[0], 'ax_RL': axs[1]}
 
                 fig, ax_LR, _outputs_tuple_LR = _plot_track_remapping_diagram(LR_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax_dict['ax_LR'], defer_render=defer_render, **kwargs)
-                perform_update_title_subtitle(fig=fig, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+                perform_update_title_subtitle(fig=fig, ax=ax_LR, title_string=None, subtitle_string=f"LR Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} neurons")
                 fig, ax_RL, _outputs_tuple_RL = _plot_track_remapping_diagram(RL_only_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_RL', short_column_name='short_RL', ax=ax_dict['ax_RL'], defer_render=defer_render, **kwargs)
-                perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+                perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} neurons")
 
                 setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
             else:
@@ -1886,7 +1886,7 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
                 ax = axs
 
                 fig, ax, _outputs_tuple = _plot_track_remapping_diagram(AnyDir_decoder_aclu_MAX_peak_maps_df, grid_bin_bounds=grid_bin_bounds, long_column_name='long_LR', short_column_name='short_LR', ax=ax, defer_render=defer_render, **kwargs)
-                perform_update_title_subtitle(fig=fig, ax=ax, title_string=None, subtitle_string=f"LR+RL Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} aclus")
+                perform_update_title_subtitle(fig=fig, ax=ax, title_string=None, subtitle_string=f"LR+RL Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} neurons")
 
                 setup_common_after_creation(collector, fig=fig, axes=[ax, ], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
 
