@@ -32,6 +32,37 @@ script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
 curr_session_context = {{ curr_session_context }}
 curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
 
+{% if should_use_neptune_logging %}
+
+# ==================================================================================================================== #
+# NEPTUNE                                                                                                              #
+# ==================================================================================================================== #
+
+import neptune # for logging progress and results
+from neptune.types import File
+from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner, AutoValueConvertingNeptuneRun, set_environment_variables 
+
+neptune_kwargs = dict(
+        project="commander.pho/PhoDibaBatchProcessing",
+        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
+)
+        
+neptuner = Neptuner(project_name=neptune_kwargs['project'], api_token=neptune_kwargs['api_token'])
+
+if neptuner.run is None:
+    # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
+    neptuner.run = AutoValueConvertingNeptuneRun(project=neptuner.project_name, api_token=neptuner.api_token, dependencies="infer", source_files=[script_file_path])
+
+    params = {"script_file_path": script_file_path, "script_file_parent_path": script_file_parent_path.as_posix(), "curr_session_context": curr_session_context, "curr_session_basedir": curr_session_basedir.resolve().as_posix()}
+    neptuner.run["parameters"] = params
+
+    neptuner.outputs = neptuner.run['outputs']
+    neptuner.figures = neptuner.outputs['figures']
+
+neptuner_run: AutoValueConvertingNeptuneRun = neptuner.run
+
+{% endif %}
+
 curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True)
 final_log_file_path: Path = None
 for a_handler in curr_task_logger.handlers:
@@ -40,6 +71,15 @@ for a_handler in curr_task_logger.handlers:
         print(f'final_log_file_path: {final_log_file_path}')
         
 assert final_log_file_path is not None, f"final_log_file_path was not found after creating logger!!"
+
+{% if should_use_neptune_logging %}
+for k, v in {'final_log_file_path': final_log_file_path.as_posix()}.items():
+    try:
+        neptuner_run[f'parameters/{k}'] = v
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+{% endif %}
+
 
 _line_sweep = '=========================='
 ## REPLACES THE `print` function within this scope
@@ -141,6 +181,24 @@ for a_custom_custom_user_completion_function in custom_user_completion_functions
     result_handler.completion_functions.append(a_custom_custom_user_completion_function)
 
 
+{% if should_use_neptune_logging %}
+for k, v in {'BATCH_DATE_TO_USE': BATCH_DATE_TO_USE, 'collected_outputs_path': collected_outputs_path.as_posix(), 'custom_user_completion_functions': custom_user_completion_functions}.items():
+    try:
+        neptuner_run[f'parameters/{k}'] = v
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+
+
+for k, v in dict(local_computations_override_file=local_computations_override_file, global_computation_results_override_file=global_computation_results_override_file, local_computations_override_output_file=local_computations_override_output_file, global_computation_results_override_output_file=global_computation_results_override_output_file,
+        should_freeze_pipeline_updates=should_freeze_pipeline_updates, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_symlink_output_pickles=should_symlink_output_pickles,
+        extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, batch_session_completion_handler_kwargs=batch_session_completion_handler_kwargs,
+        ).items():
+    try:
+        neptuner_run[f'parameters/{k}'] = v
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+{% endif %}
+
 with open(final_log_file_path, 'w') as f:
     with redirect_stdout(f), redirect_stderr(f):
         run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
@@ -152,8 +210,16 @@ with open(final_log_file_path, 'w') as f:
                                                         fail_on_exception=True,
                                                         saving_mode=result_handler.saving_mode)
 
-
         new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
+
+        {% if should_use_neptune_logging %}
+        for k, v in {'run_status': run_status, 'run_errors': run_errors.as_posix(), 'run_outputs': run_outputs}.items():
+            try:
+                neptuner_run[f'outputs/{k}'] = v
+            except BaseException as err:
+                print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+        {% endif %}
+
 
         new_print(f'\n/* ================================================================================================================== */ \n')
         new_print(f'/* Finished {curr_session_context} __________________________________________________________________________________ */')
@@ -178,10 +244,24 @@ with open(final_log_file_path, 'w') as f:
 
 
 
-
-
         new_print(f'\n ALL DONE! \n')
         new_print(f'/* ================================================================================================================== */\n')
 
 
-        {# should_symlink_output_pickles #}
+
+
+{% if should_use_neptune_logging %}
+try:
+    ## Upload the log file:
+    neptuner_run[f"outputs/log"].upload(Path(final_log_file_path).resolve())
+except BaseException as err:
+    print(f'neptune error: {err} while trying to upload log file at path "{final_log_file_path}". Skipping and continuing')
+
+
+try:
+    ## Finally, stop neptuner:
+    neptuner.stop()
+except BaseException as err:
+    print(f'neptune error: {err} while stopping!')
+
+{% endif %}
