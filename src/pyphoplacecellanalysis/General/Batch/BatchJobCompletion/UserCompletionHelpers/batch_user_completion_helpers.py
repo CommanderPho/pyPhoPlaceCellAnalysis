@@ -1275,7 +1275,9 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
     custom_user_completion_function_template_code, custom_user_completion_functions_dict = MAIN_get_template_string()
 
     """
-    custom_user_completion_functions_dict = override_custom_user_completion_functions_dict or {
+    if override_custom_user_completion_functions_dict is None:
+        # If a literall None is provided, provide ALL
+        custom_user_completion_functions_dict = {
                                     "export_rank_order_results_completion_function": export_rank_order_results_completion_function,
                                     "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
                                     "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function,
@@ -1286,6 +1288,9 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                                     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
                                     }
+    else:
+        # use the user one:
+        custom_user_completion_functions_dict = override_custom_user_completion_functions_dict
     
     
     generated_header_code: str = curr_runtime_context_header_template.render(BATCH_DATE_TO_USE=BATCH_DATE_TO_USE, collected_outputs_path_str=str(collected_outputs_path.as_posix()))
