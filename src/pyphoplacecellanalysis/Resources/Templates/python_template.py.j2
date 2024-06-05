@@ -54,7 +54,7 @@ if neptuner.run is None:
     # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
     neptuner.run = AutoValueConvertingNeptuneRun(project=neptuner.project_name, api_token=neptuner.api_token, dependencies="infer", source_files=[script_file_path])
 
-    params = {"script_file_path": script_file_path, "script_file_parent_path": script_file_parent_path.as_posix(), "curr_session_context": curr_session_context, "curr_session_basedir": curr_session_basedir.resolve().as_posix()}
+    params = {"script_file_path": script_file_path, "script_file_parent_path": script_file_parent_path.as_posix(), "curr_session_context": str(curr_session_context.get_description()), "curr_session_basedir": curr_session_basedir.resolve().as_posix()}
     neptuner.run["parameters"] = params
 
     # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
