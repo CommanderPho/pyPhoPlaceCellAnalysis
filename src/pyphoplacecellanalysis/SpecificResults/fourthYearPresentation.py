@@ -106,6 +106,7 @@ def fig_remapping_cells(curr_active_pipeline, **kwargs):
     top_level_shared_kwargs = dict(should_plot_vertical_track_bounds_lines=True, sortby='peak_long')
     # top_level_shared_kwargs = dict(should_plot_vertical_track_bounds_lines=False, should_plot_linear_track_shapes=True) # Renders the linear track shape on the maze. Assumes `flat_stack_mode=True`
 
+    use_flexitext_titles = False
 
     # # flat_stack_mode: all placefields are stacked up (z-wise) on top of each other on a single axis with no offsets:
     # shared_kwargs = dict(pad=1, active_context=curr_active_pipeline.get_session_context(), plot_zero_baselines=True, skip_figure_titles=True, use_flexitext_titles=True, flat_stack_mode=True)
@@ -137,11 +138,33 @@ def fig_remapping_cells(curr_active_pipeline, **kwargs):
                 """
                 a_collector.contexts.append(sub_context)
                 
-                fig = graphics_output_dict['disappearing_endcap_aclus'].figures[0]
-                ax = graphics_output_dict['disappearing_endcap_aclus'].axes[0]
+                fig = out_container.figures[0]
+                ax = out_container.axes[0]
             
-                perform_update_title_subtitle(fig=fig, ax=ax, title_string=None, subtitle_string=title)
-                collector.post_hoc_append(figs=graphics_output_dict['disappearing_endcap_aclus'].figures, axes=graphics_output_dict['disappearing_endcap_aclus'].axes, contexts=graphics_output_dict['disappearing_endcap_aclus'].context)
+                # title_string = f'1D Placemaps {title_substring}'
+                # subtitle_string = f'({len(ratemap.neuron_ids)} good cells)'
+
+                # 
+
+                if use_flexitext_titles:
+                    perform_update_title_subtitle(fig=fig, ax=ax, title_string=None, subtitle_string=title, active_context=out_container.context, use_flexitext_titles=False)
+
+                    # `flexitext` version:
+                    text_formatter = FormattedFigureText()
+                    # ax.set_title('')
+                    fig.suptitle('')
+                    text_formatter.setup_margins(fig)
+                    title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
+                                            title,
+                                            va="bottom", xycoords="figure fraction")
+                    footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
+                                                text_formatter._build_footer_string(active_context=sub_context),
+                                                va="top", xycoords="figure fraction")
+                    
+                else:
+                    perform_update_title_subtitle(fig=fig, ax=ax, title_string=title, subtitle_string=None, active_context=out_container.context, use_flexitext_titles=True)
+
+                collector.post_hoc_append(figs=out_container.figures, axes=out_container.axes, contexts=out_container.context)
 
                 if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
                     perform_write_to_file_callback(sub_context, fig)
@@ -153,9 +176,6 @@ def fig_remapping_cells(curr_active_pipeline, **kwargs):
             # (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, disappearing_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Disappearing Cells", subtitle_string=None, **top_level_shared_kwargs)
             graphics_output_dict['disappearing_endcap_aclus'] = curr_active_pipeline.display('_display_long_short_pf1D_comparison',active_context.adding_context_if_missing(cell_subset='disappear_endcap'), included_any_context_neuron_ids=disappearing_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Disappearing Cells", subtitle_string=None, **top_level_shared_kwargs)
             # perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} neurons")
-        
-            # collector.post_hoc_append(figs=graphics_output_dict['disappearing_endcap_aclus'].figures, axes=graphics_output_dict['disappearing_endcap_aclus'].axes, contexts=graphics_output_dict['disappearing_endcap_aclus'].context)
-
             setup_common_after_creation(collector, out_container=graphics_output_dict['disappearing_endcap_aclus'], sub_context=display_context.adding_context('subplot', subplot_name='Disappearing Cells'), 
                                         title=f'<size:22>Remapping: <weight:bold>Disappearing</> cells</>')
         
