@@ -2,6 +2,7 @@ import os
 from attrs import define, Factory, field
 import neptune # for logging progress and results
 from neptune.types import File
+from neptune.utils import stringify_unsupported
 
 import pandas as pd
 from io import StringIO
@@ -70,6 +71,9 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
         elif isinstance(value, (pathlib.PurePath, pathlib.Path)):
             super().__setitem__(key, value.as_posix())
 
+        elif isinstance(value, (IdentifyingContext)):
+            super().__setitem__(key, value.get_description())
+            
         else:
             super().__setitem__(key, value)
 
