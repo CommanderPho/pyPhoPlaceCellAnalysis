@@ -3,11 +3,13 @@ from attrs import define, Factory, field
 import neptune # for logging progress and results
 from neptune.types import File
 
+import pandas as pd
+from io import StringIO
+
 import pathlib
 from pathlib import Path
 
 from neuropy.utils.result_context import IdentifyingContext
-
 from pyphocorehelpers.function_helpers import function_attributes
 
 """
@@ -39,7 +41,11 @@ if enable_neptune:
 
 
 def set_environment_variables(neptune_kwargs=None, enable_neptune=True):
-    """ sets the environment variables from the neptune_kwargs """
+    """ sets the environment variables from the neptune_kwargs
+     
+    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables
+      
+    """
     if enable_neptune:
         if neptune_kwargs is None:
             # set defaults:
@@ -50,6 +56,19 @@ def set_environment_variables(neptune_kwargs=None, enable_neptune=True):
         os.environ["NEPTUNE_PROJECT"] = neptune_kwargs['project']
 
 
+        
+
+
+class AutoValueConvertingNeptuneRun(neptune.Run):
+    
+    def __setitem__(self, key, value):
+        if isinstance(value, pd.DataFrame):
+            csv_buffer = StringIO()
+            value.to_csv(csv_buffer, index=False)
+            super().__setitem__(key, File.from_stream(csv_buffer, extension="csv"))
+        else:
+            super().__setitem__(key, value)
+
 
 @define()
 class Neptuner(object):
@@ -59,10 +78,10 @@ class Neptuner(object):
     neptuner = Neptuner()
     
     """
-    project_name: str="commander.pho/PhoDibaLongShortUpdated"
-    api_token: str="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ=="
+    project_name: str = field(default="commander.pho/PhoDibaLongShortUpdated")
+    api_token: str = field(default="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==")
     project: neptune.Project = field(init=False)
-    run: neptune.Run = field(init=False)
+    run: AutoValueConvertingNeptuneRun = field(init=False)
 
     outputs = field(init=False)
     figures = field(init=False)
@@ -85,12 +104,13 @@ class Neptuner(object):
     #     self.run = None
     #     self.project = None
 
-
     def run_with_pipeline(self, curr_active_pipeline):
         """ starts a new run with the provided pipeline. """
         assert self.run is None, f"run_new_pipeline(...) called while the Neptuner object already has an active self.run object!"
         if self.run is None:
-            self.run = neptune.init_run(project=self.project_name, api_token=self.api_token, source_files=[]) # see git_ref=GitRef(repository_path="/path/to/repo")
+            # self.run = neptune.init_run(project=self.project_name, api_token=self.api_token, source_files=[]) # see git_ref=GitRef(repository_path="/path/to/repo")
+            self.run = AutoValueConvertingNeptuneRun(project=self.project_name, api_token=self.api_token, source_files=[]) # see git_ref=GitRef(repository_path="/path/to/repo")
+
             # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
             for k, v in curr_active_pipeline.get_session_context().to_dict().items():
                 self.run[k] = v # add the properties to the run
