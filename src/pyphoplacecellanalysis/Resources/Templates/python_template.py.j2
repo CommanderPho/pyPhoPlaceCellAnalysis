@@ -40,7 +40,8 @@ curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
 
 import neptune # for logging progress and results
 from neptune.types import File
-from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner, AutoValueConvertingNeptuneRun, set_environment_variables 
+from neptune.utils import stringify_unsupported
+from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner, AutoValueConvertingNeptuneRun
 
 neptune_kwargs = dict(
         project="commander.pho/PhoDibaBatchProcessing",
@@ -56,6 +57,13 @@ if neptuner.run is None:
     params = {"script_file_path": script_file_path, "script_file_parent_path": script_file_parent_path.as_posix(), "curr_session_context": curr_session_context, "curr_session_basedir": curr_session_basedir.resolve().as_posix()}
     neptuner.run["parameters"] = params
 
+    # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
+    for k, v in curr_session_context.to_dict().items():
+        neptuner.run[k] = v # add the properties to the run
+
+    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple())) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
+    # session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
+    neptuner.run['session_descriptor_string'] = curr_session_context.get_description() # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
     neptuner.outputs = neptuner.run['outputs']
     neptuner.figures = neptuner.outputs['figures']
 
@@ -182,7 +190,7 @@ for a_custom_custom_user_completion_function in custom_user_completion_functions
 
 
 {% if should_use_neptune_logging %}
-for k, v in {'BATCH_DATE_TO_USE': BATCH_DATE_TO_USE, 'collected_outputs_path': collected_outputs_path.as_posix(), 'custom_user_completion_functions': custom_user_completion_functions}.items():
+for k, v in {'BATCH_DATE_TO_USE': str(BATCH_DATE_TO_USE), 'collected_outputs_path': collected_outputs_path.as_posix(), 'custom_user_completion_functions': stringify_unsupported(custom_user_completion_functions)}.items():
     try:
         neptuner_run[f'parameters/{k}'] = v
     except BaseException as err:
@@ -191,7 +199,7 @@ for k, v in {'BATCH_DATE_TO_USE': BATCH_DATE_TO_USE, 'collected_outputs_path': c
 
 for k, v in dict(local_computations_override_file=local_computations_override_file, global_computation_results_override_file=global_computation_results_override_file, local_computations_override_output_file=local_computations_override_output_file, global_computation_results_override_output_file=global_computation_results_override_output_file,
         should_freeze_pipeline_updates=should_freeze_pipeline_updates, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_symlink_output_pickles=should_symlink_output_pickles,
-        extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, batch_session_completion_handler_kwargs=batch_session_completion_handler_kwargs,
+        extended_computations_include_includelist=stringify_unsupported(extended_computations_include_includelist), force_recompute_override_computations_includelist=stringify_unsupported(force_recompute_override_computations_includelist), batch_session_completion_handler_kwargs=stringify_unsupported(batch_session_completion_handler_kwargs),
         ).items():
     try:
         neptuner_run[f'parameters/{k}'] = v
@@ -213,11 +221,11 @@ with open(final_log_file_path, 'w') as f:
         new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
 
         {% if should_use_neptune_logging %}
-        for k, v in {'run_status': run_status, 'run_errors': run_errors.as_posix(), 'run_outputs': run_outputs}.items():
+        for k, v in {'run_status': run_status, 'run_errors': run_errors, 'run_outputs': run_outputs}.items():
             try:
-                neptuner_run[f'outputs/{k}'] = v
+                neptuner_run[f'outputs/{k}'] = stringify_unsupported(v)
             except BaseException as err:
-                print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+                print(f'neptune error: {err} for key "{k}" (post `run_specific_batch`). Skipping and continuing')
         {% endif %}
 
 
