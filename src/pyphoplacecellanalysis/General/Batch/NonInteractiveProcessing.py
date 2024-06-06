@@ -697,7 +697,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
 
     try:
-        _out = curr_active_pipeline.display('_display_directional_track_remapping_diagram', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
+        _out = curr_active_pipeline.display('_display_directional_track_remapping_diagram', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
     except BaseException as e:
         print(f'batch_extended_programmatic_figures(...): "_display_directional_track_remapping_diagram" failed with error: {e}\n skipping.')
 
@@ -910,7 +910,8 @@ class BatchPhoJonathanFiguresHelper:
 # ==================================================================================================================== #
 # Main Public Plot Function                                                                                            #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['active', 'batch', 'public'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-12 14:23', related_items=[])
+@function_attributes(short_name=None, tags=['active', 'batch', 'public', 'neptune', 'figures', 'output'], input_requires=[], output_provides=[],
+                      uses=['batch_programmatic_figures', 'batch_extended_programmatic_figures'], used_by=[], creation_date='2023-06-12 14:23', related_items=[])
 def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None):
     """ 2023-05-25 - Performs all the batch plotting commands. 
     

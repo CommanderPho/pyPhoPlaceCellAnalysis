@@ -446,7 +446,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
     
-    @function_attributes(short_name=None, tags=['image', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
+    @function_attributes(short_name=None, tags=['image', 'posterior'], input_requires=[], output_provides=[], uses=['get_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
     def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True):
         """ gets the posterior as a colormapped image 
         
@@ -468,7 +468,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization)
 
 
-    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
+    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['save_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
     def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=100, desired_width=None, skip_img_normalization=True):
         """ saves the posterior to disk
         
