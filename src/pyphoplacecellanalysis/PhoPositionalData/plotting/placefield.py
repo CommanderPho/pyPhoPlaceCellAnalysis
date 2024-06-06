@@ -297,6 +297,7 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
 # 2D Placefields for PyVista Interactive Plotters                                                                      #
 # ==================================================================================================================== #
 # Private _____________________________________________________________________________________________________________ #
+
 def _build_custom_placefield_maps_lookup_table(curr_active_neuron_color, num_opacity_tiers, opacity_tier_values):
     """
     Inputs:
@@ -378,7 +379,7 @@ def plot_placefields2D(pTuningCurves, active_placefields, pf_colors: np.ndarray,
     tuningCurvePlotData = IndexedOrderedDict({}) # TODO: try to convert to an ordered dict indexed by neuron_IDs
     for i in np.arange(num_curr_tuning_curves):
     #TODO: BUG: CRITICAL: Very clearly makes sense how the indexing gets off here:
-        curr_active_neuron_ID = good_placefield_neuronIDs[i]
+        curr_active_neuron_ID = good_placefield_neuronIDs[i] ## TODO: should do a dict lookup for the ACLU instead
         curr_active_neuron_color = pf_colors[:, i]
         curr_active_neuron_opaque_color = opaque_pf_colors[:,i]
         curr_active_neuron_pf_identifier = 'pf[{}]'.format(curr_active_neuron_ID)
