@@ -250,18 +250,14 @@ with open(final_log_file_path, 'w') as f:
         {# new_print(f'/* run_outputs: {run_outputs} __________________________________________________________________________________ */') #}
         {# new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */') #}
 
-
-
         new_print(f'\n ALL DONE! \n')
         new_print(f'/* ================================================================================================================== */\n')
-
-
 
 
 {% if should_use_neptune_logging %}
 try:
     ## Upload the log file:
-    neptuner_run[f"outputs/log"].upload(Path(final_log_file_path).resolve())
+    neptuner_run[f"outputs/log"].upload(Path(final_log_file_path).resolve().as_posix())
 except BaseException as err:
     print(f'neptune error: {err} while trying to upload log file at path "{final_log_file_path}". Skipping and continuing')
 
