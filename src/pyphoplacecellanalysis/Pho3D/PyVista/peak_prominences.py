@@ -13,7 +13,7 @@ from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_point_labels, _perf
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList # used to wrap _render_peak_prominence_2d_results_on_pyvista_plotter's outputs
 from pyphocorehelpers.function_helpers import function_attributes
 
-@function_attributes(short_name=None, tags=['peak_prominence'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-09 05:29', related_items=[])
+@function_attributes(short_name=None, tags=['peak_prominence'], input_requires=[], output_provides=[], uses=[], used_by=['_render_peak_prominence_2d_results_on_pyvista_plotter'], creation_date='2024-05-09 05:29', related_items=[])
 def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, promenence_plot_threshold = 1.0, included_level_indicies=[1], debug_print=False):
     """
     
@@ -95,9 +95,9 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
     # return peak_locations, colors, prominence_array, is_included_array
     
 
-@function_attributes(short_name=None, tags=['peak_prominence', 'pyvista'], input_requires=[], output_provides=[], uses=['_perform_plot_point_labels'], used_by=['render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter'], creation_date='2024-05-09 05:28', related_items=[])
-def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=2, render=True, debug_print=True, **kwargs):
-    """ Draws the 2D slice of the placefield peak around its curve.
+@function_attributes(short_name=None, tags=['peak_prominence', 'pyvista'], input_requires=[], output_provides=[], uses=['_perform_plot_point_labels', '_build_pyvista_single_neuron_prominence_result_data'], used_by=['render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter'], creation_date='2024-05-09 05:28', related_items=[])
+def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id:int=2, render=True, debug_print=True, **kwargs):
+    """ Draws the 2D slice of the placefield peak around its curve FOR A SINGLE NEURON
     
     Built Data:
         peak_locations, prominence_array, peak_labels, peak_levels, flat_peak_levels, peak_level_bboxes
@@ -121,7 +121,13 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
         print(f'prominence_array: {prominence_array}')
         print(f'peak_levels: {peak_levels}')
         print(f'peak_level_bboxes: {peak_level_bboxes}')
-                                                          
+
+
+    # active_curve_color = 'white' # always white
+    ## try to use the neuron colors:
+    active_curve_color = ipcDataExplorer.params.cell_spike_colors_dict.get(valid_neuron_id, (1, 1, 1))  # Default to white if color not found
+    #plotter.add_mesh(peak, color=neuron_color)  # Apply the color here
+
     ## Outputs:
     
     # Contours/Isos
@@ -168,7 +174,7 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     curr_contours_mesh_name = f'pf[{valid_neuron_id}]_contours'
     curr_contours = curr_pdata.contour(isosurfaces=ipcDataExplorer.params.zScalingFactor*flat_peak_levels) # I really don't know why we need to multiply by zScalingFactor (~2000.0) again.
     try:
-        contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color="white", line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
+        contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color=active_curve_color, line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
         out_pf_contours_data[curr_contours_mesh_name] = curr_contours
         out_pf_contours_actors[curr_contours_mesh_name] = contours_mesh_actor
     except ValueError as e:
@@ -191,7 +197,7 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
             a_peak_level = peak_levels[peak_idx][level_idx]
             ## Can use a rectangle instead of a box:
             out_pf_box_data[curr_box_mesh_name] = pv.Rectangle([((x0+width), y0, a_peak_level), ((x0+width), (y0+height), a_peak_level), (x0, (y0+height), a_peak_level), (x0, y0, a_peak_level)])
-            out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
+            out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color=active_curve_color,  name=curr_box_mesh_name, show_edges=True, edge_color=active_curve_color, line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
             
             ## Box Mode:
             ## build the corner points of the box:
@@ -210,6 +216,7 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
             x_center = (x0 + (x0+width))/2.0
             y_center = (y0 + (y0+height))/2.0
             
+            ## TODO: set the text color appropriately
             x_text_mesh = pv.Text3D(f'{width:.2f}')
             y_text_mesh = pv.Text3D(f'{height:.2f}')
             
