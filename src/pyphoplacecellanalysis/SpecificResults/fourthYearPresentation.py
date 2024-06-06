@@ -3,7 +3,7 @@ Contains code related to Pho Hale's 4th Year PhD Presentation on 2023-09-25
 
 """
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 import numpy as np
 import pandas as pd
 
@@ -39,6 +39,8 @@ long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matpl
 short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
 
 from flexitext import flexitext ## flexitext for formatted matplotlib text
+from flexitext.parser.make_texts import make_texts, make_plaintext_string
+# from flexitext.flexitext.text import Text
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
@@ -162,7 +164,17 @@ def fig_remapping_cells(curr_active_pipeline, **kwargs):
                                                 va="top", xycoords="figure fraction")
                     
                 else:
-                    perform_update_title_subtitle(fig=fig, ax=ax, title_string=title, subtitle_string=None, active_context=out_container.context, use_flexitext_titles=True)
+                    ## strip text:
+                    if title is not None:
+                        ## strip formatting to convert back to plaintext string:
+                        title_texts_obj: List = make_texts(title) # Text
+                        plaintext_title: str = ''.join([v.string for v in title_texts_obj])
+                        # plaintext_title: str = make_plaintext_string(formatted_string=title)
+                    # if subtitle_string is not None:
+                    #     title_texts_obj = make_texts(subtitle_string)
+                    #     plaintext_subtitle: str = title_texts_obj.string
+                    print(f'plaintext_title: {plaintext_title}')
+                    perform_update_title_subtitle(fig=fig, ax=ax, title_string=plaintext_title, subtitle_string=None, active_context=out_container.context, use_flexitext_titles=True)
 
                 collector.post_hoc_append(figs=out_container.figures, axes=out_container.axes, contexts=out_container.context)
 
