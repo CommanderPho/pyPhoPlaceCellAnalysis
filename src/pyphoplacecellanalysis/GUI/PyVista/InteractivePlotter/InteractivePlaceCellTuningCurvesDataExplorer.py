@@ -55,6 +55,8 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
     show_legend = True
 
     def __init__(self, active_config, active_session, active_epoch_placefields, pf_colors, extant_plotter=None, **kwargs):
+        should_nan_non_visited_elements = kwargs.pop('should_nan_non_visited_elements', None)
+        zScalingFactor = kwargs.pop('zScalingFactor', None)
         super(InteractivePlaceCellTuningCurvesDataExplorer, self).__init__(active_config=active_config, active_session=active_session, extant_plotter=extant_plotter, data_explorer_name='TuningMapDataExplorer', **kwargs)
         self.params.active_epoch_placefields = deepcopy(active_epoch_placefields)
         self.params.pf_colors = deepcopy(pf_colors)
@@ -65,11 +67,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # self._spikes_df = active_session.spikes_df[np.isin(active_session.spikes_df.flat_spike_idx, active_epoch_placefields.filtered_spikes_df.flat_spike_idx.to_numpy())].copy()
         self._spikes_df = deepcopy(active_session.spikes_df)
         
-        if kwargs.get('should_nan_non_visited_elements', None) is not None:
-            self.params.should_nan_non_visited_elements = kwargs['should_nan_non_visited_elements']
+        if should_nan_non_visited_elements is not None:
+            self.params.should_nan_non_visited_elements = should_nan_non_visited_elements
             
-        if kwargs.get('zScalingFactor', None) is not None:
-            self.params.zScalingFactor = kwargs['zScalingFactor']
+        if zScalingFactor is not None:
+            self.params.zScalingFactor =zScalingFactor
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         

@@ -40,8 +40,6 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         plots_kwargs = kwargs.pop('plots_kwargs', {}) 
         ui_kwargs = kwargs.pop('ui_kwargs', {}) 
 
-        
-
         ## add these to `params_kwargs`
         for a_key in ['owning_pipeline', 'active_config_name', 'active_context']:
             a_val = kwargs.pop(a_key, None)
@@ -49,7 +47,7 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
                 assert (a_key not in params_kwargs), f"key '{a_key}' present both in params_kwargs and as a top-level kwarg to this init function!"
                 params_kwargs[a_key] = a_val
 
-        QtCore.QObject.__init__(self, **kwargs) # Initialize the QObject
+        QtCore.QObject.__init__(self, **kwargs) # Initialize the QObject - TypeError: 'should_nan_non_visited_elements' is an unknown keyword argument, kwargs['zScalingFactor']
         self.active_config = deepcopy(active_config)
 
         ## If provided, apply custom `active_config_modifiying_kwargs` to the self.active_config config before setup

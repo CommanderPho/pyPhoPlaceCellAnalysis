@@ -1358,9 +1358,6 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     long_track_color = dict(facecolor=long_epoch_config['facecolor'])
     short_track_color = dict(facecolor=short_epoch_config['facecolor'])
 
-    # long_track_color = dict(facecolor='orange')
-    # short_track_color = dict(facecolor='green')
-
     ## Extract the quantities needed from the DF passed
     active_aclus = a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
     long_peak_x = a_dir_decoder_aclu_MAX_peak_maps_df[long_column_name].to_numpy()
@@ -1405,9 +1402,6 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # instances:
     long_track = LinearTrackInstance(long_track_dims, grid_bin_bounds=grid_bin_bounds)
     short_track = LinearTrackInstance(short_track_dims, grid_bin_bounds=grid_bin_bounds)
-
-    # print(long_track_dims)
-    # print(short_track_dims)
 
     # BEGIN PLOTTING _____________________________________________________________________________________________________ #
 
