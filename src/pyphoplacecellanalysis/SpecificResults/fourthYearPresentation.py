@@ -39,7 +39,7 @@ long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matpl
 short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
 
 from flexitext import flexitext ## flexitext for formatted matplotlib text
-from flexitext.parser.make_texts import make_texts, make_plaintext_string
+from flexitext.parser.make_texts import make_texts
 # from flexitext.flexitext.text import Text
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
