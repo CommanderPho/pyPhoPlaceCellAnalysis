@@ -269,8 +269,7 @@ class BatchRun(HDF_SerializationMixin):
     session_batch_status: Dict[IdentifyingContext, SessionBatchProgress] = serialized_field(default=Factory(dict)) 
     session_batch_basedirs: Dict[IdentifyingContext, Path] = serialized_field(default=Factory(dict))
     session_batch_errors: Dict[IdentifyingContext, Optional[str]] = serialized_field(default=Factory(dict))
-    session_batch_outputs: Dict[IdentifyingContext, Optional[
-        PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
+    session_batch_outputs: Dict[IdentifyingContext, Optional[PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
     # Record the start time
