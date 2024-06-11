@@ -1391,6 +1391,119 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     return across_session_results_extended_dict
 
 
+def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                                             save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
+    """  Export the pipeline's HDF5 as 'pipeline_results.h5'
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+    
+    Results can be extracted from batch output by 
+    
+    # Extracts the callback results 'determine_session_t_delta_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+
+    """
+    import sys
+    from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
+
+    # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_export_session_extended_placefield_peak_information_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+    callback_outputs = {
+        'json_output_path': None, #'t_end': t_end   
+        'csv_output_path': None,
+    }
+    err = None
+
+    # active_csv_parent_output_path = curr_active_pipeline.get_output_path().resolve()
+    active_export_parent_output_path = self.collected_outputs_path.resolve()
+
+    try:
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        print(f'included_qclu_values: {included_qclu_values}')
+    
+        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+        jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+        neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        neuron_replay_stats_df, all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df, all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
+        # both_included_neuron_stats_df = deepcopy(neuron_replay_stats_df[neuron_replay_stats_df['LS_pf_peak_x_diff'].notnull()]).drop(columns=['track_membership', 'neuron_type'])
+        
+        print(f'\t\t done (success).')
+
+    except BaseException as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+        # if self.fail_on_exception:
+        #     raise e.exc
+        # _out_inst_fr_comps = None
+        neuron_replay_stats_df = None
+        pass
+
+    if (neuron_replay_stats_df is not None):
+        print(f'\t try saving to CSV...')
+        # Save DataFrame to CSV
+        csv_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.csv').resolve()
+        try:
+            
+            neuron_replay_stats_df.to_csv(csv_output_path)
+            print(f'\t saving to CSV: "{csv_output_path}" done.')
+            callback_outputs['csv_output_path'] = csv_output_path
+
+        except BaseException as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {err} while trying to save to CSV for {curr_session_context}")
+            csv_output_path = None # set to None because it failed.
+            if self.fail_on_exception:
+                raise err.exc
+    else:
+        csv_output_path = None
+
+
+    ## standalone saving:
+    if (neuron_replay_stats_df is not None):
+        print(f'\t try saving to JSON...')
+        # Save DataFrame to JSON
+        json_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.json').resolve()
+        try:
+            neuron_replay_stats_df.to_json(json_output_path, orient='records', lines=True) ## This actually looks pretty good!
+            print(f'\t saving to JSON: "{json_output_path}" done.')
+            callback_outputs['json_output_path'] = json_output_path
+
+        except BaseException as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {err} while trying to save to json for {curr_session_context}")
+            json_output_path = None # set to None because it failed.
+            if self.fail_on_exception:
+                raise err.exc
+    else:
+        json_output_path = None
+
+    across_session_results_extended_dict['compute_and_export_session_extended_placefield_peak_information_completion_function'] = callback_outputs
+    
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    return across_session_results_extended_dict
+
 
 
 
@@ -1444,6 +1557,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                                     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
                                     'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
+                                    'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
                                     }
     else:
         # use the user one:
