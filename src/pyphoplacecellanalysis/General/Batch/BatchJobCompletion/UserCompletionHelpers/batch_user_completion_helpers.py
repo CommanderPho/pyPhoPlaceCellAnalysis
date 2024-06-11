@@ -1249,7 +1249,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds:float=0.001,
-                                                                             save_hdf=True, save_pickle=True) -> dict:
+                                                                             save_hdf=True, save_pickle=True, save_across_session_hdf=True) -> dict:
     """  Export the pipeline's HDF5 as 'pipeline_results.h5'
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
     
@@ -1265,6 +1265,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import InstantaneousFiringRatesDataframeAccessor
 
     # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
 
@@ -1274,7 +1275,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     callback_outputs = {
         'recomputed_inst_fr_comps_filepath': None, #'t_end': t_end   
         'recomputed_inst_fr_comps_h5_filepath': None,
-        # 'ripple_WCorrShuffle_df_export_CSV_path': None,
+        'common_across_session_h5': None,
     }
     err = None
 
@@ -1335,9 +1336,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
         standalone_h5_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
         recomputed_inst_fr_comps_h5_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_h5_filename).resolve()
         print(f'recomputed_inst_fr_comps_h5_filepath: "{recomputed_inst_fr_comps_h5_filepath}"')
-
         try:
-            # saveData(recomputed_inst_fr_comps_filepath, (curr_session_context, _out_recomputed_inst_fr_comps, _out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds))
             _out_recomputed_inst_fr_comps.to_hdf(recomputed_inst_fr_comps_h5_filepath, key='recomputed_inst_fr_comps', debug_print=False, enable_hdf_testing_mode=False)
             was_write_good = True
             callback_outputs['recomputed_inst_fr_comps_h5_filepath'] = recomputed_inst_fr_comps_h5_filepath
@@ -1351,6 +1350,35 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
                 raise err.exc
     else:
         recomputed_inst_fr_comps_h5_filepath = None
+
+
+    ## common_across_session_h5
+    if (_out_recomputed_inst_fr_comps is not None) and save_across_session_hdf:
+        common_across_session_h5_filename: str = f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
+        common_file_path = self.collected_outputs_path.resolve().joinpath(common_across_session_h5_filename).resolve()
+        print(f'common_file_path: "{common_file_path}"')
+
+        try:
+            InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(inst_fr_comps=_out_recomputed_inst_fr_comps, curr_active_pipeline=curr_active_pipeline, common_file_path=common_file_path)
+            callback_outputs['common_across_session_h5'] = common_file_path
+
+        except BaseException as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {err} while trying to perform InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(..., common_file_path='{common_file_path}') for {curr_session_context}")
+            common_file_path = None # set to None because it failed.
+            if self.fail_on_exception:
+                raise err.exc
+    else:
+        common_file_path = None
+
+
+
+
+    # ## Specify the output file:
+    # common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
+    # print(f'common_file_path: {common_file_path}')
+    # InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
 
 
     # callback_outputs = {
