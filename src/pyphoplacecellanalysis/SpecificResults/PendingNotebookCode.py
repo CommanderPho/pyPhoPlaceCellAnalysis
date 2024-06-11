@@ -908,7 +908,8 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-23 00:00', related_items=[])
-def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, laps_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9):
+def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, laps_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point,
+     parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9, debug_print:bool=True):
     """ 2024-01-23 - Writes the posteriors out to file 
     
     Usage:
@@ -922,16 +923,45 @@ def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, lap
                                                                                         parent_array_as_image_output_folder=parent_array_as_image_output_folder, epoch_id_identifier_str='lap', epoch_id=epoch_id)
 
     """
-    from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image
+    from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image
+    from pyphocorehelpers.plotting.media_output_helpers import get_array_as_image_stack, save_array_as_image_stack
 
     assert parent_array_as_image_output_folder.exists()
     
     epoch_id_str = f"{epoch_id_identifier_str}[{epoch_id}]"
     _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_raw_marginal.png').resolve()
-    img_data = raw_posterior_laps_marginals[epoch_id]['p_x_given_n'].astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
-    raw_tuple = save_array_as_image(img_data, desired_height=100, desired_width=None, skip_img_normalization=True, out_path=_img_path)
-    # image_raw, path_raw = raw_tuple
 
+    img_data = raw_posterior_laps_marginals[epoch_id]
+    if not isinstance(img_data, NDArray):
+        img_data = img_data['p_x_given_n']
+    img_data = img_data.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+    # img_data = raw_posterior_laps_marginals[epoch_id]['p_x_given_n'].astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+    if debug_print:
+        print(f'np.shape(raw_posterior_laps_marginals[{epoch_id}]["p_x_given_n"]): {np.shape(img_data)}')
+
+    if np.ndim(img_data) > 2:
+        n_x_bins, n_decoders, n_curr_epoch_time_bins = np.shape(img_data)
+        # raw_tuple = []
+        # for i in np.arange(n_decoders):
+        # for i in np.arange(n_curr_epoch_time_bins):
+            # _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_raw_marginal[{i}].png').resolve()
+            # _sub_raw_tuple = save_array_as_image(np.squeeze(img_data[:,i,:]), desired_height=100, desired_width=None, skip_img_normalization=True, out_path=_img_path)
+            # raw_tuple.append(_sub_raw_tuple)
+            # an_image = get_array_as_image(img_data[i], desired_height=100, desired_width=None, skip_img_normalization=True)
+        # output_img = get_array_as_image_stack(imgs=[get_array_as_image(an_img, desired_height=100, desired_width=None, skip_img_normalization=True) for an_img in img_data], offset=10, single_image_alpha_level=0.5)
+        output_img = get_array_as_image_stack(imgs=[get_array_as_image(np.atleast_2d(np.squeeze(img_data[:,:, i])).T, desired_height=100, desired_width=None, skip_img_normalization=False) for i in np.arange(n_curr_epoch_time_bins)],
+                                              offset=25, single_image_alpha_level=0.5,
+                                              should_add_border=True, border_size=1, border_color=(255, 255, 255),
+                                              should_add_shadow=True, shadow_offset=1, shadow_color=(255,255,255,100))
+        output_img.save(_img_path)
+        raw_tuple = (output_img, _img_path,)
+        # image_raw, path_raw = raw_tuple
+    else:
+        ## 2D output
+        # n_x_bins, n_decoders, n_curr_epoch_time_bins = np.shape(img_data)
+        raw_tuple = save_array_as_image(img_data, desired_height=100, desired_width=None, skip_img_normalization=True, out_path=_img_path)
+        # image_raw, path_raw = raw_tuple
+        
     _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir.png').resolve()
     img_data = laps_directional_marginals[epoch_id]['p_x_given_n'].astype(float)
     marginal_dir_tuple = save_array_as_image(img_data, desired_height=50, desired_width=None, skip_img_normalization=True, out_path=_img_path)
