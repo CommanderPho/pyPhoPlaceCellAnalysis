@@ -1262,7 +1262,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     
     callback_outputs = {
         'recomputed_inst_fr_comps_filepath': None, #'t_end': t_end   
-        # 'standalone_MAT_filepath': None,
+        'recomputed_inst_fr_comps_h5_filepath': None,
         # 'ripple_WCorrShuffle_df_export_CSV_path': None,
     }
     err = None
@@ -1316,6 +1316,31 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
         recomputed_inst_fr_comps_filepath = None
 
     callback_outputs['recomputed_inst_fr_comps_filepath'] = recomputed_inst_fr_comps_filepath
+
+
+    ## HDF5 output:
+    if _out_recomputed_inst_fr_comps is not None:
+        ## Pickle Saving:
+        standalone_h5_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
+        recomputed_inst_fr_comps_h5_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_h5_filename).resolve()
+        print(f'recomputed_inst_fr_comps_h5_filepath: "{recomputed_inst_fr_comps_h5_filepath}"')
+
+        try:
+            # saveData(recomputed_inst_fr_comps_filepath, (curr_session_context, _out_recomputed_inst_fr_comps, _out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds))
+            _out_recomputed_inst_fr_comps.to_hdf('/recomputed_inst_fr_comps', recomputed_inst_fr_comps_h5_filepath)
+            was_write_good = True
+            callback_outputs['recomputed_inst_fr_comps_h5_filepath'] = recomputed_inst_fr_comps_h5_filepath
+
+        except BaseException as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.to_hdf('/recomputed_inst_fr_comps', '{recomputed_inst_fr_comps_h5_filepath}') for {curr_session_context}")
+            recomputed_inst_fr_comps_h5_filepath = None # set to None because it failed.
+            if self.fail_on_exception:
+                raise err.exc
+    else:
+        recomputed_inst_fr_comps_h5_filepath = None
+
 
     # callback_outputs = {
     #  'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
