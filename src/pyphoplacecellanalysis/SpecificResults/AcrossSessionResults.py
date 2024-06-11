@@ -68,6 +68,17 @@ class FiringRatesDeltaTable(tb.IsDescription):
     delta_plus = tb.Float64Col()
 
 
+# ==================================================================================================================== #
+# ScatterPlotResultsTable                                                                                              #
+# ==================================================================================================================== #
+class ScatterPlotResultsTable(tb.IsDescription):
+    """ """
+    neuron_identity = NeuronIdentityTable()
+
+    lap_firing_rates_delta = FiringRatesDeltaTable()
+    replay_firing_rates_delta = FiringRatesDeltaTable()
+
+    active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
 
 
 # @pd.api.extensions.register_dataframe_accessor("inst_fr_results")
@@ -83,18 +94,6 @@ class InstantaneousFiringRatesDataframeAccessor():
     # _required_column_names = ['session_name', 'basedirs', 'status', 'errors']
     _required_column_names = ['context', 'basedirs', 'status', 'errors']
 
-    # ==================================================================================================================== #
-    # ScatterPlotResultsTable                                                                                              #
-    # ==================================================================================================================== #
-
-    class ScatterPlotResultsTable(tb.IsDescription):
-        """ """
-        neuron_identity = NeuronIdentityTable()
-
-        lap_firing_rates_delta = FiringRatesDeltaTable()
-        replay_firing_rates_delta = FiringRatesDeltaTable()
-
-        active_set_membership = EnumCol(trackMembershipTypesEnum, 'neither', base='uint8')
 
 
     @classmethod
@@ -115,8 +114,7 @@ class InstantaneousFiringRatesDataframeAccessor():
                 # The table exists; you can now append to it
             else:
                 # The table doesn't exist; you can create it
-                table = file.create_table('/', 'ScatterPlotResults', cls.ScatterPlotResultsTable)
-
+                table = file.create_table('/', 'ScatterPlotResults', ScatterPlotResultsTable)
 
 
             # Serialization
@@ -239,7 +237,7 @@ class InstantaneousFiringRatesDataframeAccessor():
             print(f'\t\t done (success).')
             return True
 
-        except Exception as e:
+        except BaseException as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
@@ -1066,7 +1064,7 @@ class AcrossSessionTables:
         return neuron_identities_table
 
     @classmethod
-    def write_table_to_files(cls, df, global_data_root_parent_path:Path, output_basename:str='neuron_identities_table', include_csv:bool=False, include_pkl:bool=True):
+    def write_table_to_files(cls, df: pd.DataFrame, global_data_root_parent_path:Path, output_basename:str='neuron_identities_table', include_csv:bool=False, include_pkl:bool=True):
         """
 
         out_path_dict = AcrossSessionTables.write_table_to_files(v, global_data_root_parent_path=global_data_root_parent_path, output_basename='a_table')
