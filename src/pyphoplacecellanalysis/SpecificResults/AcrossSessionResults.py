@@ -202,7 +202,7 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
     @classmethod
-    def add_results_to_inst_fr_results_table(cls, curr_active_pipeline, common_file_path, file_mode='w') -> bool:
+    def add_results_to_inst_fr_results_table(cls, inst_fr_comps: InstantaneousSpikeRateGroupsComputation, curr_active_pipeline, common_file_path, file_mode='w') -> bool:
         """ computes the InstantaneousSpikeRateGroupsComputation needed for FigureTwo and serializes it out to an HDF file.
         Our final output table will be indexed by unique cells but the `InstantaneousSpikeRateGroupsComputation` data structure is currently organized by graph results.
 
@@ -217,11 +217,13 @@ class InstantaneousFiringRatesDataframeAccessor():
 
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-            _out_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
-            _out_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_session_context)
+            if inst_fr_comps is None:
+                ## recompute:
+                inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
+                inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_session_context)
 
             ## Build the Output Dataframe:
-            cell_firing_rate_summary_df: pd.DataFrame = _out_inst_fr_comps.get_summary_dataframe() # Returns the dataframe with columns ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
+            cell_firing_rate_summary_df: pd.DataFrame = inst_fr_comps.get_summary_dataframe() # Returns the dataframe with columns ['aclu', 'lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus', 'active_set_membership']
 
             # Get the aclu information for each aclu in the dataframe. Adds the ['aclu', 'shank', 'cluster', 'qclu', 'neuron_type'] columns
             # unique_aclu_information_df: pd.DataFrame = curr_active_pipeline.sess.spikes_df.spikes.extract_unique_neuron_identities()
@@ -245,7 +247,7 @@ class InstantaneousFiringRatesDataframeAccessor():
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-            _out_inst_fr_comps = None
+            inst_fr_comps = None
             return False
 
 

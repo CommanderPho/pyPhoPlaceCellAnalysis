@@ -265,7 +265,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 finalized_loaded_sess_pickle_path.unlink() # .unlink() deletes a file
                 print(f"\t {finalized_loaded_sess_pickle_path} deleted.")
                 loaded_pipeline = None
-            except Exception as e:
+            except BaseException as e:
                 raise e
 
             
@@ -688,10 +688,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                     print(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
                     self.logger.warning(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
                 
+            # SAVING IS ACTUALLY DONE HERE _______________________________________________________________________________________ #
             # Save reloaded pipeline out to pickle for future loading
             try:
                 saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
-            except Exception as e:
+            except BaseException as e:
                 raise e
             
             # If we saved to a temporary name, now see if we should overwrite or backup and then replace:

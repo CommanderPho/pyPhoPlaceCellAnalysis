@@ -3040,6 +3040,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
 
         # Concatenate the two dataframes
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus], ignore_index=True)
+        df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
         return df_combined
 
 
