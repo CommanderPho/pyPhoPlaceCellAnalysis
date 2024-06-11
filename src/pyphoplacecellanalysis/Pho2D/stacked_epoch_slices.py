@@ -713,7 +713,20 @@ class ClickActionCallbacks:
                 print(f'done.')
 
 
-
+    def log_clicked_epoch_times_to_message_box_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+        """ called to copy the clicked epoch's start/end time to the clipboard
+        
+        captures: nothing
+        """
+        print(f'log_clicked_epoch_times_to_message_box_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+        if clicked_epoch_start_stop_time is not None:
+            if len(clicked_epoch_start_stop_time) == 2:
+                start_t, end_t = clicked_epoch_start_stop_time
+                # print(f'clicked widget at {clicked_ax}. Copying to clipboard...')
+                code_string: str = f"[{start_t}, {end_t}]"
+                self.ui.thin_button_bar_widget.label_message = f"<clicked> {code_string}"
+                self.show_message(message=f"{code_string}", durationMs=1000)
+                # print(f'done.')
 
 
 
@@ -1024,9 +1037,15 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         if not self.params.has_attr('on_middle_click_item_callbacks'):
             self.params['on_middle_click_item_callbacks'] = {}
-        
+
         self.params.on_middle_click_item_callbacks['copy_axis_image_to_clipboard_callback'] = ClickActionCallbacks.copy_axis_image_to_clipboard_callback
-        # a_pagination_controller.params.on_middle_click_item_callbacks['an_alt_clicked_epoch_callback'] = an_alt_clicked_epoch_callback
+
+        if not self.params.has_attr('on_secondary_click_item_callbacks'):
+            self.params['on_secondary_click_item_callbacks'] = {}
+
+        self.params.on_secondary_click_item_callbacks['copy_to_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_to_epoch_times_to_clipboard_callback
+        self.params.on_secondary_click_item_callbacks['log_clicked_epoch_times_to_message_box_callback'] = ClickActionCallbacks.log_clicked_epoch_times_to_message_box_callback
+        
 
 
     def on_jump_to_page(self, page_idx: int):
@@ -1794,6 +1813,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 a_controlled_widget.ui.root_vbox.addWidget(a_controlled_widget.ui.thin_button_bar_widget) # add the pagination control widget
                 a_controlled_widget.ui.thin_button_bar_widget.setFixedHeight(21)
                 
+                a_controlled_widget.ui.thin_button_bar_widget.label_message = "<controlled>"
+
         return new_connections_dict
 
 

@@ -30,6 +30,23 @@ class ThinButtonBarWidget(QWidget):
     sigCopySelections = QtCore.pyqtSignal()
     sigRefresh = QtCore.pyqtSignal()
 
+    @property
+    def label_message(self):
+        """The label_message property."""
+        try:
+            return self.ui.txtLineEdit.text
+        except Exception as e:
+            print(f'WARN: no text box yet. err: {e}')
+            return ""
+    @label_message.setter
+    def label_message(self, value: str):
+        try:
+            self.ui.txtLineEdit.text = value
+        except Exception as e:
+            print(f'WARN: no text box yet. err: {e}')
+            pass
+            # raise e
+
 
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -42,10 +59,10 @@ class ThinButtonBarWidget(QWidget):
         self.ui.btnCopySelectedEpochs.pressed.connect(self.on_copy_selections)
         self.ui.btnRefresh.pressed.connect(self.on_perform_refresh)
 
-        all_buttons = [self.ui.btnUnusedButton, self.ui.btnCopySelectedEpochs, self.ui.btnRefresh]
-        for a_btn in all_buttons:
-            a_btn.setEnabled(False)
-            a_btn.hide()
+        # all_buttons = [self.ui.btnUnusedButton, self.ui.btnCopySelectedEpochs, self.ui.btnRefresh]
+        # for a_btn in all_buttons:
+        #     a_btn.setEnabled(False)
+        #     a_btn.hide()
 
         # self.ui.horizontalSpacer.hide()
 

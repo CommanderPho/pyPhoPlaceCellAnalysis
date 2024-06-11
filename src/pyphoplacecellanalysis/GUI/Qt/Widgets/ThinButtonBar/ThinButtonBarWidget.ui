@@ -142,11 +142,7 @@ border-color: rgb(0, 0, 0);</string>
          <string>Refresh</string>
         </property>
         <property name="icon">
-         <iconset theme="user-idle">
-          <normaloff>.</normaloff>.</iconset>
-        </property>
-        <property name="shortcut">
-         <string>F5</string>
+         <iconset theme="user-idle"/>
         </property>
        </widget>
       </item>
@@ -167,9 +163,6 @@ border-color: rgb(0, 0, 0);</string>
         <property name="icon">
          <iconset theme="edit-copy">
           <normaloff>.</normaloff>.</iconset>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+C</string>
         </property>
        </widget>
       </item>
