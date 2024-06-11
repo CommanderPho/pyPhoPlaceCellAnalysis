@@ -534,12 +534,12 @@ class PipelineWithLoadableStage(RegisteredOutputsMixin):
     """ Has a lodable stage. """
     
     @property
-    def can_load(self):
+    def can_load(self) -> bool:
         """Whether load can be performed."""
         return (self.last_completed_stage >= PipelineStage.Input)
 
     @property
-    def is_loaded(self):
+    def is_loaded(self) -> bool:
         """The is_loaded property."""
         return (self.stage is not None) and (isinstance(self.stage, LoadedPipelineStage))
 
