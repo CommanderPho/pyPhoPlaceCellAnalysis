@@ -531,7 +531,7 @@ class BatchSessionCompletionHandler:
             else:
                 return [] # no computations needed
 
-        except Exception as e:
+        except BaseException as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying run `_require_pipeline_has_refined_pfs(...)")
@@ -589,7 +589,7 @@ class BatchSessionCompletionHandler:
         # ## Post Compute Validate 2023-05-16:
         try:
             was_updated = was_updated | self.post_compute_validate(curr_active_pipeline)
-        except Exception as e:
+        except BaseException as e:
             exception_info = sys.exc_info()
             an_err = CapturedException(e, exception_info)
             print(f'self.post_compute_validate(...) failed with exception: {an_err}')
@@ -604,7 +604,7 @@ class BatchSessionCompletionHandler:
         try:
             # self.session_computations_options.override_file
             curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.session_computations_options.override_output_file) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
-        except Exception as e:
+        except BaseException as e:
             ## TODO: catch/log saving error and indicate that it isn't saved.
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
