@@ -3890,15 +3890,15 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str,
     """
     score_metric_merged_df: pd.DataFrame = None
     # filter_columns_fn = lambda df: df[['score']]
-    filter_columns_fn = lambda df: df[columns]
-    for a_name, a_df in decoder_epochs_score_metric_df_dict.items():
+    filter_columns_fn = lambda df: df[columns] # KeyError: "['P_decoder', 'score', 'velocity', 'intercept', 'speed', 'pearsonr', 'travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change', 'total_variation', 'integral_second_derivative', 'stddev_of_diff'] not in index"
+    for a_decoder_name, a_df in decoder_epochs_score_metric_df_dict.items():
         # a_name: str = a_name.capitalize()
         if score_metric_merged_df is None:
             score_metric_merged_df = filter_columns_fn(deepcopy(a_df))
-            score_metric_merged_df = score_metric_merged_df.add_suffix(f"_{a_name}") # suffix the columns so they're unique
+            score_metric_merged_df = score_metric_merged_df.add_suffix(f"_{a_decoder_name}") # suffix the columns so they're unique
         else:
             ## append to the initial_df
-            score_metric_merged_df = score_metric_merged_df.join(filter_columns_fn(deepcopy(a_df)).add_suffix(f"_{a_name}"), lsuffix=None, rsuffix=None)
+            score_metric_merged_df = score_metric_merged_df.join(filter_columns_fn(deepcopy(a_df)).add_suffix(f"_{a_decoder_name}"), lsuffix=None, rsuffix=None)
 
     # Get the column name with the maximum value for each row
     if best_decoder_index_column_name is not None:
