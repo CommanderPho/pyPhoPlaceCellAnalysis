@@ -1205,7 +1205,7 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
 
     # Instantaneous versions:
 
-    _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # 10ms
+    _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.005) # 10ms
     _out_fig_2.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
     _out_fig_2.display(defer_show=defer_show, save_figure=save_figure, active_context=curr_active_pipeline.sess.get_context())
 
