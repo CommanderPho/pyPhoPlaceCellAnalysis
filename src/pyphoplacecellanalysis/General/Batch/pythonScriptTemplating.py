@@ -144,6 +144,7 @@ class ProcessingScriptPhases(Enum):
             'directional_decoders_decode_continuous',
             'directional_decoders_evaluate_epochs',
             'directional_decoders_epoch_heuristic_scoring',
+            'extended_pf_peak_information',
         ]
 
         _out_run_config = {}

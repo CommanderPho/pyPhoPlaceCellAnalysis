@@ -297,7 +297,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
     #         return aclu_num_peaks_df
 
-    @function_attributes(short_name=None, tags=['WORKING', 'peak', 'multi-peak', 'decoder', 'pfs'], input_requires=[], output_provides=[], uses=['get_tuning_curve_peak_positions'], used_by=[], creation_date='2024-05-21 19:00', related_items=[])
+    @function_attributes(short_name=None, tags=['WORKING', 'peak', 'multi-peak', 'decoder', 'pfs'], input_requires=[], output_provides=[], uses=['get_tuning_curve_peak_positions'], used_by=['add_directional_pf_maximum_peaks'], creation_date='2024-05-21 19:00', related_items=[])
     def get_directional_pf_maximum_peaks_dfs(self, drop_aclu_if_missing_long_or_short: bool = True) -> Tuple[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         """ The only version that only gets the maximum peaks appropriate for each decoder.
 
@@ -3818,6 +3818,26 @@ def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_act
 
 
 
+def _workaround_validate_has_extended_pf_peak_info_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
+    """ Validates `_add_extended_pf_peak_information`
+    """
+    jonathan_firing_rate_analysis = curr_active_pipeline.global_computation_results.computed_data.get('jonathan_firing_rate_analysis', None)
+    if jonathan_firing_rate_analysis is None:
+        return False
+    
+    neuron_replay_stats_df = jonathan_firing_rate_analysis.neuron_replay_stats_df
+    if neuron_replay_stats_df is None:
+        return False
+    
+    if 'long_LR_pf2D_peak_x' not in neuron_replay_stats_df.columns:
+        return False
+
+    if 'long_LR_pf1D_peak' not in neuron_replay_stats_df.columns:
+        return False
+
+    return True
+
+
 
 # ==================================================================================================================== #
 # Resume Misc Helper Functions                                                                                         #
@@ -5084,7 +5104,34 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         return global_computation_results
     
 
+    @function_attributes(short_name='extended_pf_peak_information', tags=['trial_by_trial', 'global_computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
+                        requires_global_keys=['DirectionalLaps', 'RankOrder', 'jonathan_firing_rate_analysis'], provides_global_keys=['jonathan_firing_rate_analysis'],
+                        validate_computation_test=_workaround_validate_has_extended_pf_peak_info_result, 
+                        is_global=True, computation_precidence=(1005.4))
+    def _add_extended_pf_peak_information(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+        """ Analyzes the trial-by-trial changes (such as the lap-to-lap correlations in the placefields for each cell
+        
+        Requires:
+            ['sess']
 
+        Updates:
+            global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df
+
+        """
+        rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
+        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+
+        jonathan_firing_rate_analysis_result = global_computation_results.computed_data.jonathan_firing_rate_analysis # JonathanFiringRateAnalysisResult
+        neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        neuron_replay_stats_df, all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=owning_pipeline_reference, track_templates=track_templates)
+        neuron_replay_stats_df, all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
+        # both_included_neuron_stats_df = deepcopy(neuron_replay_stats_df[neuron_replay_stats_df['LS_pf_peak_x_diff'].notnull()]).drop(columns=['track_membership', 'neuron_type'])
+        global_computation_results.computed_data['jonathan_firing_rate_analysis'] = jonathan_firing_rate_analysis_result
+
+        return global_computation_results
 
 
 

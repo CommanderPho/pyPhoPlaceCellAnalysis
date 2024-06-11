@@ -293,15 +293,14 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
 
     def refine_exclusivity_by_inst_frs_index(self, custom_SpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5, override_existing_frs_index_values:bool=False) -> bool: 
-        """ 2023-09-28
-        
+        """ 
         inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
 
 
         Adds ['custom_frs_index', 'is_refined_exclusive'] to both: (short_exclusive.track_exclusive_df, long_exclusive.track_exclusive_df)
 
         Returns: bool - Indiciating whether the `custom_SpikeRateTrends_df` was updated or whether it already had all of the needed columns and computation was skipped.
-        
+
         """
         if (not override_existing_frs_index_values) and np.isin(['aclu','custom_frs_index','is_rate_extrema','is_refined_exclusive','is_refined_LxC','is_refined_SxC'], custom_SpikeRateTrends_df.columns).all():
             # all columns already present. We can skip.
@@ -338,9 +337,129 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
 
         return True
 
+    @classmethod
+    def _perform_add_peak_promenance_pf_peaks(cls, neuron_replay_stats_df: pd.DataFrame, curr_active_pipeline, track_templates):
+        """ adds `active_peak_prominence_2d_results` to existing `neuron_replay_stats_df` from `jonathan_firing_rate_analysis_result`, adding the `['long_pf2D_peak_x', 'long_pf2D_peak_y'] + ['short_pf2D_peak_x', 'short_pf2D_peak_y']` columns
+
+        Updated to use directional values not just long/short 
+
+        
+        Usage:
+
+            jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+            neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+
+            long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any'] # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            active_result_epoch_names = [long_LR_name, long_RL_name, short_LR_name, short_RL_name]
+
+            neuron_replay_stats_df, all_modified_columns = _add_peak_promenance_pf_peaks(neuron_replay_stats_df=neuron_replay_stats_df,
+                                                                                        curr_active_pipeline=curr_active_pipeline,
+                                                                                        #  active_result_epoch_names=active_result_epoch_names,
+                                                                                        track_templates=track_templates,
+                                                                                        )
+
+            print(f'all_modified_columns: {all_modified_columns}') # all_modified_columns: ['maze1_odd_pf2D_peak_x', 'maze1_odd_pf2D_peak_y', 'maze1_even_pf2D_peak_x', 'maze1_even_pf2D_peak_y', 'maze2_odd_pf2D_peak_x', 'maze2_odd_pf2D_peak_y', 'maze2_even_pf2D_peak_x', 'maze2_even_pf2D_peak_y']
+            neuron_replay_stats_df
+
+        all_modified_columns: ['long_LR_pf2D_peak_x', 'long_LR_pf2D_peak_y', 'long_RL_pf2D_peak_x', 'long_RL_pf2D_peak_y', 'short_LR_pf2D_peak_x', 'short_LR_pf2D_peak_y', 'short_RL_pf2D_peak_x', 'short_RL_pf2D_peak_y']
+
+        
+        History:
+            Added 2024-06-11 
+        """
+        ## INPUTS: neuron_replay_stats_df, curr_active_pipeline, track_templates
+        all_modified_columns = []
+
+        neuron_replay_stats_df = deepcopy(neuron_replay_stats_df)
+
+        # Converting between decoder names and filtered epoch names:
+        # {'long':'maze1', 'short':'maze2'}
+        # {'LR':'odd', 'RL':'even'}
+        long_LR_name, short_LR_name, long_RL_name, short_RL_name = ['maze1_odd', 'maze2_odd', 'maze1_even', 'maze2_even']
+        decoder_name_to_session_context_name: Dict[str,str] = dict(zip(track_templates.get_decoder_names(), (long_LR_name, long_RL_name, short_LR_name, short_RL_name))) # {'long_LR': 'maze1_odd', 'long_RL': 'maze1_even', 'short_LR': 'maze2_odd', 'short_RL': 'maze2_even'}
+
+        ## try to add the 2D peak information to the cells in `neuron_replay_stats_df`:
+        for a_decoder_name, a_computation_result_context_name in decoder_name_to_session_context_name.items():
+        
+            # columns should be created with the modern encoder names: (e.g. 'long_LR', ...)
+            a_peak_x_col_name: str = f'{a_decoder_name}_pf2D_peak_x'
+            a_peak_y_col_name: str = f'{a_decoder_name}_pf2D_peak_y'
+
+            a_modified_columns = [a_peak_x_col_name, a_peak_y_col_name]
+
+            # Null out existing columns or initialize them to null:
+            neuron_replay_stats_df[a_peak_x_col_name] = pd.NA
+            neuron_replay_stats_df[a_peak_y_col_name] = pd.NA
+        
+            # flat_peaks_df: pd.DataFrame = deepcopy(active_peak_prominence_2d_results['flat_peaks_df']).reset_index(drop=True)
+            a_filtered_flat_peaks_df: pd.DataFrame = deepcopy(curr_active_pipeline.computation_results[a_computation_result_context_name].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['filtered_flat_peaks_df']).reset_index(drop=True)
+            neuron_replay_stats_df.loc[np.isin(neuron_replay_stats_df['aclu'].to_numpy(), a_filtered_flat_peaks_df.neuron_id.to_numpy()), a_modified_columns] = a_filtered_flat_peaks_df[['peak_center_x', 'peak_center_y']].to_numpy()
+
+            all_modified_columns.extend(a_modified_columns)
+
+        # end for
+        
+        return neuron_replay_stats_df, all_modified_columns
 
 
+    def add_peak_promenance_pf_peaks(self, curr_active_pipeline, track_templates):
+        """ modifies `self.neuron_replay_stats_df`, adding the 2D peak information to the cells as new columns from the peak_prominence results
 
+        Adds: ['long_LR_pf2D_peak_x', 'long_LR_pf2D_peak_y', 'long_RL_pf2D_peak_x', 'long_RL_pf2D_peak_y', 'short_LR_pf2D_peak_x', 'short_LR_pf2D_peak_y', 'short_RL_pf2D_peak_x', 'short_RL_pf2D_peak_y']
+
+        neuron_replay_stats_df, all_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df
+
+        neuron_replay_stats_df, all_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df
+
+        History:
+            Added 2024-06-11 
+
+        """
+        self.neuron_replay_stats_df, all_modified_columns = JonathanFiringRateAnalysisResult._perform_add_peak_promenance_pf_peaks(neuron_replay_stats_df=self.neuron_replay_stats_df,
+                                                                             curr_active_pipeline=curr_active_pipeline,
+                                                                            #  active_result_epoch_names=active_result_epoch_names,
+                                                                             track_templates=track_templates,
+                                                                             )
+        print(f'all_modified_columns: {all_modified_columns}') # all_modified_columns: ['maze1_odd_pf2D_peak_x', 'maze1_odd_pf2D_peak_y', 'maze1_even_pf2D_peak_x', 'maze1_even_pf2D_peak_y', 'maze2_odd_pf2D_peak_x', 'maze2_odd_pf2D_peak_y', 'maze2_even_pf2D_peak_x', 'maze2_even_pf2D_peak_y']
+        return self.neuron_replay_stats_df, all_modified_columns
+
+
+    @function_attributes(short_name=None, tags=['maximum-peaks', 'peaks'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-11 18:33', related_items=[])
+    def add_directional_pf_maximum_peaks(self, track_templates):
+        """ modifies `self.neuron_replay_stats_df`, adding the columns from the peak_prominence results
+
+        Adds: ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak', 'peak_diff_LR_pf1D_peak', 'peak_diff_RL_pf1D_peak']
+
+        2024-04-09 - Maximum peaks only for each template. 
+
+        neuron_replay_stats_df, all_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df
+
+        neuron_replay_stats_df, all_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df
+        """
+        all_modified_columns = []
+
+        neuron_replay_stats_df = deepcopy(self.neuron_replay_stats_df)
+        (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=False)
+        additive_df_column_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL', 'peak_diff_LR', 'peak_diff_RL']
+        target_df_column_names = [f"{v}_pf1D_peak" for v in additive_df_column_names] # columns to add to `self.neuron_replay_stats_df`
+
+        a_modified_columns = target_df_column_names
+        # Null out existing columns or initialize them to null:
+        neuron_replay_stats_df[target_df_column_names] = pd.NA
+    
+        # flat_peaks_df: pd.DataFrame = deepcopy(active_peak_prominence_2d_results['flat_peaks_df']).reset_index(drop=True)
+        a_filtered_flat_peaks_df: pd.DataFrame = deepcopy(AnyDir_decoder_aclu_MAX_peak_maps_df).reset_index(drop=False, names=['aclu']) # .reset_index(drop=True)
+        neuron_replay_stats_df.loc[np.isin(neuron_replay_stats_df['aclu'].to_numpy(), a_filtered_flat_peaks_df['aclu'].to_numpy()), a_modified_columns] = a_filtered_flat_peaks_df[additive_df_column_names].to_numpy()
+
+        all_modified_columns.extend(a_modified_columns)
+        self.neuron_replay_stats_df = neuron_replay_stats_df
+        print(f'all_modified_columns: {all_modified_columns}') # all_modified_columns: ['maze1_odd_pf2D_peak_x', 'maze1_odd_pf2D_peak_y', 'maze1_even_pf2D_peak_x', 'maze1_even_pf2D_peak_y', 'maze2_odd_pf2D_peak_x', 'maze2_odd_pf2D_peak_y', 'maze2_even_pf2D_peak_x', 'maze2_even_pf2D_peak_y']
+        return self.neuron_replay_stats_df, all_modified_columns
+         
 
 @custom_define(slots=False, repr=False)
 class LeaveOneOutDecodingAnalysis(ComputedResult):
