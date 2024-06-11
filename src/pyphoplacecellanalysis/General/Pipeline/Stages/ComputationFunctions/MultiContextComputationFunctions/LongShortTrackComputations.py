@@ -1269,7 +1269,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     @function_attributes(short_name='long_short_inst_spike_rate_groups', tags=['long_short', 'LxC', 'SxC', 'Figure2','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=['global_computation_results.computed_data.long_short_endcap'], uses=[], used_by=[], creation_date='2023-08-21 16:52', related_items=[],
         requires_global_keys=['jonathan_firing_rate_analysis', 'long_short_fr_indicies_analysis'], provides_global_keys=['long_short_inst_spike_rate_groups'],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], is_global=True)
-    def _perform_long_short_instantaneous_spike_rate_groups_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+    def _perform_long_short_instantaneous_spike_rate_groups_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, instantaneous_time_bin_size_seconds: Optional[float]=None):
         """ Must be performed after `_perform_jonathan_replay_firing_rate_analyses`
         
         Factoring out of `InstantaneousSpikeRateGroupsComputation`
@@ -1284,6 +1284,10 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends # for `_perform_long_short_instantaneous_spike_rate_groups_analysis`
         from neuropy.utils.dynamic_container import DynamicContainer
+
+        if instantaneous_time_bin_size_seconds is None:
+            instantaneous_time_bin_size_seconds = 0.01 # set to default
+
 
         if global_computation_results.computation_config is None:
             # Create a DynamicContainer-backed computation_config
@@ -1303,6 +1307,10 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             
         instantaneous_time_bin_size_seconds: float = global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
         
+
+        
+
+        ## INPUTS: instantaneous_time_bin_size_seconds
         sess = owning_pipeline_reference.sess 
         # Get the provided context or use the session context:
         active_context = sess.get_context()
@@ -2871,7 +2879,7 @@ def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, ke
 class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ class to handle spike rate computations
 
-    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
 
     """
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 10ms
@@ -2916,12 +2924,11 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
 
-        ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
-        if not isinstance(curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, JonathanFiringRateAnalysisResult):
-            jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
-        else:
-            jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
-
+        # ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
+        # if not isinstance(curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, JonathanFiringRateAnalysisResult):
+        #     jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
+        # else:
+        #     jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
 
         # jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=0.5) ## This has to be done first. No clue where to do it.
         # neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.5)
@@ -3018,7 +3025,6 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
             # Note that in general LxC and SxC might have differing numbers of cells.
             self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus)]
         
-
     def get_summary_dataframe(self) -> pd.DataFrame:
         """ Returns a summary datatable for each neuron with one entry for each cell in (self.LxC_aclus + self.SxC_aclus)
 
