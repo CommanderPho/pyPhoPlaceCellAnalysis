@@ -89,6 +89,10 @@ class InstantaneousFiringRatesDataframeAccessor():
 
     Used for FigureTwo: the cross-session scatter plot of firing rates during laps v replays for the LxCs vs. SxCs.
 
+    
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import InstantaneousFiringRatesDataframeAccessor
+
+    
     """
 
     # _required_column_names = ['session_name', 'basedirs', 'status', 'errors']
