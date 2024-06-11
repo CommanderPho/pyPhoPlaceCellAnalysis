@@ -1248,8 +1248,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
 
-def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds:float=0.001,
-                                                                             save_hdf=True, save_pickle=True, save_across_session_hdf=True) -> dict:
+def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds:float=0.0005,
+                                                                             save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False) -> dict:
     """  Export the pipeline's HDF5 as 'pipeline_results.h5'
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
     
@@ -1371,9 +1371,6 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
                 raise err.exc
     else:
         common_file_path = None
-
-
-
 
     # ## Specify the output file:
     # common_file_path = Path('output/active_across_session_scatter_plot_results.h5')

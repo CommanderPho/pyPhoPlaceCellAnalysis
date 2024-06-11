@@ -1089,7 +1089,7 @@ def add_extra_spike_rate_trends(curr_active_pipeline) -> InstantaneousSpikeRateG
 
 	"""
 	temp = InstantaneousSpikeRateGroupsComputation()
-	temp.active_identifying_session_ctx=curr_active_pipeline.sess.get_context()
+	temp.active_identifying_session_ctx = curr_active_pipeline.sess.get_context()
 
 	long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 	long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
