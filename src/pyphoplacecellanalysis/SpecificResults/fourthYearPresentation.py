@@ -184,28 +184,39 @@ def fig_remapping_cells(curr_active_pipeline, **kwargs):
 
 
         ## outputs are all `MatplotlibRenderPlots`
+        max_num_cells: int = int(max(len(disappearing_endcap_aclus), max(len(significant_distant_remapping_endcap_aclus), len(trivially_remapping_endcap_aclus))))
+        print(f'max_num_cells: {max_num_cells}')
+
+        #TODO 2024-06-10 21:57: - [ ] Want the outputs to be a fixed height
+
+
     
         if len(disappearing_endcap_aclus) > 0:
-            # (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, disappearing_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Disappearing Cells", subtitle_string=None, **top_level_shared_kwargs)
-            graphics_output_dict['disappearing_endcap_aclus'] = curr_active_pipeline.display('_display_long_short_pf1D_comparison',active_context.adding_context_if_missing(cell_subset='disappear_endcap'), included_any_context_neuron_ids=disappearing_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Disappearing Cells", subtitle_string=None, **top_level_shared_kwargs)
-            # perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} neurons")
-            setup_common_after_creation(collector, out_container=graphics_output_dict['disappearing_endcap_aclus'], sub_context=display_context.adding_context('subplot', subplot_name='Disappearing Cells'), 
-                                        title=f'<size:22>Remapping: <weight:bold>Disappearing</> cells</>')
+            percent_max_height = float(len(disappearing_endcap_aclus)) / float(max_num_cells)
+            with mpl.rc_context({'figure.figsize': ((12.4*percent_max_height), 4.8)}):
+                # (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, disappearing_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Disappearing Cells", subtitle_string=None, **top_level_shared_kwargs)
+                graphics_output_dict['disappearing_endcap_aclus'] = curr_active_pipeline.display('_display_long_short_pf1D_comparison',active_context.adding_context_if_missing(cell_subset='disappear_endcap'), included_any_context_neuron_ids=disappearing_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Disappearing Cells", subtitle_string=None, **top_level_shared_kwargs)
+                # perform_update_title_subtitle(fig=fig, ax=ax_RL, title_string=None, subtitle_string=f"RL Track Remapping - {len(RL_only_decoder_aclu_MAX_peak_maps_df)} neurons")
+                setup_common_after_creation(collector, out_container=graphics_output_dict['disappearing_endcap_aclus'], sub_context=display_context.adding_context('subplot', subplot_name='Disappearing Cells'), 
+                                            title=f'<size:22>Remapping: <weight:bold>Disappearing</> cells</>')
         
 
         if len(significant_distant_remapping_endcap_aclus) > 0:
-            # (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, significant_distant_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Significant Distance Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
-            graphics_output_dict['significant_distant_remapping_endcap_aclus'] = curr_active_pipeline.display('_display_long_short_pf1D_comparison',active_context.adding_context_if_missing(cell_subset='sig_remap_endcap'), included_any_context_neuron_ids=significant_distant_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Significant Distance Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
-            setup_common_after_creation(collector, out_container=graphics_output_dict['significant_distant_remapping_endcap_aclus'], sub_context=display_context.adding_context('subplot', subplot_name='Significantly Remapping Cells'), 
-                                        title=f'<size:22>Remapping: <weight:bold>Significant Distance</> cells</>')
+            percent_max_height = float(len(significant_distant_remapping_endcap_aclus)) / float(max_num_cells)
+            with mpl.rc_context({'figure.figsize': ((12.4*percent_max_height), 4.8)}):
+                # (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, significant_distant_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Significant Distance Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
+                graphics_output_dict['significant_distant_remapping_endcap_aclus'] = curr_active_pipeline.display('_display_long_short_pf1D_comparison',active_context.adding_context_if_missing(cell_subset='sig_remap_endcap'), included_any_context_neuron_ids=significant_distant_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Significant Distance Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
+                setup_common_after_creation(collector, out_container=graphics_output_dict['significant_distant_remapping_endcap_aclus'], sub_context=display_context.adding_context('subplot', subplot_name='Significantly Remapping Cells'), 
+                                            title=f'<size:22>Remapping: <weight:bold>Significant Distance</> cells</>')
             
-
         if len(trivially_remapping_endcap_aclus) > 0:
-            # (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, trivially_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Trivially Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
-            graphics_output_dict['trivially_remapping_endcap_aclus'] = curr_active_pipeline.display('_display_long_short_pf1D_comparison', active_context.adding_context_if_missing(cell_subset='triv_remap_endcap'), included_any_context_neuron_ids=trivially_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Trivially Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
-            setup_common_after_creation(collector, out_container=graphics_output_dict['trivially_remapping_endcap_aclus'], sub_context=display_context.adding_context('subplot', subplot_name='Simple Remapping Cells'), 
-                                        title=f'<size:22>Remapping: <weight:bold>Simple Translation</> cells</>')
-            
+            percent_max_height = float(len(trivially_remapping_endcap_aclus)) / float(max_num_cells)
+            with mpl.rc_context({'figure.figsize': ((12.4*percent_max_height), 4.8)}):
+                # (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, trivially_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Trivially Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
+                graphics_output_dict['trivially_remapping_endcap_aclus'] = curr_active_pipeline.display('_display_long_short_pf1D_comparison', active_context.adding_context_if_missing(cell_subset='triv_remap_endcap'), included_any_context_neuron_ids=trivially_remapping_endcap_aclus, reuse_axs_tuple=None, single_figure=True, shared_kwargs=shared_kwargs, title_string="Trivially Remapping Cells", subtitle_string="1D Placefields", **top_level_shared_kwargs)
+                setup_common_after_creation(collector, out_container=graphics_output_dict['trivially_remapping_endcap_aclus'], sub_context=display_context.adding_context('subplot', subplot_name='Simple Remapping Cells'), 
+                                            title=f'<size:22>Remapping: <weight:bold>Simple Translation</> cells</>')
+                
     return collector
     # return graphics_output_dict
 
