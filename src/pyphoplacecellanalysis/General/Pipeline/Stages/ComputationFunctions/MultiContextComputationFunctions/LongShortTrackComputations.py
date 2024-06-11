@@ -2883,8 +2883,8 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
 
     """
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 10ms
-    active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))) # need to write custom serialization to attributes I think
-
+    active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, repr=True, default=None, is_computable=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))) # , serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))
+    
     LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
 

@@ -16,6 +16,16 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 
+from attrs import make_class
+SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path', 'fail_on_exception'])
+
+"""
+from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import 
+
+a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path, True)
+
+
+"""
 
 # %% [markdown]
 # ## Build Processing Scripts:
@@ -1238,7 +1248,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
 
-def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds:float=0.001) -> dict:
+def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds:float=0.001,
+                                                                             save_hdf=True, save_pickle=True) -> dict:
     """  Export the pipeline's HDF5 as 'pipeline_results.h5'
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
     
@@ -1294,7 +1305,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
 
     ## standalone saving:
-    if _out_recomputed_inst_fr_comps is not None:
+    if (_out_recomputed_inst_fr_comps is not None) and save_pickle:
         ## Pickle Saving:
         standalone_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
         recomputed_inst_fr_comps_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
@@ -1319,7 +1330,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
 
     ## HDF5 output:
-    if _out_recomputed_inst_fr_comps is not None:
+    if (_out_recomputed_inst_fr_comps is not None) and save_hdf:
         ## Pickle Saving:
         standalone_h5_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
         recomputed_inst_fr_comps_h5_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_h5_filename).resolve()
@@ -1327,7 +1338,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
         try:
             # saveData(recomputed_inst_fr_comps_filepath, (curr_session_context, _out_recomputed_inst_fr_comps, _out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds))
-            _out_recomputed_inst_fr_comps.to_hdf('/recomputed_inst_fr_comps', recomputed_inst_fr_comps_h5_filepath)
+            _out_recomputed_inst_fr_comps.to_hdf(recomputed_inst_fr_comps_h5_filepath, key='recomputed_inst_fr_comps', debug_print=False, enable_hdf_testing_mode=False)
             was_write_good = True
             callback_outputs['recomputed_inst_fr_comps_h5_filepath'] = recomputed_inst_fr_comps_h5_filepath
 
