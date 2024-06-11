@@ -481,6 +481,11 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = self.find_LongShortGlobal_epoch_names()
         long_epoch_obj, short_epoch_obj = [Epoch(self.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
+        if ((short_epoch_obj.n_epochs == 0) or (short_epoch_obj.n_epochs == 0)):
+            ## Epoch names now are 'long' and 'short'
+            long_epoch_obj, short_epoch_obj = [self.filtered_epochs[an_epoch_name].to_Epoch() for an_epoch_name in [long_epoch_name, short_epoch_name]]
+
+        
         assert short_epoch_obj.n_epochs > 0, f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}'
         assert long_epoch_obj.n_epochs > 0, f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}'
         # Uses: long_epoch_obj, short_epoch_obj
