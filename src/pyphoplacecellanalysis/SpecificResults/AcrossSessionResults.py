@@ -1136,7 +1136,7 @@ class AcrossSessionTables:
             included_h5_paths = [a_dir.joinpath('output','pipeline_results.h5').resolve() for a_dir in included_session_batch_progress_df['basedirs']]
 
 
-            neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths, override_output_parent_path=override_output_parent_path, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
+            (neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table), output_path_dicts = AcrossSessionTables.build_and_save_all_combined_tables(included_session_contexts, included_h5_paths, override_output_parent_path=override_output_parent_path, output_path_suffix=f'_{BATCH_DATE_TO_USE}')
 
 
         """
