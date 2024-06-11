@@ -45,7 +45,7 @@ from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import Fig
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 
-
+@function_attributes(short_name=None, tags=['display'], input_requires=[], output_provides=[], uses=['_display_long_short_pf1D_comparison'], used_by=[], creation_date='2024-06-10 21:40', related_items=[])
 def fig_example_nontopo_remap(curr_active_pipeline):
     """Specific Figure: Example of non-neighbor preserving remapping
     Usage:
@@ -62,6 +62,7 @@ def fig_example_nontopo_remap(curr_active_pipeline):
     return curr_active_pipeline.display('_display_long_short_pf1D_comparison', curr_active_pipeline.get_session_context(), included_any_context_neuron_ids=example_aclus, reuse_axs_tuple=None, single_figure=True, title_string="Example Non-Neighbor Preserving Remapping Cells", subtitle_string=f"2 Example Cells {example_aclus}", shared_kwargs=example_shared_kwargs, **example_top_level_shared_kwargs)
      
 
+@function_attributes(short_name=None, tags=['display'], input_requires=[], output_provides=[], uses=['_display_long_short_pf1D_comparison'], used_by=[], creation_date='2024-06-10 21:39', related_items=[])
 def fig_remapping_cells(curr_active_pipeline, **kwargs):
     """
 
