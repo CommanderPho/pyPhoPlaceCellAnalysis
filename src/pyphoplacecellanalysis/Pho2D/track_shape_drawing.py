@@ -1232,8 +1232,135 @@ class AclusYOffsetMode(Enum):
     RandomJitter = "random_jitter"
     CountBased = "count_based"
 
-@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
-def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Tuple[Tuple[float, float], Tuple[float, float]], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, **kwargs):
+
+def _plot_helper_add_track_shapes(grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], is_dark_mode: bool = True, debug_print=False):
+    """ plots the long and short track on the figure
+    
+    Usage:
+
+    ## TRACK PLOTTING:
+    (long_patch, long_path), (short_patch, short_path) = _plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, ax=ax, defer_render=defer_render, is_dark_mode=is_dark_mode, debug_print=debug_print)
+    # Draw the long/short track shapes: __________________________________________________________________________________ #
+    if ax is not None:
+        ax.add_patch(long_patch)
+        ax.add_patch(short_patch)
+        ax.autoscale()
+
+
+    """
+  # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
+    import matplotlib as mpl
+    import matplotlib.patches as patches
+    import matplotlib.colors as mcolors
+    import matplotlib.cm as cm
+    from matplotlib.transforms import Affine2D
+    import matplotlib.patheffects as path_effects
+
+    from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
+
+    from pyphocorehelpers.geometry_helpers import BoundsRect
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+    
+    if is_dark_mode:
+        _default_bg_color = 'white'
+        _default_fg_color = 'black'
+        _default_edgecolors = '#CCCCCC33' # light gray
+
+    else:
+        _default_bg_color = 'black'
+        _default_fg_color = 'white'
+        _default_edgecolors = '#5a5a5a33'
+        
+    base_1D_height: float = 1.0
+    # base_1D_height: float = 0.5
+    base_platform_additive_height: float = 0.1
+
+    long_height_multiplier: float = 1.0
+    # long_height_multiplier: float = 0.5 # this renders the long track half-height
+
+    # long_y_baseline: float = 0.1
+    # short_y_baseline: float = 0.75
+
+    ## smarter, all are calculated in terms of 1.0 being the height of the total subplot axes:
+    top_bottom_padding: float = 0.025
+    intra_track_y_spacing: float = 0.05 # spacing in between the long/short tracks
+
+    total_track_y_space: float = 1.0 - (intra_track_y_spacing + (2.0 * top_bottom_padding)) # amount of total space for the tracks
+    track_y_height: float = total_track_y_space / 2.0
+
+    long_y_baseline: float = top_bottom_padding
+    short_y_baseline: float = long_y_baseline + track_y_height + intra_track_y_spacing
+
+    # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
+    # short_y_top: float = (1.0-0.1) # 0.9
+    
+    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+    ## Get the track configs for the colors:
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+
+    long_track_color = dict(facecolor=long_epoch_config['facecolor'])
+    short_track_color = dict(facecolor=short_epoch_config['facecolor'])
+
+    if isinstance(grid_bin_bounds, (tuple, list)):
+        grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
+    else:
+        assert isinstance(grid_bin_bounds, BoundsRect)
+
+
+    # display(grid_bin_bounds)
+
+    # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+    # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
+
+    long_track_dims = LinearTrackDimensions(track_length=170.0)
+    short_track_dims = LinearTrackDimensions(track_length=100.0)
+
+    common_1D_platform_height = 0.25
+    common_1D_track_height = 0.1
+    long_track_dims.minor_axis_platform_side_width = common_1D_platform_height
+    long_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
+
+    short_track_dims.minor_axis_platform_side_width = common_1D_platform_height
+    short_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
+
+    # instances:
+    long_track = LinearTrackInstance(long_track_dims, grid_bin_bounds=grid_bin_bounds)
+    short_track = LinearTrackInstance(short_track_dims, grid_bin_bounds=grid_bin_bounds)
+
+    # BEGIN PLOTTING _____________________________________________________________________________________________________ #
+
+    track_1D_height=1.0*base_1D_height
+    platform_1D_height=1.0*base_1D_height + base_platform_additive_height # want same (additive) height offset even when scaling.
+
+    long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=((track_1D_height * long_height_multiplier) + base_platform_additive_height), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=debug_print)
+    # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=(platform_1D_height * long_height_multiplier), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
+    short_path = _build_track_1D_verticies(platform_length=22.0, track_length=short_track_dims.track_length, track_1D_height=track_1D_height, platform_1D_height=platform_1D_height, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=debug_print)
+    
+    # Define the transformation: squish along y-axis by 0.5 and translate up by 0.5 units
+    # long_transformation = Affine2D().scale(1, -0.5).translate(0, long_y_baseline)
+    # short_transformation = Affine2D().scale(1, 0.5).translate(0, short_y_baseline)
+    track_to_baseline_padding: float = 0.05
+    # long_transformation = Affine2D().scale(1, 1.0).translate(0, long_y_baseline-track_to_baseline_padding)
+    # short_transformation = Affine2D().scale(1, 1.0).translate(0, short_y_baseline-track_to_baseline_padding)
+
+    long_transformation = Affine2D().scale(1, track_y_height).translate(0, (long_y_baseline-track_to_baseline_padding))
+    short_transformation = Affine2D().scale(1, track_y_height).translate(0, (short_y_baseline-track_to_baseline_padding))
+
+    # Apply the transformation to the Path
+    long_path = long_path.transformed(long_transformation)
+    short_path = short_path.transformed(short_transformation)
+
+    # Draw the long/short track shapes: __________________________________________________________________________________ #
+    long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
+    short_patch = patches.PathPatch(short_path, **short_track_color, alpha=0.5, lw=2)
+    
+    return (long_patch, long_path), (short_patch, short_path)
+
+@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies', '_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
+def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, **kwargs):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
     🔝🖼️🎨
@@ -1266,21 +1393,12 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     """
     # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
     import matplotlib as mpl
-    import matplotlib.patches as patches
     import matplotlib.colors as mcolors
     import matplotlib.cm as cm
-    from matplotlib.transforms import Affine2D
     import matplotlib.patheffects as path_effects
 
     from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
 
-    from pyphocorehelpers.geometry_helpers import BoundsRect
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
-
-
-
-    # is_dark_mode: bool = True
-    
     if is_dark_mode:
         _default_bg_color = 'white'
         _default_fg_color = 'black'
@@ -1328,7 +1446,6 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # long_y_height: float = (short_y_baseline - intra_track_y_spacing)
     # short_y_top: float = (1.0-0.1) # 0.9
     
-
     scatter_point_size: float = 15.0
 
     # Text label options:
@@ -1348,15 +1465,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
     selection_text_path_effects = [path_effects.Stroke(linewidth=0.2, foreground='red'), path_effects.Normal()]
 
-
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-    ## Get the track configs for the colors:
-    long_short_display_config_manager = LongShortDisplayConfigManager()
-    long_epoch_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
-    short_epoch_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
-
-    long_track_color = dict(facecolor=long_epoch_config['facecolor'])
-    short_track_color = dict(facecolor=short_epoch_config['facecolor'])
 
     ## Extract the quantities needed from the DF passed
     active_aclus = a_dir_decoder_aclu_MAX_peak_maps_df.index.to_numpy()
@@ -1382,54 +1491,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     if len(appearing_long_to_short_aclus) > 0:
         print(f'appearing_long_to_short_aclus: {appearing_long_to_short_aclus}')
 
-    grid_bin_bounds = BoundsRect.init_from_grid_bin_bounds(grid_bin_bounds)
-    # display(grid_bin_bounds)
-
-    # long_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
-    # short_track_dims = LinearTrackDimensions.init_from_grid_bin_bounds(grid_bin_bounds)
-
-    long_track_dims = LinearTrackDimensions(track_length=170.0)
-    short_track_dims = LinearTrackDimensions(track_length=100.0)
-
-    common_1D_platform_height = 0.25
-    common_1D_track_height = 0.1
-    long_track_dims.minor_axis_platform_side_width = common_1D_platform_height
-    long_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
-
-    short_track_dims.minor_axis_platform_side_width = common_1D_platform_height
-    short_track_dims.track_width = common_1D_track_height # (short_track_dims.minor_axis_platform_side_width
-
-    # instances:
-    long_track = LinearTrackInstance(long_track_dims, grid_bin_bounds=grid_bin_bounds)
-    short_track = LinearTrackInstance(short_track_dims, grid_bin_bounds=grid_bin_bounds)
-
-    # BEGIN PLOTTING _____________________________________________________________________________________________________ #
-
-    track_1D_height=1.0*base_1D_height
-    platform_1D_height=1.0*base_1D_height + base_platform_additive_height # want same (additive) height offset even when scaling.
-
-    long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=((track_1D_height * long_height_multiplier) + base_platform_additive_height), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=debug_print)
-    # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=long_track_dims.track_length, track_1D_height=(track_1D_height * long_height_multiplier), platform_1D_height=(platform_1D_height * long_height_multiplier), track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
-    short_path = _build_track_1D_verticies(platform_length=22.0, track_length=short_track_dims.track_length, track_1D_height=track_1D_height, platform_1D_height=platform_1D_height, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=debug_print)
-
-    
-    # Define the transformation: squish along y-axis by 0.5 and translate up by 0.5 units
-    # long_transformation = Affine2D().scale(1, -0.5).translate(0, long_y_baseline)
-    # short_transformation = Affine2D().scale(1, 0.5).translate(0, short_y_baseline)
-    track_to_baseline_padding: float = 0.05
-    # long_transformation = Affine2D().scale(1, 1.0).translate(0, long_y_baseline-track_to_baseline_padding)
-    # short_transformation = Affine2D().scale(1, 1.0).translate(0, short_y_baseline-track_to_baseline_padding)
-
-    long_transformation = Affine2D().scale(1, track_y_height).translate(0, (long_y_baseline-track_to_baseline_padding))
-    short_transformation = Affine2D().scale(1, track_y_height).translate(0, (short_y_baseline-track_to_baseline_padding))
-
-    # Apply the transformation to the Path
-    long_path = long_path.transformed(long_transformation)
-    short_path = short_path.transformed(short_transformation)
 
     ## Create the remapping figure:
-    # fig, ax = plt.subplots()
-
     ## Figure Setup:
     if ax is None:
         ## Build a new figure:
@@ -1442,16 +1505,17 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         # otherwise get the figure from the passed axis
         fig = ax.get_figure()
 
-
     ##########################
 
+    ## TRACK PLOTTING:
+    (long_patch, long_path), (short_patch, short_path) = _plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, debug_print=debug_print)
     # Draw the long/short track shapes: __________________________________________________________________________________ #
-    long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
-    ax.add_patch(long_patch)
+    if ax is not None:
+        ax.add_patch(long_patch)
+        ax.add_patch(short_patch)
+        ax.autoscale()
 
-    short_patch = patches.PathPatch(short_path, **short_track_color, alpha=0.5, lw=2)
-    ax.add_patch(short_patch)
-    ax.autoscale()
+        
 
     ## INPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, long_peak_x, short_peak_x, peak_x_diff
 
@@ -1459,19 +1523,25 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # colormap = plt.cm.viridis  # or any other colormap
 
     if unit_id_colors_map is None:
+        # Create a constant colormap with only white color
         if is_dark_mode:
             colormap = mcolors.ListedColormap(['white'])
         else:
             colormap = mcolors.ListedColormap(['black'])
-        normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
-        scalar_map = cm.ScalarMappable(norm=normalize, cmap=colormap)
 
-        # Create a constant colormap with only white color
+        if isinstance(active_aclus[0], str):
+            # string aclus:
+            unit_id_colors_map = {}
+            color = [unit_id_colors_map.get(an_aclu, _default_bg_color) for an_aclu in active_aclus]
+            get_aclu_color_fn = lambda an_aclu: unit_id_colors_map.get(an_aclu, _default_bg_color)
 
-        color = scalar_map.to_rgba(active_aclus)
-        ## constant:
-        # color = 'white'
-        get_aclu_color_fn = lambda an_aclu: scalar_map.to_rgba(an_aclu)
+        else:
+            normalize = mcolors.Normalize(vmin=active_aclus.min(), vmax=active_aclus.max())
+            scalar_map = cm.ScalarMappable(norm=normalize, cmap=colormap)
+            color = scalar_map.to_rgba(active_aclus)
+            ## constant:
+            # color = 'white'
+            get_aclu_color_fn = lambda an_aclu: scalar_map.to_rgba(an_aclu)
         
     else:
         ## use the provided `unit_id_colors_map`:
@@ -1524,7 +1594,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=30.0, c=color)
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=25.0, edgecolors=color, c='#AAAAAA33', marker='o', plotnonfinite=False)
     # circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full_like(active_aclus, fill_value=scatter_point_size), edgecolors=color, facecolors=(['#CCCCCC33'] * len(active_aclus)), marker='o', plotnonfinite=False)
-    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full_like(active_aclus, fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(active_aclus)), facecolors=color, marker='o', plotnonfinite=False)
+    circle_points_kwargs = dict(alpha=0.9, picker=enable_interactivity, s=np.full((len(active_aclus),), fill_value=scatter_point_size), edgecolors=([_default_edgecolors] * len(active_aclus)), facecolors=color, marker='o', plotnonfinite=False)
 
     _out_long_points = ax.scatter(long_peak_x, y=long_y, label='long_peak_x', **circle_points_kwargs)
     _out_short_points = ax.scatter(short_peak_x, y=short_y, label='short_peak_x', **circle_points_kwargs)
@@ -1541,7 +1611,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
 
 
     for idx, aclu_val in enumerate(active_aclus):
-        aclu_val: int = int(aclu_val)
+        # aclu_val: int = int(aclu_val)
+        aclu_val: str = str(aclu_val)
         if aclu_val not in _output_by_aclu_dict:
             _output_by_aclu_dict[aclu_val] = {}
 
@@ -1568,7 +1639,7 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
             arrow_color = get_aclu_color_fn(active_aclus[idx])
             
             # Annotate the plot with arrows; adjust the properties according to your needs
-            _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color=arrow_color))
+            _output_by_aclu_dict[aclu_val]['long_to_short_arrow'] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color=arrow_color), label=str(active_aclus[idx]))
             # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrowprops: {'arrowstyle': '->', 'color': (0.267004, 0.004874, 0.329415, 1.0), 'alpha': 0.6}
             # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrow_patch # mpl.patches.FancyArrowPatch
             # _output_by_aclu_dict[aclu_val]['long_to_short_arrow'].arrow_patch.set_color('')
@@ -1582,7 +1653,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
         text_kwargs = dict(color=aclu_labels_text_color, fontsize=aclu_labels_fontsize, ha='center', va='center')
         # Add text labels to scatter points
         for i, aclu_val in enumerate(active_aclus):
-            aclu_val: int = int(aclu_val)
+            # aclu_val: int = int(aclu_val)
+            aclu_val: str = str(aclu_val)
 
             if aclu_val not in appearing_long_to_short_aclus:
                 a_long_text = ax.text(long_peak_x[i], long_y[i], str(aclu_val), **text_kwargs)
@@ -1883,7 +1955,6 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
                 perform_update_title_subtitle(fig=fig, ax=ax, title_string=None, subtitle_string=f"LR+RL Track Remapping - {len(LR_only_decoder_aclu_MAX_peak_maps_df)} neurons")
 
                 setup_common_after_creation(collector, fig=fig, axes=[ax, ], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
-
 
 
     return collector
