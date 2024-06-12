@@ -990,6 +990,11 @@ def copy_files_in_filelist_to_dest(filelist_text_file='fileList_GreatLakes_HDF5_
 class AcrossSessionTables:
 
     aliases_columns_dict = {'global_uid':'neuron_uid', 'neuron_id':'aclu'}
+    float_columns = ['long_pf_peak_x', 'short_pf_peak_x', 'long_LR_pf2D_peak_x', 'long_LR_pf2D_peak_y',
+                            'long_RL_pf2D_peak_x', 'long_RL_pf2D_peak_y', 'short_LR_pf2D_peak_x', 'short_LR_pf2D_peak_y',
+                            'short_RL_pf2D_peak_x', 'short_RL_pf2D_peak_y', 'long_LR_pf1D_peak', 'long_RL_pf1D_peak',
+                            'short_LR_pf1D_peak', 'short_RL_pf1D_peak', 'peak_diff_RL_pf1D_peak', 'peak_diff_LR_pf1D_peak']
+
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
     def build_custom_table(included_session_contexts, included_h5_paths, df_table_keys, drop_columns_list:Optional[List]=None, should_restore_native_column_types:bool=True):
@@ -1017,7 +1022,7 @@ class AcrossSessionTables:
         return _out_table
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
-    def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths, **kwargs):
+    def build_neuron_replay_stats_table(included_session_contexts, included_h5_paths, **kwargs) -> pd.DataFrame:
         """
         Usage:
             neuron_replay_stats_table = AcrossSessionTables.build_neuron_replay_stats_table(included_session_contexts, included_h5_paths)
@@ -1026,7 +1031,13 @@ class AcrossSessionTables:
         session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         neuron_replay_stats_df_table_keys = [f"{session_group_key}/global_computations/jonathan_fr_analysis/neuron_replay_stats_df/table" for session_group_key in session_group_keys]
         drop_columns_list = ['neuron_IDX', 'has_short_pf', 'has_na', 'has_long_pf', 'index']
-        return AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_replay_stats_df_table_keys, drop_columns_list=drop_columns_list, **kwargs)
+        neuron_replay_stats_table: pd.DataFrame = AcrossSessionTables.build_custom_table(included_session_contexts, included_h5_paths, df_table_keys=neuron_replay_stats_df_table_keys, drop_columns_list=drop_columns_list, **kwargs)
+        # Manually convert specific columns to float64
+        for col in AcrossSessionTables.float_columns:
+            if col in neuron_replay_stats_table.columns:
+                neuron_replay_stats_table[col] = pd.to_numeric(neuron_replay_stats_table[col], errors='coerce')
+        return neuron_replay_stats_table
+
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
     def build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths, **kwargs):
@@ -1464,7 +1475,7 @@ def process_csv_file(file: str, session_name: str, curr_session_t_delta: Optiona
     """ reads the CSV file and adds the 'session_name' column if it is missing.
 
     """
-    df = pd.read_csv(file)
+    df = pd.read_csv(file, na_values=['', 'nan', 'np.nan', '<NA>'])
     df['session_name'] = session_name
     if curr_session_t_delta is not None:
         df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
@@ -1625,7 +1636,7 @@ def _process_and_load_exported_file(session_dict, df_file_name_key: str, loaded_
         file_path = session_dict[df_file_name_key]
         loaded_dict[session_name] = process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
     except BaseException as e:
-        print(f'session {session_name}, df_file_name_key: {df_file_name_key} - did not fully work. (error {e}. Skipping.')
+        print(f'session "{session_name}", df_file_name_key: "{df_file_name_key}" - did not fully work. (error "{e}". Skipping.')
 
 def _common_cleanup_operations(a_df):
     """ post loading and concatenation across sessions dataframe cleanup """
@@ -1746,7 +1757,7 @@ def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None,
     ## OUTPUTS: (csv_files, csv_sessions), (h5_files, h5_sessions)
 
     ## The CSV containing the session delta time:
-    t_delta_df = pd.read_csv(t_delta_csv_path, index_col=0) # Assuming that your CSV file has an index column
+    t_delta_df = pd.read_csv(t_delta_csv_path, index_col=0, na_values=['', 'nan', 'np.nan', '<NA>']) # Assuming that your CSV file has an index column
     # adds `delta_aligned_t_start`, `delta_aligned_t_end` columns
     t_delta_df['delta_aligned_t_start'] = t_delta_df['t_start'] - t_delta_df['t_delta']
     t_delta_df['delta_aligned_t_end'] = t_delta_df['t_end'] - t_delta_df['t_delta']
