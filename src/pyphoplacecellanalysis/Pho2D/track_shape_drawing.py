@@ -1233,8 +1233,9 @@ class AclusYOffsetMode(Enum):
     CountBased = "count_based"
 
 
+@function_attributes(short_name=None, tags=['matplotlib', 'patches', 'track', 'long-short'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies'], used_by=['_plot_track_remapping_diagram'], creation_date='2024-06-12 12:57', related_items=[])
 def _plot_helper_add_track_shapes(grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], is_dark_mode: bool = True, debug_print=False):
-    """ plots the long and short track on the figure
+    """ Prepares the final matplotlib patch objects to represent the 1D long and short tracks, which can be immediately added to an axis
     
     Usage:
 
@@ -1246,6 +1247,9 @@ def _plot_helper_add_track_shapes(grid_bin_bounds: Union[Tuple[Tuple[float, floa
         ax.add_patch(short_patch)
         ax.autoscale()
 
+    History:
+
+        Factored out of `_plot_track_remapping_diagram` on 2024-06-12
 
     """
   # BUILDS TRACK PROPERTIES ____________________________________________________________________________________________ #
@@ -1359,7 +1363,7 @@ def _plot_helper_add_track_shapes(grid_bin_bounds: Union[Tuple[Tuple[float, floa
     
     return (long_patch, long_path), (short_patch, short_path)
 
-@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.Pho2D.track_shape_drawing._build_track_1D_verticies', '_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
+@function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
 def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame, grid_bin_bounds: Union[Tuple[Tuple[float, float], Tuple[float, float]], BoundsRect], long_column_name:str='long_LR', short_column_name:str='short_LR', ax=None, defer_render: bool=False, enable_interactivity:bool=True, draw_point_aclu_labels:bool=False, enable_adjust_overlapping_text: bool=False, is_dark_mode: bool = True, aclus_y_offset_mode:AclusYOffsetMode=AclusYOffsetMode.CountBased, debug_print=False, **kwargs):
     """ Plots a single figure containing the long and short track outlines (flattened, overlayed) with single points on each corresponding to the peak location in 1D
 
