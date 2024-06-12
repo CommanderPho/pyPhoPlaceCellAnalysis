@@ -5724,6 +5724,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables
             import matplotlib.pyplot as plt
 
+            import matplotlib as mpl
+            import matplotlib.pyplot as plt
+            from flexitext import flexitext ## flexitext for formatted matplotlib text
+
+            from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
+            from matplotlib.gridspec import GridSpec
+            from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
+            from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+            
+
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
 
             fignum = kwargs.pop('fignum', None)

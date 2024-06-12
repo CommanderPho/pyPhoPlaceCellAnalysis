@@ -88,13 +88,23 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
         histogram_bins: int = 25
 
-        new_laps_fig = plotly_pre_post_delta_scatter(data_results_df=deepcopy(all_sessions_laps_df), out_scatter_fig=fig_laps, histogram_bins=histogram_bins)
+        new_laps_fig = plotly_pre_post_delta_scatter(data_results_df=deepcopy(all_sessions_laps_df), out_scatter_fig=fig_laps, histogram_bins=histogram_bins, px_scatter_kwargs = dict(title='Laps'))
         new_laps_fig
 
     """
     import plotly.subplots as sp
     import plotly.express as px
     import plotly.graph_objs as go
+
+
+    use_latex_labels: bool = False
+
+    if use_latex_labels:
+        pre_delta_label: str = r'"$\\text{Pre-}\Delta$"'
+        post_delta_label: str = r'"$\\text{Post-}\Delta$"'
+    else:
+        pre_delta_label: str = 'Pre-delta'
+        post_delta_label: str = 'Post-delta'
 
     figure_context_dict = {'histogram_variable_name': histogram_variable_name}
 
@@ -151,12 +161,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     # Build Figure                                                                                                         #
     # ==================================================================================================================== #
     # creating subplots
-    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=["Pre-delta", main_title, "Post-delta"])
+    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label])
     already_added_legend_entries = set()  # Keep track of trace names that are already added
 
     # Pre-Delta Histogram ________________________________________________________________________________________________ #
     # adding first histogram
-    pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title="Pre-delta")
+    pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label)
     print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
     for a_trace in pre_delta_fig.data:
         a_trace_name = a_trace.name
@@ -208,7 +218,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     # Post-Delta Histogram _______________________________________________________________________________________________ #
     # adding the second histogram
-    post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title="Post-delta")
+    post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)
 
     for a_trace in post_delta_fig.data:
         a_trace_name = a_trace.name
@@ -258,6 +268,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
             legend_title_text=legend_title_text  # Add a title to the legend
         )
 
+
+    fig.update_xaxes(title_text="# Events", row=1, col=1)
+    fig.update_xaxes(title_text="Delta-aligned Event Time (seconds)", row=1, col=2)
+    fig.update_xaxes(title_text="# Events", row=1, col=3)
+
+    fig.update_yaxes(title_text="Probability of Short Track", row=1, col=1)
 
     return fig, figure_context
 
