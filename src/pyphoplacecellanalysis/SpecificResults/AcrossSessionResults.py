@@ -648,6 +648,7 @@ class AcrossSessionsResults:
         assert len(context_minimal_names) == len(all_contexts_list)
 
         context_minimal_names_map = dict(zip(all_contexts_list, context_minimal_names))
+
         def _build_session_dep_aclu_identifier(session_context: IdentifyingContext, session_relative_aclus: np.ndarray):
             """ kdiba_pin01_one_fet11-01_12-58-54_{aclu}
                 with `context_minimal_names_map` - get tiny names like: a0s1, a0s2
@@ -680,7 +681,6 @@ class AcrossSessionsResults:
 
         # across_session_inst_fr_computation.LxC_scatter_props = LxC_scatter_props
         # across_session_inst_fr_computation.SxC_scatter_props = SxC_scatter_props
-
 
         # Broken as of 2023-10-03:
         across_session_inst_fr_computation.LxC_scatter_props = None
