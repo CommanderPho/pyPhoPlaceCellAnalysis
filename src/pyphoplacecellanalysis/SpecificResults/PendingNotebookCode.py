@@ -39,6 +39,103 @@ DecoderName = NewType('DecoderName', str)
 import matplotlib.pyplot as plt
 
 
+
+# ---------------------------------------------------------------------------- #
+#                      2024-06-15 - Significant Remapping                      #
+# ---------------------------------------------------------------------------- #
+def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Dict, x_midpoint: float=72.0):
+    """ yanked from `_perform_long_short_endcap_analysis to compute within the batch processing notebook
+
+    'has_long_pf', 'has_short_pf'
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_cell_remapping_category
+
+        neuron_replay_stats_df = deepcopy(neuron_replay_stats_table)
+        neuron_replay_stats_df, (non_disappearing_endcap_cells_df, disappearing_endcap_cells_df, minorly_changed_endcap_cells_df, significant_distant_remapping_endcap_aclus) = _add_cell_remapping_category(neuron_replay_stats_df=neuron_replay_stats_df,
+                                                            loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]), 'short_xlim': np.array([94.0156, 193.757]), 'long_ylim': np.array([138.164, 146.12]), 'short_ylim': np.array([138.021, 146.263])},
+        )
+        neuron_replay_stats_df
+    
+    """
+    # `loaded_track_limits` = deepcopy(owning_pipeline_reference.sess.config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
+    # x_midpoint: float = owning_pipeline_reference.sess.config.x_midpoint
+    # pix2cm: float = owning_pipeline_reference.sess.config.pix2cm
+
+    ## INPUTS: loaded_track_limits
+    print(f'loaded_track_limits: {loaded_track_limits}')
+
+    if 'has_long_pf' not in neuron_replay_stats_df.columns:
+        neuron_replay_stats_df['has_long_pf'] = np.logical_not(np.isnan(neuron_replay_stats_df['long_pf_peak_x']))
+    if 'has_short_pf' not in neuron_replay_stats_df.columns:
+        neuron_replay_stats_df['has_short_pf'] = np.logical_not(np.isnan(neuron_replay_stats_df['short_pf_peak_x']))
+
+    long_xlim = loaded_track_limits['long_xlim']
+    # long_ylim = loaded_track_limits['long_ylim']
+    short_xlim = loaded_track_limits['short_xlim']
+    # short_ylim = loaded_track_limits['short_ylim']
+
+    occupancy_midpoint: float = x_midpoint # 142.7512402496278 # 150.0
+    left_cap_x_bound: float = (long_xlim[0] - x_midpoint) #-shift by midpoint - 72.0 # on long track
+    right_cap_x_bound: float = (long_xlim[1] - x_midpoint) # 72.0 # on long track
+    min_significant_remapping_x_distance: float = 40.0 # from long->short track
+
+    ## STATIC:
+    # occupancy_midpoint: float = 142.7512402496278 # 150.0
+    # left_cap_x_bound: float = -72.0 # on long track
+    # right_cap_x_bound: float = 72.0 # on long track
+    # min_significant_remapping_x_distance: float = 40.0 # from long->short track
+
+    # Extract the peaks of the long placefields to find ones that have peaks outside the boundaries
+    long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - occupancy_midpoint # this shift of `occupancy_midpoint` is to center the midpoint of the track at 0. 
+    is_left_cap = (long_pf_peaks < left_cap_x_bound)
+    is_right_cap = (long_pf_peaks > right_cap_x_bound)
+    # is_either_cap =  np.logical_or(is_left_cap, is_right_cap)
+
+    # Adds ['is_long_peak_left_cap', 'is_long_peak_right_cap', 'is_long_peak_either_cap'] columns: 
+    neuron_replay_stats_df['is_long_peak_left_cap'] = False
+    neuron_replay_stats_df['is_long_peak_right_cap'] = False
+    neuron_replay_stats_df.loc[is_left_cap.index, 'is_long_peak_left_cap'] = is_left_cap # True
+    neuron_replay_stats_df.loc[is_right_cap.index, 'is_long_peak_right_cap'] = is_right_cap # True
+
+    neuron_replay_stats_df['is_long_peak_either_cap'] = np.logical_or(neuron_replay_stats_df['is_long_peak_left_cap'], neuron_replay_stats_df['is_long_peak_right_cap'])
+
+    # adds ['LS_pf_peak_x_diff'] column
+    neuron_replay_stats_df['LS_pf_peak_x_diff'] = neuron_replay_stats_df['long_pf_peak_x'] - neuron_replay_stats_df['short_pf_peak_x']
+
+    cap_cells_df = neuron_replay_stats_df[np.logical_and(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['is_long_peak_either_cap'])]
+    num_total_endcap_cells = len(cap_cells_df)
+
+    # "Disppearing" cells fall below the 1Hz firing criteria on the short track:
+    disappearing_endcap_cells_df = cap_cells_df[np.logical_not(cap_cells_df['has_short_pf'])]
+    num_disappearing_endcap_cells = len(disappearing_endcap_cells_df)
+    print(f'num_disappearing_endcap_cells/num_total_endcap_cells: {num_disappearing_endcap_cells}/{num_total_endcap_cells}')
+
+    non_disappearing_endcap_cells_df = cap_cells_df[cap_cells_df['has_short_pf']] # "non_disappearing" cells are those with a placefield on the short track as well
+    num_non_disappearing_endcap_cells = len(non_disappearing_endcap_cells_df)
+    print(f'num_non_disappearing_endcap_cells/num_total_endcap_cells: {num_non_disappearing_endcap_cells}/{num_total_endcap_cells}')
+
+    # Classify the non_disappearing cells into two groups:
+    # 1. Those that exhibit significant remapping onto somewhere else on the track
+    non_disappearing_endcap_cells_df['has_significant_distance_remapping'] = (np.abs(non_disappearing_endcap_cells_df['LS_pf_peak_x_diff']) >= min_significant_remapping_x_distance) # The most a placefield could translate intwards would be (35 + (pf_width/2.0)) I think.
+    num_significant_position_remappping_endcap_cells: int = len(non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == True])
+    print(f'num_significant_position_remappping_endcap_cells/num_non_disappearing_endcap_cells: {num_significant_position_remappping_endcap_cells}/{num_non_disappearing_endcap_cells}')
+
+    # 2. Those that seem to remain where they were on the long track, perhaps being "sampling-clipped" or translated adjacent to the platform. These two subcases can be distinguished by a change in the placefield's length (truncated cells would be a fraction of the length, although might need to account for scaling with new track length)
+    minorly_changed_endcap_cells_df = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == False]
+
+    significant_distant_remapping_endcap_aclus = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping']].index # Int64Index([3, 5, 7, 11, 14, 38, 41, 53, 57, 61, 62, 75, 78, 79, 82, 83, 85, 95, 98, 100, 102], dtype='int64')
+    
+    return neuron_replay_stats_df, (non_disappearing_endcap_cells_df, disappearing_endcap_cells_df, minorly_changed_endcap_cells_df, significant_distant_remapping_endcap_aclus,)
+
+
+
+
+
+
+
+
 # ==================================================================================================================== #
 # 2024-05-23 - Restoring 'is_user_annotated_epoch' and 'is_valid_epoch' columns                                        #
 # ==================================================================================================================== #
