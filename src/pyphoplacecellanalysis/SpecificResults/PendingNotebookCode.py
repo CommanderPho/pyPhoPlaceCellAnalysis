@@ -79,7 +79,8 @@ def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Di
     occupancy_midpoint: float = x_midpoint # 142.7512402496278 # 150.0
     left_cap_x_bound: float = (long_xlim[0] - x_midpoint) #-shift by midpoint - 72.0 # on long track
     right_cap_x_bound: float = (long_xlim[1] - x_midpoint) # 72.0 # on long track
-    min_significant_remapping_x_distance: float = 40.0 # from long->short track
+    min_significant_remapping_x_distance: float = 50.0 # from long->short track
+    # min_significant_remapping_x_distance: float = 100.0
 
     ## STATIC:
     # occupancy_midpoint: float = 142.7512402496278 # 150.0
@@ -104,16 +105,16 @@ def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Di
     # adds ['LS_pf_peak_x_diff'] column
     neuron_replay_stats_df['LS_pf_peak_x_diff'] = neuron_replay_stats_df['long_pf_peak_x'] - neuron_replay_stats_df['short_pf_peak_x']
 
-    cap_cells_df = neuron_replay_stats_df[np.logical_and(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['is_long_peak_either_cap'])]
-    num_total_endcap_cells = len(cap_cells_df)
+    cap_cells_df: pd.DataFrame = neuron_replay_stats_df[np.logical_and(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['is_long_peak_either_cap'])]
+    num_total_endcap_cells: int = len(cap_cells_df)
 
     # "Disppearing" cells fall below the 1Hz firing criteria on the short track:
-    disappearing_endcap_cells_df = cap_cells_df[np.logical_not(cap_cells_df['has_short_pf'])]
-    num_disappearing_endcap_cells = len(disappearing_endcap_cells_df)
+    disappearing_endcap_cells_df: pd.DataFrame = cap_cells_df[np.logical_not(cap_cells_df['has_short_pf'])]
+    num_disappearing_endcap_cells: int = len(disappearing_endcap_cells_df)
     print(f'num_disappearing_endcap_cells/num_total_endcap_cells: {num_disappearing_endcap_cells}/{num_total_endcap_cells}')
 
-    non_disappearing_endcap_cells_df = cap_cells_df[cap_cells_df['has_short_pf']] # "non_disappearing" cells are those with a placefield on the short track as well
-    num_non_disappearing_endcap_cells = len(non_disappearing_endcap_cells_df)
+    non_disappearing_endcap_cells_df: pd.DataFrame = cap_cells_df[cap_cells_df['has_short_pf']] # "non_disappearing" cells are those with a placefield on the short track as well
+    num_non_disappearing_endcap_cells: int = len(non_disappearing_endcap_cells_df)
     print(f'num_non_disappearing_endcap_cells/num_total_endcap_cells: {num_non_disappearing_endcap_cells}/{num_total_endcap_cells}')
 
     # Classify the non_disappearing cells into two groups:
@@ -123,11 +124,11 @@ def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Di
     print(f'num_significant_position_remappping_endcap_cells/num_non_disappearing_endcap_cells: {num_significant_position_remappping_endcap_cells}/{num_non_disappearing_endcap_cells}')
 
     # 2. Those that seem to remain where they were on the long track, perhaps being "sampling-clipped" or translated adjacent to the platform. These two subcases can be distinguished by a change in the placefield's length (truncated cells would be a fraction of the length, although might need to account for scaling with new track length)
-    minorly_changed_endcap_cells_df = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == False]
-
-    significant_distant_remapping_endcap_aclus = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping']].index # Int64Index([3, 5, 7, 11, 14, 38, 41, 53, 57, 61, 62, 75, 78, 79, 82, 83, 85, 95, 98, 100, 102], dtype='int64')
+    significant_distant_remapping_endcap_cells_df: pd.DataFrame = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == True] ## why only endcap cells?
+    minorly_changed_endcap_cells_df: pd.DataFrame = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == False]
+    # significant_distant_remapping_endcap_aclus = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping']].index # Int64Index([3, 5, 7, 11, 14, 38, 41, 53, 57, 61, 62, 75, 78, 79, 82, 83, 85, 95, 98, 100, 102], dtype='int64')
     
-    return neuron_replay_stats_df, (non_disappearing_endcap_cells_df, disappearing_endcap_cells_df, minorly_changed_endcap_cells_df, significant_distant_remapping_endcap_aclus,)
+    return neuron_replay_stats_df, (non_disappearing_endcap_cells_df, disappearing_endcap_cells_df, minorly_changed_endcap_cells_df, significant_distant_remapping_endcap_cells_df,)
 
 
 
