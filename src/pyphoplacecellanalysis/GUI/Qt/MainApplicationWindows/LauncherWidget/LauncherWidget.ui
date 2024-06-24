@@ -153,9 +153,12 @@ QToolTip {
              <string notr="true">QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255)) }
 /* Tooltip Specific Styling */
 QToolTip {
-    background-color: rgb(0, 0, 0); /* Black background */
+    background-color: rgb(15, 15, 15); /* Black background */
     color: rgb(211, 211, 211); /* Light grey text */
     border: 1px solid white; /* Optional: white border */
+}
+QTreeWidget:item:!enabled {
+	color: #808080; /* Dark grey color */
 }</string>
             </property>
             <property name="selectionMode">
@@ -166,6 +169,9 @@ QToolTip {
               <width>32</width>
               <height>64</height>
              </size>
+            </property>
+            <property name="columnCount">
+             <number>1</number>
             </property>
             <column>
              <property name="text">
@@ -179,6 +185,9 @@ QToolTip {
              <property name="icon">
               <iconset resource="../../../../Resources/GuiResources.qrc">
                <normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</iconset>
+             </property>
+             <property name="flags">
+              <set>ItemIsSelectable|ItemIsDragEnabled|ItemIsUserCheckable</set>
              </property>
             </item>
             <item>
@@ -215,6 +224,9 @@ QToolTip {
              <property name="icon">
               <iconset resource="../../../../Resources/ActionIcons.qrc">
                <normaloff>:/Render/Icons/Icon/Occupancy.png</normaloff>:/Render/Icons/Icon/Occupancy.png</iconset>
+             </property>
+             <property name="flags">
+              <set>ItemIsSelectable|ItemIsDragEnabled|ItemIsUserCheckable</set>
              </property>
             </item>
             <item>

@@ -12,10 +12,12 @@ from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, 
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
+
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import Plot, DisplayFunctionItem
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
+from neuropy.utils.result_context import IdentifyingContext
 from pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
 
 ## Define the .ui file path
@@ -47,7 +49,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
     debug_print = False
 
     @property
-    def treeWidget(self):
+    def treeWidget(self) -> QtWidgets.QTreeWidget:
         """The treeWidget property."""
         return self.mainTreeWidget # QTreeWidget
     
@@ -77,6 +79,21 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
     # def display_function_items(self) -> Dict[str,DisplayFunctionItem]:
     #     return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self._pipeline_reference.registered_display_function_dict.items()}
 
+    @property
+    def selected_context(self) -> Optional[IdentifyingContext]:
+        """The selected_context property."""
+        if not hasattr(self, 'displayContextSelectorWidget'):
+            return None
+        if self.displayContextSelectorWidget is None:
+            return None
+        return self.displayContextSelectorWidget.current_selected_context
+
+    @property
+    def has_selected_context(self) -> bool:
+        """The selected_context property."""
+        return (self.selected_context is not None)
+
+
 
     def __init__(self, debug_print=False, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -98,6 +115,8 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
 
         # Signal: itemEntered - fired when mouse hovers over an item
         self.treeWidget.itemEntered.connect(self.on_tree_item_hovered)
+
+        self.displayContextSelectorWidget.sigContextChanged.connect(self.on_selected_context_changed)
 
         # self.displayContextSelectorWidget._owning_pipeline = self.curr_active_pipeline
         # self.ui.displayContextSelectorWidget
@@ -196,7 +215,24 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         else:
             print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
         
+
+    @pyqtExceptionPrintingSlot(object, object)
+    def on_selected_context_changed(self, new_key: str, new_context: IdentifyingContext):
+        print(f'on_selected_context_changed(new_key: {new_key}, new_context: {new_context})')
+        self.update_local_display_items_are_enabled()
         
+
+    def update_local_display_items_are_enabled(self):
+        """ sets the local display items as disabled if no context is selected. 
+        """
+        it = QtWidgets.QTreeWidgetItemIterator(self.treeWidget)
+        while it.value():
+            item = it.value()
+            is_global_fn = item.data(1, QtCore.Qt.UserRole)
+            if (is_global_fn is not None) and (is_global_fn == False):
+                item.setDisabled(not self.has_selected_context)
+            it += 1  # Move to the next item in the iterator
+            
 
     def build_for_pipeline(self, curr_active_pipeline):
         self._curr_active_pipeline_ref = curr_active_pipeline
@@ -204,7 +240,10 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         
         self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline)
 
-        
+        self.ui.displayFunctionTreeItem_global_fns = None
+        self.ui.displayFunctionTreeItem_non_global_fns = None
+
+
         # Add root item
         displayFunctionTreeItem = QtWidgets.QTreeWidgetItem(["Display Functions"])
         # si.gitem = 
@@ -213,12 +252,12 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         # display_function_items
 
         # displayFunctionTreeItem_prefab_fns = QtWidgets.QTreeWidgetItem(["Prefab Functions"])
-        displayFunctionTreeItem_global_fns = QtWidgets.QTreeWidgetItem(["Global Functions"])
-        displayFunctionTreeItem_non_global_fns = QtWidgets.QTreeWidgetItem(["Non-Global Functions"])
+        self.ui.displayFunctionTreeItem_global_fns = QtWidgets.QTreeWidgetItem(["Global Functions"])
+        self.ui.displayFunctionTreeItem_non_global_fns = QtWidgets.QTreeWidgetItem(["Non-Global Functions"])
 
         # self.treeWidget.addTopLevelItem(displayFunctionTreeItem_prefab_fns)
-        self.treeWidget.addTopLevelItem(displayFunctionTreeItem_global_fns)
-        self.treeWidget.addTopLevelItem(displayFunctionTreeItem_non_global_fns)
+        self.treeWidget.addTopLevelItem(self.ui.displayFunctionTreeItem_global_fns)
+        self.treeWidget.addTopLevelItem(self.ui.displayFunctionTreeItem_non_global_fns)
 
         # for a_fcn_name, a_fcn in curr_active_pipeline.registered_display_function_dict.items():
         for a_fcn_name, a_disp_fn_item in display_function_items.items():
@@ -248,9 +287,9 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
                         
             active_tooltip_text = (a_disp_fn_item.docs or "No tooltip")
             childDisplayFunctionTreeItem.setToolTip(0, active_tooltip_text)
-            
             childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_fcn_name) # "Child 1 custom data"
             # childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_disp_fn_item) # "Child 1 custom data"
+            childDisplayFunctionTreeItem.setData(1, QtCore.Qt.UserRole, a_disp_fn_item.is_global)
 
             # childDisplayFunctionTreeItem.setIcon(0, QtGui.QIcon("child_1_icon.png"))
             # childDisplayFunctionTreeItem
@@ -258,14 +297,16 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             # self.treeWidget.addTopLevelItem(childDisplayFunctionTreeItem) # add top level
 
             if a_disp_fn_item.is_global:
-                displayFunctionTreeItem_global_fns.addChild(childDisplayFunctionTreeItem)
+                self.ui.displayFunctionTreeItem_global_fns.addChild(childDisplayFunctionTreeItem)
             else:
                 # non-global
-                displayFunctionTreeItem_non_global_fns.addChild(childDisplayFunctionTreeItem)
+                self.ui.displayFunctionTreeItem_non_global_fns.addChild(childDisplayFunctionTreeItem)
 
+        self.update_local_display_items_are_enabled()
+        
         # self.treeWidget.addTopLevelItem(displayFunctionTreeItem)
-        displayFunctionTreeItem_global_fns.setExpanded(True)
-        displayFunctionTreeItem_non_global_fns.setExpanded(True)
+        self.ui.displayFunctionTreeItem_global_fns.setExpanded(True)
+        self.ui.displayFunctionTreeItem_non_global_fns.setExpanded(True)
         
 
 
