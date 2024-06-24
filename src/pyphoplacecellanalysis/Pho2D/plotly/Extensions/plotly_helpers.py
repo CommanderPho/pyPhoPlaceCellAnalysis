@@ -949,6 +949,8 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
 
     - [ ] Truncate each session to their start/end instead of the global x bounds.
 
+    main_plot_mode='separate_row_per_session'
+    main_plot_mode='separate_row_per_session'
 
     """
     from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
