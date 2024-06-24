@@ -729,6 +729,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     # HDF_SerializationMixin
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['HDF', 'HDF5', 'export', 'output', 'serialization'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-24 17:00', related_items=[])
     def _export_global_computations_to_hdf(self, file_path, key: str, **kwargs):
         """ exports the self.global_computation_results to HDF file specified by file_path, key. """
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
@@ -803,7 +804,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         """
         
-        long_epoch_name, short_epoch_name, global_epoch_name = self.find_LongShortGlobal_epoch_names()
 
         # f.create_dataset(f'{key}/neuron_ids', data=a_sess.neuron_ids)
         # f.create_dataset(f'{key}/shank_ids', data=self.shank_ids)            
@@ -818,8 +818,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._export_global_computations_to_hdf(file_path, key=key)
 
         # Filtered Session Results:
-        for an_epoch_name in (long_epoch_name, short_epoch_name, global_epoch_name):
-            filter_context_key:str = "/" + self.filtered_contexts[an_epoch_name].get_description(separator="/", include_property_names=False) # '/kdiba/gor01/one/2006-6-08_14-26-15/maze1'
+        for an_epoch_name, an_epoch_context in self.filtered_contexts.items():
+            filter_context_key:str = "/" + an_epoch_context.get_description(separator="/", include_property_names=False) # '/kdiba/gor01/one/2006-6-08_14-26-15/maze1'
             # print(f'\tfilter_context_key: {filter_context_key}')
             with tb.open_file(file_path, mode='a') as f:
                 a_filter_group = f.create_group(session_group_key, an_epoch_name, title='the result of a filter function applied to the session.', createparents=True)
@@ -886,7 +886,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         try:
             self.to_hdf(file_path=hdf5_output_path, key="/")
             return (hdf5_output_path, None)
-        except Exception as e:
+        except BaseException as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to build the session HDF output.")
