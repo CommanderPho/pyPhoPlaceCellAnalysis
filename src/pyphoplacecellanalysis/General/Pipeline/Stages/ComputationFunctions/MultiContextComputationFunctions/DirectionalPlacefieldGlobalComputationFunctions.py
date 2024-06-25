@@ -3934,6 +3934,11 @@ def get_proper_global_spikes_df(owning_pipeline_reference) -> pd.DataFrame:
 
     In the form needed by `decode_specific_epochs(global_spikes_df, ...)`
      Get proper global_spikes_df, requires curr_active_pipeline
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
+    spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
+
     """
     # Get proper global_spikes_df:
     long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
