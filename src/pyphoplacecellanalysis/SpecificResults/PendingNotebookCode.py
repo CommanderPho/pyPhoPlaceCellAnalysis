@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
 # ---------------------------------------------------------------------------- #
-def check_for_overlaps(quiescent_periods: pd.DataFrame, debug_print=False) -> pd.DataFrame:
+def check_for_and_merge_overlapping_epochs(quiescent_periods: pd.DataFrame, debug_print=False) -> pd.DataFrame:
     """
     Checks for overlaps in the quiescent periods and merges them if necessary.
 
@@ -124,7 +124,7 @@ def find_quiescent_windows(active_spikes_df: pd.DataFrame, silence_duration:floa
     quiescent_periods = quiescent_periods[['start', 'stop', 'time_diff']]
     # quiescent_periods["label"] = quiescent_periods.index.astype('str', copy=True)
     # quiescent_periods["duration"] = quiescent_periods["stop"] - quiescent_periods["start"] 
-    quiescent_periods = check_for_overlaps(quiescent_periods=quiescent_periods)
+    quiescent_periods = check_for_and_merge_overlapping_epochs(quiescent_periods=quiescent_periods)
     # print(quiescent_periods)
     return quiescent_periods
 
