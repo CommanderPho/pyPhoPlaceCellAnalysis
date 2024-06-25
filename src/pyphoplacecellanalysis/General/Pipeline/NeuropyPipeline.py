@@ -617,7 +617,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.clear_registered_output_files() # outputs are reset each load, should they be?
 
 
-
+    @function_attributes(short_name=None, tags=['save', 'persistance'], input_requires=[], output_provides=[], uses=['saveData'], used_by=[], creation_date='2024-06-25 18:29', related_items=['save_global_computation_results'])
     def save_pipeline(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle.pkl', override_pickle_path: Optional[Path]=None):
         """ pickles (saves) the entire pipeline to a file that can be loaded later without recomputing.
 

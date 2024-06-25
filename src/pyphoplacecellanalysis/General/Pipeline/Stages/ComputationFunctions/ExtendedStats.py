@@ -54,7 +54,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 3
     _is_global = False
 
-    @function_attributes(short_name='extended_stats', tags=['statistics'], 
+    @function_attributes(short_name='extended_stats', tags=['position', 'resample', 'time_binned', 'statistics'], 
         input_requires=["computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
         output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
