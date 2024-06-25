@@ -319,9 +319,11 @@ def napari_add_aclu_slider(viewer, neuron_ids):
 
 
 def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts, include_trial_by_trial_correlation_matrix:bool = True):
-    """ Plots the directional trial-by-trial activity visualization:
+    """ Plots the directional trial-by-trial activity visualization for each of the directional epochs (in the same napari viewer window):
+
+    Compared to `napari_trial_by_trial_activity_viz`, this function plots all four directional epoch results in a single window.
+
     Usage:
-        from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_plot_directional_trial_by_trial_activity_viz
         from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_plot_directional_trial_by_trial_activity_viz
         
         directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict = napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts)
@@ -381,7 +383,7 @@ def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_p
 
 def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, layers_dict=None, **viewer_kwargs):
     """ Visualizes position binned activity matrix beside the trial-by-trial correlation matrix.
-    
+    Compared to `napari_plot_directional_trial_by_trial_activity_viz`, this function plots a single directional epoch in a napari window.
 
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import napari_trial_by_trial_activity_viz
