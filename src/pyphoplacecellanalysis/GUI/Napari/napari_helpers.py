@@ -381,7 +381,7 @@ def napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_p
     return directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict
 
 
-def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, layers_dict=None, **viewer_kwargs):
+def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, cumulative_z_scored_tuning_map_matrix=None, layers_dict=None, **viewer_kwargs):
     """ Visualizes position binned activity matrix beside the trial-by-trial correlation matrix.
     Compared to `napari_plot_directional_trial_by_trial_activity_viz`, this function plots a single directional epoch in a napari window.
 
@@ -428,10 +428,17 @@ def napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_tr
     image_layer_dict = {}
     if layers_dict is None:
         # build the default from the values:
-        layers_dict = {
+        layers_dict = {    
+        }
+
+        if cumulative_z_scored_tuning_map_matrix is not None:
+            layers_dict['Cumulative_z_scored_tuning_maps'] = dict(blending='translucent', colormap='viridis', name='CUM_z_scored_tuning_maps', img_data=cumulative_z_scored_tuning_map_matrix.transpose(1, 0, 2))
+        
+        layers_dict.update({
             'z_scored_tuning_maps': dict(blending='translucent', colormap='viridis', name='z_scored_tuning_maps', img_data=z_scored_tuning_map_matrix.transpose(1, 0, 2)), # reshape to be compatibile with C_i's dimensions
             'C_trial_by_trial_correlation_matrix': dict(blending='translucent', colormap='viridis', name='C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix),
-        }
+        })
+
 
     viewer = None
     for i, (a_name, layer_dict) in enumerate(layers_dict.items()):
