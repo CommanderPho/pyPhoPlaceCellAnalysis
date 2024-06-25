@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>645</width>
+    <width>623</width>
     <height>716</height>
    </rect>
   </property>
@@ -461,6 +461,9 @@ QTreeWidget:item:!enabled {
               <widget class="QTextBrowser" name="textBrowser">
                <property name="documentTitle">
                 <string>Display Function</string>
+               </property>
+               <property name="textInteractionFlags">
+                <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
                </property>
                <property name="placeholderText">
                 <string>No Display Function Selected</string>
