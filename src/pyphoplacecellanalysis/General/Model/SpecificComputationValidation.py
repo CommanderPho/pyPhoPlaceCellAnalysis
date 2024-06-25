@@ -1,3 +1,4 @@
+import numpy as np
 from attrs import define, Factory, field, fields
 from typing import Callable, List, Dict, Optional
 
@@ -145,6 +146,13 @@ class SpecificComputationValidator:
     def is_name_in(self, name_list: List[str]) -> bool:
         """ checks if either short_name or computation_name is contained in the name_list provided. """        
         return ((self.short_name in name_list) or (self.computation_fn_name in name_list))
+
+    def is_dependency_in_required_global_keys(self, provided_global_keys: List[str]) -> bool:
+        """ checks if either short_name or computation_name is contained in the name_list provided. """        
+        if not self.has_results_spec:
+            return False
+        return np.any(np.isin(provided_global_keys, (self.results_specification.requires_global_keys or [])))
+
 
 
     # Main Operation Functions ___________________________________________________________________________________________ #
