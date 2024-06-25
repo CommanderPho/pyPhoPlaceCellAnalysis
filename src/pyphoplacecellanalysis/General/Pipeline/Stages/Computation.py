@@ -1338,7 +1338,8 @@ class PipelineWithComputedPipelineStageMixin:
 
 
     @function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['load_split_pickled_global_computation_results'])
-    def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, debug_print:bool=True):
+    def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None,
+                                              include_includelist=None, debug_print:bool=True):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
 
         Reciprocal:
@@ -1386,31 +1387,40 @@ class PipelineWithComputedPipelineStageMixin:
         # make if doesn't exist
         split_save_folder.mkdir(exist_ok=True)
         
+        if include_includelist is None:
+            include_includelist = list(curr_active_pipeline.global_computation_results.computed_data.keys())
+
         ## only saves out the `global_computation_results` data:
         computed_data = self.global_computation_results.computed_data
         split_save_paths = {}
         split_save_output_types = {}
         failed_keys = []
+        skipped_keys = []
         for k, v in computed_data.items():
-            curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
-            if debug_print:
-                print(f'curr_split_result_pickle_path: {curr_split_result_pickle_path}')
-            was_save_success = False
-            curr_item_type = type(v)
-            try:
-                ## try get as dict                
-                v_dict = v.__dict__ #__getstate__()
-                # saveData(curr_split_result_pickle_path, (v_dict))
-                saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
-                was_save_success = True
-            except KeyError as e:
-                print(f'{k} encountered {e} while trying to save {k}. Skipping')
-                pass
-            if was_save_success:
-                split_save_paths[k] = curr_split_result_pickle_path
-                split_save_output_types[k] = curr_item_type
+            if k in include_includelist:
+                curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
+                if debug_print:
+                    print(f'curr_split_result_pickle_path: {curr_split_result_pickle_path}')
+                was_save_success = False
+                curr_item_type = type(v)
+                try:
+                    ## try get as dict                
+                    v_dict = v.__dict__ #__getstate__()
+                    # saveData(curr_split_result_pickle_path, (v_dict))
+                    saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
+                    was_save_success = True
+                except KeyError as e:
+                    print(f'{k} encountered {e} while trying to save {k}. Skipping')
+                    pass
+                if was_save_success:
+                    split_save_paths[k] = curr_split_result_pickle_path
+                    split_save_output_types[k] = curr_item_type
+                else:
+                    failed_keys.append(k)
             else:
-                failed_keys.append(k)
+                if debug_print:
+                    print(f'skipping key "{k}" because it is not included in include_includelist: {include_includelist}')
+                skipped_keys.append(k)
                 
         if len(failed_keys) > 0:
             print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
