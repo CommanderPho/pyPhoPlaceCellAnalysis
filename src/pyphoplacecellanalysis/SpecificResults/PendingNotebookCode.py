@@ -41,6 +41,112 @@ import matplotlib.pyplot as plt
 
 
 # ---------------------------------------------------------------------------- #
+#      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
+# ---------------------------------------------------------------------------- #
+def find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3, min_unique_neurons:int=14):
+    """
+    # Define the duration for silence and firing window
+    silence_duration = 0.06  # 60 ms
+    firing_window_duration = 0.3  # 300 ms
+    min_unique_neurons = 14
+
+    """
+    ## INPUTS: active_spikes_df
+
+    # Ensure the DataFrame is sorted by the event times
+    df = active_spikes_df.sort_values(by='t_rel_seconds').reset_index(drop=True)
+
+    # Calculate the differences between consecutive event times
+    df['time_diff'] = df['t_rel_seconds'].diff()
+
+    # Find the indices where the time difference is greater than 60ms (0.06 seconds)
+    quiescent_periods = df[df['time_diff'] > silence_duration]
+
+    # Extract the start and end times of the quiescent periods
+    quiescent_periods['start_time'] = df['t_rel_seconds'].shift(1)
+    quiescent_periods['end_time'] = df['t_rel_seconds']
+
+    # Drop the NaN values that result from the shift operation
+    quiescent_periods = quiescent_periods.dropna(subset=['start_time'])
+
+    # Select the relevant columns
+    quiescent_periods = quiescent_periods[['start_time', 'end_time', 'time_diff']]
+
+    # print(quiescent_periods)
+
+    ## INPUTS: quiescent_periods
+
+
+    # List to hold the results
+    results = []
+
+    # Iterate over each quiescent period
+    for _, row in quiescent_periods.iterrows():
+        silence_end = row['end_time']
+        window_start = silence_end
+        window_end = silence_end + firing_window_duration
+        
+        # Filter events that occur in the 300-ms window after the quiescent period
+        window_events = df[(df['t_rel_seconds'] >= window_start) & (df['t_rel_seconds'] <= window_end)]
+        
+        # Count unique neurons firing in this window
+        unique_neurons = window_events['aclu'].nunique()
+        
+        # Check if at least 14 unique neurons fired in this window
+        if unique_neurons >= min_unique_neurons:
+            results.append({
+                'quiescent_start': row['start_time'],
+                'quiescent_end': silence_end,
+                'window_start': window_start,
+                'window_end': window_end,
+                'unique_neurons': unique_neurons
+            })
+
+    # Convert results to a DataFrame
+    results_df = pd.DataFrame(results)
+    results_df["label"] = results_df.index.astype('str', copy=True)
+
+    return results_df
+
+@function_attributes(short_name=None, tags=['replay'], input_requires=[], output_provides=[], uses=['find_active_epochs_preceeded_by_quiescent_windows'], used_by=[], creation_date='2024-06-25 12:54', related_items=[])
+def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, rank_order_results, spikes_df):
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events
+
+    """
+    ## INPUTS: curr_active_pipeline, directional_laps_results, rank_order_results
+    # track_templates.determine_decoder_aclus_filtered_by_frate(5.0)
+    # qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2,4,9])
+    qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=rank_order_results.included_qclu_values)
+    qclu_included_aclus
+
+    modified_directional_laps_results = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
+    active_track_templates: TrackTemplates = deepcopy(modified_directional_laps_results.get_templates(rank_order_results.minimum_inclusion_fr_Hz))
+    active_track_templates
+
+    any_decoder_neuron_IDs = deepcopy(active_track_templates.any_decoder_neuron_IDs)
+    n_neurons = len(any_decoder_neuron_IDs)
+    min_num_active_neurons = max(int(round(0.3 * float(n_neurons))), 5)
+
+    print(f'n_neurons: {n_neurons}, min_num_active_neurons: {min_num_active_neurons}')
+    # get_templates(5.0)
+    active_spikes_df: pd.DataFrame = deepcopy(spikes_df)
+    active_spikes_df = active_spikes_df.spikes.sliced_by_neuron_id(any_decoder_neuron_IDs)
+    active_spikes_df
+
+    ## OUTPUTS: active_spikes_df
+
+    new_replay_epochs_df = find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_duration=0.06, firing_window_duration=0.3, min_unique_neurons=14)
+    new_replay_epochs_df
+
+    new_replay_epochs: Epoch = Epoch.from_dataframe(new_replay_epochs_df.rename(columns={'window_start': 'start', 'window_end': 'stop',}))
+    new_replay_epochs
+
+    return (qclu_included_aclus, active_track_templates, active_spikes_df), (new_replay_epochs_df, new_replay_epochs)
+
+
+
+# ---------------------------------------------------------------------------- #
 #                      2024-06-15 - Significant Remapping                      #
 # ---------------------------------------------------------------------------- #
 def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Dict, x_midpoint: float=72.0):
