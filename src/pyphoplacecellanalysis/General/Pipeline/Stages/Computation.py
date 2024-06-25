@@ -1386,6 +1386,7 @@ class PipelineWithComputedPipelineStageMixin:
         # make if doesn't exist
         split_save_folder.mkdir(exist_ok=True)
         
+        ## only saves out the `global_computation_results` data:
         computed_data = self.global_computation_results.computed_data
         split_save_paths = {}
         split_save_output_types = {}
