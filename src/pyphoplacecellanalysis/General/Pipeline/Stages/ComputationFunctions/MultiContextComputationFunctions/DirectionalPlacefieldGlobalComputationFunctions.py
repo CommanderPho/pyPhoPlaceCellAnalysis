@@ -5112,7 +5112,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     
 
     @function_attributes(short_name='extended_pf_peak_information', tags=['trial_by_trial', 'global_computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
-                        requires_global_keys=['DirectionalLaps', 'RankOrder', 'jonathan_firing_rate_analysis'], provides_global_keys=['jonathan_firing_rate_analysis'],
+                        requires_global_keys=['DirectionalLaps', 'RankOrder', 'jonathan_firing_rate_analysis'],# provides_global_keys=['jonathan_firing_rate_analysis'],
                         validate_computation_test=_workaround_validate_has_extended_pf_peak_info_result, 
                         is_global=True, computation_precidence=(1005.4))
     def _add_extended_pf_peak_information(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
