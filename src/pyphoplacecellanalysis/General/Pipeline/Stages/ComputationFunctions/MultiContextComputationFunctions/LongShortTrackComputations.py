@@ -741,7 +741,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     _computationPrecidence = 1003
     _is_global = True
 
-    @function_attributes(short_name='long_short_decoding_analyses', tags=['long_short', 'short_long', 'leave-one-out', 'replay', 'decoding', 'computation'], input_requires=[], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10',
+    @function_attributes(short_name='long_short_decoding_analyses', tags=['long_short', 'short_long', 'leave-one-out', 'replay', 'decoding', 'computation'], input_requires=['sess.replays'], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10',
                          requires_global_keys=[], provides_global_keys=['long_short_leave_one_out_decoding_analysis'],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True)
     def _perform_long_short_decoding_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False, override_long_epoch_name:Optional[str]=None, override_short_epoch_name:Optional[str]=None):
@@ -1010,7 +1010,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='jonathan_firing_rate_analysis', input_requires=['_perform_long_short_firing_rate_analyses'],
+    @function_attributes(short_name='jonathan_firing_rate_analysis', tags=['replay'], input_requires=['_perform_long_short_firing_rate_analyses'],
                           requires_global_keys=['long_short_fr_indicies_analysis'], provides_global_keys=['jonathan_firing_rate_analysis'],
                           validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df, curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df['is_refined_exclusive']), is_global=True)
     def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
@@ -1102,7 +1102,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             sess.pbe = new_pbe_epochs # copy the detected PBEs to the session
             replays_df = sess.pbe.to_dataframe()
             # replays_df = sess.ripple.to_dataframe()
-        except Exception as e:
+        except BaseException as e:
             raise e
         # else:
         #     replays_df = replays_df.copy() # make a copy of the provided df
@@ -1778,7 +1778,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_nam
 # 2023-05-10 - Long Short Decoding Analysis                                                                            #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['decoding', 'loo', 'surprise'], input_requires=[], output_provides=[], uses=['LeaveOneOutDecodingAnalysis', 'perform_full_session_leave_one_out_decoding_analysis'], used_by=[], creation_date='2023-09-21 17:25', related_items=[])
+@function_attributes(short_name=None, tags=['decoding', 'loo', 'surprise', 'replay'], input_requires=[], output_provides=[], uses=['LeaveOneOutDecodingAnalysis', 'perform_full_session_leave_one_out_decoding_analysis'], used_by=[], creation_date='2023-09-21 17:25', related_items=[])
 def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session, decoding_time_bin_size = 0.025, perform_cache_load=False) -> LeaveOneOutDecodingAnalysis:
     """ Uses existing decoders and other long/short variables to run `perform_full_session_leave_one_out_decoding_analysis` on each. """
     # Get existing long/short decoders from the cell under "# 2023-02-24 Decoders"
