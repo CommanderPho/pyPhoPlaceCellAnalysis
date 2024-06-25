@@ -31,7 +31,7 @@ jinja2 = "^3.1.2"
 pandas = "1.5.3"
 napari = {extras = ["pyqt5"], version = "^0.4.18"}
 napari-animated-gif-io = "^0.1.2"
-napari-animation = "^0.0.7"
+napari-animation = "^0.0.8"
 panel = "^1.2.3"
 params = "^0.9.0"
 jupyter-bokeh = "^3.0.7"
