@@ -16,7 +16,7 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.indexing_helpers import join_on_index
 
 from neuropy.analyses.placefields import PfND # used in `constrain_to_laps` to construct new objects
-from neuropy.core.epoch import Epoch
+from neuropy.core.epoch import Epoch, ensure_dataframe
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import perform_full_session_leave_one_out_decoding_analysis
@@ -1107,7 +1107,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # else:
         #     replays_df = replays_df.copy() # make a copy of the provided df
 
-
+        replays_df = ensure_dataframe(replays_df)
+        
         rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df, t_start=t_start, t_delta=t_delta, t_end=t_end)
         rdf, neuron_replay_stats_df = _compute_neuron_replay_stats(rdf, aclu_to_idx) # neuron_replay_stats_df is joined with `final_jonathan_df` after that is built
 
