@@ -45,11 +45,13 @@ class DisplayFunctionItem:
     is_global: bool = field()
     short_name: str = field()
     docs: str = field()
+    icon_path: Optional[str] = field()
+
 
     @classmethod
-    def init_from_fn_object(cls, a_fn):
+    def init_from_fn_object(cls, a_fn, icon_path=None):
         _obj = cls(name=a_fn.__name__, fn_callable=a_fn, is_global=getattr(a_fn,'is_global', False), short_name=(getattr(a_fn,'short_name', a_fn.__name__) or a_fn.__name__),
-            docs=a_fn.__doc__)
+            docs=a_fn.__doc__, icon_path=icon_path)
         return _obj
 
     @property
