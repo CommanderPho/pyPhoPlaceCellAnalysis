@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.indexing_helpers import find_neighbours
 
 # # Send local variables to the console
@@ -493,4 +494,63 @@ def napari_export_image_sequence(viewer: napari.viewer.Viewer, imageseries_outpu
 
     return imageseries_output_directory
 
+# Add text layer
+@function_attributes(short_name=None, tags=['napari', 'helper', 'aclu', 'text', 'label'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-25 07:34', related_items=[])
+def build_aclu_label(a_viewer, a_matrix_IDX_to_aclu_map, enable_point_based_label:bool = False):
+    """ adds a dynamically-updating text overlay label showing the current aclu that updates when the user adjusts the slider.
 
+    Usage:
+
+        from pyphoplacecellanalysis.GUI.Napari.napari_helpers import build_aclu_label
+        
+        ## Directional
+        directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict = napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts, include_trial_by_trial_correlation_matrix=True)
+        a_result = list(directional_active_lap_pf_results_dicts.values())[0]
+        a_matrix_IDX_to_aclu_map = {v:k for k, v in a_result.aclu_to_matrix_IDX_map.items()}
+        on_update_slider, points_layer = build_aclu_label(directional_viewer, a_matrix_IDX_to_aclu_map)
+
+    """
+    # INPUTS: a_matrix_IDX_to_aclu_map, a_viewer
+    
+    if enable_point_based_label:
+        # Add dummy points to add text annotations
+        points = np.array([[0, 150]])
+        features = {'aclu': np.array([-1,]),}
+        text = {
+            'string': 'aclu: {aclu:02d}',
+            'size': 20,
+            'color': 'white',
+            'translation': np.array([-5, 0]),
+        }
+        points_layer = a_viewer.add_points(points, features=features, text=text, size=10,
+                                        edge_width=7,
+                                            edge_width_is_relative=False,
+                                            edge_color='gray',
+                                            face_color='white',
+                                        )
+    else:
+        points_layer = None
+
+    def update_aclu_text_label():
+        ## Captures: a_viewer, points_layer, a_matrix_IDX_to_aclu_map,
+        curr_neuron_IDX = a_viewer.dims.current_step[0]
+        found_aclu = a_matrix_IDX_to_aclu_map.get(curr_neuron_IDX, "None")
+        # print(f'found_aclu: {found_aclu}')
+        if points_layer is not None:
+            points_layer.features['aclu'] = np.array([found_aclu,])
+            points_layer.refresh_text()
+
+        a_viewer.text_overlay.text = f"aclu: {found_aclu:02d}"
+
+
+    update_aclu_text_label()
+
+    # Define update function
+    def on_update_slider(event):
+        current_slice = event.value
+        update_aclu_text_label()
+
+    a_viewer.text_overlay.visible = True
+    # Connect update function to slider event
+    a_viewer.dims.events.connect(on_update_slider)
+    return on_update_slider, points_layer
