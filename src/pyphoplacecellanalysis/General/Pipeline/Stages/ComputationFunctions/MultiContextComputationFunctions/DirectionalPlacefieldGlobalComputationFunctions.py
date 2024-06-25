@@ -5022,7 +5022,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         return global_computation_results
 
 
-    @function_attributes(short_name='trial_by_trial_metrics', tags=['trial_by_trial', 'global_computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
+    @function_attributes(short_name='trial_by_trial_metrics', tags=['trial_by_trial', 'global_computation'], input_requires=[], output_provides=[], uses=['TrialByTrialActivity','TrialByTrialActivityResult'], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
                         requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['TrialByTrialActivity'],
                         validate_computation_test=_workaround_validate_has_directional_trial_by_trial_activity_result, 
                         is_global=True, computation_precidence=(1002.4))
@@ -5090,6 +5090,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         long_LR_name, long_RL_name, short_LR_name, short_RL_name = track_templates.get_decoder_names()
 
         directional_lap_epochs_dict = dict(zip((long_LR_name, long_RL_name, short_LR_name, short_RL_name), (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)))
+        directional_lap_epochs_dict[global_any_name] = global_any_laps_epochs_obj # add the global epoch as well
+
         directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix(active_pf_dt=active_pf_dt, directional_lap_epochs_dict=directional_lap_epochs_dict, included_neuron_IDs=any_decoder_neuron_IDs)
 
         ## OUTPUTS: directional_active_lap_pf_results_dicts
