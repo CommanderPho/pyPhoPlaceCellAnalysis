@@ -692,6 +692,10 @@ class BatchPhoJonathanFiguresHelper:
     In .run(...) it builds the plot_kwargs (`active_kwarg_list`) ahead of time that will be passed to the specific plot function using `cls._build_batch_plot_kwargs(...)`
         It then calls `active_out_figures_list = cls._perform_batch_plot(...)` to do the plotting, getting the list of figures and output paths
             -> `cls._subfn_batch_plot_automated()`
+
+            Ultimately, it calls the display function '_display_batch_pho_jonathan_replay_firing_rate_comparison'
+
+
     2022-12-08 - Batch Programmatic Figures (Currently only Jonathan-style) 
     2022-12-01 - Automated programmatic output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`
 
@@ -704,7 +708,8 @@ class BatchPhoJonathanFiguresHelper:
 
 
     @classmethod
-    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True):
+    def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False,
+             show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True):
         """ The only public function. Performs the batch plotting.
         
         # split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"

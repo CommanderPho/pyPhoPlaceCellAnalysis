@@ -8,6 +8,11 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure, FigureBase # FigureBase: both Figure and SubFigure
 from flexitext import flexitext ## flexitext for formatted matplotlib text
 
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum, NeuronType  # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
 from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
 from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
@@ -156,7 +161,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             return graphics_output_dict
 
-    @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch', 'inefficient', 'slow'], input_requires=[], output_provides=[], uses=['_make_pho_jonathan_batch_plots'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
+    @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch', 'inefficient', 'slow'], input_requires=[], output_provides=[], uses=['PhoJonathanPlotHelpers._make_pho_jonathan_batch_plots'], used_by=['BatchPhoJonathanFiguresHelper'], creation_date='2023-04-11 03:14', is_global=True)
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display.
                 Usage:
@@ -1256,7 +1261,7 @@ class PhoJonathanPlotHelpers:
 
     @classmethod
     @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['plot_single_cell_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
-    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx, aclu, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
+    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split: float, time_bins: NDArray, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx: Dict, aclu: int, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
         """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
         Internally calls `plot_single_cell_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
 
@@ -1457,6 +1462,7 @@ class PhoJonathanPlotHelpers:
 
         return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
 
+
     @classmethod
     @function_attributes(short_name='_make_pho_jonathan_batch_plots', tags=['private', 'matplotlib', 'active','jonathan', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_plot_pho_jonathan_batch_plot_single_cell', 'build_replays_custom_scatter_markers', '_build_neuron_type_distribution_color', 'build_or_reuse_figure'], used_by=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2023-04-11 08:06')
     def _make_pho_jonathan_batch_plots(cls, t_split, time_bins, neuron_replay_stats_df, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, included_unit_neuron_IDs=None, marker_split_mode=CustomScatterMarkerMode.TriSplit, n_max_plot_rows:int=4, optional_cell_info_labels=None, debug_print=False, defer_render=False, disable_top_row=False, **kwargs) -> MatplotlibRenderPlots:
@@ -1526,7 +1532,7 @@ class PhoJonathanPlotHelpers:
             except TypeError as e:
                 # TypeError: 'SubFigure' object is not subscriptable ->  # single subfigure, not subscriptable
                 curr_fig = subfigs
-            except Exception as e:
+            except BaseException as e:
                 # Unhandled exception
                 raise e
 
