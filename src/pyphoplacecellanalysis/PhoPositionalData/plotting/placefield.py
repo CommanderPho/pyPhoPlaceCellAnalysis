@@ -257,7 +257,7 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
             _plot_helper_setup_gridlines(ax_activity_v_time, active_epoch_placefields1D.ratemap.xbin, active_epoch_placefields1D.ratemap.xbin_centers)
 
 
-        ## Part 2: The Placefield Plot to the Right and the connecting features:
+        # Part 2: The Placefield Plot to the Right and the connecting features: ______________________________________________ #
         ## The individual spike lines:
         curr_cell_spike_times = active_epoch_placefields1D.ratemap_spiketrains[placefield_cell_index]  # (271,)
         curr_cell_spike_positions = active_epoch_placefields1D.ratemap_spiketrains_pos[placefield_cell_index]  # (271,)

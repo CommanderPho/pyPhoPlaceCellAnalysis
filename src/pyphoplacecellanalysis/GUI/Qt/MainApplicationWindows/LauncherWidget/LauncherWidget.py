@@ -24,6 +24,24 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.Identifyin
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'LauncherWidget.ui')
 
+## hardcoded icons to use for each display function. Eventually will be added to the display function metadata decorator
+icon_table = {'_display_spike_rasters_pyqtplot_2D':':/Icons/Icons/SpikeRaster2DIcon.ico',
+'_display_spike_rasters_pyqtplot_3D':':/Icons/Icons/SpikeRaster3DIcon.ico',
+'_display_spike_rasters_vedo_3D':':/Icons/Icons/SpikeRaster3D_VedoIcon.ico',
+'_display_directional_laps_overview':':/Render/Icons/Icon/SimplePlot/Laps.png',
+'_display_directional_merged_pfs':':/Render/Icons/Icon/Pseudo2D.png',
+'_display_1d_placefield_validations':':/Graphics/Icons/graphics/Spikes.png',
+'_display_1d_placefields':':/Graphics/Icons/graphics/Spikes.png',
+'_display_1d_placefield_occupancy':':/Render/Icons/Icon/Occupancy.png',
+'_display_2d_placefield_occupancy':':/Render/Icons/Icon/Occupancy.png',
+'_display_placemaps_pyqtplot_2D':':/Render/Icons/Icon/Heatmap.png',
+'_display_rank_order_debugger':':/Icons/Icons/visualizations/rank_order_raster_debugger.ico',
+'_display_directional_template_debugger':':/Icons/Icons/visualizations/template_1D_debugger.ico',
+'_display_3d_interactive_tuning_curves_plotter':':/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico',
+'_display_3d_interactive_spike_and_behavior_browser':':/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico',
+'_display_2d_placefield_result_plot_ratemaps_2D':':/Render/Icons/Icon/HeatmapUgly.png',
+}
+
 class LauncherWidget(PipelineOwningMixin, QWidget):
     """ a programmatic launcher widget that displays a tree that can be programmatically updated.
     
@@ -126,8 +144,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
 
     def get_display_function_items(self) -> Dict[str,DisplayFunctionItem]:
         assert self._curr_active_pipeline_ref is not None
-        return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn) for a_fn_name, a_fn in self.curr_active_pipeline.registered_display_function_dict.items()}
-
+        return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn, icon_path=icon_table.get(a_fn_name, None)) for a_fn_name, a_fn in self.curr_active_pipeline.registered_display_function_dict.items()}
 
     def get_display_function_item(self, a_fn_name: str) -> Optional[DisplayFunctionItem]:
         return self.get_display_function_items().get(a_fn_name, None)
@@ -291,7 +308,12 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             # childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_disp_fn_item) # "Child 1 custom data"
             childDisplayFunctionTreeItem.setData(1, QtCore.Qt.UserRole, a_disp_fn_item.is_global)
 
-            # childDisplayFunctionTreeItem.setIcon(0, QtGui.QIcon("child_1_icon.png"))
+            if (a_disp_fn_item.icon_path is not None) and (len(a_disp_fn_item.icon_path) > 0):
+                # has valid iconpath
+                print(f'setting icon to "{a_disp_fn_item.icon_path}"...')
+                # childDisplayFunctionTreeItem.setIcon(0, QtGui.QIcon("child_1_icon.png"))
+                childDisplayFunctionTreeItem.setIcon(0, QtGui.QIcon(a_disp_fn_item.icon_path))
+
             # childDisplayFunctionTreeItem
             # displayFunctionTreeItem.addChild(childDisplayFunctionTreeItem)
             # self.treeWidget.addTopLevelItem(childDisplayFunctionTreeItem) # add top level

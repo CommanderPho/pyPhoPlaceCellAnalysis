@@ -216,6 +216,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
 
         ## Scrollable-support:
+        ## TODO: this assumes that provided `row` is the maximum row, or that we fill each column before filling rows
         active_num_rows = row+1 # get the number of rows after adding the data (adding one to go from an index to a count)
 
         if self.params.scrollability_mode.is_scrollable:

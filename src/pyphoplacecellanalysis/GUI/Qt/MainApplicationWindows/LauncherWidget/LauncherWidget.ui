@@ -233,6 +233,10 @@ QTreeWidget:item:!enabled {
              <property name="text">
               <string notr="true">1D Placefields</string>
              </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Graphics/Icons/graphics/Spikes.png</normaloff>:/Graphics/Icons/graphics/Spikes.png</iconset>
+             </property>
             </item>
             <item>
              <property name="text">
