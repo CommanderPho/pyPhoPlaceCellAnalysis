@@ -63,6 +63,7 @@ class SpecificComputationResultsSpecification:
                 removed_keys_dict[a_key] = prev_result
         return removed_keys_dict     
             
+
 class DependencyGraph:
     """
     # Example usage
@@ -79,7 +80,7 @@ class DependencyGraph:
     
     def build_graph(self, validators):
         for key, validator in validators.items():
-            self.graph.add_node(key, provides_global_keys=validator.results_specification.provides_global_keys)
+            self.graph.add_node(key, provides_global_keys=validator.results_specification.provides_global_keys, requires_global_keys=validator.results_specification.requires_global_keys, validator=validator)
             for required_key in validator.results_specification.requires_global_keys:
                 for provider_key, provider_validator in validators.items():
                     if required_key in provider_validator.results_specification.provides_global_keys:
@@ -104,7 +105,7 @@ class DependencyGraph:
     #             dependents.update(nx.descendants(self.graph, node))
     #     return dependents
     
-    def get_downstream_dependents(self, modified_key, debug_print=False):
+    def get_downstream_dependents(self, modified_key: str, debug_print=False):
         dependents = set()
         for node in self.graph.nodes:
             if debug_print:
@@ -117,19 +118,23 @@ class DependencyGraph:
         return dependents
 
     def get_upstream_requirements(self, target_key: str, debug_print=False):
+        """
+        upstream_requirements = graph.get_upstream_requirements('perform_wcorr_shuffle_analysis')
+        print(upstream_requirements)
+        """
+
         requirements = set()
         for node in self.graph.nodes:
             if debug_print:
                 print(f'node: {node}:')
-                print(f"\tself.graph.nodes[node]['provides_global_keys']: {self.graph.nodes[node]['provides_global_keys']}")
-            if target_key in self.graph.nodes[node]['provides_global_keys']:
+                print(f"\tself.graph.nodes[node]['requires_global_keys']: {self.graph.nodes[node]['requires_global_keys']}")
+            if target_key in self.graph.nodes[node]['requires_global_keys']:
                 if debug_print:
                     print(f'target_key: {target_key}')
                 requirements.update(nx.descendants(self.graph, node))
         return requirements
 
     
-
     def visualize(self):
         import matplotlib.pyplot as plt
         # Filter out nodes with no parents or children
