@@ -905,10 +905,11 @@ def _apply_filtering_to_marginals_result_df(active_result_df: pd.DataFrame, filt
 
 ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 @function_attributes(short_name=None, tags=['filter', 'replay', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['_apply_filtering_to_marginals_result_df'], used_by=[], creation_date='2024-04-24 18:03', related_items=[])
-def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track_templates, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], ripple_all_epoch_bins_marginals_df: pd.DataFrame, ripple_decoding_time_bin_size: float):
+def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track_templates, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], ripple_all_epoch_bins_marginals_df: pd.DataFrame, ripple_decoding_time_bin_size: float,
+            should_only_include_user_selected_epochs:bool=True, **additional_selections_context):
     """ the main replay epochs filtering function.
     
-    Only includes user selected (annotated) ripples
+    if should_only_include_user_selected_epochs is True, it only includes user selected (annotated) ripples
 
 
     Usage:
@@ -924,7 +925,7 @@ def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track
     # 2024-03-04 - Filter out the epochs based on the criteria:
     filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
     ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
-    decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
+    decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates, **additional_selections_context)
 
     ## filter the epochs by something and only show those:
     # INPUTS: filtered_epochs_df
@@ -933,14 +934,16 @@ def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track
     filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
     # print(f"any_good_selected_epoch_times.shape: {any_good_selected_epoch_times.shape}") # (142, 2)
     ## Constrain again now by the user selections
-    filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(any_good_selected_epoch_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
+    if should_only_include_user_selected_epochs:
+        filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(any_good_selected_epoch_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
     # filtered_decoder_filter_epochs_decoder_result_dict
 
     # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
     filtered_decoder_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
 
-    filtered_epochs_df = filtered_epochs_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
-
+    if should_only_include_user_selected_epochs:
+        filtered_epochs_df = filtered_epochs_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+    
     ## OUT: filtered_decoder_filter_epochs_decoder_result_dict, filtered_epochs_df
 
     # `ripple_all_epoch_bins_marginals_df`
@@ -962,7 +965,7 @@ def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track
 
 
 @function_attributes(short_name=None, tags=['filter', 'epoch_selection', 'export', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
-def export_numpy_testing_filtered_epochs(curr_active_pipeline, global_epoch_name, track_templates, required_min_percentage_of_active_cells: float = 0.333333, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):
+def export_numpy_testing_filtered_epochs(curr_active_pipeline, global_epoch_name, track_templates, required_min_percentage_of_active_cells: float = 0.333333, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1, **additional_selections_context):
     """ Save testing variables to file 'NeuroPy/tests/neuropy_pf_testing.h5'
     exports: original_epochs_df, filtered_epochs_df, active_spikes_df
 
@@ -987,7 +990,7 @@ def export_numpy_testing_filtered_epochs(curr_active_pipeline, global_epoch_name
     filtered_epochs_df, filtered_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
 
 
-    decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
+    decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates, **additional_selections_context)
     print(f"any_good_selected_epoch_times.shape: {any_good_selected_epoch_times.shape}") # (142, 2)
 
     ## Save for NeuroPy testing:

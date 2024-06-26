@@ -1155,7 +1155,7 @@ class WCorrShuffle(ComputedResult):
         return fig
 
 
-    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_active_pipeline=None):
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_active_pipeline=None, **additional_selections_context):
         """ export as separate .csv files. 
 
 
@@ -1196,7 +1196,7 @@ class WCorrShuffle(ComputedResult):
             wcorr_ripple_shuffle_all_df['ripple_start_t'] = wcorr_ripple_shuffle_all_df['start'].copy()
         wcorr_ripple_shuffle_all_df['export_date'] = get_now_rounded_time_str()
 
-        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(self.curr_active_pipeline, track_templates=self.track_templates)
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(self.curr_active_pipeline, track_templates=self.track_templates, **additional_selections_context)
         _, _, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
         earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = self.curr_active_pipeline.find_LongShortDelta_times()
 
