@@ -61,7 +61,14 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 ShuffleIdx = NewType('ShuffleIdx', int)
 
-def finalize_output_shuffled_wcorr():
+def finalize_output_shuffled_wcorr(curr_active_pipeline):
+    """
+    Gets the shuffled wcorr results and outputs the final histogram for this session
+
+    wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline)
+
+
+    """
     wcorr_shuffle_results: SequenceBasedComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('SequenceBased', None)
     if wcorr_shuffle_results is not None:    
         wcorr_ripple_shuffle: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
@@ -98,6 +105,13 @@ def finalize_output_shuffled_wcorr():
     best_wcorr_max_indices = np.abs(wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].values).argmax(axis=1)
     wcorr_ripple_shuffle_all_df[f'abs_best_wcorr'] = [wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].values[i, best_idx] for i, best_idx in enumerate(best_wcorr_max_indices)] #  np.where(direction_max_indices, wcorr_ripple_shuffle_all_df['long_LR'].filter_epochs[a_column_name].to_numpy(), wcorr_ripple_shuffle_all_df['long_RL'].filter_epochs[a_column_name].to_numpy())
     wcorr_ripple_shuffle_all_df
+
+    all_shuffles_only_best_decoder_wcorr_df = pd.concat([all_shuffles_wcorr_df[np.logical_and((all_shuffles_wcorr_df['epoch_idx'] == epoch_idx), (all_shuffles_wcorr_df['decoder_idx'] == best_idx))] for epoch_idx, best_idx in enumerate(best_wcorr_max_indices)])
+
+    ## OUTPUTS: wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df
+
+    return wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df
+
 
 
 # ---------------------------------------------------------------------------- #
@@ -165,7 +179,7 @@ def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
 
 
 @function_attributes(short_name=None, tags=['replay', 'new_replay'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
-def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epochs: Epoch):
+def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025):
     """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2009.
 
     , included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0
@@ -190,32 +204,43 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     # spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
     # (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline, directional_laps_results=directional_laps_results,
     #                                                                                                                                                                             included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
-    
 
+    fail_on_exception = False
+    enable_save_h5: bool = False
+    
     # 'epochs_source'
+    epochs_source = new_replay_epochs.metadata.get('epochs_source', None)
+    assert epochs_source is not None
+    print(f'epochs_source: {epochs_source}')
+
+    if epochs_source == 'compute_diba_quiescent_style_replay_events':
+        custom_suffix: str = '_withNewComputedReplays'
+    elif epochs_source == 'diba_evt_file':
+        custom_suffix: str = '_withNewKamranExportedReplays'
+    else:
+        raise NotImplementedError(f'epochs_source: {epochs_source} is of unknown type or is missing metadata.')    
 
     ## OUTPUTS: new_replay_epochs, new_replay_epochs_df
     did_change, _backup_session_replay_epochs, _backup_session_configs = replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=new_replay_epochs)
-
+    if did_change:
+        global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True)
 
     curr_active_pipeline.reload_default_computation_functions()
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
-                     computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': 0.025}, {'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+                     computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size}, {'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
     ## 10m
 
 
     ## Long/Short Stuff:
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['long_short_decoding_analyses','long_short_fr_indicies_analyses','jonathan_firing_rate_analysis',
-                'long_short_post_decoding','long_short_inst_spike_rate_groups','long_short_endcap_analysis'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['long_short_decoding_analyses','long_short_fr_indicies_analyses','jonathan_firing_rate_analysis',
+    #             'long_short_post_decoding','long_short_inst_spike_rate_groups','long_short_endcap_analysis'], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
     ## Rank-Order Shuffle
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis',], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
     ## wcorr shuffle:
-    global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True)
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
 
     # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
@@ -232,9 +257,8 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     #     ], enabled_filter_names=None, fail_on_exception=False, debug_print=False) # , computation_kwargs_list=[{'should_skip_radon_transform': False}]
 
     # 2024-06-25 - Save all custom _______________________________________________________________________________________ #
+    ## INPUTS: custom_suffix
 
-    # custom_suffix: str = '_withNewComputedReplays'
-    custom_suffix: str = '_withNewKamranExportedReplays'
     custom_save_filenames = {
         'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
         'global_computation_pkl':f"global_computation_results{custom_suffix}.pkl",
@@ -251,8 +275,10 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
     custom_save_filepaths['global_computation_pkl']
 
-    custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
-    custom_save_filepaths['pipeline_h5']
+
+    if enable_save_h5:
+        custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+        custom_save_filepaths['pipeline_h5']
 
     return custom_save_filenames, custom_save_filepaths
 
