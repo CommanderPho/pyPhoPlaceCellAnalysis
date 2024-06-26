@@ -1402,7 +1402,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
 
 
-    def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None, defer_render:bool=False):
+    def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None, defer_render:bool=False, **additional_selections_context):
         """ Restores the user's selections to this pagination controller
 
         Uses: self.params.active_identifying_figure_ctx
@@ -1420,7 +1420,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             user_annotations = annotations_man.get_user_annotations()
         
         a_figure_ctx = self.params.active_identifying_figure_ctx
-        a_selections_ctx = a_figure_ctx.adding_context_if_missing(user_annotation='selections')
+        a_selections_ctx = a_figure_ctx.adding_context_if_missing(user_annotation='selections', **additional_selections_context)
         loaded_selections = user_annotations.get(a_selections_ctx, None)
         new_selections = loaded_selections
         if loaded_selections is not None:
@@ -1965,7 +1965,18 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return code_strings
     
 
-    def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None, defer_render:bool=False):
+    def restore_selections_from_user_annotations(self, user_annotations: Optional[Dict]=None, replay_source: Optional[str]=None, defer_render:bool=False):
+        """
+        , replay_source='diba_evt_file'
+
+        """
+        # , source='pho_algo'
+        if replay_source is None:
+            replay_source_partial_context = dict() # gets the annotations for the pho-computed ripples
+        else:
+            replay_source_partial_context = dict(source=replay_source) # source='diba_evt_file': # gets the annotations for the kdiba-evt file exported ripples, consistent with his 2009 paper
+        
+
         if user_annotations is None:
             from neuropy.core.user_annotations import UserAnnotationsManager
             annotations_man = UserAnnotationsManager()
@@ -1974,7 +1985,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # Uses: paginated_multi_decoder_decoded_epochs_window, user_annotations
         # figure_ctx_dict = {a_name:v.params.active_identifying_figure_ctx for a_name, v in self.pagination_controllers.items()} 
         figure_ctx_dict = self.figure_ctx_dict
-        loaded_selections_context_dict = {a_name:a_figure_ctx.adding_context_if_missing(user_annotation='selections') for a_name, a_figure_ctx in figure_ctx_dict.items()}
+        loaded_selections_context_dict = {a_name:a_figure_ctx.adding_context_if_missing(user_annotation='selections', **replay_source_partial_context) for a_name, a_figure_ctx in figure_ctx_dict.items()}
         loaded_selections_dict = {a_name:user_annotations.get(a_selections_ctx, None) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
 
         new_selections_dict = {a_decoder_name:a_pagination_controller.restore_selections_from_user_annotations(user_annotations, defer_render=defer_render) for a_decoder_name, a_pagination_controller in self.pagination_controllers.items()}
