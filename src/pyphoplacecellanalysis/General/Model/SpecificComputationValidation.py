@@ -129,8 +129,10 @@ class SpecificComputationValidator:
             
         else:
             # allows specifying provides_global_keys=['DirectionalMergedDecoders] as a List without importing:
+            results_specification = SpecificComputationResultsSpecification()
+
             if hasattr(a_fn, 'provides_global_keys') and (a_fn.provides_global_keys is not None):
-                results_specification = SpecificComputationResultsSpecification(provides_global_keys=list(a_fn.provides_global_keys))
+                results_specification.provides_global_keys = list(a_fn.provides_global_keys)
             if hasattr(a_fn, 'requires_global_keys') and (a_fn.requires_global_keys is not None):
                 results_specification.requires_global_keys = a_fn.requires_global_keys
 
