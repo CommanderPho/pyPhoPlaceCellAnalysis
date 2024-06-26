@@ -43,6 +43,29 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
 # ---------------------------------------------------------------------------- #
+def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
+    """ 
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import replace_replay_epochs
+
+
+    """
+    if isinstance(new_replay_epochs, pd.DataFrame):
+        new_replay_epochs = Epoch.from_dataframe(new_replay_epochs) # ensure it is an epoch object
+        
+    new_replay_epochs = new_replay_epochs.get_non_overlapping() # ensure non-overlapping
+
+    assert curr_active_pipeline.sess.basepath.exists()
+    curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
+    for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
+        a_filtered_session.replay = deepcopy(new_replay_epochs).time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
+        assert curr_active_pipeline.sess.basepath.exists()
+        a_filtered_session.config.basepath = deepcopy(curr_active_pipeline.sess.basepath)
+        assert a_filtered_session.config.basepath.exists()
+        # print(a_filtered_session.replay)
+        # a_filtered_session.start()
+
+
 @function_attributes(short_name=None, tags=['replay', 'new_replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
 def overwrite_replay_epochs_and_recompute(curr_active_pipeline, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0):
     """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2009.
@@ -54,7 +77,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, included_qclu_va
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer
 
-    rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+    # rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
     # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
     # included_qclu_values: List[int] = rank_order_results.included_qclu_values
     # ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
@@ -246,11 +269,13 @@ def find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_
 @function_attributes(short_name=None, tags=['replay'], input_requires=[], output_provides=[], uses=['find_active_epochs_preceeded_by_quiescent_windows'], used_by=[], creation_date='2024-06-25 12:54', related_items=[])
 # def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, rank_order_results, spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3):
 def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, spikes_df, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0, silence_duration:float=0.06, firing_window_duration:float=0.3):
-    
-
-    
     """ 
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events
+
+    if 'included_qclu_values' and 'minimum_inclusion_fr_Hz' don't change, the templates and directional lap results aren't required it seems. 
+    All of this is just in service of getting the properly filtered `active_spikes_df` to determine the quiescent periods.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events
 
     """
     ## INPUTS: curr_active_pipeline, directional_laps_results, rank_order_results
@@ -264,7 +289,7 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional
     # active_track_templates
 
     any_decoder_neuron_IDs = deepcopy(active_track_templates.any_decoder_neuron_IDs)
-    n_neurons = len(any_decoder_neuron_IDs)
+    n_neurons: int = len(any_decoder_neuron_IDs)
     # min_num_active_neurons: int = max(int(round(0.3 * float(n_neurons))), 5)
     min_num_active_neurons: int = active_track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline) # smarter, considers the minimum template
 
@@ -279,7 +304,9 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional
     new_replay_epochs_df, quiescent_periods = find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_duration=silence_duration, firing_window_duration=firing_window_duration, min_unique_neurons=min_num_active_neurons)
     new_replay_epochs_df = new_replay_epochs_df.rename(columns={'window_start': 'start', 'window_end': 'stop',})
 
-    new_replay_epochs: Epoch = Epoch.from_dataframe(new_replay_epochs_df)
+    new_replay_epochs: Epoch = Epoch.from_dataframe(new_replay_epochs_df, metadata={'included_qclu_values': included_qclu_values, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
+                                                                                     'silence_duration': silence_duration, 'firing_window_duration': firing_window_duration,
+                                                                                     'qclu_included_aclus': qclu_included_aclus, 'min_num_active_neurons': min_num_active_neurons})
     # new_replay_epochs
 
     return (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs)
