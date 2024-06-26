@@ -45,77 +45,156 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------- #
 def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
     """ 
+    Replaces each session's replay epochs and their `preprocessing_parameters.epoch_estimation_parameters.replays` config
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import replace_replay_epochs
 
 
     """
+    _backup_session_replay_epochs = {}
+    _backup_session_configs = {}
+    
     if isinstance(new_replay_epochs, pd.DataFrame):
         new_replay_epochs = Epoch.from_dataframe(new_replay_epochs) # ensure it is an epoch object
         
     new_replay_epochs = new_replay_epochs.get_non_overlapping() # ensure non-overlapping
 
+    ## Get the estimation parameters:
+    replay_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays
+    assert replay_estimation_parameters is not None
+    _bak_replay_estimation_parameters = deepcopy(replay_estimation_parameters) ## backup original
+    ## backup original values:
+    _backup_session_replay_epochs['sess'] = deepcopy(_bak_replay_estimation_parameters)
+    _backup_session_configs['sess'] = deepcopy(curr_active_pipeline.sess.replay)
+
+    ## Check if they changed
+    did_change: bool = False
+    did_change = did_change or np.any(ensure_dataframe(_backup_session_configs['sess']).to_numpy() != ensure_dataframe(new_replay_epochs).to_numpy())
+
+    ## Set new:
+    replay_estimation_parameters.epochs_source = new_replay_epochs.metadata.get('epochs_source', None)
+    # replay_estimation_parameters.require_intersecting_epoch = None # don't actually purge these as I don't know what they are used for
+    replay_estimation_parameters.min_inclusion_fr_active_thresh = new_replay_epochs.metadata.get('minimum_inclusion_fr_Hz', 1.0)
+    replay_estimation_parameters.min_num_unique_aclu_inclusions = new_replay_epochs.metadata.get('min_num_active_neurons', 5)
+
+    ## Assign the new parameters:
+    curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays = deepcopy(replay_estimation_parameters)
+
     assert curr_active_pipeline.sess.basepath.exists()
+    ## assign the new replay epochs:
     curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
     for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
+        ## backup original values:
+        _backup_session_replay_epochs[k] = deepcopy(a_filtered_session.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        _backup_session_configs[k] = deepcopy(a_filtered_session.replay)
+
+        ## assign the new replay epochs:
         a_filtered_session.replay = deepcopy(new_replay_epochs).time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
         assert curr_active_pipeline.sess.basepath.exists()
         a_filtered_session.config.basepath = deepcopy(curr_active_pipeline.sess.basepath)
         assert a_filtered_session.config.basepath.exists()
+        a_filtered_session.config.preprocessing_parameters.epoch_estimation_parameters.replays = deepcopy(replay_estimation_parameters)
+
         # print(a_filtered_session.replay)
         # a_filtered_session.start()
 
+    print(f'did_change: {did_change}')
 
-@function_attributes(short_name=None, tags=['replay', 'new_replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
-def overwrite_replay_epochs_and_recompute(curr_active_pipeline, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0):
+    return did_change, _backup_session_replay_epochs, _backup_session_configs
+
+
+
+@function_attributes(short_name=None, tags=['replay', 'new_replay'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
+def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epochs: Epoch):
     """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2009.
 
-    
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import overwrite_replay_epochs_and_recompute
+    , included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0
 
     
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import overwrite_replay_epochs_and_recompute
+
+        did_change, _backup_session_replay_epochs, _backup_session_configs = replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=evt_epochs)
+
     """
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer
+    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+    # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer
 
     # rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
     # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
     # included_qclu_values: List[int] = rank_order_results.included_qclu_values
     # ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
-    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    # directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
     # track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
 
-    spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
-    (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline, directional_laps_results=directional_laps_results, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
+    # spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
+    # (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline, directional_laps_results=directional_laps_results,
+    #                                                                                                                                                                             included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
     
 
-    ## OUTPUTS: new_replay_epochs, new_replay_epochs_df
-    assert curr_active_pipeline.sess.basepath.exists()
+    # 'epochs_source'
 
-    ## Apply the new replay epochs to the unfiltered session and the filtered sessions:
-    curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
-    for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
-        a_filtered_session.replay = deepcopy(new_replay_epochs).time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
-        a_filtered_session.config.basepath = deepcopy(curr_active_pipeline.sess.basepath)
-        assert a_filtered_session.config.basepath.exists()
-        # print(a_filtered_session.replay)
-        # a_filtered_session.start()
+    ## OUTPUTS: new_replay_epochs, new_replay_epochs_df
+    did_change, _backup_session_replay_epochs, _backup_session_configs = replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=new_replay_epochs)
+
 
     curr_active_pipeline.reload_default_computation_functions()
-    # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
-        'merged_directional_placefields', 
-        'long_short_decoding_analyses',
-        'jonathan_firing_rate_analysis',
-        'long_short_fr_indicies_analyses',
-        'short_long_pf_overlap_analyses',
-        'long_short_post_decoding',
-        'long_short_rate_remapping',
-        'long_short_inst_spike_rate_groups',
-        'long_short_endcap_analysis',
-        ], enabled_filter_names=None, fail_on_exception=False, debug_print=False) # , computation_kwargs_list=[{'should_skip_radon_transform': False}]
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
+                     computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': 0.025}, {'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+    ## 10m
 
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['perform_wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 50}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'], computation_kwargs_list=[{'laps_decoding_time_bin_size': 0.2}, {'time_bin_size': 0.025}, {'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+    ## Long/Short Stuff:
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['long_short_decoding_analyses','long_short_fr_indicies_analyses','jonathan_firing_rate_analysis',
+                'long_short_post_decoding','long_short_inst_spike_rate_groups','long_short_endcap_analysis'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+    ## Rank-Order Shuffle
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis',], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+
+    ## wcorr shuffle:
+    global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True)
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+
+    # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
+    #     'merged_directional_placefields', 
+    #     'long_short_decoding_analyses',
+    #     'jonathan_firing_rate_analysis',
+    #     'long_short_fr_indicies_analyses',
+    #     'short_long_pf_overlap_analyses',
+    #     'long_short_post_decoding',
+    #     'long_short_rate_remapping',
+    #     'long_short_inst_spike_rate_groups',
+    #     'long_short_endcap_analysis',
+    #     ], enabled_filter_names=None, fail_on_exception=False, debug_print=False) # , computation_kwargs_list=[{'should_skip_radon_transform': False}]
+
+    # 2024-06-25 - Save all custom _______________________________________________________________________________________ #
+
+    # custom_suffix: str = '_withNewComputedReplays'
+    custom_suffix: str = '_withNewKamranExportedReplays'
+    custom_save_filenames = {
+        'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
+        'global_computation_pkl':f"global_computation_results{custom_suffix}.pkl",
+        'pipeline_h5':f'pipeline{custom_suffix}.h5',
+    }
+    print(f'custom_save_filenames: {custom_save_filenames}')
+    custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
+    # custom_save_filepaths['pipeline_pkl'] = Path('W:/Data/KDIBA/gor01/two/2006-6-07_16-40-19/loadedSessPickle_withNewKamranExportedReplays.pkl').resolve()
+    # custom_save_filepaths['global_computation_pkl'] = Path(r'W:\Data\KDIBA\gor01\two\2006-6-07_16-40-19\output\global_computation_results_withNewKamranExportedReplays.pkl').resolve()
+
+    custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
+    custom_save_filepaths['pipeline_pkl']
+
+    custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
+    custom_save_filepaths['global_computation_pkl']
+
+    custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+    custom_save_filepaths['pipeline_h5']
+
+    return custom_save_filenames, custom_save_filepaths
 
 
 
@@ -304,11 +383,11 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional
     new_replay_epochs_df, quiescent_periods = find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_duration=silence_duration, firing_window_duration=firing_window_duration, min_unique_neurons=min_num_active_neurons)
     new_replay_epochs_df = new_replay_epochs_df.rename(columns={'window_start': 'start', 'window_end': 'stop',})
 
-    new_replay_epochs: Epoch = Epoch.from_dataframe(new_replay_epochs_df, metadata={'included_qclu_values': included_qclu_values, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
+    new_replay_epochs: Epoch = Epoch.from_dataframe(new_replay_epochs_df, metadata={'epochs_source': 'compute_diba_quiescent_style_replay_events',
+                                                                                    'included_qclu_values': included_qclu_values, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
                                                                                      'silence_duration': silence_duration, 'firing_window_duration': firing_window_duration,
                                                                                      'qclu_included_aclus': qclu_included_aclus, 'min_num_active_neurons': min_num_active_neurons})
-    # new_replay_epochs
-
+    
     return (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs)
 
 
