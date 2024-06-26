@@ -43,6 +43,32 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
 # ---------------------------------------------------------------------------- #
+def overwrite_replay_epochs_and_recompute(curr_active_pipeline):
+    
+    spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
+    (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline, directional_laps_results=directional_laps_results, rank_order_results=rank_order_results, spikes_df=spikes_df)
+    new_replay_epochs_df
+
+    curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
+    for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
+        a_filtered_session.replay = deepcopy(new_replay_epochs).time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
+        assert curr_active_pipeline.sess.basepath.exists()
+        a_filtered_session.config.basepath = deepcopy(curr_active_pipeline.sess.basepath)
+        assert a_filtered_session.config.basepath.exists()
+        # print(a_filtered_session.replay)
+        # a_filtered_session.start()
+    curr_active_pipeline.reload_default_computation_functions()
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['long_short_decoding_analyses',
+        # 'jonathan_firing_rate_analysis',
+        'long_short_fr_indicies_analyses',
+        'short_long_pf_overlap_analyses',
+        # 'long_short_post_decoding',
+        'long_short_rate_remapping',
+        'long_short_inst_spike_rate_groups',
+        'long_short_endcap_analysis',
+        ], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # , computation_kwargs_list=[{'should_skip_radon_transform': False}]
+
+
 def check_for_and_merge_overlapping_epochs(quiescent_periods: pd.DataFrame, debug_print=False) -> pd.DataFrame:
     """
     Checks for overlaps in the quiescent periods and merges them if necessary.
