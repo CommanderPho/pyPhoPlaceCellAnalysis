@@ -4405,6 +4405,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     def _build_merged_directional_placefields(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
                                                 laps_decoding_time_bin_size: float = 0.250, # 250ms
                                                 ripple_decoding_time_bin_size: float = 0.025, # 25ms
+                                                should_validate_lap_decoding_performance: bool = False,
                                             ):
         """
 
@@ -4485,34 +4486,41 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # Decode Epochs (Laps/Ripples) Using the merged all-directional decoder): ____________________________________________ #
 
         ## Decode Laps:
-        
-        global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_any_name].computation_config.pf_params.computation_epochs) # global_any_name='maze_any' (? same as global_epoch_name?)
-        
-        directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
-        
+        if (laps_decoding_time_bin_size is not None):
+            global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_any_name].computation_config.pf_params.computation_epochs) # global_any_name='maze_any' (? same as global_epoch_name?)
+            
+            directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
+        else:
+            print(f'skipping lap recomputation because laps_decoding_time_bin_size == None')
+            should_validate_lap_decoding_performance = False
+
+
         ## Decode Ripples (only uses the global_epoch_name's ripples):
-        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(ensure_dataframe(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay)))
-        min_possible_time_bin_size: float = find_minimum_time_bin_duration(global_replays['duration'].to_numpy())
-        # ripple_decoding_time_bin_size: float = min(0.010, min_possible_time_bin_size) # 10ms # 0.002
-        
-        if ripple_decoding_time_bin_size < min_possible_time_bin_size:
-            print(f'WARN: ripple_decoding_time_bin_size {ripple_decoding_time_bin_size} < min_possible_time_bin_size ({min_possible_time_bin_size}). This used to be enforced but continuing anyway.')
-        directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size)
+        if (ripple_decoding_time_bin_size is not None):
+            global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(ensure_dataframe(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay)))
+            min_possible_time_bin_size: float = find_minimum_time_bin_duration(global_replays['duration'].to_numpy())
+            # ripple_decoding_time_bin_size: float = min(0.010, min_possible_time_bin_size) # 10ms # 0.002
+            
+            if ripple_decoding_time_bin_size < min_possible_time_bin_size:
+                print(f'WARN: ripple_decoding_time_bin_size {ripple_decoding_time_bin_size} < min_possible_time_bin_size ({min_possible_time_bin_size}). This used to be enforced but continuing anyway.')
+            directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size)
+        else:
+            print(f'skipping ripple recomputation because ripple_decoding_time_bin_size == None')
 
         ## Post Compute Validations:
         directional_merged_decoders_result.perform_compute_marginals()
         
-        result_laps_epochs_df: pd.DataFrame = directional_merged_decoders_result.add_groundtruth_information(owning_pipeline_reference)
-
-         # Validate Laps:
-        try:
-            laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = directional_merged_decoders_result.laps_directional_marginals_tuple
-            percent_laps_estimated_correctly = DirectionalPseudo2DDecodersResult.validate_lap_dir_estimations(unfiltered_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
-            print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
-        except (AssertionError, ValueError) as err:
-            print(F'fails due to some types thing?')
-            print(f'\terr: {err}')
-            pass
+        # Validate Laps:
+        if should_validate_lap_decoding_performance:
+            result_laps_epochs_df: pd.DataFrame = directional_merged_decoders_result.add_groundtruth_information(owning_pipeline_reference)
+            try:
+                laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = directional_merged_decoders_result.laps_directional_marginals_tuple
+                percent_laps_estimated_correctly = DirectionalPseudo2DDecodersResult.validate_lap_dir_estimations(unfiltered_session, active_global_laps_df=global_any_laps_epochs_obj.to_dataframe(), laps_is_most_likely_direction_LR_dir=laps_is_most_likely_direction_LR_dir)
+                print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
+            except (AssertionError, ValueError) as err:
+                print(F'fails due to some types thing?')
+                print(f'\terr: {err}')
+                pass
         
         # Set the global result:
         global_computation_results.computed_data['DirectionalMergedDecoders'] = directional_merged_decoders_result
