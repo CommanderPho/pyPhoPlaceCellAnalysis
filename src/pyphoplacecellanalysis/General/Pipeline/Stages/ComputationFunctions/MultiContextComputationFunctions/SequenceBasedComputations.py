@@ -166,6 +166,8 @@ class WCorrShuffle(ComputedResult):
         global_epoch_name=global_epoch_name)
 
 
+    Which epochs does it test? Just replay? where did it get these from?
+
     """
     _VersionedResultMixin_version: str = "2024.05.30_0" # to be updated in your IMPLEMENTOR to indicate its version
 

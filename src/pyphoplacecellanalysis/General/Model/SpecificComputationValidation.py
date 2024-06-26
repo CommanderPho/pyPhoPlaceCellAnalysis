@@ -1,6 +1,7 @@
 import numpy as np
 from attrs import define, Factory, field, fields
 from typing import Callable, List, Dict, Optional
+import networkx as nx
 
 @define(slots=False, repr=True)
 class SpecificComputationResultsSpecification:
@@ -62,6 +63,110 @@ class SpecificComputationResultsSpecification:
                 removed_keys_dict[a_key] = prev_result
         return removed_keys_dict     
             
+class DependencyGraph:
+    """
+    # Example usage
+    from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph
+
+    validators = deepcopy(_comp_specifiers_dict) # { ... }  # Your validators here
+    print(validators)
+    graph = DependencyGraph(validators)
+    """
+    def __init__(self, validators):
+        self.graph = nx.DiGraph()
+        self.validators = validators
+        self.build_graph(validators)
+    
+    def build_graph(self, validators):
+        for key, validator in validators.items():
+            self.graph.add_node(key, provides_global_keys=validator.results_specification.provides_global_keys)
+            for required_key in validator.results_specification.requires_global_keys:
+                for provider_key, provider_validator in validators.items():
+                    if required_key in provider_validator.results_specification.provides_global_keys:
+                        self.graph.add_edge(provider_key, key)
+
+    # def __init__(self, validators):
+    #     self.graph = nx.DiGraph()
+    #     self.build_graph(validators)
+    
+    # def build_graph(self, validators):
+    #     for key, validator in validators.items():
+    #         self.graph.add_node(key)
+    #         for required_key in validator.results_specification.requires_global_keys:
+    #             for provider_key, provider_validator in validators.items():
+    #                 if required_key in provider_validator.results_specification.provides_global_keys:
+    #                     self.graph.add_edge(provider_key, key)
+    
+    # def get_downstream_dependents(self, modified_key):
+    #     dependents = set()
+    #     for node in self.graph.nodes:
+    #         if modified_key in validators[node].results_specification.provides_global_keys:
+    #             dependents.update(nx.descendants(self.graph, node))
+    #     return dependents
+    
+    def get_downstream_dependents(self, modified_key, debug_print=False):
+        dependents = set()
+        for node in self.graph.nodes:
+            if debug_print:
+                print(f'node: {node}:')
+                print(f"\tself.graph.nodes[node]['provides_global_keys']: {self.graph.nodes[node]['provides_global_keys']}")
+            if modified_key in self.graph.nodes[node]['provides_global_keys']:
+                if debug_print:
+                    print(f'modified_key: {modified_key}')
+                dependents.update(nx.descendants(self.graph, node))
+        return dependents
+
+    def get_upstream_requirements(self, target_key: str, debug_print=False):
+        requirements = set()
+        for node in self.graph.nodes:
+            if debug_print:
+                print(f'node: {node}:')
+                print(f"\tself.graph.nodes[node]['provides_global_keys']: {self.graph.nodes[node]['provides_global_keys']}")
+            if target_key in self.graph.nodes[node]['provides_global_keys']:
+                if debug_print:
+                    print(f'target_key: {target_key}')
+                requirements.update(nx.descendants(self.graph, node))
+        return requirements
+
+    
+
+    def visualize(self):
+        import matplotlib.pyplot as plt
+        # Filter out nodes with no parents or children
+        nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
+        subgraph = self.graph.subgraph(nodes_to_draw)
+        
+        pos = nx.spring_layout(subgraph)
+        nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray")
+        plt.show()
+
+    # def visualize(self):
+    #     # Filter out nodes with no parents or children
+    #     nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
+    #     subgraph = self.graph.subgraph(nodes_to_draw)
+        
+    #     # Use pygraphviz for better visualization
+    #     pos = nx.nx_agraph.graphviz_layout(subgraph, prog='dot')
+    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray", arrows=True)
+    #     plt.show()
+
+    # def visualize(self):
+    #     # Filter out nodes with no parents or children
+    #     nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
+    #     subgraph = self.graph.subgraph(nodes_to_draw)
+        
+    #     # Use a spring layout for better spacing
+    #     pos = nx.spring_layout(subgraph, k=0.5, iterations=50)
+        
+    #     plt.figure(figsize=(12, 12))
+    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray", arrows=True)
+        
+    #     # Draw edge labels if needed
+    #     edge_labels = {(u, v): f'{u} -> {v}' for u, v in subgraph.edges}
+    #     nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels, font_color='red')
+        
+    #     plt.show()
+
 
 
 @define(slots=False, repr=True)
@@ -94,7 +199,7 @@ class SpecificComputationValidator:
     computation_fn_name:str = field() # '_perform_long_short_post_decoding_analysis'
     validate_computation_test:Callable = field(repr=False) # lambda curr_active_pipeline, computation_filter_name='maze'
     computation_precidence: float = field()
-    results_specification: SpecificComputationResultsSpecification = field(default=Factory(SpecificComputationResultsSpecification), repr=False) # (provides_global_keys=['DirectionalMergedDecoders']) # results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders'])
+    results_specification: SpecificComputationResultsSpecification = field(default=Factory(SpecificComputationResultsSpecification), repr=True) # (provides_global_keys=['DirectionalMergedDecoders']) # results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders'])
     computation_fn_kwargs:dict = field(default=Factory(dict), repr=True)  # {'perform_cache_load': False}]`
     is_global:bool = field(default=False)
     
@@ -134,7 +239,7 @@ class SpecificComputationValidator:
             if hasattr(a_fn, 'provides_global_keys') and (a_fn.provides_global_keys is not None):
                 results_specification.provides_global_keys = list(a_fn.provides_global_keys)
             if hasattr(a_fn, 'requires_global_keys') and (a_fn.requires_global_keys is not None):
-                results_specification.requires_global_keys = a_fn.requires_global_keys
+                results_specification.requires_global_keys = list(a_fn.requires_global_keys)
 
         assert (hasattr(a_fn, 'computation_precidence') and (a_fn.computation_precidence is not None))
         computation_precidence = a_fn.computation_precidence
@@ -355,4 +460,105 @@ class SpecificComputationValidator:
 
         return newly_computed_values
 
+    # ==================================================================================================================== #
+    # Dependency Parsing/Determination                                                                                     #
+    # ==================================================================================================================== #
+    @classmethod
+    def find_matching_validators(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_fn_names: List[str], debug_print=False):
+        """
+        Usage:
+            remaining_comp_specifiers_dict = deepcopy(_comp_specifiers_dict)
+            remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
+                                                                                                probe_fn_names=['long_short_decoding_analyses','long_short_fr_indicies_analyses'])
 
+            provided_global_keys
+        """
+        found_matching_validators = {}
+        provided_global_keys = []
+        for a_name, a_validator in remaining_comp_specifiers_dict.items():
+            for a_probe_fn_name in probe_fn_names:
+                # if a_validator.is_name_in(probe_fn_names):
+                if a_validator.does_name_match(a_probe_fn_name):
+                    found_matching_validators[a_probe_fn_name] = a_validator
+                    if debug_print:
+                        print(f'found matching validator: {a_validator}')
+                    
+        for a_name, a_found_validator in found_matching_validators.items():
+            new_provided_global_keys = a_found_validator.results_specification.provides_global_keys
+            provided_global_keys.extend(new_provided_global_keys)
+
+        remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in found_matching_validators}
+        if debug_print:
+            print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, found_matching_validators: {found_matching_validators}')
+        return remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys
+
+    @classmethod
+    def find_immediate_dependencies(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], provided_global_keys: List[str], debug_print=False):
+        """
+        Usage:
+
+        remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
+        provided_global_keys
+
+        """
+        dependent_validators = {}
+        for a_name, a_validator in remaining_comp_specifiers_dict.items():
+            # set(provided_global_keys)
+            # set(a_validator.results_specification.requires_global_keys)
+            if a_validator.is_dependency_in_required_global_keys(provided_global_keys):
+                dependent_validators[a_name] = a_validator
+            # (provided_global_keys == (a_validator.results_specification.requires_global_keys or []))
+
+        for a_name, a_found_validator in dependent_validators.items():
+            new_provided_global_keys = a_found_validator.results_specification.provides_global_keys
+            provided_global_keys.extend(new_provided_global_keys)
+            remaining_comp_specifiers_dict.pop(a_name) # remove
+
+        remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in dependent_validators}
+
+        if debug_print:
+            print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, dependent_validators: {dependent_validators}')
+        return remaining_comp_specifiers_dict, dependent_validators, provided_global_keys
+
+
+# I have a class `SpecificComputationValidator` that is used to keep track of computations in a custom pipeline and manage computation order. The key fields are `computation_precidence`, `provides_global_keys`, and `requires_global_keys`. `provides_global_keys` specifies which keys are provided after the computation completes, and `requires_global_keys` specifies which keys are required before computation of the function is possible. This means that a function with a `a_key` in `requires_global_keys` is dependent on all functions with `a_key` in their `provides_global_keys`. I'd like you to propose a datastructure that can be used efficiently track dependencies, for example if the key `a_changed_key` is modified, determine all downstream dependent functions that will need to be recomputed. Here are some example validators:
+
+
+# ```python
+# {'_split_to_directional_laps': SpecificComputationValidator(short_name='split_to_directional_laps', computation_fn_name='_split_to_directional_laps', computation_precidence=1000.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalLaps'], requires_global_keys=[]), computation_fn_kwargs={}, is_global=True),
+#  '_build_merged_directional_placefields': SpecificComputationValidator(short_name='merged_directional_placefields', computation_fn_name='_build_merged_directional_placefields', computation_precidence=1000.01, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders'], requires_global_keys=['DirectionalLaps']), computation_fn_kwargs={}, is_global=True),
+#  '_perform_PBE_stats_analyses': SpecificComputationValidator(short_name='PBE_stats', computation_fn_name='_perform_PBE_stats_analyses', computation_precidence=1001.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=True),
+#  'perform_rank_order_shuffle_analysis': SpecificComputationValidator(short_name='rank_order_shuffle_analysis', computation_fn_name='perform_rank_order_shuffle_analysis', computation_precidence=1001.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['RankOrder'], requires_global_keys=['DirectionalLaps']), computation_fn_kwargs={}, is_global=True),
+#  '_decode_continuous_using_directional_decoders': SpecificComputationValidator(short_name='directional_decoders_decode_continuous', computation_fn_name='_decode_continuous_using_directional_decoders', computation_precidence=1002.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalDecodersDecoded'], requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders']), computation_fn_kwargs={}, is_global=True),
+#  '_decode_and_evaluate_epochs_using_directional_decoders': SpecificComputationValidator(short_name='directional_decoders_evaluate_epochs', computation_fn_name='_decode_and_evaluate_epochs_using_directional_decoders', computation_precidence=1002.1, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalDecodersEpochsEvaluations'], requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders']), computation_fn_kwargs={}, is_global=True),
+#  '_decoded_epochs_heuristic_scoring': SpecificComputationValidator(short_name='directional_decoders_epoch_heuristic_scoring', computation_fn_name='_decoded_epochs_heuristic_scoring', computation_precidence=1002.2, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations']), computation_fn_kwargs={}, is_global=True),
+#  '_split_train_test_laps_data': SpecificComputationValidator(short_name='directional_train_test_split', computation_fn_name='_split_train_test_laps_data', computation_precidence=1002.3, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['TrainTestSplit'], requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders']), computation_fn_kwargs={}, is_global=True),
+#  '_build_trial_by_trial_activity_metrics': SpecificComputationValidator(short_name='trial_by_trial_metrics', computation_fn_name='_build_trial_by_trial_activity_metrics', computation_precidence=1002.4, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['TrialByTrialActivity'], requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders']), computation_fn_kwargs={}, is_global=True),
+#  '_perform_long_short_decoding_analyses': SpecificComputationValidator(short_name='long_short_decoding_analyses', computation_fn_name='_perform_long_short_decoding_analyses', computation_precidence=1003.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['long_short_leave_one_out_decoding_analysis'], requires_global_keys=[]), computation_fn_kwargs={}, is_global=True),
+#  '_perform_long_short_pf_overlap_analyses': SpecificComputationValidator(short_name='short_long_pf_overlap_analyses', computation_fn_name='_perform_long_short_pf_overlap_analyses', computation_precidence=1003.02, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['short_long_pf_overlap_analyses'], requires_global_keys=[]), computation_fn_kwargs={}, is_global=True),
+#  '_perform_long_short_firing_rate_analyses': SpecificComputationValidator(short_name='long_short_fr_indicies_analyses', computation_fn_name='_perform_long_short_firing_rate_analyses', computation_precidence=1003.03, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['long_short_fr_indicies_analysis'], requires_global_keys=[]), computation_fn_kwargs={}, is_global=True),
+#  '_perform_jonathan_replay_firing_rate_analyses': SpecificComputationValidator(short_name='jonathan_firing_rate_analysis', computation_fn_name='_perform_jonathan_replay_firing_rate_analyses', computation_precidence=1003.04, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['jonathan_firing_rate_analysis'], requires_global_keys=['long_short_fr_indicies_analysis']), computation_fn_kwargs={}, is_global=True),
+#  '_perform_long_short_post_decoding_analysis': SpecificComputationValidator(short_name='long_short_post_decoding', computation_fn_name='_perform_long_short_post_decoding_analysis', computation_precidence=1003.05, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['long_short_post_decoding'], requires_global_keys=['long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis']), computation_fn_kwargs={}, is_global=True),
+#  '_perform_long_short_instantaneous_spike_rate_groups_analysis': SpecificComputationValidator(short_name='long_short_inst_spike_rate_groups', computation_fn_name='_perform_long_short_instantaneous_spike_rate_groups_analysis', computation_precidence=1003.06, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['long_short_inst_spike_rate_groups'], requires_global_keys=['jonathan_firing_rate_analysis', 'long_short_fr_indicies_analysis']), computation_fn_kwargs={}, is_global=True),
+#  '_perform_long_short_endcap_analysis': SpecificComputationValidator(short_name='long_short_endcap_analysis', computation_fn_name='_perform_long_short_endcap_analysis', computation_precidence=1003.07, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['long_short_endcap'], requires_global_keys=['jonathan_firing_rate_analysis']), computation_fn_kwargs={}, is_global=True),
+#  'perform_wcorr_shuffle_analysis': SpecificComputationValidator(short_name='wcorr_shuffle_analysis', computation_fn_name='perform_wcorr_shuffle_analysis', computation_precidence=1005.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=['SequenceBased'], requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations']), computation_fn_kwargs={}, is_global=True),
+#  '_add_extended_pf_peak_information': SpecificComputationValidator(short_name='extended_pf_peak_information', computation_fn_name='_add_extended_pf_peak_information', computation_precidence=1005.4, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=['DirectionalLaps', 'RankOrder', 'jonathan_firing_rate_analysis']), computation_fn_kwargs={}, is_global=True),
+#  '_perform_lap_direction_determination': SpecificComputationValidator(short_name='lap_direction_determination', computation_fn_name='_perform_lap_direction_determination', computation_precidence=-0.1, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_baseline_placefield_computation': SpecificComputationValidator(short_name='pf_computation', computation_fn_name='_perform_baseline_placefield_computation', computation_precidence=0.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_position_decoding_computation': SpecificComputationValidator(short_name='position_decoding', computation_fn_name='_perform_position_decoding_computation', computation_precidence=1.01, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_two_step_position_decoding_computation': SpecificComputationValidator(short_name='position_decoding_two_step', computation_fn_name='_perform_two_step_position_decoding_computation', computation_precidence=1.02, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_recursive_latent_placefield_decoding': SpecificComputationValidator(short_name='recursive_latent_pf_decoding', computation_fn_name='_perform_recursive_latent_placefield_decoding', computation_precidence=1.03, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_specific_epochs_decoding': SpecificComputationValidator(short_name='_perform_specific_epochs_decoding', computation_fn_name='_perform_specific_epochs_decoding', computation_precidence=1.04, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_velocity_vs_pf_density_computation': SpecificComputationValidator(short_name='EloyAnalysis', computation_fn_name='_perform_velocity_vs_pf_density_computation', computation_precidence=2.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_velocity_vs_pf_simplified_count_density_computation': SpecificComputationValidator(short_name='velocity_vs_pf_simplified_count_density', computation_fn_name='_perform_velocity_vs_pf_simplified_count_density_computation', computation_precidence=2.01, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_DEP_perform_pf_find_ratemap_peaks_computation': SpecificComputationValidator(short_name='_DEP_ratemap_peaks', computation_fn_name='_DEP_perform_pf_find_ratemap_peaks_computation', computation_precidence=2.02, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation': SpecificComputationValidator(short_name='ratemap_peaks_prominence2d', computation_fn_name='_perform_pf_find_ratemap_peaks_peak_prominence2d_computation', computation_precidence=2.03, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_placefield_overlap_computation': SpecificComputationValidator(short_name='placefield_overlap', computation_fn_name='_perform_placefield_overlap_computation', computation_precidence=2.04, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_extended_statistics_computation': SpecificComputationValidator(short_name='extended_stats', computation_fn_name='_perform_extended_statistics_computation', computation_precidence=3.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_spike_burst_detection_computation': SpecificComputationValidator(short_name='spike_burst_detection', computation_fn_name='_perform_spike_burst_detection_computation', computation_precidence=4.0, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_firing_rate_trends_computation': SpecificComputationValidator(short_name='firing_rate_trends', computation_fn_name='_perform_firing_rate_trends_computation', computation_precidence=4.01, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_time_dependent_placefield_computation': SpecificComputationValidator(short_name='pfdt_computation', computation_fn_name='_perform_time_dependent_placefield_computation', computation_precidence=9, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False),
+#  '_perform_time_dependent_pf_sequential_surprise_computation': SpecificComputationValidator(short_name='pf_dt_sequential_surprise', computation_fn_name='_perform_time_dependent_pf_sequential_surprise_computation', computation_precidence=9.01, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False)}
+# ```
+
+'perform_wcorr_shuffle_analysis': requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations']
