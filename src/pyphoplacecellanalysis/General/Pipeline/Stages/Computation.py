@@ -320,7 +320,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         """ re-runs just a specific computation provided by computation_functions_name_includelist """
         active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.initFromIsGlobal(are_global))
         if progress_logger_callback is not None:
-            progress_logger_callback(f'run_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
+            progress_logger_callback(f'\trun_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
 
@@ -645,7 +645,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
     @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['run_specific_computations_single_context'], used_by=[], creation_date='2023-07-21 18:21', related_items=[])
-    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
+    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
         """ perform a specific computation (specified in computation_functions_name_includelist) in a minimally destructive manner using the previously recomputed results:
         Ideally would already have access to the:
         - Previous computation result
@@ -658,7 +658,11 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
         Updates:
             curr_active_pipeline.computation_results
+            curr_active_pipeline.global_computation_results
         """
+        if progress_logger_callback is None:
+            progress_logger_callback = print
+
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
 
@@ -696,12 +700,13 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             ## TODO: ERROR: `owning_pipeline_reference=self` is not CORRECT as self is of type `ComputedPipelineStage` (or `DisplayPipelineStage`) and not `NeuropyPipeline`
                 # this has been fine for all the global functions so far because the majority of the properties are defined on the stage anyway, but any pipeline properties will be missing! 
             global_kwargs = dict(owning_pipeline_reference=self, global_computation_results=previous_computation_result, computation_results=self.computation_results, active_configs=self.active_configs, include_includelist=enabled_filter_names, debug_print=debug_print)
-            self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
+            print(f'for global computations: Performing run_specific_computations_single_context(..., computation_functions_name_includelist={computation_functions_name_includelist}, ...)...')
+            self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
         else:
             # Non-global functions:
             for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
                 if a_select_config_name in enabled_filter_names:
-                    print(f'Performing run_specific_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                    print(f'===>|> for filtered_session with filter named "{a_select_config_name}": Performing run_specific_computations_single_context(..., computation_functions_name_includelist={computation_functions_name_includelist})...')
                     if active_computation_params is None:
                         curr_active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
                     else:
@@ -711,7 +716,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
                     ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
                     previous_computation_result = self.computation_results[a_select_config_name]
-                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
+                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callbac)
         
         ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
 
@@ -1388,7 +1393,7 @@ class PipelineWithComputedPipelineStageMixin:
         split_save_folder.mkdir(exist_ok=True)
         
         if include_includelist is None:
-            include_includelist = list(curr_active_pipeline.global_computation_results.computed_data.keys())
+            include_includelist = list(self.global_computation_results.computed_data.keys())
 
         ## only saves out the `global_computation_results` data:
         computed_data = self.global_computation_results.computed_data
