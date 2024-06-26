@@ -39,6 +39,66 @@ DecoderName = NewType('DecoderName', str)
 import matplotlib.pyplot as plt
 
 
+# ==================================================================================================================== #
+# 2024-06-26 - Shuffled WCorr Output with working histogram                                                            #
+# ==================================================================================================================== #
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+from typing import NewType
+
+import neuropy.utils.type_aliases as types
+from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
+from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle, SequenceBasedComputationsContainer
+
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
+DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
+ShuffleIdx = NewType('ShuffleIdx', int)
+
+def finalize_output_shuffled_wcorr():
+    wcorr_shuffle_results: SequenceBasedComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('SequenceBased', None)
+    if wcorr_shuffle_results is not None:    
+        wcorr_ripple_shuffle: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
+        wcorr_ripple_shuffle: WCorrShuffle = WCorrShuffle(**get_dict_subset(wcorr_ripple_shuffle.to_dict(), subset_excludelist=['_VersionedResultMixin_version']))
+        curr_active_pipeline.global_computation_results.computed_data.SequenceBased.wcorr_ripple_shuffle = wcorr_ripple_shuffle
+        filtered_epochs_df: pd.DataFrame = deepcopy(wcorr_ripple_shuffle.filtered_epochs_df)
+        print(f'wcorr_ripple_shuffle.n_completed_shuffles: {wcorr_ripple_shuffle.n_completed_shuffles}')
+    else:
+        print(f'SequenceBased is not computed.')
+
+    # wcorr_ripple_shuffle: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=True)
+
+    n_epochs: int = wcorr_ripple_shuffle.n_epochs
+    print(f'n_epochs: {n_epochs}')
+    n_completed_shuffles: int = wcorr_ripple_shuffle.n_completed_shuffles
+    print(f'n_completed_shuffles: {n_completed_shuffles}')
+    wcorr_ripple_shuffle.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline)
+    n_completed_shuffles: int = wcorr_ripple_shuffle.n_completed_shuffles
+    print(f'n_completed_shuffles: {n_completed_shuffles}')
+    desired_ripple_decoding_time_bin_size: float = wcorr_shuffle_results.wcorr_ripple_shuffle.all_templates_decode_kwargs['desired_ripple_decoding_time_bin_size']
+    print(f'{desired_ripple_decoding_time_bin_size = }')
+    # filtered_epochs_df
+
+    # 7m - 200 shuffles
+    (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_ripple_shuffle.post_compute(decoder_names=deepcopy(track_templates.get_decoder_names()))
+    wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = wcorr_ripple_shuffle.build_all_shuffles_dataframes(decoder_names=deepcopy(track_templates.get_decoder_names()))
+    ## Prepare for plotting in histogram:
+    wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['start', 'stop'], how='any', inplace=False)
+    wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL'], how='all', inplace=False)
+    wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.convert_dtypes()
+    # {'long_best_dir_decoder_IDX': int, 'short_best_dir_decoder_IDX': int}
+    wcorr_ripple_shuffle_all_df
+    ## Gets the absolutely most extreme value from any of the four decoders and uses that
+    best_wcorr_max_indices = np.abs(wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].values).argmax(axis=1)
+    wcorr_ripple_shuffle_all_df[f'abs_best_wcorr'] = [wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].values[i, best_idx] for i, best_idx in enumerate(best_wcorr_max_indices)] #  np.where(direction_max_indices, wcorr_ripple_shuffle_all_df['long_LR'].filter_epochs[a_column_name].to_numpy(), wcorr_ripple_shuffle_all_df['long_RL'].filter_epochs[a_column_name].to_numpy())
+    wcorr_ripple_shuffle_all_df
+
 
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
