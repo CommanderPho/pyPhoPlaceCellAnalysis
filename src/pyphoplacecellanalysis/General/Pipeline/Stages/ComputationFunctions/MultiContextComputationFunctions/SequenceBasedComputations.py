@@ -889,7 +889,7 @@ class WCorrShuffle(ComputedResult):
 
 
     def build_all_shuffles_dataframes(self, decoder_names: Optional[List[types.DecoderName]]=None):
-        """
+        """ Builds two dataframes for plotting the WCorr results: one containing only the real wcorrs for each decoder, and another containing all of the shuffles
         
         wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = wcorr_ripple_shuffle.build_all_shuffles_dataframes(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
         
@@ -939,6 +939,10 @@ class WCorrShuffle(ComputedResult):
         # Concatenate dataframes along columns
         wcorr_ripple_shuffle_all_df: pd.DataFrame = pd.concat([deepcopy(self.filtered_epochs_df), real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df], axis=1)
         wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.drop(columns=['start_t']) ## drop redundant column
+        ## Drop rows missing critical data and then convert datatypes:
+        wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['start', 'stop'], how='any', inplace=False)
+        wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL'], how='all', inplace=False)
+        wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.convert_dtypes()
 
         ## OUTPUTS: wcorr_ripple_shuffle_all_df, real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, all_shuffles_wcorr_df
         # return wcorr_ripple_shuffle_all_df, real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, all_shuffles_wcorr_df
