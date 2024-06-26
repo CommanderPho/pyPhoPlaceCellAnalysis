@@ -43,21 +43,39 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
 # ---------------------------------------------------------------------------- #
-def overwrite_replay_epochs_and_recompute(curr_active_pipeline):
-    
-    spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
-    (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline, directional_laps_results=directional_laps_results, rank_order_results=rank_order_results, spikes_df=spikes_df)
-    new_replay_epochs_df
+def overwrite_replay_epochs_and_recompute(curr_active_pipeline, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0):
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import overwrite_replay_epochs_and_recompute
 
+    
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer
+
+    rank_order_results: RankOrderComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+    # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+    # included_qclu_values: List[int] = rank_order_results.included_qclu_values
+    # ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    # track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+
+    spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
+    (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline, directional_laps_results=directional_laps_results, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
+    
+
+    ## OUTPUTS: new_replay_epochs, new_replay_epochs_df
+    assert curr_active_pipeline.sess.basepath.exists()
+
+    ## Apply the new replay epochs to the unfiltered session and the filtered sessions:
     curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
     for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
         a_filtered_session.replay = deepcopy(new_replay_epochs).time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
-        assert curr_active_pipeline.sess.basepath.exists()
         a_filtered_session.config.basepath = deepcopy(curr_active_pipeline.sess.basepath)
         assert a_filtered_session.config.basepath.exists()
         # print(a_filtered_session.replay)
         # a_filtered_session.start()
+
     curr_active_pipeline.reload_default_computation_functions()
+    # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['long_short_decoding_analyses',
         # 'jonathan_firing_rate_analysis',
         'long_short_fr_indicies_analyses',
@@ -67,6 +85,22 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline):
         'long_short_inst_spike_rate_groups',
         'long_short_endcap_analysis',
         ], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # , computation_kwargs_list=[{'should_skip_radon_transform': False}]
+
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
+        'merged_directional_placefields', 
+        'long_short_decoding_analyses', #'pipeline_complete_compute_long_short_fr_indicies',
+        'jonathan_firing_rate_analysis',
+        'long_short_fr_indicies_analyses',
+        'short_long_pf_overlap_analyses',
+        'long_short_post_decoding',
+        'long_short_rate_remapping',
+        'long_short_inst_spike_rate_groups',
+        'long_short_endcap_analysis',
+        ], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['perform_wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 50}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'], computation_kwargs_list=[{'laps_decoding_time_bin_size': 0.2}, {'time_bin_size': 0.025}, {'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
 
 
 def check_for_and_merge_overlapping_epochs(quiescent_periods: pd.DataFrame, debug_print=False) -> pd.DataFrame:
@@ -218,7 +252,11 @@ def find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_
     return results_df, quiescent_periods
 
 @function_attributes(short_name=None, tags=['replay'], input_requires=[], output_provides=[], uses=['find_active_epochs_preceeded_by_quiescent_windows'], used_by=[], creation_date='2024-06-25 12:54', related_items=[])
-def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, rank_order_results, spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3):
+# def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, rank_order_results, spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3):
+def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, spikes_df, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0, silence_duration:float=0.06, firing_window_duration:float=0.3):
+    
+
+    
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events
 
@@ -226,11 +264,11 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional
     ## INPUTS: curr_active_pipeline, directional_laps_results, rank_order_results
     # track_templates.determine_decoder_aclus_filtered_by_frate(5.0)
     # qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2,4,9])
-    qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=rank_order_results.included_qclu_values)
+    qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=included_qclu_values)
     # qclu_included_aclus
 
     modified_directional_laps_results = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
-    active_track_templates: TrackTemplates = deepcopy(modified_directional_laps_results.get_templates(rank_order_results.minimum_inclusion_fr_Hz))
+    active_track_templates: TrackTemplates = deepcopy(modified_directional_laps_results.get_templates(minimum_inclusion_fr_Hz))
     # active_track_templates
 
     any_decoder_neuron_IDs = deepcopy(active_track_templates.any_decoder_neuron_IDs)
