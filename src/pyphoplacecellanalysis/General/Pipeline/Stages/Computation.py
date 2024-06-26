@@ -716,7 +716,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
                     ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
                     previous_computation_result = self.computation_results[a_select_config_name]
-                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callbac)
+                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback)
         
         ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
 
