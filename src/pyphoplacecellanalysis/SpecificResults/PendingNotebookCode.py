@@ -43,8 +43,11 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
 # ---------------------------------------------------------------------------- #
+@function_attributes(short_name=None, tags=['replay', 'new_replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
 def overwrite_replay_epochs_and_recompute(curr_active_pipeline, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0):
-    """ 
+    """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2009.
+
+    
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import overwrite_replay_epochs_and_recompute
 
     
@@ -76,19 +79,9 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, included_qclu_va
 
     curr_active_pipeline.reload_default_computation_functions()
     # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['long_short_decoding_analyses',
-        # 'jonathan_firing_rate_analysis',
-        'long_short_fr_indicies_analyses',
-        'short_long_pf_overlap_analyses',
-        # 'long_short_post_decoding',
-        'long_short_rate_remapping',
-        'long_short_inst_spike_rate_groups',
-        'long_short_endcap_analysis',
-        ], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # , computation_kwargs_list=[{'should_skip_radon_transform': False}]
-
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
         'merged_directional_placefields', 
-        'long_short_decoding_analyses', #'pipeline_complete_compute_long_short_fr_indicies',
+        'long_short_decoding_analyses',
         'jonathan_firing_rate_analysis',
         'long_short_fr_indicies_analyses',
         'short_long_pf_overlap_analyses',
@@ -96,7 +89,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, included_qclu_va
         'long_short_rate_remapping',
         'long_short_inst_spike_rate_groups',
         'long_short_endcap_analysis',
-        ], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        ], enabled_filter_names=None, fail_on_exception=False, debug_print=False) # , computation_kwargs_list=[{'should_skip_radon_transform': False}]
 
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['perform_wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 50}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'], computation_kwargs_list=[{'laps_decoding_time_bin_size': 0.2}, {'time_bin_size': 0.025}, {'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
@@ -148,7 +141,6 @@ def check_for_and_merge_overlapping_epochs(quiescent_periods: pd.DataFrame, debu
     non_overlapping_periods_df["label"] = non_overlapping_periods_df.index.astype('str', copy=True)
 
     return non_overlapping_periods_df
-
 
 def find_quiescent_windows(active_spikes_df: pd.DataFrame, silence_duration:float=0.06) -> pd.DataFrame:
     """
