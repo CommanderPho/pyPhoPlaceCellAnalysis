@@ -1400,12 +1400,16 @@ class RankOrderAnalyses:
         # active_epochs_df: pd.DataFrame = filtered_active_epochs.copy()
         filtered_active_epochs = filtered_active_epochs[np.isin(filtered_active_epochs['label'], final_good_Probe_Epoch_ids)]
 
+        
         ## OUTPUT DICTS:
         # create a nested dictionary of {Probe_Epoch_id: {aclu: rank}} from the ranked_aclu values
         output_dict = {}
 
         ## Loop over the results now to do the actual stats:
         epoch_ranked_aclus_stats_dict = {}
+
+        _omitted_epoch_ids = []
+        
 
         for epoch_id in list(epoch_ranked_aclus_dict.keys()):
 
@@ -1433,7 +1437,7 @@ class RankOrderAnalyses:
             is_template_aclu_actually_active_in_epoch: NDArray = np.isin(template_aclus, actually_included_epoch_aclus) # a bool array indicating whether each aclu in the template is active in  in the epoch (spikes_df). Used for indexing into the template peak_ranks (`long_pf_peak_ranks`, `short_pf_peak_ranks`)
             template_epoch_actually_included_aclus: NDArray = np.array(template_aclus)[is_template_aclu_actually_active_in_epoch] ## `actually_included_template_aclus`: the final aclus for this template actually active in this epoch
 
-            epoch_active_long_pf_peak_ranks = np.array(long_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch]
+            epoch_active_long_pf_peak_ranks = np.array(long_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch] ## occurs when `epoch_active_long_pf_peak_ranks` only has one entry
             epoch_active_short_pf_peak_ranks = np.array(short_pf_peak_ranks)[is_template_aclu_actually_active_in_epoch]
             #TODO 2023-11-22 11:35: - [ ] Is there the possibility that the template doesn't have spikes that are present in the epoch? I think so in general.
             assert np.shape(epoch_active_short_pf_peak_ranks) == np.shape(actually_included_epoch_ranks), f"np.shape(epoch_active_short_pf_peak_ranks): {np.shape(epoch_active_short_pf_peak_ranks)}, np.shape(actually_included_epoch_ranks): {np.shape(actually_included_epoch_ranks)}\n\tTODO 2023-11-22 11:35: - [ ] Is there the possibility that the template doesn't have spikes that are present in the epoch? I think so in general." #
