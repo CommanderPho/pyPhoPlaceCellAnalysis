@@ -566,4 +566,4 @@ class SpecificComputationValidator:
 #  '_perform_time_dependent_pf_sequential_surprise_computation': SpecificComputationValidator(short_name='pf_dt_sequential_surprise', computation_fn_name='_perform_time_dependent_pf_sequential_surprise_computation', computation_precidence=9.01, results_specification=SpecificComputationResultsSpecification(provides_global_keys=[], requires_global_keys=[]), computation_fn_kwargs={}, is_global=False)}
 # ```
 
-'perform_wcorr_shuffle_analysis': requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations']
+# 'perform_wcorr_shuffle_analysis': requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations']
