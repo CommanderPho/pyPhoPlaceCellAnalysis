@@ -1531,27 +1531,18 @@ class RankOrderAnalyses:
 
             # long_short_z_diff: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value))
 
-            try:
+            always_positive_long_short_magnitude_diff: float = np.max([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)]) - np.min([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)])
+            assert (always_positive_long_short_magnitude_diff >= 0.0), f"always_positive_long_short_magnitude_diff: {always_positive_long_short_magnitude_diff}"
+            long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
+            if (always_positive_long_short_magnitude_diff > 0.0):
+                assert (np.isclose(long_or_short_polarity_multiplier, -1.0) or np.isclose(long_or_short_polarity_multiplier, 1.0)), f"long_or_short_polarity_multiplier: {long_or_short_polarity_multiplier} should equal -1 or +1"
+                long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
+            else:
+                long_short_z_diff: float = 0.0 # the value is exactly zero. Surprising.
 
-                always_positive_long_short_magnitude_diff: float = np.max([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)]) - np.min([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)])
-                assert (always_positive_long_short_magnitude_diff >= 0.0), f"always_positive_long_short_magnitude_diff: {always_positive_long_short_magnitude_diff}" # AssertionError: always_positive_long_short_magnitude_diff: nan -- this is occuring because a NaN value is produced when `real_long_result_corr_value` is NaN, ocurring whenever `active_epoch_aclu_long_ranks` or `real_short_rank_stats` have only one entry in them (because then the correlation isn't defined)
-                long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
-                if (always_positive_long_short_magnitude_diff > 0.0):
-                    assert (np.isclose(long_or_short_polarity_multiplier, -1.0) or np.isclose(long_or_short_polarity_multiplier, 1.0)), f"long_or_short_polarity_multiplier: {long_or_short_polarity_multiplier} should equal -1 or +1"
-                    long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
-                else:
-                    long_short_z_diff: float = 0.0 # the value is exactly zero. Surprising.
-
-                long_short_naive_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value # `long_short_naive_z_diff` was the old pre-2023-12-07 way of calculating the z-score diff.
-                # epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay)
-                epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer=long_stats_z_scorer, short_stats_z_scorer=short_stats_z_scorer, long_short_z_diff=long_short_z_diff, long_short_naive_z_diff=long_short_naive_z_diff, is_forward_replay=is_forward_replay)
-
-            except AssertionError as e:
-                _omitted_epoch_ids.append(epoch_id)
-
-            except BaseException as e:
-                print(f'ERROR: unhandled exception : {e}')
-                raise e
+            long_short_naive_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value # `long_short_naive_z_diff` was the old pre-2023-12-07 way of calculating the z-score diff.
+            # epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay)
+            epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer=long_stats_z_scorer, short_stats_z_scorer=short_stats_z_scorer, long_short_z_diff=long_short_z_diff, long_short_naive_z_diff=long_short_naive_z_diff, is_forward_replay=is_forward_replay)
 
         ## END for epoch_id
 
@@ -1571,11 +1562,6 @@ class RankOrderAnalyses:
         long_z_score_values = np.array(long_z_score_values)
         short_z_score_values = np.array(short_z_score_values)
         long_short_z_score_diff_values = np.array(long_short_z_score_diff_values)
-
-        # Drop omitted epochs:
-        if len(_omitted_epoch_ids) > 0:
-            print(f'Dropping {len(_omitted_epoch_ids)} _omitted_epoch_ids: {_omitted_epoch_ids} from filtered_active_epochs')
-            filtered_active_epochs = filtered_active_epochs[np.logical_not(np.isin(filtered_active_epochs['label'], _omitted_epoch_ids))]
 
         return RankOrderResult(is_global=True, ranked_aclus_stats_dict=epoch_ranked_aclus_stats_dict, selected_spikes_fragile_linear_neuron_IDX_dict=epoch_selected_spikes_fragile_linear_neuron_IDX_dict,
                                long_z_score=long_z_score_values, short_z_score=short_z_score_values, long_short_z_score_diff=long_short_z_score_diff_values,
@@ -1968,8 +1954,6 @@ class RankOrderAnalyses:
     @classmethod
     def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first', minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2,4,9]):
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_paired_t_test
-        from neuropy.utils.indexing_helpers import intersection_of_arrays
-
 
         global_spikes_df, (odd_shuffle_helper, even_shuffle_helper), active_directional_laps_results = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
@@ -1990,23 +1974,6 @@ class RankOrderAnalyses:
         ## Replay Epochs:
         LR_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, debug_print=False)
         RL_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, debug_print=False)
-
-        ## handle removing omitted events:
-        # filtered_active_epochs
-        both_included_epoch_labels = intersection_of_arrays(LR_outputs.epochs_df.label, RL_outputs.epochs_df.label) ## find only the arrays that are present in both
-        LR_included_epochs = np.isin(LR_outputs.epochs_df.label, both_included_epoch_labels)
-        RL_included_epochs = np.isin(RL_outputs.epochs_df.label, both_included_epoch_labels)
-
-        LR_outputs.epochs_df = LR_outputs.epochs_df[LR_included_epochs] #.reset_index(drop=True)
-        RL_outputs.epochs_df = RL_outputs.epochs_df[RL_included_epochs]
-
-        LR_outputs.long_z_score = LR_outputs.long_z_score[LR_included_epochs]
-        LR_outputs.short_z_score = LR_outputs.short_z_score[LR_included_epochs]
-        LR_outputs.long_short_z_score_diff = LR_outputs.long_short_z_score_diff[LR_included_epochs]
-
-        RL_outputs.long_z_score = RL_outputs.long_z_score[RL_included_epochs]
-        RL_outputs.short_z_score = RL_outputs.short_z_score[RL_included_epochs]
-        RL_outputs.long_short_z_score_diff = RL_outputs.long_short_z_score_diff[RL_included_epochs]
 
         ripple_evts_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((LR_outputs.long_z_score, LR_outputs.short_z_score), (RL_outputs.long_z_score, RL_outputs.short_z_score))]
         print(f'ripple_evts_paired_tests: {ripple_evts_paired_tests}')
