@@ -237,7 +237,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     fail_on_exception = False
     enable_save_h5: bool = False
-    num_wcorr_shuffles: int = 1000
+    num_wcorr_shuffles: int = 200
 
     # 'epochs_source'
     epochs_source = new_replay_epochs.metadata.get('epochs_source', None)
@@ -510,7 +510,7 @@ def find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_
 
 @function_attributes(short_name=None, tags=['replay', 'compute', 'compute_diba_quiescent_style_replay_events'], input_requires=[], output_provides=[], uses=['find_active_epochs_preceeded_by_quiescent_windows'], used_by=[], creation_date='2024-06-25 12:54', related_items=[])
 # def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, rank_order_results, spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3):
-def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, spikes_df, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0, silence_duration:float=0.06, firing_window_duration:float=0.3,
+def compute_diba_quiescent_style_replay_events(curr_active_pipeline, spikes_df, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0, silence_duration:float=0.06, firing_window_duration:float=0.3,
             enable_export_to_neuroscope_EVT_file:bool=True):
     """ 
 
@@ -526,7 +526,8 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional
     # qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2,4,9])
     qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=included_qclu_values)
     # qclu_included_aclus
-
+    
+    directional_laps_results: DirectionalLapsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'])
     modified_directional_laps_results = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
     active_track_templates: TrackTemplates = deepcopy(modified_directional_laps_results.get_templates(minimum_inclusion_fr_Hz))
     # active_track_templates
