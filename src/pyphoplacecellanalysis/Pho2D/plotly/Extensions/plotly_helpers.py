@@ -16,10 +16,15 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
 from neuropy.utils.result_context import IdentifyingContext
 
+from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+
+
+@function_attributes(short_name=None, tags=['plotly', 'export', 'save'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-27 17:59', related_items=[])
 def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_extension: Union[str, List[str], Tuple[str]]='.png'):
     """ save figures to the 'figures' subfolder
 
-    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import plotly_helper_save_figures
+    from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_helper_save_figures
+
 
 
     """
@@ -67,6 +72,9 @@ def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_
             a_save_fn(a_fig, a_save_name)
 
     return _perform_save_all_extensions, save_fn_dict
+
+
+
 
 @function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-27 09:07', related_items=[])
 def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25, px_scatter_kwargs=None,

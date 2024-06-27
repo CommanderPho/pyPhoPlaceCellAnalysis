@@ -49,6 +49,7 @@ class OutputsSpecifier:
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.GraphicsView import GraphicsView
+from plotly.basedatatypes import BaseFigure as PlotlyBaseFigure ## for plotly figure detection
 
 # ==================================================================================================================== #
 # GRAPHICS/FIGURES EXPORTING                                                                                           #
@@ -665,8 +666,9 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
         erronious_suffixes = final_fig_save_basename_path.suffixes
         assert len(erronious_suffixes) == 0, f"erronious_suffixes: {erronious_suffixes} is still not empty after renaming!"
         
-
     is_matplotlib_figure = isinstance(a_fig, plt.FigureBase)
+    is_plotly_figure = isinstance(a_fig, PlotlyBaseFigure)
+
     # PDF: .pdf versions:
     if write_vector_format:
         try:
@@ -679,6 +681,13 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                     pdf.savefig(a_fig)
                     
                 additional_output_metadata = {'fig_format':'matplotlib', 'pdf_metadata': active_pdf_metadata}
+
+            elif is_plotly_figure:
+                ## Plotly only:
+                fig_vector_save_path = final_fig_save_basename_path.with_suffix('.svg')
+                a_fig.write_image(fig_vector_save_path)
+                additional_output_metadata = {'fig_format':'plotly'}
+
             else:
                 # pyqtgraph figure: pyqtgraph's exporter can't currently do PDF, so we'll do .svg instead:
                 fig_vector_save_path = final_fig_save_basename_path.with_suffix('.svg')
@@ -691,7 +700,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                 print(f'\t saved "{file_uri_from_path(fig_vector_save_path)}"')
             active_out_figure_paths.append(fig_vector_save_path)
 
-        except Exception as e:
+        except BaseException as e:
             print(f'Error occured while writing vector format for fig. {e}. Skipping.')
 
     # PNG: .png versions:
@@ -700,9 +709,15 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
         try:
             fig_png_out_path = final_fig_save_basename_path.with_suffix('.png')
             # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
-            ## MATPLOTLIB only:
             if is_matplotlib_figure:
+                ## MATPLOTLIB only:
                 a_fig.savefig(fig_png_out_path)
+            
+            elif is_plotly_figure:
+                ## Plotly only:
+                a_fig.write_image(fig_png_out_path)
+                additional_output_metadata = {'fig_format':'plotly'} # Unused here
+
             else:
                 # pyqtgraph
                 export_pyqtgraph_plot(a_fig, savepath=fig_png_out_path)
