@@ -477,13 +477,16 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         """
         return DirectionalDecodersTuple(self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)
 
-    def get_decoder_names(self) -> Tuple[str, str, str, str]:
+    @classmethod
+    def get_decoder_names(cls) -> Tuple[str, str, str, str]:
         return ('long_LR','long_RL','short_LR','short_RL')
     
-    def get_LR_decoder_names(self) -> Tuple[str, str]:
+    @classmethod
+    def get_LR_decoder_names(cls) -> Tuple[str, str]:
         return ('long_LR', 'short_LR')
     
-    def get_RL_decoder_names(self) -> Tuple[str, str]:
+    @classmethod
+    def get_RL_decoder_names(cls) -> Tuple[str, str]:
         return ('long_RL', 'short_RL')
     
     def get_decoders_dict(self) -> Dict[str, BasePositionDecoder]:
