@@ -207,8 +207,47 @@ def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
     return did_change, _backup_session_replay_epochs, _backup_session_configs
 
 
+def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_strings) -> str:
+    """
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_custom_suffix_for_replay_filename
+    custom_suffix = _get_custom_suffix_for_replay_filename(new_replay_epochs=new_replay_epochs)
 
-@function_attributes(short_name=None, tags=['replay', 'new_replay'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
+    print(f'custom_suffix: "{custom_suffix}"')
+
+    """
+    assert new_replay_epochs.metadata is not None
+    metadata = deepcopy(new_replay_epochs.metadata)
+    extras_strings = []
+
+    epochs_source = metadata.get('epochs_source', None)
+    assert epochs_source is not None
+    # print(f'epochs_source: {epochs_source}')
+
+    valid_epochs_source_values = ['compute_diba_quiescent_style_replay_events', 'diba_evt_file']
+    assert epochs_source in valid_epochs_source_values, f"epochs_source: '{epochs_source}' is not in valid_epochs_source_values: {valid_epochs_source_values}"
+
+    if epochs_source == 'compute_diba_quiescent_style_replay_events':
+        custom_suffix: str = '_withNewComputedReplays'
+        # qclu = new_replay_epochs.metadata.get('qclu', "[1,2]")
+        custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata.get('included_qclu_values', '[1,2]')}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+
+    elif epochs_source == 'diba_evt_file':
+        custom_suffix: str = '_withNewKamranExportedReplays'
+        custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+        # qclu = new_replay_epochs.metadata.get('qclu', "[1,2]") # Diba export files are always qclus [1, 2]
+    else:
+        raise NotImplementedError(f'epochs_source: {epochs_source} is of unknown type or is missing metadata.')    
+
+    # with np.printoptions(precision=1, suppress=True, threshold=5):
+    #     # score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.   
+    #     return '-'.join([f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+    #     # return '-'.join([f"replaySource_{metadata['epochs_source']}", f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+        
+    return custom_suffix
+
+
+
+@function_attributes(short_name=None, tags=['replay', 'new_replay', 'top'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
 def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025):
     """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2009.
 
@@ -236,28 +275,22 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     # spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
     # (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline, directional_laps_results=directional_laps_results,
     #                                                                                                                                                                             included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
-
-    fail_on_exception = False
-    enable_save_pipeline_pkl: bool = False
+    def str_for_filename(new_replay_epochs: Epoch, *extras_strings):
+        assert new_replay_epochs.metadata is not None
+        with np.printoptions(precision=1, suppress=True, threshold=5):
+            metadata = deepcopy(new_replay_epochs.metadata)
+            # score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.   
+            return '-'.join([f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+            # return '-'.join([f"replaySource_{metadata['epochs_source']}", f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+            
+    fail_on_exception = True
+    enable_save_pipeline_pkl: bool = True
     enable_save_h5: bool = False
     num_wcorr_shuffles: int = 25
 
     # 'epochs_source'
-    epochs_source = new_replay_epochs.metadata.get('epochs_source', None)
-    assert epochs_source is not None
-    print(f'epochs_source: {epochs_source}')
-
-    valid_epochs_source_values = ['compute_diba_quiescent_style_replay_events', 'diba_evt_file']
-    assert epochs_source in valid_epochs_source_values, f"epochs_source: '{epochs_source}' is not in valid_epochs_source_values: {valid_epochs_source_values}"
-
-    if epochs_source == 'compute_diba_quiescent_style_replay_events':
-        custom_suffix: str = '_withNewComputedReplays'
-        qclu = new_replay_epochs.metadata.get('qclu', "[1,2]")
-    elif epochs_source == 'diba_evt_file':
-        custom_suffix: str = '_withNewKamranExportedReplays'
-        qclu = new_replay_epochs.metadata.get('qclu', "[1,2]") # Diba export files are always qclus [1, 2]
-    else:
-        raise NotImplementedError(f'epochs_source: {epochs_source} is of unknown type or is missing metadata.')    
+    custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=new_replay_epochs)
+    print(f'custom_suffix: "{custom_suffix}"')
 
     ## OUTPUTS: new_replay_epochs, new_replay_epochs_df
     did_change, _backup_session_replay_epochs, _backup_session_configs = replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=new_replay_epochs)
@@ -270,11 +303,41 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     print(f'custom_save_filenames: {custom_save_filenames}')
     custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
 
+            
+
+    def _subfn_perform_pickle_pipeline(curr_active_pipeline, custom_save_filepaths):
+        """ Pickles the pipelines as needed
+        captures: enable_save_pipeline_pkl, enable_save_h5
+
+        custom_save_filepaths = _subfn_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
+        """
+        try:
+            if enable_save_pipeline_pkl:
+                custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
+                custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
+
+            if enable_save_h5:
+                custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+            
+            print(f'custom_save_filepaths: {custom_save_filepaths}\n')
+
+        except BaseException as e:
+            print(f'failed pickling in `finalize_output_shuffled_wcorr(...)` with error: {e}')
+            pass
+        
+        return custom_save_filepaths
+
+
+
     if not did_change:
         print(f'no changes!')
+        curr_active_pipeline.reload_default_computation_functions()
+    
+        ## wcorr shuffle:
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+
     else:
         print(f'replay epochs changed!')
-        global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True)
 
         curr_active_pipeline.reload_default_computation_functions()
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
@@ -287,12 +350,23 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         #             'long_short_post_decoding','long_short_inst_spike_rate_groups','long_short_endcap_analysis'], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
         ## Rank-Order Shuffle
+        ## try dropping result and recomputing:
+        global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True)
+
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis',], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
+        ## Pickle first thing after changes:
+        # custom_save_filepaths = _subfn_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
 
-    ## wcorr shuffle:
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+        ## wcorr shuffle:
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+
+
+        ## Pickle again after recomputing:
+        custom_save_filepaths = _subfn_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
+
+
 
     try:
         decoder_names = deepcopy(TrackTemplates.get_decoder_names())
@@ -301,7 +375,9 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         custom_save_filepaths['standalone_wcorr_pkl'] = standalone_pkl_filepath
         custom_save_filepaths['standalone_mat_pkl'] = standalone_mat_filepath
         print(f'completed overwrite_replay_epochs_and_recompute(...). custom_save_filepaths: {custom_save_filepaths}\n')
-
+        custom_save_filenames['standalone_wcorr_pkl'] = standalone_pkl_filepath.name
+        custom_save_filenames['standalone_mat_pkl'] = standalone_mat_filepath.name
+        
     except BaseException as e:
         print(f'failed doing `finalize_output_shuffled_wcorr(...)` with error: {e}')
         pass
@@ -326,21 +402,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     # custom_save_filepaths['pipeline_pkl'] = Path('W:/Data/KDIBA/gor01/two/2006-6-07_16-40-19/loadedSessPickle_withNewKamranExportedReplays.pkl').resolve()
     # custom_save_filepaths['global_computation_pkl'] = Path(r'W:\Data\KDIBA\gor01\two\2006-6-07_16-40-19\output\global_computation_results_withNewKamranExportedReplays.pkl').resolve()
-
-    try:
-        if enable_save_pipeline_pkl:
-            custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
-            custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
-
-        if enable_save_h5:
-            custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
-        
-        print(f'custom_save_filepaths: {custom_save_filepaths}\n')
-
-    except BaseException as e:
-        print(f'failed pickling in `finalize_output_shuffled_wcorr(...)` with error: {e}')
-        pass
-
 
     return did_change, custom_save_filenames, custom_save_filepaths
 
