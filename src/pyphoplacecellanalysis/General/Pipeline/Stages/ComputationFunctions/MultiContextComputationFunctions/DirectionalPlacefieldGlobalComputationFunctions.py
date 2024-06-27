@@ -3932,7 +3932,7 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str,
     return score_metric_merged_df
 
 @function_attributes(short_name=None, tags=['spikes_df', 'global', 'global_spikes_df'], input_requires=[], output_provides=[], uses=[], used_by=['_decode_continuous_using_directional_decoders', 'compute_train_test_split_laps_decoders'], creation_date='2024-03-29 22:28', related_items=['decode_specific_epochs'])
-def get_proper_global_spikes_df(owning_pipeline_reference) -> pd.DataFrame:
+def get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz: Optional[float]=None) -> pd.DataFrame:
     """ Gets the global_spikes_df filtered to the correct cells, etc.
 
     In the form needed by `decode_specific_epochs(global_spikes_df, ...)`
@@ -3945,9 +3945,11 @@ def get_proper_global_spikes_df(owning_pipeline_reference) -> pd.DataFrame:
     """
     # Get proper global_spikes_df:
     long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-    rank_order_results = owning_pipeline_reference.global_computation_results.computed_data['RankOrder'] # "RankOrderComputationsContainer"
-    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-    included_qclu_values: List[int] = rank_order_results.included_qclu_values
+    if minimum_inclusion_fr_Hz is None:
+        rank_order_results = owning_pipeline_reference.global_computation_results.computed_data['RankOrder'] # "RankOrderComputationsContainer"
+        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        included_qclu_values: List[int] = rank_order_results.included_qclu_values
+
     directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
     track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
     any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
