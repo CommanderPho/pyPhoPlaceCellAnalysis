@@ -238,8 +238,9 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     #                                                                                                                                                                             included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
 
     fail_on_exception = False
+    enable_save_pipeline_pkl: bool = False
     enable_save_h5: bool = False
-    num_wcorr_shuffles: int = 50
+    num_wcorr_shuffles: int = 25
 
     # 'epochs_source'
     epochs_source = new_replay_epochs.metadata.get('epochs_source', None)
@@ -327,12 +328,14 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     # custom_save_filepaths['global_computation_pkl'] = Path(r'W:\Data\KDIBA\gor01\two\2006-6-07_16-40-19\output\global_computation_results_withNewKamranExportedReplays.pkl').resolve()
 
     try:
-        custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
-        custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
+        if enable_save_pipeline_pkl:
+            custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
+            custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
 
         if enable_save_h5:
             custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
-        print(f'saving out to pickle files in overwrite_replay_epochs_and_recompute(...) failed somewhere. custom_save_filepaths: {custom_save_filepaths}\n')
+        
+        print(f'custom_save_filepaths: {custom_save_filepaths}\n')
 
     except BaseException as e:
         print(f'failed pickling in `finalize_output_shuffled_wcorr(...)` with error: {e}')
