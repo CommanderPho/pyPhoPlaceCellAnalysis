@@ -239,7 +239,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     fail_on_exception = False
     enable_save_h5: bool = False
-    num_wcorr_shuffles: int = 200
+    num_wcorr_shuffles: int = 50
 
     # 'epochs_source'
     epochs_source = new_replay_epochs.metadata.get('epochs_source', None)
@@ -251,8 +251,10 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     if epochs_source == 'compute_diba_quiescent_style_replay_events':
         custom_suffix: str = '_withNewComputedReplays'
+        qclu = new_replay_epochs.metadata.get('qclu', "[1,2]")
     elif epochs_source == 'diba_evt_file':
         custom_suffix: str = '_withNewKamranExportedReplays'
+        qclu = new_replay_epochs.metadata.get('qclu', "[1,2]") # Diba export files are always qclus [1, 2]
     else:
         raise NotImplementedError(f'epochs_source: {epochs_source} is of unknown type or is missing metadata.')    
 
