@@ -61,14 +61,20 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 ShuffleIdx = NewType('ShuffleIdx', int)
 
-def finalize_output_shuffled_wcorr(curr_active_pipeline):
+def finalize_output_shuffled_wcorr(curr_active_pipeline, decoder_names, custom_suffix: str):
     """
     Gets the shuffled wcorr results and outputs the final histogram for this session
 
-    wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline)
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import finalize_output_shuffled_wcorr
 
-
+        decoder_names = deepcopy(track_templates.get_decoder_names())
+        wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath) = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline,
+                                                                                                                                        decoder_names=decoder_names, custom_suffix=custom_suffix)
     """
+    from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+
+    
     wcorr_shuffle_results: SequenceBasedComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('SequenceBased', None)
     if wcorr_shuffle_results is not None:    
         wcorr_ripple_shuffle: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
@@ -93,8 +99,8 @@ def finalize_output_shuffled_wcorr(curr_active_pipeline):
     # filtered_epochs_df
 
     # 7m - 200 shuffles
-    (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_ripple_shuffle.post_compute(decoder_names=deepcopy(track_templates.get_decoder_names()))
-    wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = wcorr_ripple_shuffle.build_all_shuffles_dataframes(decoder_names=deepcopy(track_templates.get_decoder_names()))
+    (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_ripple_shuffle.post_compute(decoder_names=deepcopy(decoder_names))
+    wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = wcorr_ripple_shuffle.build_all_shuffles_dataframes(decoder_names=deepcopy(decoder_names))
     ## Prepare for plotting in histogram:
     wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['start', 'stop'], how='any', inplace=False)
     wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL'], how='all', inplace=False)
@@ -110,7 +116,26 @@ def finalize_output_shuffled_wcorr(curr_active_pipeline):
 
     ## OUTPUTS: wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df
 
-    return wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df
+
+    ## INPUTS: wcorr_ripple_shuffle
+    # standalone save
+    standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_ripple_shuffle.n_completed_shuffles}.pkl' 
+    standalone_pkl_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
+    print(f'saving to "{standalone_pkl_filepath}"...')
+    wcorr_ripple_shuffle.save_data(standalone_pkl_filepath)
+    ## INPUTS: wcorr_ripple_shuffle
+    standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
+    standalone_mat_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"
+    wcorr_ripple_shuffle.save_data_mat(filepath=standalone_mat_filepath, **{'session': curr_active_pipeline.get_session_context().to_dict()})
+
+    # wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
+    # active_context = curr_active_pipeline.get_session_context()
+    # session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+    # session_name: str = curr_active_pipeline.session_name
+    # export_files_dict = wcorr_ripple_shuffle.export_csvs(parent_output_path=collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
+    # export_files_dict
+
+    return wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath)
 
 
 
