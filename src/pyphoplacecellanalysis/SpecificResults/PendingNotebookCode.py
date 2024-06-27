@@ -188,7 +188,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import overwrite_replay_epochs_and_recompute
 
-        did_change, _backup_session_replay_epochs, _backup_session_configs = replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=evt_epochs)
+        did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=evt_epochs)
 
     """
     from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
@@ -207,7 +207,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     fail_on_exception = False
     enable_save_h5: bool = False
-    
+
     # 'epochs_source'
     epochs_source = new_replay_epochs.metadata.get('epochs_source', None)
     assert epochs_source is not None
@@ -222,8 +222,8 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     ## OUTPUTS: new_replay_epochs, new_replay_epochs_df
     did_change, _backup_session_replay_epochs, _backup_session_configs = replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=new_replay_epochs)
-    if did_change:
-        global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True)
+    # if did_change:
+    global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True)
 
     curr_active_pipeline.reload_default_computation_functions()
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
@@ -280,7 +280,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
         custom_save_filepaths['pipeline_h5']
 
-    return custom_save_filenames, custom_save_filepaths
+    return did_change, custom_save_filenames, custom_save_filepaths
 
 
 
