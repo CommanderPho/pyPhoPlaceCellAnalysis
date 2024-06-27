@@ -84,6 +84,7 @@ def finalize_output_shuffled_wcorr(curr_active_pipeline, decoder_names, custom_s
         print(f'wcorr_ripple_shuffle.n_completed_shuffles: {wcorr_ripple_shuffle.n_completed_shuffles}')
     else:
         print(f'SequenceBased is not computed.')
+        wcorr_ripple_shuffle = None
 
     # wcorr_ripple_shuffle: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=True)
 
@@ -285,6 +286,10 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis',], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
+
+    ## wcorr shuffle:
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+
     try:
         decoder_names = deepcopy(TrackTemplates.get_decoder_names())
         wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath) = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline,
@@ -297,9 +302,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         print(f'failed doing `finalize_output_shuffled_wcorr(...)` with error: {e}')
         pass
 
-
-    ## wcorr shuffle:
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
     # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
