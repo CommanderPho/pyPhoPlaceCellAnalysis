@@ -14,6 +14,7 @@ from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphocorehelpers.mixins.gettable_mixin import GetAccessibleMixin
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr, SimpleFieldSizesReprMixin
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
@@ -98,8 +99,10 @@ global_computation_results: pyphocorehelpers.DataStructure.dynamic_parameters.Dy
 """
 
 
+
+
 @custom_define(slots=False)
-class ComputationResult(SimpleFieldSizesReprMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+class ComputationResult(SimpleFieldSizesReprMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin, GetAccessibleMixin):
     """
         The result of a single computation, on a filtered session with a specified config 
         The primary output data is stored in self.computed_data's dict
@@ -137,9 +140,6 @@ class ComputationResult(SimpleFieldSizesReprMixin, HDF_SerializationMixin, Attrs
         """ TEMPORARY WORK AROUND: workaround after conversion from DynamicParameters-based class. """
         print(f'DEPRICATION WARNING: workaround to allow subscripting ComputationResult objects. Will be depricated. key: {key}')
         return getattr(self, key)
-
-
-
 
 
 class VersionedResultMixin:
@@ -256,9 +256,8 @@ class VersionedResultMixin:
         # super(VersionedResultMixin, self).__init__()
         
 
-
 @define(slots=False, repr=False)
-class ComputedResult(SimpleFieldSizesReprMixin, VersionedResultMixin, HDFMixin, AttrsBasedClassHelperMixin):
+class ComputedResult(SimpleFieldSizesReprMixin, VersionedResultMixin, HDFMixin, AttrsBasedClassHelperMixin, GetAccessibleMixin):
     """ 2023-05-10 - an object to replace DynamicContainers and static dicts for holding specific computed results
     
     Usage:

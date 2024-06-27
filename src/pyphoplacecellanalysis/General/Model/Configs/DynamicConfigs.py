@@ -11,12 +11,13 @@ from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
 from neuropy.core.epoch import NamedTimerange
 from neuropy.utils.dynamic_container import DynamicContainer
 
+from pyphocorehelpers.mixins.gettable_mixin import GetAccessibleMixin
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 # Old class Names: VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
 
 @define(slots=False)
-class BaseConfig:
+class BaseConfig(GetAccessibleMixin):
     """ 2023-10-24 - Base class to enable successful unpickling from old pre-attrs-based classes (based on `DynamicParameters`) to attrs-based classes.`
 
     """
