@@ -1968,6 +1968,8 @@ class RankOrderAnalyses:
     @classmethod
     def main_ripples_analysis(cls, curr_active_pipeline, num_shuffles:int=300, rank_alignment='first', minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2,4,9]):
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_paired_t_test
+        from neuropy.utils.indexing_helpers import intersection_of_arrays
+
 
         global_spikes_df, (odd_shuffle_helper, even_shuffle_helper), active_directional_laps_results = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=curr_active_pipeline, num_shuffles=num_shuffles, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
@@ -1991,6 +1993,20 @@ class RankOrderAnalyses:
 
         ## handle removing omitted events:
         # filtered_active_epochs
+        both_included_epoch_labels = intersection_of_arrays(LR_outputs.epochs_df.label, RL_outputs.epochs_df.label) ## find only the arrays that are present in both
+        LR_included_epochs = np.isin(LR_outputs.epochs_df.label, both_included_epoch_labels)
+        RL_included_epochs = np.isin(RL_outputs.epochs_df.label, both_included_epoch_labels)
+
+        LR_outputs.epochs_df = LR_outputs.epochs_df[LR_included_epochs] #.reset_index(drop=True)
+        RL_outputs.epochs_df = RL_outputs.epochs_df[RL_included_epochs]
+
+        LR_outputs.long_z_score = LR_outputs.long_z_score[LR_included_epochs]
+        LR_outputs.short_z_score = LR_outputs.short_z_score[LR_included_epochs]
+        LR_outputs.long_short_z_score_diff = LR_outputs.long_short_z_score_diff[LR_included_epochs]
+
+        RL_outputs.long_z_score = RL_outputs.long_z_score[RL_included_epochs]
+        RL_outputs.short_z_score = RL_outputs.short_z_score[RL_included_epochs]
+        RL_outputs.long_short_z_score_diff = RL_outputs.long_short_z_score_diff[RL_included_epochs]
 
         ripple_evts_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((LR_outputs.long_z_score, LR_outputs.short_z_score), (RL_outputs.long_z_score, RL_outputs.short_z_score))]
         print(f'ripple_evts_paired_tests: {ripple_evts_paired_tests}')
