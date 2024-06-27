@@ -117,6 +117,7 @@ def finalize_output_shuffled_wcorr(curr_active_pipeline):
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
 # ---------------------------------------------------------------------------- #
+@function_attributes(short_name=None, tags=['replay', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=['overwrite_replay_epochs_and_recompute'], creation_date='2024-06-26 21:10', related_items=[])
 def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
     """ 
     Replaces each session's replay epochs and their `preprocessing_parameters.epoch_estimation_parameters.replays` config
@@ -213,6 +214,9 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     assert epochs_source is not None
     print(f'epochs_source: {epochs_source}')
 
+    valid_epochs_source_values = ['compute_diba_quiescent_style_replay_events', 'diba_evt_file']
+    assert epochs_source in valid_epochs_source_values, f"epochs_source: '{epochs_source}' is not in valid_epochs_source_values: {valid_epochs_source_values}"
+
     if epochs_source == 'compute_diba_quiescent_style_replay_events':
         custom_suffix: str = '_withNewComputedReplays'
     elif epochs_source == 'diba_evt_file':
@@ -270,17 +274,36 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     # custom_save_filepaths['global_computation_pkl'] = Path(r'W:\Data\KDIBA\gor01\two\2006-6-07_16-40-19\output\global_computation_results_withNewKamranExportedReplays.pkl').resolve()
 
     custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
-    custom_save_filepaths['pipeline_pkl']
 
     custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
-    custom_save_filepaths['global_computation_pkl']
-
 
     if enable_save_h5:
         custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
-        custom_save_filepaths['pipeline_h5']
 
     return did_change, custom_save_filenames, custom_save_filepaths
+
+
+@function_attributes(short_name=None, tags=['import', 'diba_evt_file'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-26 21:06', related_items=[])
+def try_load_neuroscope_EVT_file_epochs(curr_active_pipeline, ext:str='bst') -> Epoch:
+    """ loads the replay epochs from an exported .evt file
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import try_load_neuroscope_EVT_file_epochs
+
+        evt_epochs = try_load_neuroscope_EVT_file_epochs(curr_active_pipeline)
+
+        ## load a previously exported to .ebt computed replays:
+        evt_epochs = try_load_neuroscope_EVT_file_epochs(curr_active_pipeline, ext='PHONEW')
+        evt_epochs.metadata['epochs_source'] = 'compute_diba_quiescent_style_replay_events'
+
+    """
+    ## FROM .evt file
+    evt_filepath = curr_active_pipeline.sess.basepath.joinpath(f'{curr_active_pipeline.session_name}.{ext}.evt').resolve()
+    assert evt_filepath.exists(), f"evt_filepath: '{evt_filepath}' does not exist!"
+    evt_epochs: Epoch = Epoch.from_neuroscope(in_filepath=evt_filepath, metadata={'epochs_source': 'diba_evt_file'}).get_non_overlapping()
+    evt_epochs.filename = str(evt_filepath) ## set the filepath
+    return evt_epochs
 
 
 
@@ -431,9 +454,10 @@ def find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_
     results_df["duration"] = results_df["window_end"] - results_df["window_start"] 
     return results_df, quiescent_periods
 
-@function_attributes(short_name=None, tags=['replay'], input_requires=[], output_provides=[], uses=['find_active_epochs_preceeded_by_quiescent_windows'], used_by=[], creation_date='2024-06-25 12:54', related_items=[])
+@function_attributes(short_name=None, tags=['replay', 'compute', 'compute_diba_quiescent_style_replay_events'], input_requires=[], output_provides=[], uses=['find_active_epochs_preceeded_by_quiescent_windows'], used_by=[], creation_date='2024-06-25 12:54', related_items=[])
 # def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, rank_order_results, spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3):
-def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, spikes_df, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0, silence_duration:float=0.06, firing_window_duration:float=0.3):
+def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, spikes_df, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0, silence_duration:float=0.06, firing_window_duration:float=0.3,
+            enable_export_to_neuroscope_EVT_file:bool=True):
     """ 
 
     if 'included_qclu_values' and 'minimum_inclusion_fr_Hz' don't change, the templates and directional lap results aren't required it seems. 
@@ -465,7 +489,6 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional
     # active_spikes_df
 
     ## OUTPUTS: active_spikes_df
-
     new_replay_epochs_df, quiescent_periods = find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_duration=silence_duration, firing_window_duration=firing_window_duration, min_unique_neurons=min_num_active_neurons)
     new_replay_epochs_df = new_replay_epochs_df.rename(columns={'window_start': 'start', 'window_end': 'stop',})
 
@@ -474,6 +497,16 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional
                                                                                      'silence_duration': silence_duration, 'firing_window_duration': firing_window_duration,
                                                                                      'qclu_included_aclus': qclu_included_aclus, 'min_num_active_neurons': min_num_active_neurons})
     
+    if enable_export_to_neuroscope_EVT_file:
+        ## Save computed epochs out to a neuroscope .evt file:
+        filename = f"{curr_active_pipeline.session_name}"
+        filepath = curr_active_pipeline.get_output_path().joinpath(filename).resolve()
+        ## set the filename of the Epoch:
+        new_replay_epochs.filename = filepath
+        filepath = new_replay_epochs.to_neuroscope(ext='PHONEW')
+        assert filepath.exists()
+        print(F'saved out newly computed epochs to "{filepath}".')
+
     return (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs)
 
 
