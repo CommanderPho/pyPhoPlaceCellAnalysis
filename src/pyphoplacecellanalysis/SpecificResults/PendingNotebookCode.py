@@ -237,6 +237,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     fail_on_exception = False
     enable_save_h5: bool = False
+    num_wcorr_shuffles: int = 1000
 
     # 'epochs_source'
     epochs_source = new_replay_epochs.metadata.get('epochs_source', None)
@@ -298,7 +299,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
 
     ## wcorr shuffle:
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 100}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
     # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
