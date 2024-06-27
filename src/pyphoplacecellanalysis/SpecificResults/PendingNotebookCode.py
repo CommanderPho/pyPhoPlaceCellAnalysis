@@ -85,7 +85,8 @@ def finalize_output_shuffled_wcorr(curr_active_pipeline, decoder_names, custom_s
     else:
         print(f'SequenceBased is not computed.')
         wcorr_ripple_shuffle = None
-
+        raise ValueError(f'SequenceBased is not computed.')
+    
     # wcorr_ripple_shuffle: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=True)
 
     n_epochs: int = wcorr_ripple_shuffle.n_epochs
