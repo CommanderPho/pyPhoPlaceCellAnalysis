@@ -924,7 +924,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         Usage:
         
         from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
-        spike_raster_window = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline)
+        spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline)
 
         
         """
@@ -949,12 +949,25 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             else:
                 # assert len(found_spike_raster_windows) == 1, f"found {len(found_spike_raster_windows)} Spike3DRasterWindowWidget windows using TopLevelWindowHelper.all_widgets(...) but require exactly one."
                 # Get the most recent existing one and reuse that:
-                spike_raster_window = found_spike_raster_windows[0]
+                spike_raster_window = None
+                # spike_raster_window = found_spike_raster_windows[0]
+                for a_canidate_window in found_spike_raster_windows:
+                    if spike_raster_window is None:
+                        if a_canidate_window.isVisible():
+                            spike_raster_window = a_canidate_window
+    
+                if spike_raster_window is None:
+                    raise ValueError(f'WARNING: found no open windows for spike_raster_window out of {len(found_spike_raster_windows)} candidate options!!!')
+
                 # Extras:
                 active_2d_plot = spike_raster_window.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
                 active_3d_plot = spike_raster_window.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
 
-        return spike_raster_window
+        main_graphics_layout_widget = active_2d_plot.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+        background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+
+        return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget)
     
     
 
