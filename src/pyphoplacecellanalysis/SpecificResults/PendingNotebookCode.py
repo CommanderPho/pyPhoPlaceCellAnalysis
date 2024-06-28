@@ -314,7 +314,7 @@ def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_str
 
     elif epochs_source == 'diba_evt_file':
         custom_suffix: str = '_withNewKamranExportedReplays'
-        custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+        custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata.get('included_qclu_values', '[1,2]')}", f"frateThresh_{metadata.get('minimum_inclusion_fr_Hz', 5.0):.1f}", *extras_strings])
         # qclu = new_replay_epochs.metadata.get('qclu', "[1,2]") # Diba export files are always qclus [1, 2]
     else:
         raise NotImplementedError(f'epochs_source: {epochs_source} is of unknown type or is missing metadata.')    
@@ -327,10 +327,9 @@ def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_str
     return custom_suffix
 
 
-
 @function_attributes(short_name=None, tags=['replay', 'new_replay', 'top'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
 def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025):
-    """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2009.
+    """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2007.
 
     , included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0
 
@@ -487,7 +486,8 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     return did_change, custom_save_filenames, custom_save_filepaths
 
 
-@function_attributes(short_name=None, tags=['import', 'diba_evt_file'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-26 21:06', related_items=[])
+# Replay Loading/Estimation Methods __________________________________________________________________________________ #
+@function_attributes(short_name=None, tags=['replay', 'epochs', 'import', 'diba_evt_file'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-26 21:06', related_items=[])
 def try_load_neuroscope_EVT_file_epochs(curr_active_pipeline, ext:str='bst') -> Epoch:
     """ loads the replay epochs from an exported .evt file
 
