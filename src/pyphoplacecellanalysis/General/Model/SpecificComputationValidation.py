@@ -64,115 +64,6 @@ class SpecificComputationResultsSpecification:
         return removed_keys_dict     
             
 
-class DependencyGraph:
-    """
-    # Example usage
-    from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph
-
-    validators = deepcopy(_comp_specifiers_dict) # { ... }  # Your validators here
-    print(validators)
-    graph = DependencyGraph(validators)
-    """
-    def __init__(self, validators):
-        self.graph = nx.DiGraph()
-        self.validators = validators
-        self.build_graph(validators)
-    
-    def build_graph(self, validators):
-        for key, validator in validators.items():
-            self.graph.add_node(key, provides_global_keys=validator.results_specification.provides_global_keys, requires_global_keys=validator.results_specification.requires_global_keys, validator=validator)
-            for required_key in validator.results_specification.requires_global_keys:
-                for provider_key, provider_validator in validators.items():
-                    if required_key in provider_validator.results_specification.provides_global_keys:
-                        self.graph.add_edge(provider_key, key)
-
-    # def __init__(self, validators):
-    #     self.graph = nx.DiGraph()
-    #     self.build_graph(validators)
-    
-    # def build_graph(self, validators):
-    #     for key, validator in validators.items():
-    #         self.graph.add_node(key)
-    #         for required_key in validator.results_specification.requires_global_keys:
-    #             for provider_key, provider_validator in validators.items():
-    #                 if required_key in provider_validator.results_specification.provides_global_keys:
-    #                     self.graph.add_edge(provider_key, key)
-    
-    # def get_downstream_dependents(self, modified_key):
-    #     dependents = set()
-    #     for node in self.graph.nodes:
-    #         if modified_key in validators[node].results_specification.provides_global_keys:
-    #             dependents.update(nx.descendants(self.graph, node))
-    #     return dependents
-    
-    def get_downstream_dependents(self, modified_key: str, debug_print=False):
-        dependents = set()
-        for node in self.graph.nodes:
-            if debug_print:
-                print(f'node: {node}:')
-                print(f"\tself.graph.nodes[node]['provides_global_keys']: {self.graph.nodes[node]['provides_global_keys']}")
-            if modified_key in self.graph.nodes[node]['provides_global_keys']:
-                if debug_print:
-                    print(f'modified_key: {modified_key}')
-                dependents.update(nx.descendants(self.graph, node))
-        return dependents
-
-    def get_upstream_requirements(self, target_key: str, debug_print=False):
-        """
-        upstream_requirements = graph.get_upstream_requirements('perform_wcorr_shuffle_analysis')
-        print(upstream_requirements)
-        """
-
-        requirements = set()
-        for node in self.graph.nodes:
-            if debug_print:
-                print(f'node: {node}:')
-                print(f"\tself.graph.nodes[node]['requires_global_keys']: {self.graph.nodes[node]['requires_global_keys']}")
-            if target_key in self.graph.nodes[node]['requires_global_keys']:
-                if debug_print:
-                    print(f'target_key: {target_key}')
-                requirements.update(nx.descendants(self.graph, node))
-        return requirements
-
-    
-    def visualize(self):
-        import matplotlib.pyplot as plt
-        # Filter out nodes with no parents or children
-        nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
-        subgraph = self.graph.subgraph(nodes_to_draw)
-        
-        pos = nx.spring_layout(subgraph)
-        nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray")
-        plt.show()
-
-    # def visualize(self):
-    #     # Filter out nodes with no parents or children
-    #     nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
-    #     subgraph = self.graph.subgraph(nodes_to_draw)
-        
-    #     # Use pygraphviz for better visualization
-    #     pos = nx.nx_agraph.graphviz_layout(subgraph, prog='dot')
-    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray", arrows=True)
-    #     plt.show()
-
-    # def visualize(self):
-    #     # Filter out nodes with no parents or children
-    #     nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
-    #     subgraph = self.graph.subgraph(nodes_to_draw)
-        
-    #     # Use a spring layout for better spacing
-    #     pos = nx.spring_layout(subgraph, k=0.5, iterations=50)
-        
-    #     plt.figure(figsize=(12, 12))
-    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray", arrows=True)
-        
-    #     # Draw edge labels if needed
-    #     edge_labels = {(u, v): f'{u} -> {v}' for u, v in subgraph.edges}
-    #     nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels, font_color='red')
-        
-    #     plt.show()
-
-
 
 @define(slots=False, repr=True)
 class SpecificComputationValidator:
@@ -211,6 +102,21 @@ class SpecificComputationValidator:
     @property
     def has_results_spec(self) -> bool:
        return (self.results_specification is not None) 
+
+
+    @property
+    def provides_global_keys(self) -> List[str]:
+        if not self.has_results_spec:
+            return []
+        return (self.results_specification.provides_global_keys) 
+
+
+    @property
+    def requires_global_keys(self) -> List[str]:
+        if not self.has_results_spec:
+            return []
+        return (self.results_specification.requires_global_keys) 
+
 
     @classmethod
     def init_from_decorated_fn(cls, a_fn):
@@ -488,6 +394,7 @@ class SpecificComputationValidator:
                     if debug_print:
                         print(f'found matching validator: {a_validator}')
                     
+        # Get each validator's provided keys:
         for a_name, a_found_validator in found_matching_validators.items():
             new_provided_global_keys = a_found_validator.results_specification.provides_global_keys
             provided_global_keys.extend(new_provided_global_keys)
@@ -525,6 +432,25 @@ class SpecificComputationValidator:
             print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, dependent_validators: {dependent_validators}')
         return remaining_comp_specifiers_dict, dependent_validators, provided_global_keys
 
+    @classmethod
+    def find_provided_result_keys(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_fn_names: List[str]) -> List[str]:
+        """ returns a list of computed properties that the specified functions provide. 
+        
+        provided_global_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
+                                                                                            probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
+                                                                                            )
+        provided_global_keys
+
+        """
+        found_matching_validators = {}
+        provided_global_keys = []
+        for a_name, a_validator in remaining_comp_specifiers_dict.items():
+            for a_probe_fn_name in probe_fn_names:
+                if a_validator.does_name_match(a_probe_fn_name):
+                    provided_global_keys.extend(a_validator.results_specification.provides_global_keys) # Get each validator's provided keys:
+                    
+        return provided_global_keys
+        
 
 # I have a class `SpecificComputationValidator` that is used to keep track of computations in a custom pipeline and manage computation order. The key fields are `computation_precidence`, `provides_global_keys`, and `requires_global_keys`. `provides_global_keys` specifies which keys are provided after the computation completes, and `requires_global_keys` specifies which keys are required before computation of the function is possible. This means that a function with a `a_key` in `requires_global_keys` is dependent on all functions with `a_key` in their `provides_global_keys`. I'd like you to propose a datastructure that can be used efficiently track dependencies, for example if the key `a_changed_key` is modified, determine all downstream dependent functions that will need to be recomputed. Here are some example validators:
 
@@ -567,3 +493,115 @@ class SpecificComputationValidator:
 # ```
 
 # 'perform_wcorr_shuffle_analysis': requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations']
+
+
+class DependencyGraph:
+    """
+    # Example usage
+
+    from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph, SpecificComputationValidator, SpecificComputationResultsSpecification
+
+    _comp_specifiers_dict: Dict[str, SpecificComputationValidator] = curr_active_pipeline.get_merged_computation_function_validators()
+    validators = deepcopy(_comp_specifiers_dict) # { ... }  # Your validators here
+    print(validators)
+    graph = DependencyGraph(validators)
+    """
+    def __init__(self, validators: Dict[str, SpecificComputationValidator]):
+        self.graph = nx.DiGraph()
+        self.validators = validators
+        self.build_graph(validators)
+    
+    def build_graph(self, validators):
+        for key, validator in validators.items():
+            self.graph.add_node(key, provides_global_keys=validator.results_specification.provides_global_keys, requires_global_keys=validator.results_specification.requires_global_keys, validator=validator)
+            for required_key in validator.results_specification.requires_global_keys:
+                for provider_key, provider_validator in validators.items():
+                    if required_key in provider_validator.results_specification.provides_global_keys:
+                        self.graph.add_edge(provider_key, key)
+
+    # def __init__(self, validators):
+    #     self.graph = nx.DiGraph()
+    #     self.build_graph(validators)
+    
+    # def build_graph(self, validators):
+    #     for key, validator in validators.items():
+    #         self.graph.add_node(key)
+    #         for required_key in validator.results_specification.requires_global_keys:
+    #             for provider_key, provider_validator in validators.items():
+    #                 if required_key in provider_validator.results_specification.provides_global_keys:
+    #                     self.graph.add_edge(provider_key, key)
+    
+    # def get_downstream_dependents(self, modified_key):
+    #     dependents = set()
+    #     for node in self.graph.nodes:
+    #         if modified_key in validators[node].results_specification.provides_global_keys:
+    #             dependents.update(nx.descendants(self.graph, node))
+    #     return dependents
+    
+    def get_downstream_dependents(self, modified_key: str, debug_print=False):
+        dependents = set()
+        for node in self.graph.nodes:
+            if debug_print:
+                print(f'node: {node}:')
+                print(f"\tself.graph.nodes[node]['provides_global_keys']: {self.graph.nodes[node]['provides_global_keys']}")
+            if modified_key in self.graph.nodes[node]['provides_global_keys']:
+                if debug_print:
+                    print(f'modified_key: {modified_key}')
+                dependents.update(nx.descendants(self.graph, node))
+        return dependents
+
+    def get_upstream_requirements(self, target_key: str, debug_print=False):
+        """
+        upstream_requirements = graph.get_upstream_requirements('perform_wcorr_shuffle_analysis')
+        print(upstream_requirements)
+        """
+
+        requirements = set()
+        for node in self.graph.nodes:
+            if debug_print:
+                print(f'node: {node}:')
+                print(f"\tself.graph.nodes[node]['requires_global_keys']: {self.graph.nodes[node]['requires_global_keys']}")
+            if target_key in self.graph.nodes[node]['requires_global_keys']:
+                if debug_print:
+                    print(f'target_key: {target_key}')
+                requirements.update(nx.descendants(self.graph, node))
+        return requirements
+
+    
+    def visualize(self):
+        import matplotlib.pyplot as plt
+        # Filter out nodes with no parents or children
+        nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
+        subgraph = self.graph.subgraph(nodes_to_draw)
+        
+        pos = nx.spring_layout(subgraph)
+        nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray")
+        plt.show()
+
+    # def visualize(self):
+    #     # Filter out nodes with no parents or children
+    #     nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
+    #     subgraph = self.graph.subgraph(nodes_to_draw)
+        
+    #     # Use pygraphviz for better visualization
+    #     pos = nx.nx_agraph.graphviz_layout(subgraph, prog='dot')
+    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray", arrows=True)
+    #     plt.show()
+
+    # def visualize(self):
+    #     # Filter out nodes with no parents or children
+    #     nodes_to_draw = [node for node in self.graph.nodes if list(self.graph.predecessors(node)) or list(self.graph.successors(node))]
+    #     subgraph = self.graph.subgraph(nodes_to_draw)
+        
+    #     # Use a spring layout for better spacing
+    #     pos = nx.spring_layout(subgraph, k=0.5, iterations=50)
+        
+    #     plt.figure(figsize=(12, 12))
+    #     nx.draw(subgraph, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", edge_color="gray", arrows=True)
+        
+    #     # Draw edge labels if needed
+    #     edge_labels = {(u, v): f'{u} -> {v}' for u, v in subgraph.edges}
+    #     nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels, font_color='red')
+        
+    #     plt.show()
+
