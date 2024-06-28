@@ -591,10 +591,10 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     else:
                         # Otherwise it already exists and is not None, so don't overwrite it:
                         if progress_logger_callback is not None:
-                            progress_logger_callback(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and active_computation_results[{a_select_config_name}] already exists and is non-None')
+                            progress_logger_callback(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and `active_computation_results[{a_select_config_name}]` already exists and is non-None')
                             progress_logger_callback('\t TODO: this will prevent recomputation even when the excludelist/includelist or computation function definitions change. Rework so that this is smarter.')
                         
-                        print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and active_computation_results[{a_select_config_name}] already exists and is non-None')
+                        print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and `active_computation_results[{a_select_config_name}]` already exists and is non-None')
                         print('\t TODO: this will prevent recomputation even when the excludelist/includelist or computation function definitions change. Rework so that this is smarter.')
                         # active_computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, curr_active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
                         skip_computations_for_this_result = True
