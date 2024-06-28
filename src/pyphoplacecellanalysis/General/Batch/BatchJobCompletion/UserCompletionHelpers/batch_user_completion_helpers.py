@@ -1256,7 +1256,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
-def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, suppress_exceptions:bool=True) -> dict:
     """  Computes the shuffled wcorrs and export them to
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
     
@@ -1276,6 +1276,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     from neuropy.utils.mixins.indexing_helpers import get_dict_subset
     from neuropy.core.epoch import Epoch, ensure_Epoch, ensure_dataframe
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events, overwrite_replay_epochs_and_recompute, try_load_neuroscope_EVT_file_epochs, replace_replay_epochs
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
@@ -1303,32 +1304,61 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     assert replay_estimation_parameters is not None
     _bak_replay_estimation_parameters = deepcopy(replay_estimation_parameters) ## backup original
 
-    replay_epoch_variations.update({
-        'initial_loaded': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay_backup), metadata={'epochs_source': 'initial_loaded'}),
-        'normal_computed': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay), metadata={'epochs_source': 'normal_computed', 'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'], 'min_num_active_neurons': replay_estimation_parameters['min_num_unique_aclu_inclusions']}),
-        # 'diba_evt_file': deepcopy(diba_evt_file_replay_epochs),
-        # 'diba_quiescent_method_replay_epochs': deepcopy(diba_quiescent_method_replay_epochs),
-    })
-
-    ## Compute new epochs: 
-    included_qclu_values = [1,2]
-    minimum_inclusion_fr_Hz = 5.0
-    spikes_df = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-    (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (diba_quiescent_method_replay_epochs_df, diba_quiescent_method_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline,
-                                                                                                                                                                                included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
-    ## OUTPUTS: diba_quiescent_method_replay_epochs
-    replay_epoch_variations.update({
-        'diba_quiescent_method_replay_epochs': deepcopy(diba_quiescent_method_replay_epochs),
-    })
-
-    ## FROM .evt file
-    ## Load exported epochs from a neuroscope .evt file:
-    diba_evt_file_replay_epochs: Epoch = try_load_neuroscope_EVT_file_epochs(curr_active_pipeline)
-    if diba_evt_file_replay_epochs is not None:
+    with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"initial_loaded" failed with error: {formatted_exception_str}. Skipping.'))):
         replay_epoch_variations.update({
-            'diba_evt_file': deepcopy(diba_evt_file_replay_epochs),
+            'initial_loaded': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay_backup), metadata={'epochs_source': 'initial_loaded'}),
         })
+        
 
+    try:
+        replay_epoch_variations.update({
+            'initial_loaded': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay_backup), metadata={'epochs_source': 'initial_loaded'}),
+        })
+        
+    except BaseException as e:
+        print(f'"initial_loaded" failed with error {e}. Skipping.')
+
+
+    try:
+        replay_epoch_variations.update({
+            'normal_computed': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay), metadata={'epochs_source': 'normal_computed', 'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'], 'min_num_active_neurons': replay_estimation_parameters['min_num_unique_aclu_inclusions']}),
+        })
+        
+    except BaseException as e:
+        print(f'"normal_computed" failed with error {e}. Skipping.')
+
+
+    try:
+        ## Compute new epochs: 
+        included_qclu_values = [1,2]
+        minimum_inclusion_fr_Hz = 5.0
+        spikes_df = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (diba_quiescent_method_replay_epochs_df, diba_quiescent_method_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline,
+                                                                                                                                                                                    included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
+        ## OUTPUTS: diba_quiescent_method_replay_epochs
+        replay_epoch_variations.update({
+            'diba_quiescent_method_replay_epochs': deepcopy(diba_quiescent_method_replay_epochs),
+        })
+        
+    except BaseException as e:
+        print(f'"diba_quiescent_method_replay_epochs" failed with error {e}. Skipping.')
+
+
+
+    try:
+        ## FROM .evt file
+        ## Load exported epochs from a neuroscope .evt file:
+        diba_evt_file_replay_epochs: Epoch = try_load_neuroscope_EVT_file_epochs(curr_active_pipeline)
+        if diba_evt_file_replay_epochs is not None:
+            replay_epoch_variations.update({
+                'diba_evt_file': deepcopy(diba_evt_file_replay_epochs),
+            })
+        
+    except BaseException as e:
+        print(f'"diba_evt_file" failed with error {e}. Skipping.')
+
+    print(f'completed replay extraction, have: {list(replay_epoch_variations.keys())}')
+    
     ## OUTPUT: replay_epoch_variations
     callback_outputs['replay_epoch_variations'] = replay_epoch_variations
 
