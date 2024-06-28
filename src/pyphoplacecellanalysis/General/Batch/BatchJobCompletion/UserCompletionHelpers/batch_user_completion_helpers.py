@@ -1258,7 +1258,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
 def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """  Computes the shuffled wcorrs and export them to
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
     
     Results can be extracted from batch output by 
     
@@ -1492,10 +1492,6 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     return across_session_results_extended_dict
 
 
-custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=new_replay_epochs)
-print(f'custom_suffix: "{custom_suffix}"')
-wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath) = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline,
-                                                                                                                                                          decoder_names=deepcopy(TrackTemplates.get_decoder_names()), custom_suffix=custom_suffix)
 
 
 
