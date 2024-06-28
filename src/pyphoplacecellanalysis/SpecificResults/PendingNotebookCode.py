@@ -140,6 +140,87 @@ def finalize_output_shuffled_wcorr(curr_active_pipeline, decoder_names, custom_s
     return wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath)
 
 
+@function_attributes(short_name=None, tags=['histogram', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-27 22:43', related_items=[])
+def plot_replay_wcorr_histogram(df: pd.DataFrame, plot_var_name: str, all_shuffles_only_best_decoder_wcorr_df: Optional[pd.DataFrame]=None, footer_annotation_text=None):
+    """ Create horizontal histogram Takes outputs of finalize_output_shuffled_wcorr to plot a histogram like the Diba 2007 paper
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_replay_wcorr_histogram
+        plot_var_name: str = 'abs_best_wcorr'
+        footer_annotation_text = f'{curr_active_pipeline.get_session_context()}<br>{params_description_str}'
+
+        fig = plot_replay_wcorr_histogram(df=wcorr_ripple_shuffle_all_df, plot_var_name=plot_var_name,
+             all_shuffles_only_best_decoder_wcorr_df=all_shuffles_only_best_decoder_wcorr_df, footer_annotation_text=footer_annotation_text)
+
+        # Save figure to disk:
+        _out_result = curr_active_pipeline.output_figure(a_fig_context, fig=fig)
+        _out_result
+
+        # Show the figure
+        fig.show()
+
+    """
+    import plotly.io as pio
+    import plotly.express as px
+    import plotly.graph_objects as go
+    from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers
+
+
+    resolution_multiplier = 1
+    fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
+    is_dark_mode, template = PlotlyHelpers.get_plotly_template(is_dark_mode=False)
+    pio.templates.default = template
+
+    # fig = px.histogram(df, x=plot_var_name) # , orientation='h'
+    df = deepcopy(df) # pd.DataFrame(data)
+    df = df.dropna(subset=[plot_var_name], how='any', inplace=False)
+
+    histogram_kwargs = dict(histnorm='percent', nbinsx=30)
+    fig = go.Figure()
+    wcorr_ripple_hist_trace = fig.add_trace(go.Histogram(x=df[plot_var_name], name='Observed Replay', **histogram_kwargs))
+
+    if all_shuffles_only_best_decoder_wcorr_df is not None:
+        shuffle_trace = fig.add_trace(go.Histogram(x=all_shuffles_only_best_decoder_wcorr_df['shuffle_wcorr'], name='Shuffle', **histogram_kwargs))
+    
+    # Overlay both histograms
+    fig = fig.update_layout(barmode='overlay')
+    # Reduce opacity to see both histograms
+    fig = fig.update_traces(opacity=0.75)
+
+    # Update layout for better visualization
+    fig = fig.update_layout(
+        title=f'Horizontal Histogram of "{plot_var_name}"',
+        xaxis_title=plot_var_name,
+        yaxis_title='Percent Count',
+        # yaxis_title='Count',
+    )
+
+    ## Add the metadata for the replays being plotted:
+    # new_replay_epochs.metadata
+    if footer_annotation_text is None:
+        footer_annotation_text = ''
+
+    # Add footer text annotation
+    fig = fig.update_layout(
+        annotations=[
+            dict(
+                x=0,
+                y=-0.25,
+                xref='paper',
+                yref='paper',
+                text=footer_annotation_text,
+                showarrow=False,
+                xanchor='left',
+                yanchor='bottom'
+            )
+        ]
+    )
+
+    fig = fig.update_layout(fig_size_kwargs)
+    return fig
+
+
 
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
@@ -429,7 +510,7 @@ def try_load_neuroscope_EVT_file_epochs(curr_active_pipeline, ext:str='bst') -> 
     return evt_epochs
 
 
-
+@function_attributes(short_name=None, tags=['helper'], input_requires=[], output_provides=[], uses=[], used_by=['compute_diba_quiescent_style_replay_events'], creation_date='2024-06-27 22:16', related_items=[])
 def check_for_and_merge_overlapping_epochs(quiescent_periods: pd.DataFrame, debug_print=False) -> pd.DataFrame:
     """
     Checks for overlaps in the quiescent periods and merges them if necessary.
@@ -476,112 +557,11 @@ def check_for_and_merge_overlapping_epochs(quiescent_periods: pd.DataFrame, debu
 
     return non_overlapping_periods_df
 
-def find_quiescent_windows(active_spikes_df: pd.DataFrame, silence_duration:float=0.06) -> pd.DataFrame:
-    """
-    # Define the duration for silence and firing window
-    silence_duration = 0.06  # 60 ms
-    firing_window_duration = 0.3  # 300 ms
-    min_unique_neurons = 14
 
-    """
-    ## INPUTS: active_spikes_df
-
-    # Ensure the DataFrame is sorted by the event times
-    spikes_df = deepcopy(active_spikes_df)[['t_rel_seconds']].sort_values(by='t_rel_seconds').reset_index(drop=True).drop_duplicates(subset=['t_rel_seconds'], keep='first')
-
-    # Drop rows with duplicate values in the 't_rel_seconds' column, keeping the first occurrence
-    spikes_df = spikes_df.drop_duplicates(subset=['t_rel_seconds'], keep='first')
-
-    # Calculate the differences between consecutive event times
-    spikes_df['time_diff'] = spikes_df['t_rel_seconds'].diff()
-
-    # Find the indices where the time difference is greater than 60ms (0.06 seconds)
-    quiescent_periods = spikes_df[spikes_df['time_diff'] > silence_duration]
-
-    # Extract the start and end times of the quiescent periods
-    # quiescent_periods['start'] = spikes_df['t_rel_seconds'].shift(1)
-    quiescent_periods['stop'] = quiescent_periods['t_rel_seconds']
-    quiescent_periods['start'] = quiescent_periods['stop'] - quiescent_periods['time_diff']
-
-    # Drop the NaN values that result from the shift operation
-    quiescent_periods = quiescent_periods.dropna(subset=['start'])
-
-    # Select the relevant columns
-    quiescent_periods = quiescent_periods[['start', 'stop', 'time_diff']]
-    # quiescent_periods["label"] = quiescent_periods.index.astype('str', copy=True)
-    # quiescent_periods["duration"] = quiescent_periods["stop"] - quiescent_periods["start"] 
-    quiescent_periods = check_for_and_merge_overlapping_epochs(quiescent_periods=quiescent_periods)
-    # print(quiescent_periods)
-    return quiescent_periods
-
-def find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3, min_unique_neurons:int=14):
-    """
-    # Define the duration for silence and firing window
-    silence_duration = 0.06  # 60 ms
-    firing_window_duration = 0.3  # 300 ms
-    min_unique_neurons = 14
-
-    """
-    ## INPUTS: active_spikes_df
-
-    # Ensure the DataFrame is sorted by the event times
-    spikes_df = deepcopy(active_spikes_df).sort_values(by='t_rel_seconds').reset_index(drop=True)
-    # Calculate the differences between consecutive event times
-    spikes_df['time_diff'] = spikes_df['t_rel_seconds'].diff()
-
-    ## INPUTS: quiescent_periods
-    quiescent_periods = find_quiescent_windows(active_spikes_df=active_spikes_df, silence_duration=silence_duration)
-
-    # List to hold the results
-    results = []
-
-    # Variable to keep track of the end time of the last valid epoch
-    # last_epoch_end = -float('inf')
-
-    # Iterate over each quiescent period
-    for idx, row in quiescent_periods.iterrows():
-        silence_end = row['stop']
-        window_start = silence_end
-        window_end = silence_end + firing_window_duration
-        
-        # Check if there's another quiescent period within the current window
-        if (idx + 1) < len(quiescent_periods):
-            next_row = quiescent_periods.iloc[idx + 1]
-            next_quiescent_start = next_row['start']
-            if next_quiescent_start < window_end:
-                window_end = next_quiescent_start
-                # break
-    
-        # Filter events that occur in the 300-ms window after the quiescent period
-        window_events = spikes_df[(spikes_df['t_rel_seconds'] >= window_start) & (spikes_df['t_rel_seconds'] <= window_end)]
-        
-        # Count unique neurons firing in this window
-        unique_neurons = window_events['aclu'].nunique()
-        
-        # Check if at least 14 unique neurons fired in this window
-        if unique_neurons >= min_unique_neurons:
-            results.append({
-                'quiescent_start': row['start'],
-                'quiescent_end': silence_end,
-                'window_start': window_start,
-                'window_end': window_end,
-                'unique_neurons': unique_neurons
-            })
-            # Variable to keep track of the end time of the last valid epoch
-            # last_epoch_end = window_end
-
-
-    # Convert results to a DataFrame
-    results_df = pd.DataFrame(results)
-    results_df["label"] = results_df.index.astype('str', copy=True)
-    results_df["duration"] = results_df["window_end"] - results_df["window_start"] 
-    return results_df, quiescent_periods
-
-@function_attributes(short_name=None, tags=['replay', 'compute', 'compute_diba_quiescent_style_replay_events'], input_requires=[], output_provides=[], uses=['find_active_epochs_preceeded_by_quiescent_windows'], used_by=[], creation_date='2024-06-25 12:54', related_items=[])
-# def compute_diba_quiescent_style_replay_events(curr_active_pipeline, directional_laps_results, rank_order_results, spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3):
+@function_attributes(short_name=None, tags=['replay', 'compute', 'compute_diba_quiescent_style_replay_events'], input_requires=[], output_provides=[], uses=['check_for_and_merge_overlapping_epochs'], used_by=[], creation_date='2024-06-25 12:54', related_items=[])
 def compute_diba_quiescent_style_replay_events(curr_active_pipeline, spikes_df, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0, silence_duration:float=0.06, firing_window_duration:float=0.3,
             enable_export_to_neuroscope_EVT_file:bool=True):
-    """ 
+    """ Method to find putative replay events similar to the Diba 2007 paper: by finding quiet periods and then getting the activity for 300ms after them.
 
     if 'included_qclu_values' and 'minimum_inclusion_fr_Hz' don't change, the templates and directional lap results aren't required it seems. 
     All of this is just in service of getting the properly filtered `active_spikes_df` to determine the quiescent periods.
@@ -590,6 +570,117 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, spikes_df, 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events
 
     """
+    # ==================================================================================================================== #
+    # BEGIN SUBFUNCTIONS                                                                                                   #
+    # ==================================================================================================================== #
+
+    def find_quiescent_windows(active_spikes_df: pd.DataFrame, silence_duration:float=0.06) -> pd.DataFrame:
+        """
+        # Define the duration for silence and firing window
+        silence_duration = 0.06  # 60 ms
+        firing_window_duration = 0.3  # 300 ms
+        min_unique_neurons = 14
+
+        CAPTURES NOTHING
+        """
+        ## INPUTS: active_spikes_df
+
+        # Ensure the DataFrame is sorted by the event times
+        spikes_df = deepcopy(active_spikes_df)[['t_rel_seconds']].sort_values(by='t_rel_seconds').reset_index(drop=True).drop_duplicates(subset=['t_rel_seconds'], keep='first')
+
+        # Drop rows with duplicate values in the 't_rel_seconds' column, keeping the first occurrence
+        spikes_df = spikes_df.drop_duplicates(subset=['t_rel_seconds'], keep='first')
+
+        # Calculate the differences between consecutive event times
+        spikes_df['time_diff'] = spikes_df['t_rel_seconds'].diff()
+
+        # Find the indices where the time difference is greater than 60ms (0.06 seconds)
+        quiescent_periods = spikes_df[spikes_df['time_diff'] > silence_duration]
+
+        # Extract the start and end times of the quiescent periods
+        # quiescent_periods['start'] = spikes_df['t_rel_seconds'].shift(1)
+        quiescent_periods['stop'] = quiescent_periods['t_rel_seconds']
+        quiescent_periods['start'] = quiescent_periods['stop'] - quiescent_periods['time_diff']
+
+        # Drop the NaN values that result from the shift operation
+        quiescent_periods = quiescent_periods.dropna(subset=['start'])
+
+        # Select the relevant columns
+        quiescent_periods = quiescent_periods[['start', 'stop', 'time_diff']]
+        # quiescent_periods["label"] = quiescent_periods.index.astype('str', copy=True)
+        # quiescent_periods["duration"] = quiescent_periods["stop"] - quiescent_periods["start"] 
+        quiescent_periods = check_for_and_merge_overlapping_epochs(quiescent_periods=quiescent_periods)
+        # print(quiescent_periods)
+        return quiescent_periods
+
+    def find_active_epochs_preceeded_by_quiescent_windows(active_spikes_df, silence_duration:float=0.06, firing_window_duration:float=0.3, min_unique_neurons:int=14):
+        """
+        # Define the duration for silence and firing window
+        silence_duration = 0.06  # 60 ms
+        firing_window_duration = 0.3  # 300 ms
+        min_unique_neurons = 14
+
+        CAPTURES NOTHING
+        """
+        ## INPUTS: active_spikes_df
+
+        # Ensure the DataFrame is sorted by the event times
+        spikes_df = deepcopy(active_spikes_df).sort_values(by='t_rel_seconds').reset_index(drop=True)
+        # Calculate the differences between consecutive event times
+        spikes_df['time_diff'] = spikes_df['t_rel_seconds'].diff()
+
+        ## INPUTS: quiescent_periods
+        quiescent_periods = find_quiescent_windows(active_spikes_df=active_spikes_df, silence_duration=silence_duration)
+
+        # List to hold the results
+        results = []
+
+        # Variable to keep track of the end time of the last valid epoch
+        # last_epoch_end = -float('inf')
+
+        # Iterate over each quiescent period
+        for idx, row in quiescent_periods.iterrows():
+            silence_end = row['stop']
+            window_start = silence_end
+            window_end = silence_end + firing_window_duration
+            
+            # Check if there's another quiescent period within the current window
+            if (idx + 1) < len(quiescent_periods):
+                next_row = quiescent_periods.iloc[idx + 1]
+                next_quiescent_start = next_row['start']
+                if next_quiescent_start < window_end:
+                    window_end = next_quiescent_start
+                    # break
+        
+            # Filter events that occur in the 300-ms window after the quiescent period
+            window_events = spikes_df[(spikes_df['t_rel_seconds'] >= window_start) & (spikes_df['t_rel_seconds'] <= window_end)]
+            
+            # Count unique neurons firing in this window
+            unique_neurons = window_events['aclu'].nunique()
+            
+            # Check if at least 14 unique neurons fired in this window
+            if unique_neurons >= min_unique_neurons:
+                results.append({
+                    'quiescent_start': row['start'],
+                    'quiescent_end': silence_end,
+                    'window_start': window_start,
+                    'window_end': window_end,
+                    'unique_neurons': unique_neurons
+                })
+                # Variable to keep track of the end time of the last valid epoch
+                # last_epoch_end = window_end
+
+
+        # Convert results to a DataFrame
+        results_df = pd.DataFrame(results)
+        results_df["label"] = results_df.index.astype('str', copy=True)
+        results_df["duration"] = results_df["window_end"] - results_df["window_start"] 
+        return results_df, quiescent_periods
+
+    # ==================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                  #
+    # ==================================================================================================================== #
+
     ## INPUTS: curr_active_pipeline, directional_laps_results, rank_order_results
     # track_templates.determine_decoder_aclus_filtered_by_frate(5.0)
     # qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2,4,9])
