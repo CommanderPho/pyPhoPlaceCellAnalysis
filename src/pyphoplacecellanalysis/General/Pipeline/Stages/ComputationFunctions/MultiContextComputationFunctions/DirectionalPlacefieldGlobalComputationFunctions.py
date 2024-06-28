@@ -2496,7 +2496,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
         conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_conditional_prob_column_names]) ## just use the columns from this
         # (k, v) = self.decoder_ripple_filter_epochs_decoder_result_dict.items()[0]
-        assert np.shape(conditional_prob_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of columns"
+        assert np.shape(conditional_prob_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of rows"
 
         # Build the final merged dataframe with the score columns for each of the four decoders but only one copy of the common columns.
         extracted_merged_scores_df: pd.DataFrame = pd.concat((common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df), axis='columns')
