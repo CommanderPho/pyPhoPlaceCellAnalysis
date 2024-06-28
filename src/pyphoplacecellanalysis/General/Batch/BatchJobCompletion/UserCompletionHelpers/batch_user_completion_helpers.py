@@ -1277,7 +1277,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     from neuropy.core.epoch import Epoch, ensure_Epoch, ensure_dataframe
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
-    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events, overwrite_replay_epochs_and_recompute, try_load_neuroscope_EVT_file_epochs, replace_replay_epochs
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_replay_wcorr_histogram
@@ -1304,31 +1305,17 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     assert replay_estimation_parameters is not None
     _bak_replay_estimation_parameters = deepcopy(replay_estimation_parameters) ## backup original
 
-    with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"initial_loaded" failed with error: {formatted_exception_str}. Skipping.'))):
+    with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\t"initial_loaded" failed with error: {formatted_exception_str}. Skipping.'))):
         replay_epoch_variations.update({
             'initial_loaded': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay_backup), metadata={'epochs_source': 'initial_loaded'}),
         })
         
-
-    try:
-        replay_epoch_variations.update({
-            'initial_loaded': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay_backup), metadata={'epochs_source': 'initial_loaded'}),
-        })
-        
-    except BaseException as e:
-        print(f'"initial_loaded" failed with error {e}. Skipping.')
-
-
-    try:
+    with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"normal_computed" failed with error: {formatted_exception_str}. Skipping.'))):
         replay_epoch_variations.update({
             'normal_computed': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay), metadata={'epochs_source': 'normal_computed', 'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'], 'min_num_active_neurons': replay_estimation_parameters['min_num_unique_aclu_inclusions']}),
         })
-        
-    except BaseException as e:
-        print(f'"normal_computed" failed with error {e}. Skipping.')
 
-
-    try:
+    with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"diba_quiescent_method_replay_epochs" failed with error: {formatted_exception_str}. Skipping.'))):
         ## Compute new epochs: 
         included_qclu_values = [1,2]
         minimum_inclusion_fr_Hz = 5.0
@@ -1340,12 +1327,9 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
             'diba_quiescent_method_replay_epochs': deepcopy(diba_quiescent_method_replay_epochs),
         })
         
-    except BaseException as e:
-        print(f'"diba_quiescent_method_replay_epochs" failed with error {e}. Skipping.')
 
 
-
-    try:
+    with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\t"diba_evt_file" failed with error: {formatted_exception_str}. Skipping.'))):
         ## FROM .evt file
         ## Load exported epochs from a neuroscope .evt file:
         diba_evt_file_replay_epochs: Epoch = try_load_neuroscope_EVT_file_epochs(curr_active_pipeline)
@@ -1354,8 +1338,6 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
                 'diba_evt_file': deepcopy(diba_evt_file_replay_epochs),
             })
         
-    except BaseException as e:
-        print(f'"diba_evt_file" failed with error {e}. Skipping.')
 
     print(f'completed replay extraction, have: {list(replay_epoch_variations.keys())}')
     
