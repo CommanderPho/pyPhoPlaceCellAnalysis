@@ -244,6 +244,33 @@ def plot_replay_wcorr_histogram(df: pd.DataFrame, plot_var_name: str, all_shuffl
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
 # ---------------------------------------------------------------------------- #
+@function_attributes(short_name=None, tags=['pure', 'pkl'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-28 13:23', related_items=[])
+def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames, custom_save_filepaths, enable_save_pipeline_pkl, enable_save_global_computations_pkl, enable_save_h5):
+    """ Pickles the pipelines as needed
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import helper_perform_pickle_pipeline
+    custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=_temp_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths, enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False)
+
+    """
+    try:
+        if enable_save_pipeline_pkl:
+            custom_save_filepaths['pipeline_pkl'] = a_curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
+
+        if enable_save_global_computations_pkl:
+            custom_save_filepaths['global_computation_pkl'] = a_curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
+
+        if enable_save_h5:
+            custom_save_filepaths['pipeline_h5'] = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+        
+        print(f'custom_save_filepaths: {custom_save_filepaths}')
+
+    except BaseException as e:
+        print(f'failed pickling in `helper_perform_pickle_pipeline(...)` with error: {e}')
+        pass
+    
+    return custom_save_filepaths
+
+
 @function_attributes(short_name=None, tags=['replay', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=['overwrite_replay_epochs_and_recompute'], creation_date='2024-06-26 21:10', related_items=[])
 def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
     """ 
@@ -278,7 +305,6 @@ def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
     # replay_estimation_parameters.require_intersecting_epoch = None # don't actually purge these as I don't know what they are used for
     replay_estimation_parameters.min_inclusion_fr_active_thresh = new_replay_epochs.metadata.get('minimum_inclusion_fr_Hz', 1.0)
     replay_estimation_parameters.min_num_unique_aclu_inclusions = new_replay_epochs.metadata.get('min_num_active_neurons', 5)
-
 
     did_change = did_change or (get_dict_subset(_bak_replay_estimation_parameters, ['epochs_source', 'min_num_unique_aclu_inclusions', 'min_inclusion_fr_active_thresh']) != get_dict_subset(replay_estimation_parameters, ['epochs_source', 'min_num_unique_aclu_inclusions', 'min_inclusion_fr_active_thresh']))
     ## Assign the new parameters:
@@ -349,12 +375,24 @@ def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_str
 @function_attributes(short_name=None, tags=['replay', 'new_replay', 'top'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
 def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025, 
                                           num_wcorr_shuffles: int=25, fail_on_exception=True,
-                                          enable_save_pipeline_pkl: bool=True, enable_save_h5: bool = False):
+                                          enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False):
     """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2007.
 
     , included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0
 
     
+    If `did_change` == True,
+        ['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring']
+        ['wcorr_shuffle_analysis']
+
+        are updated
+
+    Otherwise:
+        ['wcorr_shuffle_analysis'] can be updated
+
+
+
+
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import overwrite_replay_epochs_and_recompute
 
@@ -399,31 +437,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     print(f'custom_save_filenames: {custom_save_filenames}')
     custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
 
-            
-
-    def _subfn_perform_pickle_pipeline(curr_active_pipeline, custom_save_filepaths):
-        """ Pickles the pipelines as needed
-        captures: enable_save_pipeline_pkl, enable_save_h5
-
-        custom_save_filepaths = _subfn_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
-        """
-        try:
-            if enable_save_pipeline_pkl:
-                custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
-                custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
-
-            if enable_save_h5:
-                custom_save_filepaths['pipeline_h5'] = curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
-            
-            print(f'custom_save_filepaths: {custom_save_filepaths}\n')
-
-        except BaseException as e:
-            print(f'failed pickling in `finalize_output_shuffled_wcorr(...)` with error: {e}')
-            pass
-        
-        return custom_save_filepaths
-
-
 
     if not did_change:
         print(f'no changes!')
@@ -453,15 +466,14 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
         ## Pickle first thing after changes:
-        # custom_save_filepaths = _subfn_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
+        # custom_save_filepaths = helper_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
 
         ## wcorr shuffle:
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
-
         ## Pickle again after recomputing:
-        custom_save_filepaths = _subfn_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
-
+        custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths,
+                                                                enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
 
 
     try:
