@@ -1208,6 +1208,7 @@ class WCorrShuffle(ComputedResult):
         _, _, global_epoch_name = self.curr_active_pipeline.find_LongShortGlobal_epoch_names()
         earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = self.curr_active_pipeline.find_LongShortDelta_times()
 
+        ## 2024-06-28 - pulls ripple epochs automationally. Not good.
         filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(self.curr_active_pipeline, global_epoch_name, self.track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
         filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
