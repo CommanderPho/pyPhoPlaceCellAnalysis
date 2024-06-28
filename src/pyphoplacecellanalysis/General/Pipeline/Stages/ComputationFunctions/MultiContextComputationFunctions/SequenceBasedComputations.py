@@ -216,7 +216,7 @@ class WCorrShuffle(ComputedResult):
 
 
     @classmethod
-    def build_real_result(cls, track_templates, directional_merged_decoders_result, active_spikes_df, all_templates_decode_kwargs) -> Tuple[Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]], NDArray]:
+    def build_real_result(cls, track_templates: TrackTemplates, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, active_spikes_df: pd.DataFrame, all_templates_decode_kwargs) -> Tuple[Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]], NDArray]:
         real_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
         # real_output_alt_directional_merged_decoders_result, (real_decoder_laps_filter_epochs_decoder_result_dict, real_decoder_ripple_filter_epochs_decoder_result_dict) = _try_all_templates_decode(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=real_directional_merged_decoders_result, shuffled_decoders_dict=real_directional_merged_decoders_result.all_directional_decoder_dict, **a_sweep_dict)
         real_output_alt_directional_merged_decoders_result, (real_decoder_laps_filter_epochs_decoder_result_dict, real_decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=active_spikes_df, a_directional_merged_decoders_result=real_directional_merged_decoders_result, shuffled_decoders_dict=track_templates.get_decoders_dict(), 
