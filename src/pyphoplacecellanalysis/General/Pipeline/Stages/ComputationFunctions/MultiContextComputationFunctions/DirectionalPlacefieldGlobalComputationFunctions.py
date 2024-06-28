@@ -2660,7 +2660,14 @@ class DecoderDecodedEpochsResult(ComputedResult):
                     if any_good_selected_epoch_indicies is not None:
                         print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} valid filter epoch times) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
                         a_df['is_valid_epoch'] = False
-                        a_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
+
+                        try:
+                            a_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                            # a_df['is_valid_epoch'].loc[any_good_selected_epoch_indicies] = True
+
+                        except BaseException as e:
+                            print(f'WARNING: trying to get whether the epochs are valid FAILED probably, 2024-06-28 custom computed epochs thing: {e}, just setting all to True')
+                            a_df['is_valid_epoch'] = True
                     else:
                         print(f'\t failed all methods for selection filter')
 
@@ -3911,9 +3918,17 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str,
         extracted_merged_scores_df
 
     """
+    from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
+
     score_metric_merged_df: pd.DataFrame = None
+
+    ## only get columns that are actually included in each:
+    valid_columns = intersection_of_arrays(*[list(a_df.columns) for a_decoder_name, a_df in decoder_epochs_score_metric_df_dict.items()])
+    valid_columns = [v for v in valid_columns if v in columns] # only include column_names that are in columns
+
+
     # filter_columns_fn = lambda df: df[['score']]
-    filter_columns_fn = lambda df: df[columns] # KeyError: "['P_decoder', 'score', 'velocity', 'intercept', 'speed', 'pearsonr', 'travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change', 'total_variation', 'integral_second_derivative', 'stddev_of_diff'] not in index"
+    filter_columns_fn = lambda df: df[valid_columns] # KeyError: "['P_decoder', 'score', 'velocity', 'intercept', 'speed', 'pearsonr', 'travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change', 'total_variation', 'integral_second_derivative', 'stddev_of_diff'] not in index"
     for a_decoder_name, a_df in decoder_epochs_score_metric_df_dict.items():
         # a_name: str = a_name.capitalize()
         if score_metric_merged_df is None:
@@ -3930,6 +3945,7 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str,
 
     ## OUTPUTS: radon_transform_merged_df, decoder_laps_radon_transform_df_dict
     return score_metric_merged_df
+
 
 @function_attributes(short_name=None, tags=['spikes_df', 'global', 'global_spikes_df'], input_requires=[], output_provides=[], uses=[], used_by=['_decode_continuous_using_directional_decoders', 'compute_train_test_split_laps_decoders'], creation_date='2024-03-29 22:28', related_items=['decode_specific_epochs'])
 def get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz: Optional[float]=None) -> pd.DataFrame:
