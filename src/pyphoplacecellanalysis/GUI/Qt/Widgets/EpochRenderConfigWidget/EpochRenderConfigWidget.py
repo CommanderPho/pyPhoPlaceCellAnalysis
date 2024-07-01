@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Callable
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.LayoutWidget import LayoutWidget
-
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 ## IMPORTS:
 from attrs import define, field, Factory
@@ -85,8 +85,6 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
         return ['name', 'pen_QColor', 'brush_QColor', 'height', 'y_location', 'isVisible']
 
 
-
-
     ## Programmatic Update/Retrieval:    
     def update_from_config(self, config: EpochDisplayConfig):
         """ called to programmatically update the config """
@@ -143,7 +141,7 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
             else:
                 print(f'\tno binding for {a_widget} of type: {type(a_widget)}')
 
-        
+
 
         # if self.enable_debug_print:
         #     print(f'config_from_state(...): name={self.name}, isVisible={self.isVisible}, color={self.color}, spikesVisible={self.spikesVisible}')
@@ -164,6 +162,94 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
         # return SingleNeuronPlottingExtended(name=self.name, isVisible=self.isVisible, color=color_hex_str, spikesVisible=self.spikesVisible)
         return a_config
         
+
+
+# @define(slots=False, auto_detect=True) # , init=False
+@metadata_attributes(short_name=None, tags=['epoch', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 00:00', related_items=[])
+class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
+    """ a widget that contains a vertical list of `EpochRenderConfigWidget`. Allowing graphically configuring the rendering Epochs 
+        
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
+
+    
+    """
+    ui: PhoUIContainer = field(default=None)
+    configs: Dict[str, EpochDisplayConfig] = field(default=Factory(Dict[str, EpochDisplayConfig]))
+    out_render_config_widgets_dict: Dict[str, pg.Qt.QtWidgets.QWidget] = field(default=Factory(Dict[str, pg.Qt.QtWidgets.QWidget]))
+
+    ## Attrs manual __init__
+    def __init__(self, configs: Optional[Dict[str, EpochDisplayConfig]]=None, parent=None): # 
+        self.ui = PhoUIContainer()
+        super().__init__(parent=parent) # Call the inherited classes __init__ method
+        self.configs = configs or {}
+        if parent is not None:
+            parent.addWidget(self)
+        self.initUI()
+
+    def initUI(self):
+
+        # self.ui.rootWidget = pg.Qt.QtWidgets.QWidget()
+        # self.addWidget(self.ui.rootWidget)
+        self.ui.config_widget_layout = pg.Qt.QtWidgets.QVBoxLayout()
+        self.ui.config_widget_layout.setSpacing(0)
+        self.ui.config_widget_layout.setContentsMargins(0, 0, 0, 0)
+        # config_widget_layout.setObjectName("horizontalLayout")
+        self.ui.config_widget_layout.setObjectName("verticalLayout")
+
+        self.ui.out_render_config_widgets_dict = {}
+        for a_config_name, a_config in self.configs.items():
+            if isinstance(a_config, (list, tuple)):
+                if len(a_config) == 1:
+                    curr_widget = build_single_epoch_display_config_widget(a_config[0]) # 
+                    self.ui.config_widget_layout.addWidget(curr_widget)
+                    self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
+
+                else:
+                    ## extract all items
+                    a_sub_config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
+                    a_sub_config_widget_layout.setSpacing(0)
+                    a_sub_config_widget_layout.setContentsMargins(0, 0, 0, 0)
+                    a_sub_config_widget_layout.setObjectName(f"horizontalLayout[{a_config_name}]")
+                    
+                    self.ui.out_render_config_widgets_dict[a_config_name] = []
+
+
+                    for i, a_sub_config in enumerate(a_config):
+                        a_sub_curr_widget = build_single_epoch_display_config_widget(a_sub_config)
+                        a_sub_curr_widget.setObjectName(f"config[{a_config_name}][{i}]")
+                        a_sub_config_widget_layout.addWidget(a_sub_curr_widget)
+                        # self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
+                        self.ui.out_render_config_widgets_dict[a_config_name].append(a_sub_curr_widget)
+                        
+                    # curr_widget = a_sub_config_widget_layout
+                    self.ui.config_widget_layout.addLayout(a_sub_config_widget_layout)
+
+            else:
+                # Otherwise a straight-up config
+                curr_widget = build_single_epoch_display_config_widget(a_config)
+                self.ui.config_widget_layout.addWidget(curr_widget)
+                self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
+
+
+            # config_widget_layout.addWidget(curr_widget)
+            # self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
+
+        # out_render_config_widgets_dict
+        # self.ui.rootWidget.setLayout(self.ui.config_widget_layout)
+        self.setLayout(self.ui.config_widget_layout)
+                
+    ## Programmatic Update/Retrieval:    
+    def update_from_configs(self, configs: Dict[str, EpochDisplayConfig]):
+        """ called to programmatically update the config """
+        raise NotImplementedError                
+
+    def configs_from_states(self) -> Dict[str, EpochDisplayConfig]:
+        """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
+        raise NotImplementedError
+
+        
+
+
 
 def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) -> EpochRenderConfigWidget:
     """ builds a simple EpochRenderConfigWidget widget from a simple EpochDisplayConfig
@@ -201,8 +287,10 @@ def build_containing_epoch_display_configs_root_widget(epoch_display_configs, pa
         rootWidget = pg.Qt.QtWidgets.QWidget()
     else:
         rootWidget = pg.Qt.QtWidgets.QWidget()
+        # self.addWidget(rootWidget)
         parent.addWidget(rootWidget)
 
+    # self.addWidget(rootWidget)
 
     # config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
     config_widget_layout = pg.Qt.QtWidgets.QVBoxLayout()
