@@ -812,6 +812,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # ==================================================================================================================== #
     # Legends                                                                                                              #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['legend'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-01 18:29', related_items=[])
     def _build_or_update_epoch_interval_rect_legend(self, parent_item):
         """ Build a legend for a single plot each of the epoch rects 
     
@@ -829,6 +830,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return legend
     
 
+    @function_attributes(short_name=None, tags=['legend'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-01 18:29', related_items=[])
     def build_or_update_all_epoch_interval_rect_legends(self):
         """ Build a legend for each of the subplots. 
 
@@ -851,13 +853,15 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         previously_encountered_plot_items = []
         interval_info = self.get_all_rendered_intervals_dict()
-        print(f'=== BEGIN')
+        if self.enable_debug_print:
+            print(f'=== BEGIN')
         for a_name, an_intervals_dict in interval_info.items():
             # is_first_iteration_on_plot = (i
-
-            print(f'a_name: {a_name}:')
+            if self.enable_debug_print:
+                print(f'a_name: {a_name}:')
             for a_plot_name, a_plotted_intervals in an_intervals_dict.items():
-                print(f'\ta_plot_name: {a_plot_name}, a_plotted_intervals: {a_plotted_intervals}, type(a_plotted_intervals): {type(a_plotted_intervals)}')
+                if self.enable_debug_print:
+                    print(f'\ta_plot_name: {a_plot_name}, a_plotted_intervals: {a_plotted_intervals}, type(a_plotted_intervals): {type(a_plotted_intervals)}')
                 a_target_plot = self.plots[a_plot_name]
                 # if a_plot_name == target_plot_name:
                 ## Here's the object, add it to the legend
@@ -883,6 +887,32 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         return legends_dict
     
+    @function_attributes(short_name=None, tags=['legend', 'remove_all', 'remove'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-01 18:29', related_items=[])
+    def remove_all_epoch_interval_rect_legends(self):
+        """ removes any created legends """
+        ## Remove the legends
+        legends = self.plots.get('legends', None)
+        if legends is not None:
+            for a_legend_plot, a_legend in legends.data_items():
+                if self.enable_debug_print:
+                    print(f'a_legend_plot: {a_legend_plot}, a_legend: {a_legend}')
+                if a_legend is not None:
+                    a_legend.clear() ## clear the legend items
+                    try:
+                        a_legend.setParentItem(None)
+                    except BaseException as err:
+                        if self.enable_debug_print:
+                            print(f'err: {err}')
+                        pass
+                    
+                    # a_legend_plot.removeItem(a_legend)
+
+                ## Increase the right margin:
+                a_legend_plot.layout.setContentsMargins(0, 0, 0, 0)  # left, top, right, bottom
+
+            legends.clear()
+            del self.plots['legends']
+            
 
 
     ######################################################
