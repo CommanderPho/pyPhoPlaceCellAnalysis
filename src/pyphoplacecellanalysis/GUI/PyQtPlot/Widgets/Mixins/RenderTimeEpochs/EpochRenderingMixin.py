@@ -5,6 +5,9 @@ import pandas as pd
 
 from qtpy import QtCore
 
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from nptyping import NDArray
+
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable, iPythonKeyCompletingMixin
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
@@ -401,6 +404,67 @@ class EpochRenderingMixin:
     
         return out_dict
 
+
+    def get_all_rendered_intervals_dict(self, debug_print=False) -> Dict[str, Dict[str, IntervalRectsItem]]:
+        """ Returns a dictionary containing the hierarchy of all the members. Can optionally also print. 
+        
+        Example:
+            interval_info = active_2d_plot.list_all_rendered_intervals()
+            >>> CONSOLE OUTPUT >>>        
+                rendered_epoch_names: ['PBEs', 'Laps']
+                    name: PBEs - 0 plots:
+                    name: Laps - 2 plots:
+                        background_static_scroll_window_plot: plot[42 intervals]
+                        main_plot_widget: plot[42 intervals]
+                out_dict: {'PBEs': {}, 'Laps': {'background_static_scroll_window_plot': 'plot[42 intervals]', 'main_plot_widget': 'plot[42 intervals]'}}
+            <<<
+        
+            interval_info
+                {'PBEs': {},
+                'Laps': {'background_static_scroll_window_plot': 'plot[42 intervals]',
+                'main_plot_widget': 'plot[42 intervals]'}}
+        """
+        out_dict = {}
+        rendered_epoch_names = self.interval_datasource_names
+        if debug_print:
+            print(f'rendered_epoch_names: {rendered_epoch_names}')
+        for a_name in rendered_epoch_names:
+            out_dict[a_name] = {}
+            a_render_container = self.rendered_epochs[a_name]
+            render_container_items = {key:value for key, value in a_render_container.items() if (not isinstance(key, str))}
+            if debug_print:
+                print(f'\tname: {a_name} - {len(render_container_items)} plots:')
+                # print(f'\t\ta_render_container: {a_render_container}')
+            curr_plots_dict = {}
+            
+            for a_plot, a_rect_item in render_container_items.items():
+                if isinstance(a_plot, str):
+                    ## This is still happening due to the '__class__' item!
+                    print(f'WARNING: there was an item in a_render_container of type string: (a_plot: {a_plot} <{type(a_plot)}>, a_rect_item: {type(a_rect_item)}')
+                    # pass 
+                else:
+                    if isinstance(a_rect_item, IntervalRectsItem):
+                        num_intervals = len(a_rect_item.data)
+                    else:
+                        num_intervals = len(a_rect_item) # for 3D plots, for example, we have a list of meshes which we will use len(...) to get the number of
+                        
+                    if debug_print:
+                        print(f'\t\t{a_plot.objectName()}: plot[{num_intervals} intervals]')
+
+                    # curr_plots_dict[a_plot.objectName()] = f'plot[{num_intervals} intervals]'
+
+                    curr_plots_dict[a_plot.objectName()] = a_rect_item
+
+
+            out_dict[a_name] = curr_plots_dict
+            
+        if debug_print:
+            print(f'out_dict: {out_dict}')
+
+        return out_dict
+
+
+
     def update_rendered_intervals_visualization_properties(self, update_dict):
         """ Updates the interval datasources from the provided update_dict
 
@@ -778,3 +842,6 @@ class EpochRenderingMixin:
 
         return required_vertical_offsets, required_interval_heights
 
+
+
+    
