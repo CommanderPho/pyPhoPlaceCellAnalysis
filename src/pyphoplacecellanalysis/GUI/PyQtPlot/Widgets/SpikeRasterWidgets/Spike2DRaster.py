@@ -580,6 +580,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
     def _update_plots(self):
         """
+        Seems to be called every time the timeline is scrolled at least.
+
         
         """
         self.logger.debug(f'Spike2DRaster._update_plots()')
@@ -806,6 +808,82 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def remove_PBEs_intervals(self):
         self.remove_rendered_intervals('PBEs', debug_print=False)
         
+
+    # ==================================================================================================================== #
+    # Legends                                                                                                              #
+    # ==================================================================================================================== #
+    def _build_or_update_epoch_interval_rect_legend(self, parent_item):
+        """ Build a legend for a single plot each of the epoch rects 
+    
+        parent_item = self.ui.main_plot_widget.graphicsItem()
+
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import CustomLegendItemSample
+        
+        # Add legend inside the plot boundaries
+        legend_size = None # auto-sizing legend to contents
+        legend = pg.LegendItem(legend_size, offset=(-30, -30))  # Negative offset (x, y) from bottom-right corner
+        legend.setParentItem(parent_item)
+        legend.anchor((1, 1), (1, 1))  # Anchors the legend to the bottom-right corner
+        legend.setSampleType(CustomLegendItemSample)
+        return legend
+    
+
+    def build_or_update_all_epoch_interval_rect_legends(self):
+        """ Build a legend for each of the subplots. 
+
+        active_2d_plot.build_or_update_all_epoch_interval_rect_legends()
+
+        """
+        from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlots
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import RenderedEpochsItemsContainer
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, CustomLegendItemSample
+
+        ## Try to get existing legends:
+        legends_dict = self.plots.get('legends', None)
+        if legends_dict is None:
+            ## create new container
+            self.plots['legends'] = RenderPlots(name='legends')
+            legends_dict = self.plots['legends']
+
+        assert legends_dict is not None
+        ## OUTPUTS: legends_dict
+
+        previously_encountered_plot_items = []
+        interval_info = self.get_all_rendered_intervals_dict()
+        print(f'=== BEGIN')
+        for a_name, an_intervals_dict in interval_info.items():
+            # is_first_iteration_on_plot = (i
+
+            print(f'a_name: {a_name}:')
+            for a_plot_name, a_plotted_intervals in an_intervals_dict.items():
+                print(f'\ta_plot_name: {a_plot_name}, a_plotted_intervals: {a_plotted_intervals}, type(a_plotted_intervals): {type(a_plotted_intervals)}')
+                a_target_plot = self.plots[a_plot_name]
+                # if a_plot_name == target_plot_name:
+                ## Here's the object, add it to the legend
+                a_legend = legends_dict.get(a_target_plot, None) ## get the legend for this plot
+                if a_legend is None:
+                    ## create a legend:
+                    legends_dict[a_target_plot] = self._build_or_update_epoch_interval_rect_legend(a_target_plot.graphicsItem())
+                    a_legend = legends_dict[a_target_plot]
+                else:
+                    # reuse the legend
+                    # legends_dict[a_target_plot].clear() ## clear any existing items
+                    pass
+                assert a_legend is not None
+                # end if a_legend  
+                if (a_plot_name not in previously_encountered_plot_items):
+                    # first time for this plot
+                    a_legend.clear() ## clear
+                    ## Increase the right margin:
+                    a_target_plot.layout.setContentsMargins(0, 0, 300, 0)  # left, top, right, bottom
+
+                a_legend.addItem(a_plotted_intervals, a_name) ## add the item to the legend
+                previously_encountered_plot_items.append(a_plot_name)
+
+        return legends_dict
+    
+
 
     ######################################################
     # TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin specific overrides for 2D:
