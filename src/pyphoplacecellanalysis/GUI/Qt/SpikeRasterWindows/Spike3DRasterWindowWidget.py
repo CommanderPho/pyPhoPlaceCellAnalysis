@@ -465,6 +465,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             
         if reply == QtWidgets.QMessageBox.Yes:
             self.GlobalConnectionManagerAccessingMixin_on_destroy() # call destroy to tear down the registered children for the global connection mannager
+            self.deleteLater() # schedule the object for deletion
             event.accept()
             print('Window closed')
         else:
@@ -955,7 +956,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                     if spike_raster_window is None:
                         if a_canidate_window.isVisible():
                             spike_raster_window = a_canidate_window
-    
+                        else:
+                            ## close the window
+                            a_canidate_window.deleteLater()
+
+
                 if spike_raster_window is None:
                     raise ValueError(f'WARNING: found no open windows for spike_raster_window out of {len(found_spike_raster_windows)} candidate options!!!')
 
