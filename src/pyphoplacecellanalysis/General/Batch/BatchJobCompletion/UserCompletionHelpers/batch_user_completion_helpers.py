@@ -1344,6 +1344,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     ## OUTPUT: replay_epoch_variations
     callback_outputs['replay_epoch_variations'] = replay_epoch_variations
 
+
+    ## Duplicate Copy of pipeline to perform desired computations:
     for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
         # ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
         # replay_epochs_key = 'diba_quiescent_method_replay_epochs'
