@@ -1321,7 +1321,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
     @function_attributes(short_name='wcorr_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'session', 'pf1D'], input_requires=['DirectionalLaps', 'RankOrder'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
-    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024):
+    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Requires:
@@ -1345,6 +1345,12 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
         # num_shuffles:int=1000
         # minimum_inclusion_fr_Hz:float=12.0
         # included_qclu_values=[1,2]
+
+        if drop_previous_result_and_compute_fresh:
+            removed_sequence_based_result = global_computation_results.computed_data.pop('SequenceBased', None)
+            if removed_sequence_based_result is not None:
+                print(f'removed previous "SequenceBased" result and computing fresh since `drop_previous_result_and_compute_fresh == True`')
+
 
         if ('SequenceBased' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'SequenceBased')):
             # initialize
