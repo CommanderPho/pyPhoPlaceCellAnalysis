@@ -1434,6 +1434,7 @@ class PipelineWithComputedPipelineStageMixin:
         split_save_folder.mkdir(exist_ok=True)
         
         if include_includelist is None:
+            ## include all keys if none are specified
             include_includelist = list(self.global_computation_results.computed_data.keys())
 
         ## only saves out the `global_computation_results` data:
@@ -1611,7 +1612,7 @@ class PipelineWithComputedPipelineStageMixin:
             sucessfully_updated_keys, successfully_loaded_keys, found_split_paths = curr_active_pipeline.load_split_pickled_global_computation_results(allow_overwrite_existing_allow_keys=['DirectionalLaps', 'RankOrder'])
         """
         allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
-        loaded_global_computation_results, successfully_loaded_keys, failed_loaded_keys, found_split_paths = self.try_load_split_pickled_global_computation_results(global_computation_results_pickle_path = (override_global_computation_results_pickle_path or self.global_computation_results_pickle_path),
+        loaded_global_computation_results, successfully_loaded_keys, failed_loaded_keys, found_split_paths = self.try_load_split_pickled_global_computation_results(global_computation_results_pickle_path=(override_global_computation_results_pickle_path or self.global_computation_results_pickle_path),
                                                                                                                                                                     debug_print=debug_print)
         
         sucessfully_updated_keys = {}
@@ -1621,7 +1622,7 @@ class PipelineWithComputedPipelineStageMixin:
             if curr_result_key in self.global_computation_results.computed_data:
                 # key already exists, overwrite it?
                 
-                if not allow_overwrite_existing:
+                if (not allow_overwrite_existing):
                     if (curr_result_key in allow_overwrite_existing_allow_keys):
                         should_apply = True
                     else:

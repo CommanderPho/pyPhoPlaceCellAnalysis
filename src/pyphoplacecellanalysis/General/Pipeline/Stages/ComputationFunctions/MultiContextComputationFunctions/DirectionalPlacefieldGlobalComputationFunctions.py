@@ -4890,7 +4890,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
         validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, 
                         is_global=True, computation_precidence=1002.2)
-    def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
+    def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
@@ -5056,7 +5056,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         return global_computation_results
 
 
-    @function_attributes(short_name='trial_by_trial_metrics', tags=['trial_by_trial', 'global_computation'], input_requires=[], output_provides=[], uses=['TrialByTrialActivity','TrialByTrialActivityResult'], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
+    @function_attributes(short_name='trial_by_trial_metrics', tags=['trial_by_trial', 'global_computation'], input_requires=["owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf1D_dt']"], output_provides=[], uses=['TrialByTrialActivity','TrialByTrialActivityResult'], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
                         requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['TrialByTrialActivity'],
                         validate_computation_test=_workaround_validate_has_directional_trial_by_trial_activity_result, 
                         is_global=True, computation_precidence=(1002.4))
