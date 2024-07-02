@@ -450,6 +450,43 @@ class SpecificComputationValidator:
                     provided_global_keys.extend(a_validator.results_specification.provides_global_keys) # Get each validator's provided keys:
                     
         return provided_global_keys
+    
+
+    @classmethod
+    def find_validators_providing_results(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_provided_result_keys: List[str], return_flat_list:bool=True) -> List[str]:
+        """ returns a list of computed properties that the specified functions provide. 
+        
+        found_validators_dict = SpecificComputationValidator.find_validators_providing_results(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
+                                                                                            probe_provided_result_keys=['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased'])
+
+        found_validators_dict
+
+        """
+        if return_flat_list:
+            found_matching_validators_list = []
+        else:
+            found_matching_validators = {}
+
+        for a_name, a_validator in remaining_comp_specifiers_dict.items():
+            for a_probe_result_name in probe_provided_result_keys:
+                if a_probe_result_name in (a_validator.provides_global_keys or []):
+                    ## this validator matches
+                    if return_flat_list:
+                        # found_matching_validators[a_probe_result_name] = a_validator
+                        found_matching_validators_list.append(a_validator)
+                    else:              
+                        if a_probe_result_name not in found_matching_validators:
+                            found_matching_validators[a_probe_result_name] = [] # make a new list
+                        found_matching_validators[a_probe_result_name].append(a_validator)
+                    # 
+                        
+        if return_flat_list:
+            return found_matching_validators_list
+        else:
+            return found_matching_validators
+    
+        
+
         
 
 # I have a class `SpecificComputationValidator` that is used to keep track of computations in a custom pipeline and manage computation order. The key fields are `computation_precidence`, `provides_global_keys`, and `requires_global_keys`. `provides_global_keys` specifies which keys are provided after the computation completes, and `requires_global_keys` specifies which keys are required before computation of the function is possible. This means that a function with a `a_key` in `requires_global_keys` is dependent on all functions with `a_key` in their `provides_global_keys`. I'd like you to propose a datastructure that can be used efficiently track dependencies, for example if the key `a_changed_key` is modified, determine all downstream dependent functions that will need to be recomputed. Here are some example validators:
