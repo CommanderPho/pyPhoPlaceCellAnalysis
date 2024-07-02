@@ -263,6 +263,15 @@ QToolButton:!checked{
           <property name="whatsThis">
            <string>Height</string>
           </property>
+          <property name="frame">
+           <bool>false</bool>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::NoButtons</enum>
+          </property>
+          <property name="keyboardTracking">
+           <bool>false</bool>
+          </property>
           <property name="decimals">
            <number>1</number>
           </property>
@@ -283,6 +292,12 @@ QToolButton:!checked{
            <string>Position Offset</string>
           </property>
           <property name="frame">
+           <bool>false</bool>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::NoButtons</enum>
+          </property>
+          <property name="keyboardTracking">
            <bool>false</bool>
           </property>
           <property name="decimals">
