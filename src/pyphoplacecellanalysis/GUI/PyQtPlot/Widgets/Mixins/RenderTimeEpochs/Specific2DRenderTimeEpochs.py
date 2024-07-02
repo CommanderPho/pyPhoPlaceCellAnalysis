@@ -134,8 +134,6 @@ class General2DRenderTimeEpochs(object):
             return False
         
         
-        
-
     @classmethod
     def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs): # , curr_pipeline=None
         """ directly-called method 

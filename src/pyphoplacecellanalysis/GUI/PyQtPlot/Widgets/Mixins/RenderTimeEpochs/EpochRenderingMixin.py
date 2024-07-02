@@ -1,5 +1,6 @@
 from copy import copy, deepcopy
 from neuropy.core import Epoch
+from pyphocorehelpers.function_helpers import function_attributes
 import numpy as np
 import pandas as pd
 
@@ -679,6 +680,26 @@ class EpochRenderingMixin:
 
         return out_configs_dict
     
+
+    @function_attributes(short_name=None, tags=['epoch', 'epoch_render_config_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-02 03:38', related_items=[])
+    def build_or_update_epoch_render_configs_widget(self, parent=None):
+        """
+        Called to update the render epoch configuration manager from the internal epoch datasources
+        """
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
+
+        epoch_display_configs = self.extract_interval_display_config_lists()
+
+        an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
+        if an_epochs_display_list_widget is None:
+            # create a new one:    
+            an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
+            self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+        else:
+            an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+
+
 
     # ---------------------------------------------------------------------------- #
     #                          Private Implementor Methods                         #
