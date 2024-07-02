@@ -1118,6 +1118,63 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     
 
 
+
+    def build_epoch_intervals_visual_configs_widget(self):
+        """ addds to the right sidebar and connects controls """
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig, _get_default_epoch_configs
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigWidget, EpochRenderConfigsListWidget
+
+        ## Get 2D or 3D Raster from spike_raster_window
+        active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+        if active_raster_plot is None:
+            active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+            assert active_raster_plot is not None
+
+
+        ## Backup Existing Colors:
+        # _plot_backup_colors = ColorData.backup_raster_colors(active_raster_plot) # note that they are all 0.0-1.0 format. RGBA
+        # deepcopy(active_raster_plot.params.neuron_qcolors) #, active_raster_plot.params.neuron_qcolors_map
+
+        rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
+        a_layout_widget = rightSideContainerWidget.ui.layout_widget
+        # rightSideContainerWidget.setVisible(True) # shows the sidebar
+
+        # epoch_display_configs = _get_default_epoch_configs()
+
+        epoch_display_configs = active_raster_plot.extract_interval_display_config_lists()
+        an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=a_layout_widget)
+
+        active_raster_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+        
+
+        _connections_list = []
+        def _on_update_rendered_intervals(active_2d_plot):
+            print(f'_on_update_rendered_intervals(...)')
+            _legends_dict = active_2d_plot.build_or_update_all_epoch_interval_rect_legends()
+            epoch_display_configs = active_2d_plot.extract_interval_display_config_lists()
+            an_epochs_display_list_widget = active_2d_plot.ui.get('epochs_render_configs_widget', None)
+            if an_epochs_display_list_widget is None:
+                # create a new one:    
+                an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=a_layout_widget)
+                active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+            else:
+                an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+
+
+        _a_connection = active_raster_plot.sigRenderedIntervalsListChanged.connect(_on_update_rendered_intervals)
+        _connections_list.append(_a_connection)
+         
+        # self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
+
+        # Display the sidebar:
+        self.set_right_sidebar_visibility(is_visible=True)
+    
+
+
+
+
+
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)

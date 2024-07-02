@@ -167,7 +167,6 @@ class EpochDisplayConfig(BasePlotDataParams):
         return cls(name=name, isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity)
 
 
-
     @classmethod
     def init_configs_list_from_interval_datasource_df(cls, name: str, a_ds) -> List["EpochDisplayConfig"]:
         """
