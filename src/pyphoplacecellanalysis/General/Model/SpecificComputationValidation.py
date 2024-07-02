@@ -436,13 +436,13 @@ class SpecificComputationValidator:
     def find_provided_result_keys(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_fn_names: List[str]) -> List[str]:
         """ returns a list of computed properties that the specified functions provide. 
         
-        provided_global_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
-                                                                                            probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
-                                                                                            )
-        provided_global_keys
+        Usage:
+            provided_global_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
+                                                                                                probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
+                                                                                                )
+            provided_global_keys # ['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased']
 
         """
-        found_matching_validators = {}
         provided_global_keys = []
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             for a_probe_fn_name in probe_fn_names:
@@ -456,10 +456,11 @@ class SpecificComputationValidator:
     def find_validators_providing_results(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_provided_result_keys: List[str], return_flat_list:bool=True) -> List[str]:
         """ returns a list of computed properties that the specified functions provide. 
         
-        found_validators_dict = SpecificComputationValidator.find_validators_providing_results(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
-                                                                                            probe_provided_result_keys=['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased'])
+        Usage:
 
-        found_validators_dict
+            found_validators_dict = SpecificComputationValidator.find_validators_providing_results(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
+                                                                                                probe_provided_result_keys=['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased'])
+            [v.computation_fn_name for v in found_validators_dict]
 
         """
         if return_flat_list:

@@ -1062,33 +1062,10 @@ class PipelineWithComputedPipelineStageMixin:
     def find_matching_validators(self, probe_fn_names: List[str], debug_print=False):
         """
         Usage:
-            remaining_comp_specifiers_dict = deepcopy(_comp_specifiers_dict)
-            remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
-                                                                                                probe_fn_names=['long_short_decoding_analyses','long_short_fr_indicies_analyses'])
-
+            remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = curr_active_pipeline.find_matching_validators(probe_fn_names=['long_short_decoding_analyses','long_short_fr_indicies_analyses'])
             provided_global_keys
         """
-        remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"] = deepcopy(self.get_merged_computation_function_validators())
-
-        found_matching_validators = {}
-        provided_global_keys = []
-        for a_name, a_validator in remaining_comp_specifiers_dict.items():
-            for a_probe_fn_name in probe_fn_names:
-                # if a_validator.is_name_in(probe_fn_names):
-                if a_validator.does_name_match(a_probe_fn_name):
-                    found_matching_validators[a_probe_fn_name] = a_validator
-                    if debug_print:
-                        print(f'found matching validator: {a_validator}')
-                    
-        # Get each validator's provided keys:
-        for a_name, a_found_validator in found_matching_validators.items():
-            new_provided_global_keys = a_found_validator.results_specification.provides_global_keys
-            provided_global_keys.extend(new_provided_global_keys)
-
-        remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in found_matching_validators}
-        if debug_print:
-            print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, found_matching_validators: {found_matching_validators}')
-        return remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys
+        return SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
 
     def find_immediate_dependencies(self, provided_global_keys: List[str], debug_print=False):
         """
@@ -1098,46 +1075,26 @@ class PipelineWithComputedPipelineStageMixin:
         provided_global_keys
 
         """
-        remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"] = deepcopy(self.get_merged_computation_function_validators())
-        dependent_validators = {}
-        for a_name, a_validator in remaining_comp_specifiers_dict.items():
-            # set(provided_global_keys)
-            # set(a_validator.results_specification.requires_global_keys)
-            if a_validator.is_dependency_in_required_global_keys(provided_global_keys):
-                dependent_validators[a_name] = a_validator
-            # (provided_global_keys == (a_validator.results_specification.requires_global_keys or []))
-
-        for a_name, a_found_validator in dependent_validators.items():
-            new_provided_global_keys = a_found_validator.results_specification.provides_global_keys
-            provided_global_keys.extend(new_provided_global_keys)
-            remaining_comp_specifiers_dict.pop(a_name) # remove
-
-        remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in dependent_validators}
-
-        if debug_print:
-            print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, dependent_validators: {dependent_validators}')
-        return remaining_comp_specifiers_dict, dependent_validators, provided_global_keys
+        return SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), provided_global_keys=provided_global_keys)
 
     def find_provided_result_keys(self, probe_fn_names: List[str]) -> List[str]:
         """ returns a list of computed properties that the specified functions provide. 
         
-        provided_global_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
-                                                                                            probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
-                                                                                            )
+        provided_global_keys = curr_active_pipeline.find_provided_result_keys(probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'])
         provided_global_keys
 
         """
-        remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"] = deepcopy(self.get_merged_computation_function_validators())
-        found_matching_validators = {}
-        provided_global_keys = []
-        for a_name, a_validator in remaining_comp_specifiers_dict.items():
-            for a_probe_fn_name in probe_fn_names:
-                if a_validator.does_name_match(a_probe_fn_name):
-                    provided_global_keys.extend(a_validator.results_specification.provides_global_keys) # Get each validator's provided keys:
-                    
-        return provided_global_keys
+        return SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
     
 
+    def find_validators_providing_results(self, probe_provided_result_keys: List[str], return_flat_list:bool=True) -> List[str]:
+        """ returns a list of computed properties that the specified functions provide. 
+        
+            found_validators_dict = curr_active_pipeline.find_validators_providing_results(probe_provided_result_keys=['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased'])
+            [v.computation_fn_name for v in found_validators_dict]
+
+        """
+        return SpecificComputationValidator.find_validators_providing_results(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_provided_result_keys=probe_provided_result_keys, return_flat_list=return_flat_list)
 
 
     def reload_default_computation_functions(self):
