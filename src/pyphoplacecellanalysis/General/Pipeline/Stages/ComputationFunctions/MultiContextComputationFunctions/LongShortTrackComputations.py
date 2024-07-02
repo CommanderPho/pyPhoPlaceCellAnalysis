@@ -988,7 +988,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='long_short_fr_indicies_analyses', tags=['short_long','firing_rate', 'computation','laps','replays'], input_requires=['laps', 'replays'], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00', 
+    @function_attributes(short_name='long_short_fr_indicies_analyses', tags=['short_long','firing_rate', 'computation','laps','replays'], input_requires=['laps', 'replays', 'sess.replay'], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00', 
                          requires_global_keys=[], provides_global_keys=['long_short_fr_indicies_analysis'],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['long_short_fr_indicies_df']), is_global=True)
     def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
@@ -1779,7 +1779,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_nam
 # 2023-05-10 - Long Short Decoding Analysis                                                                            #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['decoding', 'loo', 'surprise', 'replay'], input_requires=[], output_provides=[], uses=['LeaveOneOutDecodingAnalysis', 'perform_full_session_leave_one_out_decoding_analysis'], used_by=[], creation_date='2023-09-21 17:25', related_items=[])
+@function_attributes(short_name=None, tags=['decoding', 'loo', 'surprise', 'replay'], input_requires=['long_session.replay', 'short_session.replay', 'global_session.replay'], output_provides=[], uses=['LeaveOneOutDecodingAnalysis', 'perform_full_session_leave_one_out_decoding_analysis'], used_by=[], creation_date='2023-09-21 17:25', related_items=[])
 def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session, decoding_time_bin_size = 0.025, perform_cache_load=False) -> LeaveOneOutDecodingAnalysis:
     """ Uses existing decoders and other long/short variables to run `perform_full_session_leave_one_out_decoding_analysis` on each. """
     # Get existing long/short decoders from the cell under "# 2023-02-24 Decoders"
@@ -2007,7 +2007,7 @@ def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thr
     # num_cells_included_in_epoch_mat
     return num_cells_included_in_epoch_mat
 
-@function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'top_level', 'compute', 'fr_index', 'laps', 'replays'], input_requires=['laps', 'replays'], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
+@function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'top_level', 'compute', 'fr_index', 'laps', 'replays'], input_requires=['laps', 'replays', 'filtered_sessions[an_epoch_name].replay'], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
     """ wraps `compute_long_short_firing_rate_indicies(...)` to compute the long_short_fr_index for the complete pipeline
 
@@ -2086,10 +2086,9 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         # New sess.compute_estimated_replay_epochs(...) based method:
         # raise NotImplementedError(f'estimate_replay_epochs is invalid because it does not properly use the parameters!')
         assert curr_active_pipeline.sess.config.preprocessing_parameters.replays is not None
+        raise ValueError(f"2024-07-02 - Overwriting internal replays with estimates, not what was intended!")
         long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].estimate_replay_epochs(*curr_active_pipeline.sess.config.preprocessing_parameters.replays) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
-
-    
 
     # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
     global_non_replays: Epoch = Epoch(Epoch.from_PortionInterval(global_replays.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry

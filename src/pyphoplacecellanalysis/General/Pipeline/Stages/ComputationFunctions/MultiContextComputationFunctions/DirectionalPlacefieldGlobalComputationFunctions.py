@@ -598,7 +598,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
 
 
-@function_attributes(short_name=None, tags=['ESSENTIAL', 'filter', 'epoch_selection', 'user-annotations'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
+@function_attributes(short_name=None, tags=['ESSENTIAL', 'filter', 'epoch_selection', 'user-annotations', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
 def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name: str, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):
     """
     Filters epochs and spikes based on the specified criteria, and updates the epoch IDs.
@@ -4038,7 +4038,7 @@ def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time
     
 
 
-@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
+@function_attributes(short_name=None, tags=['replay'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
 def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False,
                                                          epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> Tuple[DecodedFilterEpochsResult, Optional[DecodedFilterEpochsResult]]:
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder for a single set of time_bin_size values
@@ -4420,7 +4420,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
 
-    @function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'replay', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields'], used_by=[], creation_date='2023-10-25 09:33', related_items=['DirectionalPseudo2DDecodersResult'],
+    @function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'replay', 'session', 'pf1D', 'pf2D'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['PfND.build_merged_directional_placefields'], used_by=[], creation_date='2023-10-25 09:33', related_items=['DirectionalPseudo2DDecodersResult'],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'],
         validate_computation_test=validate_has_directional_merged_placefields, is_global=True)
     def _build_merged_directional_placefields(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
