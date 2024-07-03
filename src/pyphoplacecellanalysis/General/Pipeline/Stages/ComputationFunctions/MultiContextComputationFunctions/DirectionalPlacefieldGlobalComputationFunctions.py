@@ -4039,6 +4039,41 @@ def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time
 
 
 @function_attributes(short_name=None, tags=['replay'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
+@function_attributes(short_name=None, tags=['replay', 'hardcoded-epochs-laps-and-replays'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-07-03 15:35', related_items=['_try_single_decode'])
+def _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, spikes_df: pd.DataFrame, decoding_epochs: Epoch, desired_epoch_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False, epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> DecodedFilterEpochsResult:
+    """ Decodes any arbitrarily specfied epochs at the specified time bin size
+
+    Usage:
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_arbitrary_epochs_decoding_for_decoder
+
+    
+    spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+    """
+    from neuropy.core.epoch import TimeColumnAliasesProtocol
+    
+    # Modifies alt_directional_merged_decoders_result, a copy of the original result, with new timebins
+    a_directional_pf1D_Decoder = deepcopy(a_directional_pf1D_Decoder)
+
+    if use_single_time_bin_per_epoch:
+        print(f'WARNING: use_single_time_bin_per_epoch=True so time bin sizes will be ignored.')
+
+    ## Decode Ripples:
+    if desired_epoch_decoding_time_bin_size is not None:
+        decoding_epochs = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(decoding_epochs))
+        decoding_epochs, epoch_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=decoding_epochs, desired_decoding_time_bin_size=desired_epoch_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_epoch_decoding_time_bin_size), mode=epochs_filtering_mode)
+        if use_single_time_bin_per_epoch:
+            epoch_decoding_time_bin_size = None
+
+        a_decoded_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(spikes_df), filter_epochs=decoding_epochs, decoding_time_bin_size=epoch_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+
+    else:
+        a_decoded_filter_epochs_decoder_result = None
+
+
+    return a_decoded_filter_epochs_decoder_result #, epoch_decoding_time_bin_size
+
+
 def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False,
                                                          epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> Tuple[DecodedFilterEpochsResult, Optional[DecodedFilterEpochsResult]]:
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder for a single set of time_bin_size values
