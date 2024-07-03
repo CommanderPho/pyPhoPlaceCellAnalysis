@@ -700,6 +700,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # ==================================================================================================================== #
     # State Save/Restore                                                                                                   #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['TODO', 'UNFINISHED', 'save_state', 'renderables', 'restore'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 05:23', related_items=[])
     def save_state_active_renderables(self, debug_print=True):
         """ Called to capture the currently added renderables, their customized visual appearance and layout, etc so that they can be restored later by calling `self.perform_restore_renderables(...)` with the output state of this function.
         TODO: not yet complete    
@@ -812,7 +813,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # ==================================================================================================================== #
     # Legends                                                                                                              #
     # ==================================================================================================================== #
-    @function_attributes(short_name=None, tags=['legend'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-01 18:29', related_items=[])
+    @function_attributes(short_name=None, tags=['legend'], input_requires=[], output_provides=[], uses=[], used_by=['build_or_update_all_epoch_interval_rect_legends'], creation_date='2024-07-01 18:29', related_items=[])
     def _build_or_update_epoch_interval_rect_legend(self, parent_item):
         """ Build a legend for a single plot each of the epoch rects 
     
@@ -830,7 +831,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return legend
     
 
-    @function_attributes(short_name=None, tags=['legend'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-01 18:29', related_items=[])
+    @function_attributes(short_name=None, tags=['legend'], input_requires=[], output_provides=[], uses=['_build_or_update_epoch_interval_rect_legend'], used_by=[], creation_date='2024-07-01 18:29', related_items=[])
     def build_or_update_all_epoch_interval_rect_legends(self):
         """ Build a legend for each of the subplots. 
 
@@ -906,8 +907,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                         pass
                     
                     # a_legend_plot.removeItem(a_legend)
-
-                ## Increase the right margin:
                 a_legend_plot.layout.setContentsMargins(0, 0, 0, 0)  # left, top, right, bottom
 
             legends.clear()

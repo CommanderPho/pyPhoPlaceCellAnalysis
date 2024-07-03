@@ -5,7 +5,8 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.MainWindowWrapper import PhoBaseMainWindow
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
-
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from nptyping import NDArray
 # from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
 
 
@@ -416,7 +417,7 @@ class PhoMenuHelper(object):
     #     return new_menu, new_children_items, new_actions
 
     @classmethod    
-    def parse_QAction_for_menu_path(cls, specific_action):
+    def parse_QAction_for_menu_path(cls, specific_action: QtWidgets.QAction) -> List[str]:
         action_objname_str = specific_action.objectName() # 'actionAddTimeIntervals_Laps'
         return action_objname_str.removeprefix('action').split('_') # ['AddTimeIntervals', 'Laps']
 
