@@ -4040,7 +4040,7 @@ def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time
 
 
 
-@function_attributes(short_name=None, tags=['replay', 'hardcoded-epochs-laps-and-replays'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-07-03 15:35', related_items=['_try_single_decode'])
+@function_attributes(short_name=None, tags=['replay', 'hardcoded-epochs-laps-and-replays'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['a_directional_pf1D_Decoder.decode_specific_epochs', '_compute_proper_filter_epochs'], used_by=[], creation_date='2024-07-03 15:35', related_items=['_try_single_decode'])
 def _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, spikes_df: pd.DataFrame, decoding_epochs: Epoch, desired_epoch_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False, epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> DecodedFilterEpochsResult:
     """ Decodes any arbitrarily specfied epochs at the specified time bin size
 
@@ -4077,7 +4077,7 @@ def _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: B
     if use_single_time_bin_per_epoch:
         print(f'WARNING: use_single_time_bin_per_epoch=True so time bin sizes will be ignored.')
 
-    ## Decode Ripples:
+    ## Decode Epochs by calling `a_directional_pf1D_Decoder.decode_specific_epochs` plus do some extra pre-processing of the epochs to be safe:
     if desired_epoch_decoding_time_bin_size is not None:
         decoding_epochs = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(decoding_epochs))
         decoding_epochs, epoch_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=decoding_epochs, desired_decoding_time_bin_size=desired_epoch_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_epoch_decoding_time_bin_size), mode=epochs_filtering_mode)
@@ -4099,7 +4099,7 @@ def _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: B
 
 
 
-@function_attributes(short_name=None, tags=['replay', 'hardcoded-epochs-laps-and-replays'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
+@function_attributes(short_name=None, tags=['replay', 'hardcoded-epochs-laps-and-replays', 'TODO::hardcoded-epochs_laps_and_replays'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
 def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False,
                                                          epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> Tuple[DecodedFilterEpochsResult, Optional[DecodedFilterEpochsResult]]:
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder for a single set of time_bin_size values
@@ -4118,7 +4118,7 @@ def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decod
 
     if use_single_time_bin_per_epoch:
         print(f'WARNING: use_single_time_bin_per_epoch=True so time bin sizes will be ignored.')
-        
+    
     ## Decode Laps:
     if desired_laps_decoding_time_bin_size is not None:
         global_any_laps_epochs_obj = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any' (? same as global_epoch_name?)
@@ -4128,23 +4128,23 @@ def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decod
             laps_decoding_time_bin_size = None
 
         a_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
-        # laps_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result)
+        ## new `_compute_arbitrary_epochs_decoding_for_decoder` way (but untested)
+        # a_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder, deepcopy(curr_active_pipeline.sess.spikes_df), global_any_laps_epochs_obj, laps_decoding_time_bin_size, use_single_time_bin_per_epoch, epochs_filtering_mode)
+
     else:
         # do not decode laps:
         a_directional_laps_filter_epochs_decoder_result = None
-
 
     ## Decode Ripples:
     if desired_ripple_decoding_time_bin_size is not None:
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
         global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode=epochs_filtering_mode)
-        # global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode=EpochFilteringMode.DropShorter)
-        # global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(replay_epochs_df=global_replays, desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, mode=EpochFilteringMode.ConstrainDecodingTimeBinSizeToMinimum)
         if use_single_time_bin_per_epoch:
             ripple_decoding_time_bin_size = None
 
         a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
-        # ripple_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_ripple_filter_epochs_decoder_result)
+        # ## new `_compute_arbitrary_epochs_decoding_for_decoder` way (but untested)
+        # a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder, deepcopy(curr_active_pipeline.sess.spikes_df), global_replays, ripple_decoding_time_bin_size, use_single_time_bin_per_epoch, epochs_filtering_mode)
 
     else:
         a_directional_ripple_filter_epochs_decoder_result = None
