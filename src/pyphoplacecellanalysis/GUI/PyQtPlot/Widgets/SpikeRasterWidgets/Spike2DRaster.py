@@ -242,6 +242,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         # self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)
         self.params.temporal_zoom_factor = 1.0        
+
+        # Time Interval (epochs) legends:
+        self.params.enable_time_interval_legend_in_right_margin = True
         
         self.enable_debug_print = False
         self.enable_debug_widgets = True
@@ -880,8 +883,16 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 if (a_plot_name not in previously_encountered_plot_items):
                     # first time for this plot
                     a_legend.clear() ## clear
+
+                    needs_legend_margin: bool = (len(interval_info) > 0)
+
                     ## Increase the right margin:
-                    a_target_plot.layout.setContentsMargins(0, 0, 300, 0)  # left, top, right, bottom
+                    if (self.params.enable_time_interval_legend_in_right_margin and needs_legend_margin):
+                        ## Increase the right margin:
+                        a_target_plot.layout.setContentsMargins(0, 0, 300, 0)  # left, top, right, bottom
+                    else:
+                        a_legend_plot.layout.setContentsMargins(0, 0, 0, 0)  # left, top, right, bottom
+                            
 
                 a_legend.addItem(a_plotted_intervals, a_name) ## add the item to the legend
                 previously_encountered_plot_items.append(a_plot_name)

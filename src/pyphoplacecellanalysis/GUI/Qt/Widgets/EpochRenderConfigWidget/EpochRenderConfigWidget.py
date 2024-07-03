@@ -252,45 +252,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         self.ui.config_widget_layout.setObjectName("verticalLayout")
 
         self.ui.out_render_config_widgets_dict = {}
-        for a_config_name, a_config in self.configs.items():
-            if isinstance(a_config, (list, tuple)):
-                if len(a_config) == 1:
-                    curr_widget = build_single_epoch_display_config_widget(a_config[0]) # 
-                    self.ui.config_widget_layout.addWidget(curr_widget)
-                    self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
-
-                else:
-                    ## extract all items
-                    a_sub_config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
-                    a_sub_config_widget_layout.setSpacing(0)
-                    a_sub_config_widget_layout.setContentsMargins(0, 0, 0, 0)
-                    a_sub_config_widget_layout.setObjectName(f"horizontalLayout[{a_config_name}]")
-                    
-                    self.ui.out_render_config_widgets_dict[a_config_name] = []
-
-
-                    for i, a_sub_config in enumerate(a_config):
-                        a_sub_curr_widget = build_single_epoch_display_config_widget(a_sub_config)
-                        a_sub_curr_widget.setObjectName(f"config[{a_config_name}][{i}]")
-                        a_sub_config_widget_layout.addWidget(a_sub_curr_widget)
-                        # self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
-                        self.ui.out_render_config_widgets_dict[a_config_name].append(a_sub_curr_widget)
-                        
-                    # curr_widget = a_sub_config_widget_layout
-                    self.ui.config_widget_layout.addLayout(a_sub_config_widget_layout)
-
-            else:
-                # Otherwise a straight-up config
-                curr_widget = build_single_epoch_display_config_widget(a_config)
-                self.ui.config_widget_layout.addWidget(curr_widget)
-                self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
-
-
-            # config_widget_layout.addWidget(curr_widget)
-            # self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
-
-        # out_render_config_widgets_dict
-        # self.ui.rootWidget.setLayout(self.ui.config_widget_layout)
+        self.ui.out_render_config_widgets_dict = self._build_children_widgets(configs=self.configs)
         self.setLayout(self.ui.config_widget_layout)
 
                 
