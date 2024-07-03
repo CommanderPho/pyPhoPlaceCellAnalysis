@@ -689,7 +689,6 @@ class EpochRenderingMixin:
         from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
 
         epoch_display_configs = self.extract_interval_display_config_lists()
-
         an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
         if an_epochs_display_list_widget is None:
             # create a new one:    
@@ -697,6 +696,54 @@ class EpochRenderingMixin:
             self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
         else:
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+
+    @function_attributes(short_name=None, tags=['epochs', 'epoch_render_configs', 'update', 'sync'], input_requires=[], output_provides=[], uses=['self.extract_interval_display_config_lists'], used_by=[], creation_date='2024-07-03 11:27', related_items=['update_epochs_from_configs_widget'])
+    def build_or_update_epoch_render_configs_widget(self, parent=None):
+        """ `Plotted Rects` -> `configs widget`
+        Called to update the render epoch configuration manager from the internal epoch datasources
+        """
+        epoch_display_configs = self.extract_interval_display_config_lists()
+        an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
+        if an_epochs_display_list_widget is None:
+            # create a new one:    
+            print(f'no epochs_render_configs_widget exists, creating a new one...')
+            an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
+            self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+        else:
+            an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+
+    @function_attributes(short_name=None, tags=['epochs', 'epoch_render_configs', 'update', 'sync'], input_requires=[], output_provides=[], uses=['self.update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-07-03 11:27', related_items=['build_or_update_epoch_render_configs_widget'])
+    def update_epochs_from_configs_widget(self):
+        """ Update plots from configs:
+        configs widget -> `Plotted Rects` 
+        
+        Usage:
+        update_epochs_from_configs_widget(active_2d_plot)
+
+        """
+        an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
+        if an_epochs_display_list_widget is None:
+            # create a new one:    
+            raise NotImplementedError
+            # an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(active_2d_plot.extract_interval_display_config_lists(), parent=active_2d_plot)
+            # active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+        # else:
+        #     an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+        ## get the configs from the configs widget
+        _out_configs = an_epochs_display_list_widget.configs_from_states()
+        update_dict = {k:v.to_dict() for k, v in _out_configs.items()}
+        self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
+
+
+
+
+
+
+
+
 
 
 

@@ -1255,7 +1255,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
 
-@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
+@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
 def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, suppress_exceptions:bool=True) -> dict:
     """  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
@@ -1283,6 +1283,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_replay_wcorr_histogram
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import finalize_output_shuffled_wcorr, _get_custom_suffix_for_replay_filename
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
+
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -1295,49 +1297,17 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
         # 'ripple_WCorrShuffle_df_export_CSV_path': None,
     }
 
+
+    # ==================================================================================================================== #
+    # Compute Alternative Replays: `replay_epoch_variations`                                                               #
+    # ==================================================================================================================== #
+
     replay_epoch_outputs = {} # replay_epochs_key
 
     ## Compute new epochs: 
     replay_epoch_variations = {}
 
-    ## Get the estimation parameters:
-    replay_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays
-    assert replay_estimation_parameters is not None
-    _bak_replay_estimation_parameters = deepcopy(replay_estimation_parameters) ## backup original
-
-    with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\t"initial_loaded" failed with error: {formatted_exception_str}. Skipping.'))):
-        replay_epoch_variations.update({
-            'initial_loaded': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay_backup), metadata={'epochs_source': 'initial_loaded'}),
-        })
-        
-    with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"normal_computed" failed with error: {formatted_exception_str}. Skipping.'))):
-        replay_epoch_variations.update({
-            'normal_computed': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay), metadata={'epochs_source': 'normal_computed', 'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'], 'min_num_active_neurons': replay_estimation_parameters['min_num_unique_aclu_inclusions']}),
-        })
-
-    with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"diba_quiescent_method_replay_epochs" failed with error: {formatted_exception_str}. Skipping.'))):
-        ## Compute new epochs: 
-        included_qclu_values = [1,2]
-        minimum_inclusion_fr_Hz = 5.0
-        spikes_df = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-        (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (diba_quiescent_method_replay_epochs_df, diba_quiescent_method_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline,
-                                                                                                                                                                                    included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
-        ## OUTPUTS: diba_quiescent_method_replay_epochs
-        replay_epoch_variations.update({
-            'diba_quiescent_method_replay_epochs': deepcopy(diba_quiescent_method_replay_epochs),
-        })
-        
-
-
-    with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\t"diba_evt_file" failed with error: {formatted_exception_str}. Skipping.'))):
-        ## FROM .evt file
-        ## Load exported epochs from a neuroscope .evt file:
-        diba_evt_file_replay_epochs: Epoch = try_load_neuroscope_EVT_file_epochs(curr_active_pipeline)
-        if diba_evt_file_replay_epochs is not None:
-            replay_epoch_variations.update({
-                'diba_evt_file': deepcopy(diba_evt_file_replay_epochs),
-            })
-        
+    replay_epoch_variations = compute_all_replay_epoch_variations(curr_active_pipeline)
 
     print(f'completed replay extraction, have: {list(replay_epoch_variations.keys())}')
     
@@ -1345,6 +1315,10 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     callback_outputs['replay_epoch_variations'] = replay_epoch_variations
 
 
+
+    # ==================================================================================================================== #
+    # For each replay, duplicate entire pipeline to perform desired computations to ensure no downstream effects           #
+    # ==================================================================================================================== #
     ## Duplicate Copy of pipeline to perform desired computations:
     for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
         # ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
