@@ -4295,8 +4295,15 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     return (laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
 
 
-@function_attributes(short_name=None, tags=['weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function', 'TODO::hardcoded-epochs_laps_and_replays'], input_requires=[], output_provides=[], uses=['_compute_complete_df_metrics', 'compute_weighted_correlations', '_compute_epoch_decoding_radon_transform_for_decoder', '_compute_matching_best_indicies'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-02-15 19:55', related_items=[])
-def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]], spikes_df: pd.DataFrame, should_skip_radon_transform=False):
+
+
+
+
+
+@#TODO 2024-07-03 17:17: - [ ] NOT YET FINISHED
+@function_attributes(short_name=None, tags=['NOT_YET_FINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 17:18', related_items=[])
+def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, new_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]],
+                                   spikes_df: pd.DataFrame, should_skip_radon_transform=False):
     """ computes for all score metrics (Radon Transform, WCorr, PearsonR) and adds them appropriately. 
     
     spikes_df is needed for Simple Correlation Score calculation.
@@ -4306,6 +4313,111 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
         
         
     
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_all_df_score_metrics
+
+        decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result, track_templates)
+
+    
+        (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(directional_merged_decoders_result, track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
+        laps_radon_transform_merged_df, ripple_radon_transform_merged_df, laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df = merged_df_outputs_tuple
+        decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict = raw_dict_outputs_tuple
+
+    """
+
+    ## Radon Transform:
+    decoder_ripple_radon_transform_df_dict = {}
+
+    # These 'extra' dicts were intended to be used in debugging the Radon Transform calculations, but were never needed.
+    decoder_ripple_radon_transform_extras_dict = {}
+
+    if not should_skip_radon_transform:
+        for a_name, a_decoder in track_templates.get_decoders_dict().items():
+            decoder_ripple_radon_transform_df_dict[a_name], decoder_ripple_radon_transform_extras_dict[a_name] = _subfn_compute_arbitrary_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder=a_decoder, a_directional_arbitrary_filter_epochs_decoder_result=new_epochs_decoder_result_dict[a_name],
+                                                                                                                                                                                    nlines=8192, margin=4.0,
+                                                                                                                                                                                    n_jobs=6)
+            
+        # 6m 19.7s - nlines=8192, margin=16, n_jobs=1
+        # 17m 57.6s - nlines=24000, margin=16, n_jobs=1
+        # 4m 31.9s -  nlines=8192, margin=16, n_jobs=4
+        # Still running 14m later - neighbours: 8 = int(margin: 32 / pos_bin_size: 3.8054171165052444)
+            
+        ## INPUTS: decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict
+        (_, ripple_radon_transform_merged_df), (new_epochs_decoder_result_dict, new_epochs_decoder_result_dict) = _subfn_compute_complete_df_metrics(directional_merged_decoders_result, track_templates, new_epochs_decoder_result_dict, new_epochs_decoder_result_dict,
+                                                                                                                                                                                                                    decoder_laps_df_dict=deepcopy(decoder_laps_radon_transform_df_dict), decoder_ripple_df_dict=deepcopy(decoder_ripple_radon_transform_df_dict), active_df_columns = ['score', 'velocity', 'intercept', 'speed'])
+
+        # agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs) = laps_radon_stats
+        print(f'\tPerformance: Ripple: Radon Transform:')
+        ripple_radon_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_radon_transform_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+    else:
+        _, ripple_radon_transform_merged_df = None, None
+
+    ## Weighted Correlation
+    decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(new_epochs_decoder_result_dict))
+    (_, ripple_weighted_corr_merged_df), (new_epochs_decoder_result_dict, new_epochs_decoder_result_dict) = _subfn_compute_complete_df_metrics(directional_merged_decoders_result, track_templates, new_epochs_decoder_result_dict, new_epochs_decoder_result_dict,
+                                                                                                                                                                                                                decoder_laps_df_dict=deepcopy(decoder_laps_weighted_corr_df_dict), decoder_ripple_df_dict=deepcopy(decoder_ripple_weighted_corr_df_dict), active_df_columns = ['wcorr'])
+    
+    ## Simple Pearson Correlation
+    assert spikes_df is not None
+    (_, ripple_simple_pf_pearson_merged_df), corr_column_names = directional_merged_decoders_result.compute_simple_spike_time_v_pf_peak_x_by_epoch(track_templates=track_templates, spikes_df=deepcopy(spikes_df))
+    ## OUTPUTS: (_, ripple_simple_pf_pearson_merged_df), corr_column_names
+    ## Computes the highest-valued decoder for this score:
+    best_decoder_index_col_name: str = 'best_decoder_index'
+    ripple_simple_pf_pearson_merged_df[best_decoder_index_col_name] = ripple_simple_pf_pearson_merged_df[corr_column_names].abs().apply(lambda row: np.argmax(row.values), axis=1)
+
+    ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs, and finally merge in the results:
+    ripple_simple_pf_pearson_merged_df: pd.DataFrame = _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)).join(ripple_simple_pf_pearson_merged_df)
+    
+    ## Extract the individual decoder probability into the .active_epochs
+    per_decoder_df_column_name = 'pearsonr'
+    # for a_name, a_decoder in track_templates.get_decoders_dict().items():
+    for a_name, a_simple_pf_column_name in zip(track_templates.get_decoder_names(), corr_column_names):
+        ## Build a single-column dataframe containing only the appropriate column for this decoder
+        _a_ripple_metric_df: pd.DataFrame = pd.DataFrame({per_decoder_df_column_name: ripple_simple_pf_pearson_merged_df[a_simple_pf_column_name].to_numpy()})     
+        with ExceptionPrintingContext():
+            new_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=new_epochs_decoder_result_dict[a_name], a_score_result_df=_a_ripple_metric_df, columns=[per_decoder_df_column_name])
+
+
+    # TEST AGREEMENTS ____________________________________________________________________________________________________ #
+
+    ## count up the number that the RadonTransform and the most-likely direction agree
+    # agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs) = laps_radon_stats
+    print(f'Performance: Ripple: WCorr')
+    ripple_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+
+    # Test agreement:
+    print(f'Performance: Ripple: Simple PF PearsonR')
+    ripple_simple_pf_pearsonr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+
+    ## OUTPUTS: laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df
+
+    ## OUTPUTS: decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict
+    ## OUTPUTS: laps_radon_transform_merged_df, ripple_radon_transform_merged_df, laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df
+    ## OUTPUTS: (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
+    raw_dict_outputs_tuple = (decoder_ripple_radon_transform_df_dict, decoder_ripple_radon_transform_extras_dict, decoder_ripple_weighted_corr_df_dict)
+    merged_df_outputs_tuple = (ripple_radon_transform_merged_df, ripple_weighted_corr_merged_df, ripple_simple_pf_pearson_merged_df)
+    return (new_epochs_decoder_result_dict, new_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple
+
+
+
+
+
+
+
+
+
+@function_attributes(short_name=None, tags=['weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function', 'TODO::hardcoded-epochs_laps_and_replays'], input_requires=[], output_provides=[], uses=['_compute_complete_df_metrics', 'compute_weighted_correlations', '_compute_epoch_decoding_radon_transform_for_decoder', '_compute_matching_best_indicies'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-02-15 19:55', related_items=[])
+def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates,
+                                   decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]],
+                                   spikes_df: pd.DataFrame, should_skip_radon_transform=False):
+    """ computes for all score metrics (Radon Transform, WCorr, PearsonR) and adds them appropriately. 
+    
+    spikes_df is needed for Simple Correlation Score calculation.
+    
+    ## NOTE: To plot the radon transforms the values must be added to the result object's active_filter_epochs dataframe.
+        That's why we spend so much trouble to do that
+        
+        
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_all_df_score_metrics
 
