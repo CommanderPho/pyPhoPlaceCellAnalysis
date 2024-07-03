@@ -523,6 +523,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
 
 # Replay Loading/Estimation Methods __________________________________________________________________________________ #
+
 @function_attributes(short_name=None, tags=['replay', 'epochs', 'import', 'diba_evt_file'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-26 21:06', related_items=[])
 def try_load_neuroscope_EVT_file_epochs(curr_active_pipeline, ext:str='bst') -> Optional[Epoch]:
     """ loads the replay epochs from an exported .evt file
@@ -761,6 +762,78 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, spikes_df, 
         print(F'saved out newly computed epochs to "{filepath}".')
 
     return (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs)
+
+@function_attributes(short_name=None, tags=['MAIN', 'replay'], input_requires=[], output_provides=[], uses=['compute_diba_quiescent_style_replay_events', 'try_load_neuroscope_EVT_file_epochs', 'try_load_neuroscope_EVT_file_epochs'], used_by=['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'], creation_date='2024-07-03 06:12', related_items=[])
+def compute_all_replay_epoch_variations(curr_active_pipeline) -> Dict[str, Epoch]:
+    """ Computes alternative replays (such as loading them from Diba-exported files, computing using the quiescent periods before the event, etc)
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
+
+    replay_epoch_variations = compute_all_replay_epoch_variations(curr_active_pipeline)
+    replay_epoch_variations
+
+    """
+    # 
+    from neuropy.core.epoch import Epoch, ensure_Epoch, ensure_dataframe
+    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
+    # print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    # print(f'compute_all_replay_epoch_variations(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    
+    suppress_exceptions: bool = True # allow some alternative replay computations to fail
+
+
+    # ==================================================================================================================== #
+    # Compute Alternative Replays: `replay_epoch_variations`                                                               #
+    # ==================================================================================================================== #
+
+    ## Compute new epochs: 
+    replay_epoch_variations = {}
+
+
+    with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\t"initial_loaded" failed with error: {formatted_exception_str}. Skipping.'))):
+        replay_epoch_variations.update({
+            'initial_loaded': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay_backup), metadata={'epochs_source': 'initial_loaded'}),
+        })
+        
+    with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"normal_computed" failed with error: {formatted_exception_str}. Skipping.'))):
+        ## Get the estimation parameters:
+        replay_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays
+        assert replay_estimation_parameters is not None
+
+        ## get the epochs computed normally:
+        replay_epoch_variations.update({
+            'normal_computed': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay), metadata={'epochs_source': 'normal_computed', 'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'], 'min_num_active_neurons': replay_estimation_parameters['min_num_unique_aclu_inclusions']}),
+        })
+
+    with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"diba_quiescent_method_replay_epochs" failed with error: {formatted_exception_str}. Skipping.'))):
+        ## Compute new epochs: 
+        included_qclu_values = [1,2]
+        minimum_inclusion_fr_Hz = 5.0
+        spikes_df = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (diba_quiescent_method_replay_epochs_df, diba_quiescent_method_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline,
+                                                                                                                                                                                    included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
+        ## OUTPUTS: diba_quiescent_method_replay_epochs
+        replay_epoch_variations.update({
+            'diba_quiescent_method_replay_epochs': deepcopy(diba_quiescent_method_replay_epochs),
+        })
+        
+    with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\t"diba_evt_file" failed with error: {formatted_exception_str}. Skipping.'))):
+        ## FROM .evt file
+        ## Load exported epochs from a neuroscope .evt file:
+        diba_evt_file_replay_epochs: Epoch = try_load_neuroscope_EVT_file_epochs(curr_active_pipeline)
+        if diba_evt_file_replay_epochs is not None:
+            replay_epoch_variations.update({
+                'diba_evt_file': deepcopy(diba_evt_file_replay_epochs),
+            })
+        
+
+    print(f'completed replay extraction, have: {list(replay_epoch_variations.keys())}')
+    
+    ## OUTPUT: replay_epoch_variations
+    return replay_epoch_variations    
+
 
 
 
