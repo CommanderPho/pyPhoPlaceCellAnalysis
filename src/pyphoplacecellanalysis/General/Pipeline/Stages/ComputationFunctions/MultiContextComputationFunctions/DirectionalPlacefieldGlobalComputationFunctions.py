@@ -4038,17 +4038,36 @@ def _compute_proper_filter_epochs(epochs_df: pd.DataFrame, desired_decoding_time
     
 
 
-@function_attributes(short_name=None, tags=['replay'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
+
+
 @function_attributes(short_name=None, tags=['replay', 'hardcoded-epochs-laps-and-replays'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-07-03 15:35', related_items=['_try_single_decode'])
 def _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, spikes_df: pd.DataFrame, decoding_epochs: Epoch, desired_epoch_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False, epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> DecodedFilterEpochsResult:
     """ Decodes any arbitrarily specfied epochs at the specified time bin size
 
+    History:
+        Factored out of `_compute_lap_and_ripple_epochs_decoding_for_decoder(...)` which did hard-coded laps and replays together so that it could be used on any arbitrary interval
+
+
     Usage:
 
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_arbitrary_epochs_decoding_for_decoder
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, _compute_arbitrary_epochs_decoding_for_decoder
 
-    
-    spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+        active_decoding_epochs: Epoch = deepcopy(replay_epoch_variations['diba_quiescent_method_replay_epochs'])
+        active_decoding_time_bin_size: float = 0.02 # 20ms
+        minimum_inclusion_fr_Hz: float = active_decoding_epochs.metadata.get('minimum_inclusion_fr_Hz', 1.0)
+        included_qclu_values: List[int] = active_decoding_epochs.metadata.get('included_qclu_values', [1,2])
+
+        directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        # spikes_df = curr_active_pipeline.sess.spikes_df # inferior way
+        spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        ## Decode epochs for all four decoders:
+        new_epochs_decoder_result_dict: Dict[str, Optional["DecodedFilterEpochsResult"]] = {}
+        for a_name, a_decoder in track_templates.get_decoders_dict().items():
+            new_epochs_decoder_result_dict[a_name] = _compute_arbitrary_epochs_decoding_for_decoder(a_decoder, spikes_df=deepcopy(spikes_df), decoding_epochs=active_decoding_epochs, desired_epoch_decoding_time_bin_size=active_decoding_time_bin_size)
+
+        ## OUTPUTS: new_epochs_decoder_result_dict,
+
     """
     from neuropy.core.epoch import TimeColumnAliasesProtocol
     
@@ -4074,10 +4093,19 @@ def _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: B
     return a_decoded_filter_epochs_decoder_result #, epoch_decoding_time_bin_size
 
 
+
+
+
+
+
+
+@function_attributes(short_name=None, tags=['replay', 'hardcoded-epochs-laps-and-replays'], input_requires=['filtered_sessions[global_epoch_name].replay'], output_provides=[], uses=['_compute_proper_filter_epochs'], used_by=[], creation_date='2024-05-22 17:58', related_items=['_try_single_decode'])
 def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: BasePositionDecoder, curr_active_pipeline, desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: float = 0.1, use_single_time_bin_per_epoch: bool=False,
                                                          epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> Tuple[DecodedFilterEpochsResult, Optional[DecodedFilterEpochsResult]]:
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder for a single set of time_bin_size values
     ~12.2s per decoder.
+
+    #TODO 2024-07-03 16:17: - [ ] Convert to call new `_compute_arbitrary_epochs_decoding_for_decoder(...)` one for the laps and replays. Should be drop-in equivalent
 
     """
     from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
@@ -4267,7 +4295,7 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     return (laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
 
 
-@function_attributes(short_name=None, tags=['weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=['_compute_complete_df_metrics', 'compute_weighted_correlations', '_compute_epoch_decoding_radon_transform_for_decoder', '_compute_matching_best_indicies'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-02-15 19:55', related_items=[])
+@function_attributes(short_name=None, tags=['weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function', 'TODO::hardcoded-epochs_laps_and_replays'], input_requires=[], output_provides=[], uses=['_compute_complete_df_metrics', 'compute_weighted_correlations', '_compute_epoch_decoding_radon_transform_for_decoder', '_compute_matching_best_indicies'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-02-15 19:55', related_items=[])
 def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]], spikes_df: pd.DataFrame, should_skip_radon_transform=False):
     """ computes for all score metrics (Radon Transform, WCorr, PearsonR) and adds them appropriately. 
     
@@ -4382,7 +4410,7 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
 # Custom Decoding of Epochs (Laps/Ripple) ____________________________________________________________________________ #
 
 # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
-@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=['_compute_lap_and_ripple_epochs_decoding_for_decoder'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-05-22 18:07', related_items=[])
+@function_attributes(short_name=None, tags=['epochs', 'TODO::hardcoded-epochs_laps_and_replays'], input_requires=[], output_provides=[], uses=['_compute_lap_and_ripple_epochs_decoding_for_decoder'], used_by=['_decode_and_evaluate_epochs_using_directional_decoders'], creation_date='2024-05-22 18:07', related_items=[])
 def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates: "TrackTemplates", epochs_filtering_mode:EpochFilteringMode=EpochFilteringMode.DropShorter) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, Optional[DecodedFilterEpochsResult]]]:
         """ Custom Decoder Computation:
         2024-02-15 - Appears to be best to refactor to the TrackTemplates object. __________________________________________ #
