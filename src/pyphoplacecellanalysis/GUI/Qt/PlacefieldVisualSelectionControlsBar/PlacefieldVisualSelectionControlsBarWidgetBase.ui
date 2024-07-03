@@ -481,7 +481,7 @@ QToolButton:!checked{
            <x>0</x>
            <y>0</y>
            <width>1272</width>
-           <height>130</height>
+           <height>137</height>
           </rect>
          </property>
          <property name="baseSize">

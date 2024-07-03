@@ -223,7 +223,7 @@ border-color: rgb(0, 0, 0);</string>
           <string>save</string>
          </property>
          <property name="icon">
-          <iconset resource="../../../Resources/RemoteIcons.qrc">
+          <iconset>
            <normaloff>:/Icons/silx/svg/Icons/silx/svg/document-save.svg</normaloff>:/Icons/silx/svg/Icons/silx/svg/document-save.svg</iconset>
          </property>
          <property name="iconSize">
@@ -252,7 +252,7 @@ border-color: rgb(0, 0, 0);</string>
           <string>...</string>
          </property>
          <property name="icon">
-          <iconset resource="../../../Resources/RemoteIcons.qrc">
+          <iconset>
            <normaloff>:/Icons/silx/svg/Icons/silx/svg/plot-roi-between.svg</normaloff>:/Icons/silx/svg/Icons/silx/svg/plot-roi-between.svg</iconset>
          </property>
          <property name="iconSize">
@@ -307,7 +307,7 @@ border-color: rgb(0, 0, 0);</string>
  <resources>
   <include location="../../../Resources/GuiResources.qrc"/>
   <include location="../../../Resources/ActionIcons.qrc"/>
-  <include location="../../../Resources/RemoteIcons.qrc"/>
+  <include location="../../../Resources/ActionIcons.qrc"/>
  </resources>
  <connections/>
 </ui>

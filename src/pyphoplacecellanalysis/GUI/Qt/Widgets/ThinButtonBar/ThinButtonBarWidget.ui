@@ -142,7 +142,8 @@ border-color: rgb(0, 0, 0);</string>
          <string>Refresh</string>
         </property>
         <property name="icon">
-         <iconset theme="user-idle"/>
+         <iconset theme="user-idle">
+          <normaloff>.</normaloff>.</iconset>
         </property>
        </widget>
       </item>
