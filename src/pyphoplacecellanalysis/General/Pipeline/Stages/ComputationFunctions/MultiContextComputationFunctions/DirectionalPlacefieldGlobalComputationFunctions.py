@@ -4213,6 +4213,35 @@ def _compute_nonmarginalized_decoder_prob(an_all_epoch_bins_marginals_df: pd.Dat
     a_marginals_df['most_likely_decoder_index'] = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].apply(lambda row: np.argmax(row.values), axis=1)
     return a_marginals_df
 
+
+
+
+def _subfn_compute_arbitrary_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder, a_directional_arbitrary_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult], nlines=4192, margin=4, n_jobs=4):
+    """ Decodes any arbitrary decoded epochs and their RadonTransforms using the provided decoder.
+    
+    #TODO 2024-07-03 17:14: - [ ] replaces `_subfn_compute_epoch_decoding_radon_transform_for_decoder`
+
+    """
+    a_directional_pf1D_Decoder = deepcopy(a_directional_pf1D_Decoder)
+    pos_bin_size: float = a_directional_pf1D_Decoder.pos_bin_size # 3.793023081021702'
+    xbin_centers = deepcopy(a_directional_pf1D_Decoder.xbin_centers)
+
+    ## Decode Epochs:
+    if a_directional_arbitrary_filter_epochs_decoder_result is not None:
+        epoch_radon_transform_extras = []
+        epoch_radon_transform_df, *epoch_radon_transform_extras = a_directional_arbitrary_filter_epochs_decoder_result.compute_radon_transforms(pos_bin_size=pos_bin_size, xbin_centers=xbin_centers, nlines=nlines, margin=margin, n_jobs=n_jobs)
+    else:
+        epoch_radon_transform_extras = None
+        epoch_radon_transform_df = None
+
+    return epoch_radon_transform_df, epoch_radon_transform_extras
+
+
+
+
+
+
+@function_attributes(short_name=None, tags=['TODO::hardcoded-epochs_laps_and_replays'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 17:10', related_items=[])
 def _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult, a_directional_ripple_filter_epochs_decoder_result: Optional[DecodedFilterEpochsResult], nlines=4192, margin=4, n_jobs=4):
     """ Decodes the laps and the ripples and their RadonTransforms using the provided decoder.
     ~12.2s per decoder.
