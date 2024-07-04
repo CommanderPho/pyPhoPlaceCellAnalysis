@@ -409,6 +409,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     """
     from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+    from neuropy.utils.debug_helpers import parameter_sweeps
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function
     # SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path'])
 
@@ -474,12 +475,16 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['perform_rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz, 'included_qclu_values': included_qclu_values, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields',
-                                                                                                   'directional_decoders_evaluate_epochs',
-                                                                                                     'directional_decoders_epoch_heuristic_scoring'],
-                        computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size},
-                                                 {'should_skip_radon_transform': False},
-                                                    {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_evaluate_epochs',  'directional_decoders_epoch_heuristic_scoring'],
+                        computation_kwargs_list=[{'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+        
+
+        # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields',
+        #                                                                                            'directional_decoders_evaluate_epochs',
+        #                                                                                              'directional_decoders_epoch_heuristic_scoring'],
+        #                 computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size},
+        #                                          {'should_skip_radon_transform': False},
+        #                                             {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
         
 
 
@@ -489,8 +494,10 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
         # BEGIN normal data Export ___________________________________________________________________________________________ #
         return_full_decoding_results: bool = False
+        desired_ripple_decoding_time_bin_size = [0.010, 0.020]
+
         custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=[None],
-                                                                                       desired_ripple_decoding_time_bin_size=[0.010, 0.020],
+                                                                                       desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size,
                                                                                 use_single_time_bin_per_epoch=[False],
                                                                                 minimum_event_duration=[desired_ripple_decoding_time_bin_size[-1]])
 
