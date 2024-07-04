@@ -462,8 +462,14 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         print(f'replay epochs changed!')
 
         curr_active_pipeline.reload_default_computation_functions()
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'rank_order_shuffle_analysis','directional_decoders_epoch_heuristic_scoring'],
-                        computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size}, {'should_skip_radon_transform': False}, {}, {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields',
+                                                                                                   'directional_decoders_evaluate_epochs',
+                                                                                                     'rank_order_shuffle_analysis',
+                                                                                                     'directional_decoders_epoch_heuristic_scoring'],
+                        computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size},
+                                                    {'should_skip_radon_transform': False},
+                                                    {},
+                                                    {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
         ## 10m
 
         ## Export these new computations to .csv for across-session analysis:

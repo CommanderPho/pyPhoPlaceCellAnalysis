@@ -1248,6 +1248,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+    from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events, overwrite_replay_epochs_and_recompute, try_load_neuroscope_EVT_file_epochs, replace_replay_epochs
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
@@ -1262,6 +1263,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     
     base_BATCH_DATE_TO_USE: str = f"{self.BATCH_DATE_TO_USE}" ## backup original string
 
+    should_suppress_errors: bool = self.fail_on_exception # get('fail_on_exception', False)
+    
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -1305,13 +1308,16 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
         ## Export to .evt file
 
         ## Save computed epochs out to a neuroscope .evt file:
-        filename = f"{curr_active_pipeline.session_name}"
-        filepath = curr_active_pipeline.get_output_path().joinpath(filename).resolve()
+        filename = f"{curr_active_pipeline.session_name}{custom_suffix}"
+        good_filename: str = sanitize_filename_for_Windows(filename)
+        print(f'\tgood_filename: {good_filename}')
+        filepath = curr_active_pipeline.get_output_path().joinpath(good_filename).resolve()
+        
         curr_replay_epoch = deepcopy(a_replay_epochs)
 
         ## set the filename of the Epoch:
         curr_replay_epoch.filename = filepath
-        filepath = curr_replay_epoch.to_neuroscope(ext=custom_suffix)
+        filepath = curr_replay_epoch.to_neuroscope(ext='PHONEW')
         assert filepath.exists()
         print(F'saved out newly computed epochs of type "{replay_epochs_key} to "{filepath}".')
         replay_epoch_outputs[replay_epochs_key].update(dict(exported_evt_file_path=str(filepath.as_posix())))
@@ -1335,7 +1341,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
         print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
         self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
 
-        with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
+        with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
             # for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
             a_curr_active_pipeline = deepcopy(curr_active_pipeline)
             did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
