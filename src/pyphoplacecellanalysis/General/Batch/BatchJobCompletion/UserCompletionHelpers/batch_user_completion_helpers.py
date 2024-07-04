@@ -1284,7 +1284,30 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     ## OUTPUT: replay_epoch_variations
     callback_outputs['replay_epoch_variations'] = replay_epoch_variations
 
+    ## Save the replay epochs out to event files:
+    for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
+        # ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
+        # replay_epochs_key = 'diba_quiescent_method_replay_epochs'
+        # a_replay_epochs = replay_epoch_variations[replay_epochs_key]
+        print(f'performing comp for "{replay_epochs_key}"...')
+        replay_epoch_outputs[replay_epochs_key] = {} # init to empty
 
+        custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
+        print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
+
+        ## Export to .evt file
+
+        ## Save computed epochs out to a neuroscope .evt file:
+        filename = f"{curr_active_pipeline.session_name}"
+        filepath = curr_active_pipeline.get_output_path().joinpath(filename).resolve()
+        curr_replay_epoch = deepcopy(a_replay_epochs)
+
+        ## set the filename of the Epoch:
+        curr_replay_epoch.filename = filepath
+        filepath = curr_replay_epoch.to_neuroscope(ext=custom_suffix)
+        assert filepath.exists()
+        print(F'saved out newly computed epochs of type "{replay_epochs_key} to "{filepath}".')
+        replay_epoch_outputs[replay_epochs_key].update(dict(exported_evt_file_path=str(filepath.as_posix())))
 
     # ==================================================================================================================== #
     # For each replay, duplicate entire pipeline to perform desired computations to ensure no downstream effects           #
