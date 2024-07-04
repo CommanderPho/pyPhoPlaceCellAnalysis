@@ -58,6 +58,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+
 DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 ShuffleIdx = NewType('ShuffleIdx', int)
 
@@ -252,6 +254,8 @@ def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames
     custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=_temp_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths, enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False)
 
     """
+    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+    
     try:
         if enable_save_pipeline_pkl:
             custom_save_filepaths['pipeline_pkl'] = a_curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
