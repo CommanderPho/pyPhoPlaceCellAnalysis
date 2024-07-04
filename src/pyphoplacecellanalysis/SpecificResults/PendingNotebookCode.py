@@ -383,10 +383,13 @@ def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_str
 @function_attributes(short_name=None, tags=['replay', 'new_replay', 'top'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
 def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025, 
                                           num_wcorr_shuffles: int=25, fail_on_exception=True,
-                                          enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False):
+                                          enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, user_completion_dummy=None):
     """ Recomputes the replay epochs using a custom implementation of the criteria in Diba 2007.
 
     , included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0
+
+
+    #TODO 2024-07-04 10:52: - [ ] Need to add the custom processing suffix to `BATCH_DATE_TO_USE`
 
     
     If `did_change` == True,
@@ -398,9 +401,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     Otherwise:
         ['wcorr_shuffle_analysis'] can be updated
 
-
-
-
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import overwrite_replay_epochs_and_recompute
 
@@ -409,6 +409,8 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     """
     from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function
+    # SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path'])
 
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderComputationsContainer
 
@@ -434,6 +436,10 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=new_replay_epochs)
     print(f'custom_suffix: "{custom_suffix}"')
 
+    assert (user_completion_dummy is not None), f"2024-07-04 - `user_completion_dummy` must be provided with a modified .BATCH_DATE_TO_USE to include the custom suffix!"
+    # if user_completion_dummy is None:
+    #     user_completion_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path)
+
     ## OUTPUTS: new_replay_epochs, new_replay_epochs_df
     did_change, _backup_session_replay_epochs, _backup_session_configs = replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=new_replay_epochs)
 
@@ -444,7 +450,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     }
     print(f'custom_save_filenames: {custom_save_filenames}')
     custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
-
 
     if not did_change:
         print(f'no changes!')
@@ -457,9 +462,41 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         print(f'replay epochs changed!')
 
         curr_active_pipeline.reload_default_computation_functions()
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
-                        computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size}, {'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'rank_order_shuffle_analysis','directional_decoders_epoch_heuristic_scoring'],
+                        computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size}, {'should_skip_radon_transform': False}, {}, {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
         ## 10m
+
+        ## Export these new computations to .csv for across-session analysis:
+        # Uses `perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function` to compute the new outputs:
+
+        # BEGIN normal data Export ___________________________________________________________________________________________ #
+        return_full_decoding_results: bool = False
+        custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=[None],
+                                                                                       desired_ripple_decoding_time_bin_size=[0.010, 0.020],
+                                                                                use_single_time_bin_per_epoch=[False],
+                                                                                minimum_event_duration=[desired_ripple_decoding_time_bin_size[-1]])
+
+
+        ## make sure that the exported .csv and .h5 files have unique names based on the unique replays used. Also avoid unduely recomputing laps each time.
+        _across_session_results_extended_dict = {}
+        ## Combine the output of `perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function` into two dataframes for the laps, one per-epoch and one per-time-bin
+        _across_session_results_extended_dict = _across_session_results_extended_dict | perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(user_completion_dummy, None,
+                                                        curr_session_context=curr_active_pipeline.get_session_context(), curr_session_basedir=curr_active_pipeline.sess.basepath.resolve(), curr_active_pipeline=curr_active_pipeline,
+                                                        across_session_results_extended_dict=_across_session_results_extended_dict, return_full_decoding_results=return_full_decoding_results,
+                                                        save_hdf=True, save_csvs=True,
+                                                        # desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.5, num=4),
+                                                        custom_all_param_sweep_options=custom_all_param_sweep_options, # directly provide the parameter sweeps
+                                                    )
+        # with `return_full_decoding_results == False`
+        out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple = _across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
+        (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
+
+        custom_save_filepaths['csv_out_path'] = out_path
+        custom_save_filepaths['ripple_csv_out_path'] = ripple_out_path
+
+        # END Normal data Export _____________________________________________________________________________________________ #
+
+
 
 
         ## Long/Short Stuff:
@@ -483,7 +520,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths,
                                                                 enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
 
-
     try:
         decoder_names = deepcopy(TrackTemplates.get_decoder_names())
         wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath) = finalize_output_shuffled_wcorr(a_curr_active_pipeline=curr_active_pipeline,
@@ -497,7 +533,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
     except BaseException as e:
         print(f'failed doing `finalize_output_shuffled_wcorr(...)` with error: {e}')
         pass
-
 
     # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
@@ -514,7 +549,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     # 2024-06-25 - Save all custom _______________________________________________________________________________________ #
     ## INPUTS: custom_suffix
-
 
     # custom_save_filepaths['pipeline_pkl'] = Path('W:/Data/KDIBA/gor01/two/2006-6-07_16-40-19/loadedSessPickle_withNewKamranExportedReplays.pkl').resolve()
     # custom_save_filepaths['global_computation_pkl'] = Path(r'W:\Data\KDIBA\gor01\two\2006-6-07_16-40-19\output\global_computation_results_withNewKamranExportedReplays.pkl').resolve()
