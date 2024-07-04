@@ -494,9 +494,11 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
         # BEGIN normal data Export ___________________________________________________________________________________________ #
         return_full_decoding_results: bool = False
+        # desired_laps_decoding_time_bin_size = [None] # doesn't work
+        desired_laps_decoding_time_bin_size = [1.5] # large so it doesn't take long
         desired_ripple_decoding_time_bin_size = [0.010, 0.020]
 
-        custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=[None],
+        custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=desired_laps_decoding_time_bin_size,
                                                                                        desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size,
                                                                                 use_single_time_bin_per_epoch=[False],
                                                                                 minimum_event_duration=[desired_ripple_decoding_time_bin_size[-1]])
