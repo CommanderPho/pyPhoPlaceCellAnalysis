@@ -1255,6 +1255,13 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import finalize_output_shuffled_wcorr, _get_custom_suffix_for_replay_filename
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
 
+    # SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path'])
+    # a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path)
+    
+    # "self" already is a dummy
+    
+    base_BATCH_DATE_TO_USE: str = f"{self.BATCH_DATE_TO_USE}" ## backup original string
+
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -1318,12 +1325,22 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
         # replay_epochs_key = 'diba_quiescent_method_replay_epochs'
         # a_replay_epochs = replay_epoch_variations[replay_epochs_key]
         print(f'performing comp for "{replay_epochs_key}"...')
-        replay_epoch_outputs[replay_epochs_key] = {} # init to empty
+        # replay_epoch_outputs[replay_epochs_key] = {} # init to empty
+
+        custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
+        print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
+
+        ## Modify .BATCH_DATE_TO_USE to include the custom suffix
+        curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}_{custom_suffix}"
+        print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
+        self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
 
         with ExceptionPrintingContext(suppress=True, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
             # for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
             a_curr_active_pipeline = deepcopy(curr_active_pipeline)
-            did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs, enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False)
+            did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
+                                                                                                              enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
+                                                                                                              user_completion_dummy=self)
 
             replay_epoch_outputs[replay_epochs_key].update(dict(did_change=did_change, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths))
 
@@ -1334,11 +1351,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
             # ==================================================================================================================== #
 
             ## Call on `a_replay_epochs`, _temp_curr_active_pipeline:
-
-            custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
-            print(f'custom_suffix: "{custom_suffix}"')
             replay_epoch_outputs[replay_epochs_key].update(dict(custom_suffix=custom_suffix))
-
 
             ## INPUTS: a_curr_active_pipeline, custom_suffix
             decoder_names = TrackTemplates.get_decoder_names()
@@ -1455,7 +1468,9 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
         ## end error handler
 
     # END FOR
-  
+    ## restore original base_BATCH_DATE_TO_USE
+    self.BATCH_DATE_TO_USE = base_BATCH_DATE_TO_USE
+
     callback_outputs = {
         'custom_suffix': custom_suffix,
         'replay_epoch_variations': deepcopy(replay_epoch_variations),
