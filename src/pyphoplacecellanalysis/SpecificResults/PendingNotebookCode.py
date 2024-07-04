@@ -462,15 +462,27 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         print(f'replay epochs changed!')
 
         curr_active_pipeline.reload_default_computation_functions()
+
+        metadata = deepcopy(new_replay_epochs.metadata)
+        minimum_inclusion_fr_Hz = metadata.get('minimum_inclusion_fr_Hz', None)
+        included_qclu_values = metadata.get('included_qclu_values', None)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields','perform_rank_order_shuffle_analysis'],
+                                                           computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size},
+                                                                                    {'num_shuffles': num_wcorr_shuffles, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz, 'included_qclu_values': included_qclu_values, 'skip_laps': True}],
+                                                         enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+        
+
+        # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['perform_rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz, 'included_qclu_values': included_qclu_values, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields',
                                                                                                    'directional_decoders_evaluate_epochs',
-                                                                                                     'rank_order_shuffle_analysis',
                                                                                                      'directional_decoders_epoch_heuristic_scoring'],
                         computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size},
-                                                    {'should_skip_radon_transform': False},
-                                                    {},
+                                                 {'should_skip_radon_transform': False},
                                                     {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
-        ## 10m
+        
+
+
 
         ## Export these new computations to .csv for across-session analysis:
         # Uses `perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function` to compute the new outputs:
