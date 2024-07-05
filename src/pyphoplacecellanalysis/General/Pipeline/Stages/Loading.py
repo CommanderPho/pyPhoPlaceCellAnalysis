@@ -60,14 +60,16 @@ def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, 
     _desired_final_pickle_path = None
     if pkl_path.exists():
         # file already exists:
-        
         ## Save under a temporary name in the same output directory, and then compare post-hoc
         _desired_final_pickle_path = pkl_path
         pkl_path, _ = build_unique_filename(pkl_path, additional_postfix_extension='tmp') # changes the final path to the temporary file created.
         is_temporary_file_used = True # this is the only condition where this is true
-            
+    else:
+        # it doesn't exist so the final pickle path is the real one
+        _desired_final_pickle_path = pkl_path            
+
     # Save reloaded pipeline out to pickle for future loading
-    with ProgressMessagePrinter(filepath=_desired_final_pickle_path, action=f"Saving (file mode '{file_mode}')", contents_description='session pickle file', finished_message='saved session pickle file', returns_string=False):
+    with ProgressMessagePrinter(filepath=_desired_final_pickle_path, action=f"Saving (file mode '{file_mode}')", contents_description='pickle file', finished_message='saved pickle file', returns_string=False):
         try:
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
@@ -122,7 +124,7 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
         if not isinstance(pkl_path, Path):
             pkl_path = Path(pkl_path).resolve()
             
-        with ProgressMessagePrinter(filepath=pkl_path, action=f"Saving (file mode '{file_mode}')", contents_description='session pickle file', finished_message='saved session pickle file', returns_string=False):
+        with ProgressMessagePrinter(filepath=pkl_path, action=f"Saving (file mode '{file_mode}')", contents_description='pickle file', finished_message='saved pickle file', returns_string=False):
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
                 # pickle.dump(db, dbfile)
