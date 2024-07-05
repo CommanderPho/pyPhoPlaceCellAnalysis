@@ -1294,12 +1294,14 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     # ==================================================================================================================== #
     # For each replay, duplicate entire pipeline to perform desired computations to ensure no downstream effects           #
     # ==================================================================================================================== #
+    print(f'=====================================>> Starting computations for the 4 new epochs...')
+
     ## Duplicate Copy of pipeline to perform desired computations:
     for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
         # ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
         # replay_epochs_key = 'diba_quiescent_method_replay_epochs'
         # a_replay_epochs = replay_epoch_variations[replay_epochs_key]
-        print(f'performing comp for "{replay_epochs_key}"...')
+        print(f'\t=====================================>> performing comp for "{replay_epochs_key}"...')
         # replay_epoch_outputs[replay_epochs_key] = {} # init to empty
 
         custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
@@ -1310,7 +1312,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
         print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
         self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
 
-        print(f'WARNING: should_suppress_errors: {should_suppress_errors}')f
+        print(f'\tWARNING: should_suppress_errors: {should_suppress_errors}')
         with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
             # for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
             a_curr_active_pipeline = deepcopy(curr_active_pipeline)
@@ -1320,6 +1322,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 
             replay_epoch_outputs[replay_epochs_key].update(dict(did_change=did_change, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths))
 
+            print(f'<<<<<<<<<<<<<<< Done with `overwrite_replay_epochs_and_recompute(...)` for replay_epochs_key: {replay_epochs_key}')
             ## modifies `_temp_curr_active_pipeline`
 
             # ==================================================================================================================== #
@@ -1338,9 +1341,9 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
                 wcorr_shuffles: WCorrShuffle = WCorrShuffle(**get_dict_subset(wcorr_shuffles.to_dict(), subset_excludelist=['_VersionedResultMixin_version']))
                 a_curr_active_pipeline.global_computation_results.computed_data.SequenceBased.wcorr_ripple_shuffle = wcorr_shuffles
                 filtered_epochs_df: pd.DataFrame = deepcopy(wcorr_shuffles.filtered_epochs_df)
-                print(f'wcorr_ripple_shuffle.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles}')
+                print(f'\t\twcorr_ripple_shuffle.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles}')
             else:
-                print(f'SequenceBased is not computed.')
+                print(f'\t\tSequenceBased is not computed.')
                 wcorr_shuffles = None
                 raise ValueError(f'SequenceBased is not computed.')
 
