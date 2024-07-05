@@ -1306,8 +1306,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     
     base_BATCH_DATE_TO_USE: str = f"{self.BATCH_DATE_TO_USE}" ## backup original string
 
-    should_suppress_errors: bool = self.fail_on_exception # get('fail_on_exception', False)
-    
+    should_suppress_errors: bool = (not self.fail_on_exception) # get('fail_on_exception', False)    
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
