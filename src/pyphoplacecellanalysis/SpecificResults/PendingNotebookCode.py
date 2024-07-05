@@ -563,7 +563,9 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         
     except BaseException as e:
         print(f'failed doing `finalize_output_shuffled_wcorr(...)` with error: {e}')
-        pass
+        if user_completion_dummy.fail_on_exception:
+            print(f'did_change: {did_change}, custom_save_filenames: {custom_save_filenames}, custom_save_filepaths: {custom_save_filepaths}')
+            raise e
 
     # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
