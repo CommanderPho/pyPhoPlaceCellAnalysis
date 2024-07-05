@@ -368,7 +368,7 @@ def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_str
 
     elif epochs_source == 'initial_loaded':
         custom_suffix: str = '_withOldestImportedReplays'
-        custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata.get('included_qclu_values', '??')}", f"frateThresh_{metadata.get('minimum_inclusion_fr_Hz', 0.1):.1f}", *extras_strings])
+        custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata.get('included_qclu_values', 'XX')}", f"frateThresh_{metadata.get('minimum_inclusion_fr_Hz', 0.1):.1f}", *extras_strings])
 
     elif epochs_source == 'normal_computed':
         custom_suffix: str = '_withNormalComputedReplays'
