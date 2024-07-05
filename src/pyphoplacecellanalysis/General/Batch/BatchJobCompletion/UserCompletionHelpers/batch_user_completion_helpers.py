@@ -1305,7 +1305,6 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
     # "self" already is a dummy
     
     base_BATCH_DATE_TO_USE: str = f"{self.BATCH_DATE_TO_USE}" ## backup original string
-
     should_suppress_errors: bool = (not self.fail_on_exception) # get('fail_on_exception', False)    
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -1383,6 +1382,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
         print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
         self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
 
+        print(f'WARNING: should_suppress_errors: {should_suppress_errors}')f
         with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
             # for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
             a_curr_active_pipeline = deepcopy(curr_active_pipeline)
