@@ -71,7 +71,7 @@ def finalize_output_shuffled_wcorr(a_curr_active_pipeline, decoder_names, custom
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import finalize_output_shuffled_wcorr
 
         decoder_names = deepcopy(track_templates.get_decoder_names())
-        wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath) = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline,
+        wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_WCorrShuffle_df_export_CSV_path) = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline,
                                                                                                                                         decoder_names=decoder_names, custom_suffix=custom_suffix)
     """
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
@@ -553,7 +553,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     try:
         decoder_names = deepcopy(TrackTemplates.get_decoder_names())
-        wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath) = finalize_output_shuffled_wcorr(a_curr_active_pipeline=curr_active_pipeline,
+        wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_WCorrShuffle_df_export_CSV_path) = finalize_output_shuffled_wcorr(a_curr_active_pipeline=curr_active_pipeline,
                                                                                                                                         decoder_names=decoder_names, custom_suffix=custom_suffix)
         custom_save_filepaths['standalone_wcorr_pkl'] = standalone_pkl_filepath
         custom_save_filepaths['standalone_mat_pkl'] = standalone_mat_filepath
