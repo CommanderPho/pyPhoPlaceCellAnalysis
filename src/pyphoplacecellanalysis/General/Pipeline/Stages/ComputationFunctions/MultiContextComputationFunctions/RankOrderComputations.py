@@ -2583,7 +2583,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         if include_includelist is not None:
             print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
-        print(f'perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
+        print(f'####> perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
 
         # Needs to store the parameters
         # num_shuffles:int=1000
@@ -2601,7 +2601,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
         ## Laps Rank-Order Analysis:
         if not skip_laps:
-            print(f'\tcomputing Laps rank-order shuffles:')
+            print(f'\t##> computing Laps rank-order shuffles:')
             print(f'\t\tnum_shuffles: {num_shuffles}, minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz} Hz')
             # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
             _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
@@ -2630,7 +2630,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
 
         ## Ripple Rank-Order Analysis:
-        print(f'\tcomputing Ripple rank-order shuffles:')
+        print(f'\t##> computing Ripple rank-order shuffles:')
         _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # rank_alignment='first'
         (LR_ripple_outputs, RL_ripple_outputs, ripple_evts_paired_tests) = _ripples_outputs
         global_computation_results.computed_data['RankOrder'].LR_ripple = LR_ripple_outputs
@@ -2664,6 +2664,9 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         except (AssertionError, BaseException) as e:
             print(f'Issue with `RankOrderAnalyses.most_likely_directional_rank_order_shuffling(...)` e: {e}')
             raise
+
+
+        print(f'< done with `perform_rank_order_shuffle_analysis(...)`')
 
 
         """ Usage:

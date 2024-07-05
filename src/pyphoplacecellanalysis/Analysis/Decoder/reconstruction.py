@@ -879,7 +879,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             TODO 2023-04-06 - REMOVE this argument. it is unused. It exists just for backwards compatibility with the stateful decoder.
         """
         # call .get_by_id(ids) on the placefield (pf):
-        neuron_sliced_pf = self.pf.get_by_id(ids)
+        neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
         ## apply the neuron_sliced_pf to the decoder:
         neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
         return neuron_sliced_decoder

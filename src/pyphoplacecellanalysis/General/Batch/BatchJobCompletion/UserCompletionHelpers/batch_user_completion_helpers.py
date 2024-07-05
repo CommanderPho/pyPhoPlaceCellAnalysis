@@ -1380,7 +1380,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
         print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
         ## Modify .BATCH_DATE_TO_USE to include the custom suffix
-        curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}_{custom_suffix}"
+        curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}{custom_suffix}"
         print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
         self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
 
