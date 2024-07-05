@@ -593,8 +593,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
     minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
     # included_qclu_values: List[int] = rank_order_results.included_qclu_values
-    directional_laps_results: "DirectionalLapsResult" = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-    track_templates: "TrackTemplates" = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+    directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # : "DirectionalLapsResult"
+    track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference? : "TrackTemplates"
 
     ## Copy the default result:
     directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
@@ -961,24 +961,63 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'reload_exported_kdiba_session_position_info_mat_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     active_data_mode_name: str = curr_active_pipeline.session_data_type
-
-    # known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
-
     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
     # active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
+
+    def _update_loaded_track_limits(a_session):
+        """ captures: curr_active_pipeline
+        """
+        sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+        a_session.config = sess_config
+        _bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
+        ## Apply fn
+        a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
+        _new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
+        # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
+        did_change: bool = ((_bak_loaded_track_limits is None) or np.any((np.array(_new_loaded_track_limits) != np.array(_bak_loaded_track_limits))))
+        return did_change, a_session
+
+    ## Check if they changed
+    did_change: bool = False
+
+    ## Do main session:
     a_session = deepcopy(curr_active_pipeline.sess)
-    # sess_config: SessionConfig = SessionConfig(**deepcopy(session.config.to_dict()))
-    sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
-    a_session.config = sess_config
-
-    # a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=deepcopy(curr_active_pipeline.sess))
-    a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
-    # a_session
-
+    new_did_change, a_session = _update_loaded_track_limits(a_session=a_session)
     curr_active_pipeline.stage.sess = a_session ## apply the session
+    did_change = did_change | new_did_change
+    print(f'curr_active_pipeline.sess changed its track limits!')
     # curr_active_pipeline.sess.config = a_session.config # apply the config only...
+
+    # --------------------- Do for filtered sessions as well --------------------- #
+
+
+    did_change = did_change or np.any(ensure_dataframe(_backup_session_configs['sess']).to_numpy() != ensure_dataframe(new_replay_epochs).to_numpy())
+
+    _new_sessions = {}
+
+    # curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
+    for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
+        ## backup original values:
+        # _backup_session_replay_epochs[k] = deepcopy(a_filtered_session.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        # _backup_session_configs[k] = deepcopy(a_filtered_session.replay)
+
+
+        a_filtered_session = deepcopy(a_filtered_session)
+        # sess_config: SessionConfig = SessionConfig(**deepcopy(a_filtered_session.config.__getstate__()))
+        # a_filtered_session.config = sess_config
+        # _new_sessions[k] = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_filtered_session)
+        new_did_change, a_filtered_session = _update_loaded_track_limits(a_session=a_filtered_session)
+        if new_did_change:
+            print(f'\tfiltered_session[{k}] changed!')
+        did_change = did_change | new_did_change
+        
+
+    for k, a_filtered_session in _new_sessions.items():
+        curr_active_pipeline.filtered_sessions[k] = a_filtered_session
+
+
 
     loaded_track_limits = a_session.config.loaded_track_limits
     
@@ -1230,7 +1269,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
-def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, suppress_exceptions:bool=True) -> dict:
+def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
     
