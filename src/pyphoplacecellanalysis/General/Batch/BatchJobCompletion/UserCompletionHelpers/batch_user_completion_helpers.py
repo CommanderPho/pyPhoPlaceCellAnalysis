@@ -221,11 +221,12 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['CSV', 'time_bin_sizes', 'marginals'], input_requires=['DirectionalMergedDecoders'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:24', related_items=[])
+@function_attributes(short_name=None, tags=['CSV', 'time_bin_sizes', 'marginals'], input_requires=['DirectionalMergedDecoders'], output_provides=[], uses=['_compute_all_df_score_metrics'], used_by=[], creation_date='2024-04-27 21:24', related_items=[])
 def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_hdf=True, save_csvs=True, return_full_decoding_results:bool=False, 
                                                                              custom_all_param_sweep_options=None,
-                                                                             desired_shared_decoding_time_bin_sizes:Optional[NDArray]=None) -> dict:
+                                                                             desired_shared_decoding_time_bin_sizes:Optional[NDArray]=None,
+                                                                             additional_session_context: Optional[IdentifyingContext]=None) -> dict:
     """
     if `return_full_decoding_results` == True, returns the full decoding results for debugging purposes. `output_alt_directional_merged_decoders_result`
 
@@ -236,6 +237,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
                                                                             minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]])
 
 
+
+    additional_session_context if provided, this is combined with the session context.
     ## CSVs are saved out in `_subfn_process_time_bin_swept_results`
 
 
@@ -723,7 +726,15 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     
     ## Call the subfunction to process the time_bin_size swept result and produce combined output dataframes:
-    combined_multi_timebin_outputs_tuple = _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context=curr_active_pipeline.get_session_context())
+    if additional_session_context is not None:
+        if isinstance(additional_session_context, dict):
+            additional_session_context = IdentifyingContext(**additional_session_context)
+        active_context = (curr_active_pipeline.get_session_context() | additional_session_context)
+    else:
+        active_context = curr_active_pipeline.get_session_context()
+        
+        
+    combined_multi_timebin_outputs_tuple = _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context=active_context)
     # Unpacking:    
     # (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
 

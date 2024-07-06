@@ -4308,9 +4308,10 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     
     ## Merge in the RadonTransform df:
     laps_metric_merged_df: pd.DataFrame = _laps_all_epoch_bins_marginals_df.join(laps_metric_merged_df)
-    ripple_metric_merged_df: pd.DataFrame = _ripple_all_epoch_bins_marginals_df.join(ripple_metric_merged_df)
+    ripple_metric_merged_df: pd.DataFrame = _ripple_all_epoch_bins_marginals_df.join(ripple_metric_merged_df) # has ['ripple_idx', 'ripple_start_t'] to join on
 
-    ## Extract the individual decoder probability into the .active_epochs
+    ## Extract the individual decoder probability into the .active_epochs:
+    shared_index_column_names = ['ripple_idx', 'ripple_start_t']
     per_decoder_df_columns = ['P_decoder']
     decoder_name_to_decoder_probability_column_map = dict(zip(track_templates.get_decoder_names(), ['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']))
     # for a_name, a_decoder in track_templates.get_decoders_dict().items():
@@ -4357,6 +4358,7 @@ def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_r
         decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict = raw_dict_outputs_tuple
 
     """
+    raise NotImplementedError()
 
     ## Radon Transform:
     decoder_ripple_radon_transform_df_dict = {}
