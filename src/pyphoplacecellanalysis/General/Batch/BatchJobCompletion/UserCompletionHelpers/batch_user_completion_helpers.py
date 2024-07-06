@@ -235,6 +235,10 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
                                                                             use_single_time_bin_per_epoch=[False],
                                                                             minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]])
 
+
+    ## CSVs are saved out in `_subfn_process_time_bin_swept_results`
+
+
     """
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -613,6 +617,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 
     for a_sweep_dict in all_param_sweep_options:
+        ## Looks like each iteration of the loop serves to update: `output_alt_directional_merged_decoders_result`, `output_extracted_result_tuples`, `output_directional_decoders_epochs_decode_results_dict`, 
         a_sweep_tuple = frozenset(a_sweep_dict.items())
         print(f'a_sweep_dict: {a_sweep_dict}')
 
@@ -641,6 +646,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             ## Add the session-specific columns:
             a_df = add_session_df_columns(a_df, session_name, curr_session_t_delta, a_time_bin_column_name)
 
+            
+            #TODO 2024-07-05 20:53: - [ ] Note that these aren't added back to the source `an_alt_dir_Pseudo2D_decoders_result`
         ## Build the output tuple:
         output_extracted_result_tuples[a_sweep_tuple] = (laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df) # output tuples are extracted here, where changes are needed I think
         

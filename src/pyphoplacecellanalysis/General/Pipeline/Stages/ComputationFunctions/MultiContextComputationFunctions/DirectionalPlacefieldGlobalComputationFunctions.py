@@ -3889,9 +3889,13 @@ def _update_decoder_result_active_filter_epoch_columns(a_result_obj: DecodedFilt
     decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_radon_transform_df=decoder_laps_radon_transform_df_dict[a_name])
     decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_radon_transform_df=decoder_ripple_radon_transform_df_dict[a_name])
     
+    If the score result is filtered, the results will be NaN :[
+
     """
     # assert a_result_obj.active_filter_epochs.n_epochs == np.shape(a_radon_transform_df)[0]
-    assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0], f"a_result_obj.num_filter_epochs: {a_result_obj.num_filter_epochs} != np.shape(a_score_result_df)[0]: {np.shape(a_score_result_df)[0]}" # #TODO 2024-05-23 02:19: - [ ] I don't know the full purpose of this assert, I'm guessing it's to make sure were operating on the same epochs
+    
+
+    assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0], f"a_result_obj.num_filter_epochs: {a_result_obj.num_filter_epochs} != np.shape(a_score_result_df)[0]: {np.shape(a_score_result_df)[0]}" # #TODO 2024-05-23 02:19: - [ ] I don't know the full purpose of this assert, I'm guessing it's to make sure were operating on the same epochs. What's passed in is a flat vector of values so we have no correspondance (like the start_t) if they don't literally correspond
     if isinstance(a_result_obj.filter_epochs, pd.DataFrame):
         a_result_obj.filter_epochs.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
         a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df) # add the newly computed columns to the Epochs object
