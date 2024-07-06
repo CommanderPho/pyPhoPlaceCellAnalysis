@@ -457,7 +457,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
         directional_merged_decoders_result.perform_compute_marginals() # this only works for the pseudo2D decoder, not the individual 1D ones
 
-
         # directional_merged_decoders_result_dict: Dict[types.DecoderName, DirectionalPseudo2DDecodersResult] = {}
 
         decoder_laps_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict = {}

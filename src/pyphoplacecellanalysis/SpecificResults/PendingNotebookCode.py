@@ -495,6 +495,15 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
         ## Export these new computations to .csv for across-session analysis:
         # Uses `perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function` to compute the new outputs:
+        additional_session_context = None
+        try:
+            if custom_suffix is not None:
+                additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
+                print(f'Using custom suffix: "{custom_suffix}" - additional_session_context: "{additional_session_context}"')
+        except NameError as err:
+            additional_session_context = None
+            print(f'NO CUSTOM SUFFIX.')    
+    
 
         # BEGIN normal data Export ___________________________________________________________________________________________ #
         return_full_decoding_results: bool = False
@@ -517,6 +526,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
                                                         save_hdf=True, save_csvs=True,
                                                         # desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.5, num=4),
                                                         custom_all_param_sweep_options=custom_all_param_sweep_options, # directly provide the parameter sweeps
+                                                        additional_session_context=additional_session_context
                                                     )
         # with `return_full_decoding_results == False`
         out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple = _across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
@@ -1051,18 +1061,23 @@ def recover_user_annotation_and_is_valid_columns(an_active_df, all_sessions_all_
     # `is_user_annotated` ________________________________________________________________________________________________ #
     # did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_selected_epoch_times, t_column_names=[a_time_column_names,])
 
-    ## Option 2 - the `all_sessions_all_scores_ripple_df` df column-based approach. get only the valid rows from the `all_sessions_all_scores_ripple_df` df
-    any_good_selected_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_user_annotated_epoch']][['start', 'stop']].to_numpy()
-    any_good_selected_epoch_times = np.unique(any_good_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
-    # print(f'METHOD 1: any_good_selected_epoch_times: {np.shape(any_good_selected_epoch_times)}') # interesting: difference of 1: (436, 2) v. (435, 2) 
+    if all_sessions_all_scores_df is not None:
+        ## Option 2 - the `all_sessions_all_scores_ripple_df` df column-based approach. get only the valid rows from the `all_sessions_all_scores_ripple_df` df
+        any_good_selected_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_user_annotated_epoch']][['start', 'stop']].to_numpy()
+        any_good_selected_epoch_times = np.unique(any_good_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+        # print(f'METHOD 1: any_good_selected_epoch_times: {np.shape(any_good_selected_epoch_times)}') # interesting: difference of 1: (436, 2) v. (435, 2) 
 
-    did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_selected_epoch_times, t_column_names=[a_time_column_names,])
+        did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_selected_epoch_times, t_column_names=[a_time_column_names,])
 
-    # `is_valid_epoch` ___________________________________________________________________________________________________ #
-    # get only the valid rows from the `all_sessions_all_scores_ripple_df` df
-    any_good_is_valid_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_valid_epoch']][['start', 'stop']].to_numpy()
-    any_good_is_valid_epoch_times = np.unique(any_good_is_valid_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
-    did_update_is_valid = DecoderDecodedEpochsResult.try_add_is_valid_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_is_valid_epoch_times, t_column_names=[a_time_column_names,])
+        # `is_valid_epoch` ___________________________________________________________________________________________________ #
+        # get only the valid rows from the `all_sessions_all_scores_ripple_df` df
+        any_good_is_valid_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_valid_epoch']][['start', 'stop']].to_numpy()
+        any_good_is_valid_epoch_times = np.unique(any_good_is_valid_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+        did_update_is_valid = DecoderDecodedEpochsResult.try_add_is_valid_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_is_valid_epoch_times, t_column_names=[a_time_column_names,])
+    else:
+        print(f'WARNING: no `all_sessions_all_scores_df` to get "is_valid_epoch" and "is_user_annotated_epoch" from!\n\tSetting "is_valid_epoch" all to True and "is_user_annotated_Epoch" all to False.')
+        an_active_df['is_valid_epoch'] = True # all True
+        an_active_df['is_user_annotated_epoch'] = False # all False
 
     ## OUTPUTS: an_active_df
     return an_active_df
