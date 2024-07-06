@@ -370,7 +370,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     ## All templates AND merged decode:
     def _try_all_templates_decode(owning_pipeline_reference, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, use_single_time_bin_per_epoch: bool,
-                            desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None) -> Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]: #-> Dict[str, DirectionalPseudo2DDecodersResult]:
+                            desired_laps_decoding_time_bin_size: Optional[float]=None, desired_ripple_decoding_time_bin_size: Optional[float]=None, desired_shared_decoding_time_bin_size: Optional[float]=None, minimum_event_duration: Optional[float]=None, suppress_exceptions: bool=True) -> Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]: #-> Dict[str, DirectionalPseudo2DDecodersResult]:
         """ decodes laps and ripples for a single bin size but for each of the four track templates. 
         
         Added 2024-05-23 04:23 
@@ -686,7 +686,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(an_alt_dir_Pseudo2D_decoders_result, track_templates,
                                                                                                                                                                                             decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                                                                                             spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df),
-                                                                                                                                                                                            should_skip_radon_transform=True)
+                                                                                                                                                                                            should_skip_radon_transform=True, suppress_exceptions=suppress_exceptions)
         
         laps_radon_transform_merged_df, ripple_radon_transform_merged_df, laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df, laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df = merged_df_outputs_tuple
         decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_extras_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict = raw_dict_outputs_tuple
