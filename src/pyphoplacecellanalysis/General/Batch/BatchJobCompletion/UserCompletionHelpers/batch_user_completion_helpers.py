@@ -660,7 +660,13 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
             laps_time_bin_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_laps_decoding_time_bin_size_str}/laps_time_bin_marginals_df', format='table', data_columns=True)
             laps_all_epoch_bins_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_laps_decoding_time_bin_size_str}/laps_all_epoch_bins_marginals_df', format='table', data_columns=True)
 
-        ## TODO: output ripple .h5 here if desired.
+        ## Ripple .h5 export:
+        ripple_decoding_time_bin_size: float = an_alt_dir_Pseudo2D_decoders_result.ripple_decoding_time_bin_size
+        actual_ripple_decoding_time_bin_size_str: str = str(ripple_decoding_time_bin_size)
+        if save_hdf and (actual_ripple_decoding_time_bin_size_str is not None):
+            ripple_time_bin_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_ripple_decoding_time_bin_size_str}/ripple_time_bin_marginals_df', format='table', data_columns=True)
+            ripple_all_epoch_bins_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_ripple_decoding_time_bin_size_str}/ripple_all_epoch_bins_marginals_df', format='table', data_columns=True)
+
         
         # get the current lap object and determine the percentage correct:
         if should_output_lap_decoding_performance_info:
