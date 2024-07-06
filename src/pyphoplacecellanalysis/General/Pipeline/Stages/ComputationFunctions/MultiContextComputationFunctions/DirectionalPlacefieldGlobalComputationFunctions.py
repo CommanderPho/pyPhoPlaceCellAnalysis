@@ -3903,6 +3903,7 @@ def _update_decoder_result_active_filter_epoch_columns(a_result_obj: DecodedFilt
         # Otherwise it's an Epoch object
         a_result_obj.filter_epochs._df.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
         a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().join(a_score_result_df) # add the newly computed columns to the Epochs object
+        ## ValueError: columns overlap but no suffix specified: Index(['lap_idx', 'lap_start_t'], dtype='object') -- occured after adding in start_t
     return a_result_obj
 
 ## INPUTS: decoder_laps_radon_transform_df_dict
@@ -4318,8 +4319,15 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     for a_name in track_templates.get_decoder_names():
         ## Build a single-column dataframe containing only the appropriate column for this decoder
         a_prob_column_name:str = decoder_name_to_decoder_probability_column_map[a_name]
-        a_laps_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': laps_metric_merged_df[a_prob_column_name].to_numpy(), **{k:laps_metric_merged_df[k].to_numpy() for k in ['lap_idx', 'lap_start_t']}}) # ['lap_idx', 'lap_start_t']
-        a_ripple_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': ripple_metric_merged_df[a_prob_column_name].to_numpy(), **{k:ripple_metric_merged_df[k].to_numpy() for k in ['ripple_idx', 'ripple_start_t']}}) # ['ripple_idx', 'ripple_start_t']
+        a_laps_additional_columns = {}
+        a_ripple_additional_columns = {}
+
+        # ## #TODO 2024-07-05 23:22: - [ ] add in the columns needed to align properly
+        # a_laps_additional_columns = {k:laps_metric_merged_df[k].to_numpy() for k in ['lap_idx', 'lap_start_t']} # when incldued, I get `ValueError: columns overlap but no suffix specified: Index(['lap_idx', 'lap_start_t'], dtype='object')`
+        # a_ripple_additional_columns = {k:ripple_metric_merged_df[k].to_numpy() for k in ['ripple_idx', 'ripple_start_t']}
+
+        a_laps_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': laps_metric_merged_df[a_prob_column_name].to_numpy(), **a_laps_additional_columns}) # ['lap_idx', 'lap_start_t']
+        a_ripple_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': ripple_metric_merged_df[a_prob_column_name].to_numpy(), **a_ripple_additional_columns}) # ['ripple_idx', 'ripple_start_t']
         
         # Example Suppressing Exception:
         with ExceptionPrintingContext(suppress=suppress_exceptions):

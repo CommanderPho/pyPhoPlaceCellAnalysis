@@ -266,6 +266,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 
+    suppress_exceptions: bool = (not self.fail_on_exception)
+
     # Export CSVs:
     def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str, parent_output_path: Path, active_context):
         """ captures nothing
@@ -521,6 +523,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     all_param_sweep_options = custom_all_param_sweep_options
 
 
+    
+    
     ## Perfrom the computations:
 
     # DirectionalMergedDecoders: Get the result after computation:
