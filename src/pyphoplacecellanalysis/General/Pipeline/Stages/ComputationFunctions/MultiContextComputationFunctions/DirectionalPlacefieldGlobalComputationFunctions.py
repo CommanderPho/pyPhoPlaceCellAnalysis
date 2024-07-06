@@ -4317,9 +4317,9 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     for a_name in track_templates.get_decoder_names():
         ## Build a single-column dataframe containing only the appropriate column for this decoder
         a_prob_column_name:str = decoder_name_to_decoder_probability_column_map[a_name]
-        a_laps_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': laps_metric_merged_df[a_prob_column_name].to_numpy()})
-        a_ripple_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': ripple_metric_merged_df[a_prob_column_name].to_numpy()})
-        
+        a_laps_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': laps_metric_merged_df[a_prob_column_name].to_numpy(), **{k:laps_metric_merged_df[k].to_numpy() for k in ['lap_idx', 'lap_start_t']}}) # ['lap_idx', 'lap_start_t']
+        a_ripple_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': ripple_metric_merged_df[a_prob_column_name].to_numpy(), **{k:ripple_metric_merged_df[k].to_numpy() for k in ['ripple_idx', 'ripple_start_t']}}) # ['ripple_idx', 'ripple_start_t']
+        ff
         # Example Suppressing Exception:
         with ExceptionPrintingContext():
             decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_score_result_df=a_laps_decoder_prob_df, columns=per_decoder_df_columns)
