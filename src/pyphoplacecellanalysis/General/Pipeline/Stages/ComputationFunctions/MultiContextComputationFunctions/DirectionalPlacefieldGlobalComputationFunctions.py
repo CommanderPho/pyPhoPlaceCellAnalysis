@@ -4594,11 +4594,18 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
     for a_name, a_simple_pf_column_name in zip(track_templates.get_decoder_names(), corr_column_names):
         ## Build a single-column dataframe containing only the appropriate column for this decoder
         _a_laps_metric_df: pd.DataFrame = pd.DataFrame({per_decoder_df_column_name: laps_simple_pf_pearson_merged_df[a_simple_pf_column_name].to_numpy()})
-        _a_ripple_metric_df: pd.DataFrame = pd.DataFrame({per_decoder_df_column_name: ripple_simple_pf_pearson_merged_df[a_simple_pf_column_name].to_numpy()})     
+
+
+        ripple_additional_column_names = ['ripple_start_t'] # ['ripple_idx', 'ripple_start_t']
+        a_ripple_additional_columns = {k:ripple_simple_pf_pearson_merged_df[k].to_numpy() for k in ripple_additional_column_names}
+        _a_ripple_metric_df: pd.DataFrame = pd.DataFrame({per_decoder_df_column_name: ripple_simple_pf_pearson_merged_df[a_simple_pf_column_name].to_numpy(), **a_ripple_additional_columns})     
+        _a_ripple_metric_df = _a_ripple_metric_df.rename(columns={'ripple_start_t': 'start'})
+        
         with ExceptionPrintingContext(suppress=suppress_exceptions): # this is causing horrible silent failures   
             decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_score_result_df=_a_laps_metric_df, columns=[per_decoder_df_column_name])
+
         with ExceptionPrintingContext(suppress=suppress_exceptions):
-            decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=_a_ripple_metric_df, columns=[per_decoder_df_column_name])
+            decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=_a_ripple_metric_df, columns=[per_decoder_df_column_name], index_column_names=['start'])
 
 
     # TEST AGREEMENTS ____________________________________________________________________________________________________ #
