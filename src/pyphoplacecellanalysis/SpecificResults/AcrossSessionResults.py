@@ -1288,7 +1288,7 @@ from attrs import define
 from pyphocorehelpers.Filesystem.path_helpers import try_parse_chain # used in `parse_filename`
 
 
-@function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-28 10:16', related_items=[])
+@function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=['try_parse_chain'], used_by=['find_most_recent_files'], creation_date='2024-03-28 10:16', related_items=[])
 def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, str]:
     """
     A revised version built on 2024-03-28 that uses `try_parse_chain` instead of nested for loops.
@@ -1382,7 +1382,7 @@ def _OLD_parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, s
     return export_datetime, session_str, export_file_type, decoding_time_bin_size_str
 
 
-@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 09:18', related_items=['convert_to_dataframe'])
+@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=['parse_filename'], used_by=[], creation_date='2024-04-15 09:18', related_items=['convert_to_dataframe'])
 def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False) -> Dict[str, Dict[str, Tuple[Path, str, datetime]]]:
     """
     Returns a dictionary representing the most recent files for each session type among a list of provided file paths.
