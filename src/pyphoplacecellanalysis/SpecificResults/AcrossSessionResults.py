@@ -1442,6 +1442,20 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
             if should_add:
                 sessions[session_str][file_type] = (path, decoding_time_bin_size_str, export_datetime)
 
+
+    ## Post-process to get session info
+    # split_char: str = '__'
+    # for session_str, outer_dict in sessions.items():
+    #     for file_type, inner_dict in outer_dict.items():
+    #         ## Parse
+    #         _split_columns = session_str.split(split_char)
+    #         if len(_split_columns) > 1:
+    #             _session_names.append(_split_columns[0])
+    #             _accrued_replay_epoch_names.append(_split_columns[-1])
+    #         else:
+    #             _session_names.append(_split_columns[0])
+                _accrued_replay_epoch_names.append('')
+
     return sessions
 
 
