@@ -1868,7 +1868,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         _simple_corr_results_dict = {}
         partitioned_dfs: Dict[int, pd.DataFrame] = dict(zip(*partition_df(spikes_df, partitionColumn='Probe_Epoch_id')))
         for an_epoch_idx, an_epoch_spikes_df in partitioned_dfs.items():
-            # for each epoch
+            # get the spikes in each epoch
             # print(f'an_epoch_idx: {an_epoch_idx}, np.shape(epoch_spikes_df): {np.shape(an_epoch_spikes_df)}')
            
             # _temp_dfs = []
@@ -1886,10 +1886,15 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     _simple_corr_results_dict[an_epoch_idx].append(np.nan) ## NaN can be added here to indicate that the curr epoch has too few active aclus for this decoder.
                 else:
                     _an_arr = a_decoder_specific_spikes_df[['t_rel_seconds', a_peak_x_col_name]].dropna(subset=['t_rel_seconds', a_peak_x_col_name], inplace=False).to_numpy().T
-                    a_pearson_v = pearsonr(_an_arr[0], _an_arr[1]).statistic
+                    if np.shape(_an_arr)[-1] < 2:
+                        ## pearsonr is undefined if there are less than two elements in the list
+                        print(f'WARNING: less than two array elements for an_epoch_idx: {an_epoch_idx}, a_pearson_v will be NaN for a_peak_x_col_name: {a_peak_x_col_name}, a_decoder_neuron_IDs: {a_decoder_neuron_IDs}, min_num_required_unique_aclus: {min_num_required_unique_aclus}')
+                        a_pearson_v = np.nan               
+                    else:
+                        a_pearson_v = pearsonr(_an_arr[0], _an_arr[1]).statistic #ValueError: x and y must have length at least 2.
                     if np.isnan(a_pearson_v):
                         print(f'WARNING: hit NaN a_pearson_v: {a_pearson_v} for a_peak_x_col_name: {a_peak_x_col_name}, a_decoder_neuron_IDs: {a_decoder_neuron_IDs}, min_num_required_unique_aclus: {min_num_required_unique_aclus}')
-                    _simple_corr_results_dict[an_epoch_idx].append(a_pearson_v) ## how is this returning NaN for some entries?
+                    _simple_corr_results_dict[an_epoch_idx].append(a_pearson_v) ## how is this returning NaN for some entries? ANS: pearsonr is undefined if there are less than two elements in the list
 
 
         ## Convert results dict into a pd.DataFrame            
@@ -3883,7 +3888,7 @@ def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame
 
 
 
-def _update_decoder_result_active_filter_epoch_columns(a_result_obj: DecodedFilterEpochsResult, a_score_result_df: pd.DataFrame, columns=['score', 'velocity', 'intercept', 'speed']):
+def _update_decoder_result_active_filter_epoch_columns(a_result_obj: DecodedFilterEpochsResult, a_score_result_df: pd.DataFrame, columns=['score', 'velocity', 'intercept', 'speed'], index_column_names=None):
     """ Joins the radon-transform result into the `a_result_obj.filter_epochs` dataframe.
     
     decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_radon_transform_df=decoder_laps_radon_transform_df_dict[a_name])
@@ -3891,20 +3896,66 @@ def _update_decoder_result_active_filter_epoch_columns(a_result_obj: DecodedFilt
     
     If the score result is filtered, the results will be NaN :[
 
-    """
-    # assert a_result_obj.active_filter_epochs.n_epochs == np.shape(a_radon_transform_df)[0]
     
 
-    assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0], f"a_result_obj.num_filter_epochs: {a_result_obj.num_filter_epochs} != np.shape(a_score_result_df)[0]: {np.shape(a_score_result_df)[0]}" # #TODO 2024-05-23 02:19: - [ ] I don't know the full purpose of this assert, I'm guessing it's to make sure were operating on the same epochs. What's passed in is a flat vector of values so we have no correspondance (like the start_t) if they don't literally correspond
-    if isinstance(a_result_obj.filter_epochs, pd.DataFrame):
-        a_result_obj.filter_epochs.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
-        a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df) # add the newly computed columns to the Epochs object
+
+    """
+    if index_column_names is not None:
+        ## use these columns as the ones to join on
+        # assert a_result_obj.active_filter_epochs.n_epochs == np.shape(a_radon_transform_df)[0]
+        # a_score_result_df['ripple_start_t']
+
+        # from neuropy.core.epoch import find_data_indicies_from_epoch_times
+
+        # selection_start_stop_times = deepcopy(active_epochs_df[['start', 'stop']].to_numpy())
+        # print(f'np.shape(selection_start_stop_times): {np.shape(selection_start_stop_times)}')
+
+        # test_epochs_data_df: pd.DataFrame = deepcopy(ripple_simple_pf_pearson_merged_df)
+        # print(f'np.shape(test_epochs_data_df): {np.shape(test_epochs_data_df)}')
+
+        # # 2D_search (for both start, end times):
+        # found_data_indicies = find_data_indicies_from_epoch_times(test_epochs_data_df, epoch_times=selection_start_stop_times)
+        # print(f'np.shape(found_data_indicies): {np.shape(found_data_indicies)}')
+
+        # # 1D_search (only for start times):
+        # found_data_indicies_1D_search = find_data_indicies_from_epoch_times(test_epochs_data_df, epoch_times=np.squeeze(selection_start_stop_times[:, 0]))
+        # print(f'np.shape(found_data_indicies_1D_search): {np.shape(found_data_indicies_1D_search)}')
+        # found_data_indicies_1D_search
+
+        # assert np.array_equal(found_data_indicies, found_data_indicies_1D_search)
+
+        ## INPUTS: a_result_obj.filter_epochs, a_score_result_df
+        # ValueError: columns overlap but no suffix specified: Index(['ripple_idx', 'ripple_start_t'], dtype='object')
+
+        # list(a_result_obj.filter_epochs.columns)
+        # list(a_score_result_df.columns)
+        # a_result_obj.filter_epochs.merge(a_score_result_df)
+
+
+        if isinstance(a_result_obj.filter_epochs, pd.DataFrame):
+            a_result_obj.filter_epochs.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
+            # a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df) # add the newly computed columns to the Epochs object - ValueError: columns overlap but no suffix specified: Index(['ripple_idx', 'ripple_start_t'], dtype='object')
+            a_result_obj.filter_epochs = a_result_obj.filter_epochs.merge(a_score_result_df, how='left', on=index_column_names)            
+        else:
+            # Otherwise it's an Epoch object
+            a_result_obj.filter_epochs._df.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
+            # a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().join(a_score_result_df) # add the newly computed columns to the Epochs object
+            a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().merge(a_score_result_df, how='left', on=index_column_names)
+
     else:
-        # Otherwise it's an Epoch object
-        a_result_obj.filter_epochs._df.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
-        a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().join(a_score_result_df) # add the newly computed columns to the Epochs object
-        ## ValueError: columns overlap but no suffix specified: Index(['lap_idx', 'lap_start_t'], dtype='object') -- occured after adding in start_t
+        ## must have the same number of entries in each
+        assert a_result_obj.num_filter_epochs == np.shape(a_score_result_df)[0], f"a_result_obj.num_filter_epochs: {a_result_obj.num_filter_epochs} != np.shape(a_score_result_df)[0]: {np.shape(a_score_result_df)[0]}" # #TODO 2024-05-23 02:19: - [ ] I don't know the full purpose of this assert, I'm guessing it's to make sure were operating on the same epochs. What's passed in is a flat vector of values so we have no correspondance (like the start_t) if they don't literally correspond
+        if isinstance(a_result_obj.filter_epochs, pd.DataFrame):
+            a_result_obj.filter_epochs.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
+            a_result_obj.filter_epochs = a_result_obj.filter_epochs.join(a_score_result_df) # add the newly computed columns to the Epochs object - ValueError: columns overlap but no suffix specified: Index(['ripple_idx', 'ripple_start_t'], dtype='object')
+        else:
+            # Otherwise it's an Epoch object
+            a_result_obj.filter_epochs._df.drop(columns=columns, inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
+            a_result_obj.filter_epochs._df = a_result_obj.filter_epochs.to_dataframe().join(a_score_result_df) # add the newly computed columns to the Epochs object
+            ## ValueError: columns overlap but no suffix specified: Index(['lap_idx', 'lap_start_t'], dtype='object') -- occured after adding in start_t
+
     return a_result_obj
+
 
 ## INPUTS: decoder_laps_radon_transform_df_dict
 def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str, pd.DataFrame], columns=['score', 'velocity', 'intercept', 'speed'], best_decoder_index_column_name:str='best_decoder_index') ->  pd.DataFrame:
@@ -4319,21 +4370,25 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     for a_name in track_templates.get_decoder_names():
         ## Build a single-column dataframe containing only the appropriate column for this decoder
         a_prob_column_name:str = decoder_name_to_decoder_probability_column_map[a_name]
-        a_laps_additional_columns = {}
-        a_ripple_additional_columns = {}
-
-        # ## #TODO 2024-07-05 23:22: - [ ] add in the columns needed to align properly
-        # a_laps_additional_columns = {k:laps_metric_merged_df[k].to_numpy() for k in ['lap_idx', 'lap_start_t']} # when incldued, I get `ValueError: columns overlap but no suffix specified: Index(['lap_idx', 'lap_start_t'], dtype='object')`
-        # a_ripple_additional_columns = {k:ripple_metric_merged_df[k].to_numpy() for k in ['ripple_idx', 'ripple_start_t']}
-
-        a_laps_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': laps_metric_merged_df[a_prob_column_name].to_numpy(), **a_laps_additional_columns}) # ['lap_idx', 'lap_start_t']
-        a_ripple_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': ripple_metric_merged_df[a_prob_column_name].to_numpy(), **a_ripple_additional_columns}) # ['ripple_idx', 'ripple_start_t']
         
+        # ## #TODO 2024-07-05 23:22: - [ ] add in the columns needed to align properly
+        a_laps_additional_columns = {}
+        # a_laps_additional_columns = {k:laps_metric_merged_df[k].to_numpy() for k in ['lap_idx', 'lap_start_t']} # when incldued, I get `ValueError: columns overlap but no suffix specified: Index(['lap_idx', 'lap_start_t'], dtype='object')`
+        a_laps_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': laps_metric_merged_df[a_prob_column_name].to_numpy(), **a_laps_additional_columns}) # ['lap_idx', 'lap_start_t']
+
+        ## Ripple Setup: special
+        # a_ripple_additional_columns = {}
+        ripple_additional_column_names = ['ripple_start_t'] # ['ripple_idx', 'ripple_start_t']
+        a_ripple_additional_columns = {k:ripple_metric_merged_df[k].to_numpy() for k in ripple_additional_column_names}
+        a_ripple_decoder_prob_df: pd.DataFrame = pd.DataFrame({'P_decoder': ripple_metric_merged_df[a_prob_column_name].to_numpy(), **a_ripple_additional_columns}) # ['ripple_idx', 'ripple_start_t']
+        a_ripple_decoder_prob_df = a_ripple_decoder_prob_df.rename(columns={'ripple_start_t': 'start'})
+
+
         # Example Suppressing Exception:
         with ExceptionPrintingContext(suppress=suppress_exceptions):
             decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_score_result_df=a_laps_decoder_prob_df, columns=per_decoder_df_columns)
         with ExceptionPrintingContext(suppress=suppress_exceptions):
-            decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=a_ripple_decoder_prob_df, columns=per_decoder_df_columns)
+            decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=a_ripple_decoder_prob_df, columns=per_decoder_df_columns, index_column_names=['start']) # ripple_additional_column_names
 
     return (laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
 
