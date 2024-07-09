@@ -116,8 +116,14 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     figure_context_dict = {'histogram_variable_name': histogram_variable_name}
 
-    unique_sessions = data_results_df['session_name'].unique()
-    num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+    # unique_sessions = data_results_df['session_name'].unique()
+    # num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True) # number of unique sessions, ignoring the NA entries
+    if 'session_name' in data_results_df.columns:
+        num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True)
+    else:
+        num_unique_sessions: int = 1
+    
+        
     figure_context_dict['num_unique_sessions'] = num_unique_sessions
 
     ## Extract the unique time bin sizes:
