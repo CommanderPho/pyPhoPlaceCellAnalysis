@@ -1454,7 +1454,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     #             _accrued_replay_epoch_names.append(_split_columns[-1])
     #         else:
     #             _session_names.append(_split_columns[0])
-                _accrued_replay_epoch_names.append('')
+                # _accrued_replay_epoch_names.append('')
 
     return sessions
 
