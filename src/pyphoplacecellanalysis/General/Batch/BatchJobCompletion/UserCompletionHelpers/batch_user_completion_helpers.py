@@ -1,4 +1,5 @@
 from copy import deepcopy
+import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
@@ -1055,6 +1056,75 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     return across_session_results_extended_dict
 
 
+
+def backup_previous_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+    """  Makes a backup copy of the pipeline's files (pkl, HDF5) with desired suffix
+    
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import backup_previous_session_files_completion_function
+    
+    Results can be extracted from batch output by 
+    
+    # Extracts the callback results 'determine_session_t_delta_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+
+    """
+    import sys
+    from datetime import timedelta, datetime
+    from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
+    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    import shutil
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'backup_previous_session_files_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    
+    desired_suffix: str = 'Pre2024-07-09'
+    was_write_good: bool = False
+
+    _out = {'pipeline_pkl': curr_active_pipeline.pickle_path,
+            'global_computation_pkl': curr_active_pipeline.global_computation_results_pickle_path,
+            'pipeline_h5': curr_active_pipeline.h5_export_path,
+    }
+    _existing_session_files_dict = {a_name:a_path for a_name, a_path in _out.items() if a_path.exists()}
+
+    _successful_copies_dict = {}
+    # for a_name, a_path in _out.items():
+    for a_name, a_path in _existing_session_files_dict.items():
+        if a_path.exists():
+            # file really exists, do something with it
+            desired_path: Path = a_path.with_stem(f"{a_path.stem}_{desired_suffix}").resolve() # # WindowsPath('W:/Data/KDIBA/gor01/one/2006-6-08_14-26-15/output/pipeline_results_Pre2024-07-09.h5')
+            ## hopefully it doesn't already exist!
+            desired_path.exists()
+
+            ## copy
+            try:
+                print(f"'{a_path}' backing up -> to desired_path: '{desired_path}'")
+                shutil.copy(a_path, desired_path)
+                print('done.')
+                was_write_good = True
+                _successful_copies_dict[a_name] = desired_path
+
+            except BaseException as e:
+                exception_info = sys.exc_info()
+                err = CapturedException(e, exception_info)
+                print(f"ERROR: encountered exception {err} while trying to backup the {a_name} file at {a_path} for {curr_session_context}")
+                if self.fail_on_exception:
+                    raise err.exc
+            
+    callback_outputs = {
+     'desired_suffix': desired_suffix,
+     'session_files_dict': _existing_session_files_dict, 'successfully_copied_files_dict':_successful_copies_dict,
+    }
+    across_session_results_extended_dict['backup_previous_session_files_completion_function'] = callback_outputs
+    
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    return across_session_results_extended_dict
+
+
+
+
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """  Computes the shuffled wcorrs and export them to
@@ -1814,6 +1884,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
                                     'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
                                     'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function,
+                                    'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function,
                                     }
     else:
         # use the user one:
