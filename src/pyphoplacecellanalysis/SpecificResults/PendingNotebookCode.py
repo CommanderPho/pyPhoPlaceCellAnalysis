@@ -9,6 +9,7 @@ from matplotlib import cm, pyplot as plt
 from matplotlib.gridspec import GridSpec
 from neuropy.core import Laps
 from neuropy.utils.dynamic_container import DynamicContainer
+from neuropy.utils.result_context import IdentifyingContext
 from nptyping import NDArray
 import attrs
 import matplotlib as mpl
