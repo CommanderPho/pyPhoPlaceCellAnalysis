@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=job_{{ curr_session_context }}
 #SBATCH --output=slurm_%x-%j.log
-#SBATCH --error=slurm_%x-%j.log
 #SBATCH --chdir='{{ curr_batch_script_rundir }}'
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
