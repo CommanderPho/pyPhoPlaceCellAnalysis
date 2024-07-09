@@ -1030,7 +1030,7 @@ class WCorrShuffle(ComputedResult):
             print(f'error: {e}')
             raise e
 
-
+    @function_attributes(short_name=None, tags=['discover', 'files'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 04:43', related_items=[])
     def discover_load_and_append_shuffle_data_from_directory(self, save_directory, debug_print = False):
         """ searches the save_directory for pickled shuffle results and attempts to sequentially load them.
         
