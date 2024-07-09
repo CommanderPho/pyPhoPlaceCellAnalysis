@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Set job name and log file
+job_name="job_{{ curr_session_context }}"
+log_file="slurm_${job_name}.log"
+
+# Change to the specified directory
+cd '{{ curr_batch_script_rundir }}'
+
+# Set environment variables
+export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
+
+# Activate the virtual environment
+source '/home/halechr/repos/Spike3D/.venv/bin/activate'
+
+# Redirect all output to a single file
+exec > >(tee -a $log_file) 2>&1
+
+# Run the Python script
+python '{{ python_script_path }}'
+
+# Deactivate the virtual environment when done (optional here but good practice)
+deactivate

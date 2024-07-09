@@ -26,11 +26,9 @@ from neuropy.utils.result_context import IdentifyingContext
 # from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
 # included_session_contexts, output_python_scripts, output_slurm_scripts, powershell_script_path, vscode_workspace_path
-BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_slurm_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
-
+BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
 
 from enum import Enum
-
 
 
 def get_batch_neptune_kwargs():
@@ -38,9 +36,6 @@ def get_batch_neptune_kwargs():
         project="commander.pho/PhoDibaBatchProcessing",
         api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
     )
-
-
-
 
 
 class ProcessingScriptPhases(Enum):
@@ -183,7 +178,7 @@ class ProcessingScriptPhases(Enum):
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
-         create_slurm_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True,          # , should_create_powershell_scripts:bool=True
+         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True,          # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None,
         batch_session_completion_handler_kwargs=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
@@ -218,6 +213,13 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
             script_file.write(script_content)
         return slurm_script_path
+    
+    def _subfn_build_non_slurm_bash_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_bash_script_name_prefix:str='run'):
+        bash_script_path = os.path.join(curr_batch_script_rundir, f'{a_bash_script_name_prefix}_{a_curr_session_context}.sh')
+        with open(bash_script_path, 'w') as script_file:
+            script_content = bash_non_slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
+            script_file.write(script_content)
+        return bash_script_path
 
     assert isinstance(session_batch_basedirs, dict)
 
@@ -250,10 +252,16 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     # base_python_template = env.get_template('slurm_python_template_base.py.j2')
     # python_template = env.get_template('slurm_python_template_NoRecompute.py.j2', parent='slurm_python_template_base.py.j2')
     slurm_template = env.get_template('slurm_template.sh.j2')
+    bash_non_slurm_template = env.get_template('bash_template.sh.j2')
+    
+
 
     output_python_scripts = []
 
     output_slurm_scripts = {'run': [], 'figs': []}
+    output_non_slurm_bash_scripts = {'run': [], 'figs': []}
+
+
     # Make sure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
     
@@ -306,9 +314,15 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                 output_slurm_scripts['figs'].append(slurm_figure_script_path)
 
 
+        ## Create the non-slurm bash script:
+        if create_non_slurm_bash_scripts:
+            bash_run_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_bash_script_name_prefix='run')
+            output_non_slurm_bash_scripts['run'].append(bash_run_script_path)
 
+            if should_perform_figure_generation_to_file:
+                bash_figure_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_bash_script_name_prefix='figs')
+                output_non_slurm_bash_scripts['figs'].append(bash_figure_script_path)
 
-    
 
     # if should_create_powershell_scripts and (platform.system() == 'Windows'):
     #     powershell_script_path = build_windows_powershell_run_script(output_python_scripts, max_concurrent_jobs=max_parallel_executions)
@@ -324,7 +338,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         vscode_workspace_path = None
 
 
-    return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_slurm_scripts=output_slurm_scripts, vscode_workspace_path=vscode_workspace_path)
+    return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_slurm_scripts=output_slurm_scripts, output_non_slurm_bash_scripts=output_non_slurm_bash_scripts, vscode_workspace_path=vscode_workspace_path)
     # return included_session_contexts, output_python_scripts, output_slurm_scripts
 
 
