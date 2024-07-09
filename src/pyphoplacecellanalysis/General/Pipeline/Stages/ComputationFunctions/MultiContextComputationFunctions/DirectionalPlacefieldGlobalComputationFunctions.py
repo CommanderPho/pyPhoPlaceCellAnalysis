@@ -2710,6 +2710,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=['ripple_all_scores_merged_df.csv'], uses=['self.perform_export_dfs_dict_to_csvs', 'self.build_complete_all_scores_merged_df'], used_by=[], creation_date='2024-03-15 10:13', related_items=[])
     def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
         """ export as separate .csv files. 
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+
         active_context = curr_active_pipeline.get_session_context()
         curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
         CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
