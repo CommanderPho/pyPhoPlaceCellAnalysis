@@ -1259,9 +1259,9 @@ class AcrossSessionTables:
 # 2024-01-27 - Across Session CSV Import and Processing                                                                #
 # ==================================================================================================================== #
 """ 
-from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import find_csv_files, find_HDF5_files, find_most_recent_files, process_csv_file
+from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import find_csv_files, find_HDF5_files, find_most_recent_files, read_and_process_csv_file
 
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv_files, find_HDF5_files, find_most_recent_files, process_csv_file
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv_files, find_HDF5_files, find_most_recent_files, read_and_process_csv_file
 
 """
 
@@ -1485,8 +1485,8 @@ def convert_to_dataframe(csv_sessions: Dict[str, Dict[str, Tuple[Path, str, date
     return pd.DataFrame(_output_tuples, columns=['session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime'])
     # parsed_files_df
 
-@function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:19', related_items=[])
-def process_csv_file(file: str, session_name: str, curr_session_t_delta: Optional[float], time_col: str) -> pd.DataFrame:
+@function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=[], used_by=['_process_and_load_exported_file'], creation_date='2024-07-09 18:19', related_items=[])
+def read_and_process_csv_file(file: str, session_name: str, curr_session_t_delta: Optional[float], time_col: str) -> pd.DataFrame:
     """ reads the CSV file and adds the 'session_name' column if it is missing.
 
     """
@@ -1686,12 +1686,12 @@ def _split_user_annotated_ripple_df(all_sessions_user_annotated_ripple_df):
 from neuropy.utils.indexing_helpers import PandasHelpers
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
 
-
+@function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=['read_and_process_csv_file'], used_by=[], creation_date='2024-07-10 16:52', related_items=[])
 def _process_and_load_exported_file(session_dict, df_file_name_key: str, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str) -> None:
     """ updates loaded_dict """
     try:
         file_path = session_dict[df_file_name_key]
-        loaded_dict[session_name] = process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
+        loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
     except BaseException as e:
         print(f'session "{session_name}", df_file_name_key: "{df_file_name_key}" - did not fully work. (error "{e}". Skipping.')
 
