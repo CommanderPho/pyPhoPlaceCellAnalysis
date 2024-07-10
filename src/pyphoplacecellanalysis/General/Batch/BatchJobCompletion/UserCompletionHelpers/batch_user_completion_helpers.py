@@ -269,8 +269,11 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     suppress_exceptions: bool = (not self.fail_on_exception)
 
+    if additional_session_context is None:
+        print(f'\t!!!! 2024-07-10 WARNING: additional_session_context is None!')
+
     # Export CSVs:
-    def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str, parent_output_path: Path, active_context):
+    def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str, parent_output_path: Path, active_context: IdentifyingContext):
         """ captures nothing
         """
         # output_date_str: str = get_now_rounded_time_str()
@@ -285,7 +288,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         marginals_df.to_csv(out_path)
         return out_path 
 
-    def _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context):
+    def _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context: IdentifyingContext):
         """ After the sweeps are complete and multiple (one for each time_bin_size swept) indepdnent dfs are had with the four results types this function concatenates each of the four into a single dataframe for all time_bin_size values with a column 'time_bin_size'. 
         It also saves them out to CSVs in a manner similar to what `compute_and_export_marginals_dfs_completion_function` did to be compatible with `2024-01-23 - Across Session Point and YellowBlue Marginal CSV Exports.ipynb`
         Captures: save_csvs
@@ -369,7 +372,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         if curr_session_t_delta is not None:
             df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
         return df
-
 
     ## All templates AND merged decode:
     def _try_all_templates_decode(owning_pipeline_reference, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, use_single_time_bin_per_epoch: bool,
@@ -471,7 +473,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
         return directional_merged_decoders_result, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
         
-
     def _update_result_laps(a_result: DecodedFilterEpochsResult, laps_df: pd.DataFrame) -> pd.DataFrame:
         """ captures nothing. Can reusing the same laps_df as it makes no modifications to it. 
         
@@ -499,11 +500,22 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     assert self.collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
-    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
-    active_context = curr_active_pipeline.get_session_context()
-    session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+    # active_context = curr_active_pipeline.get_session_context()
+    if additional_session_context is not None:
+        if isinstance(additional_session_context, dict):
+            additional_session_context = IdentifyingContext(**additional_session_context)
+        active_context = (curr_active_pipeline.get_session_context() | additional_session_context)
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
+    else:
+        active_context = curr_active_pipeline.get_session_context()
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+
+    print(f'\tactive_context: {active_context}')    
+    print(f'\tsession_ctxt_key: {session_ctxt_key}')
+    print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')    
     
     ## INPUT PARAMETER: time_bin_size sweep paraemters    
     if custom_all_param_sweep_options is None:
@@ -523,9 +535,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     all_param_sweep_options = custom_all_param_sweep_options
 
-
-    
-    
     ## Perfrom the computations:
 
     # DirectionalMergedDecoders: Get the result after computation:
@@ -546,7 +555,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     out_path_filenname_str: str = f"{out_path_basename_str}.h5"
     out_path: Path = self.collected_outputs_path.resolve().joinpath(out_path_filenname_str).resolve()
-    print(f'\out_path_str: "{out_path_filenname_str}"')
+    print(f'\tout_path_str: "{out_path_filenname_str}"')
     print(f'\tout_path: "{out_path}"')
     
     # Ensure it has the 'lap_track' column
@@ -560,52 +569,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     assert 'maze_id' in laps_df.columns, f"laps_df is still missing the 'maze_id' column after calling `laps_obj.update_maze_id_if_needed(...)`. laps_df.columns: {print(list(laps_df.columns))}"
 
     # # BEGIN BLOCK ________________________________________________________________________________________________________ #
-
-    # # Uses: session_ctxt_key, all_param_sweep_options
-    # output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalPseudo2DDecodersResult] = {} # empty dict
-    # output_laps_decoding_accuracy_results_dict = {} # empty dict
-    # output_extracted_result_tuples = {}
-
-    # for a_sweep_dict in all_param_sweep_options:
-    #     a_sweep_tuple = frozenset(a_sweep_dict.items())
-    #     print(f'a_sweep_dict: {a_sweep_dict}')
-    #     # Convert parameters to string because Parquet supports metadata as string
-    #     a_sweep_str_params = {key: str(value) for key, value in a_sweep_dict.items() if value is not None}
-        
-    #     output_alt_directional_merged_decoders_result[a_sweep_tuple] = _try_single_decode(curr_active_pipeline, alt_directional_merged_decoders_result, **a_sweep_dict)
-
-    #     laps_time_bin_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].laps_time_bin_marginals_df.copy()
-    #     laps_all_epoch_bins_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].laps_all_epoch_bins_marginals_df.copy()
-        
-    #     ## Ripples:
-    #     ripple_time_bin_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].ripple_time_bin_marginals_df.copy()
-    #     ripple_all_epoch_bins_marginals_df: pd.DataFrame = output_alt_directional_merged_decoders_result[a_sweep_tuple].ripple_all_epoch_bins_marginals_df.copy()
-
-    #     session_name = curr_session_name
-    #     curr_session_t_delta = t_delta
-        
-    #     for a_df, a_time_bin_column_name in zip((laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df), ('t_bin_center', 'lap_start_t', 't_bin_center', 'ripple_start_t')):
-    #         ## Add the session-specific columns:
-    #         a_df = add_session_df_columns(a_df, session_name, curr_session_t_delta, a_time_bin_column_name)
-
-    #     ## Build the output tuple:
-    #     output_extracted_result_tuples[a_sweep_tuple] = (laps_time_bin_marginals_df, laps_all_epoch_bins_marginals_df, ripple_time_bin_marginals_df, ripple_all_epoch_bins_marginals_df)
-        
-    #     # desired_laps_decoding_time_bin_size_str: str = a_sweep_str_params.get('desired_laps_decoding_time_bin_size', None)
-    #     laps_decoding_time_bin_size: float = output_alt_directional_merged_decoders_result[a_sweep_tuple].laps_decoding_time_bin_size
-    #     # ripple_decoding_time_bin_size: float = output_alt_directional_merged_decoders_result[a_sweep_tuple].ripple_decoding_time_bin_size
-    #     actual_laps_decoding_time_bin_size_str: str = str(laps_decoding_time_bin_size)
-    #     if save_hdf and (actual_laps_decoding_time_bin_size_str is not None):
-    #         laps_time_bin_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_laps_decoding_time_bin_size_str}/laps_time_bin_marginals_df', format='table', data_columns=True)
-    #         laps_all_epoch_bins_marginals_df.to_hdf(out_path, key=f'{session_ctxt_key}/{actual_laps_decoding_time_bin_size_str}/laps_all_epoch_bins_marginals_df', format='table', data_columns=True)
-
-    #     ## TODO: output ripple .h5 here if desired.
-            
-    #     # get the current lap object and determine the percentage correct:
-    #     result_laps_epochs_df: pd.DataFrame = _update_result_laps(a_result=output_alt_directional_merged_decoders_result[a_sweep_tuple], laps_df=laps_df)
-    #     (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
-    #     output_laps_decoding_accuracy_results_dict[laps_decoding_time_bin_size] = (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
-        
 
     # BEGIN BLOCK 2 - modernizing from `_perform_compute_custom_epoch_decoding`  ________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_lap_and_ripple_epochs_decoding_for_decoder, _perform_compute_custom_epoch_decoding, _compute_all_df_score_metrics
@@ -626,17 +589,10 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     for a_sweep_dict in all_param_sweep_options:
         ## Looks like each iteration of the loop serves to update: `output_alt_directional_merged_decoders_result`, `output_extracted_result_tuples`, `output_directional_decoders_epochs_decode_results_dict`, 
         a_sweep_tuple = frozenset(a_sweep_dict.items())
-        print(f'a_sweep_dict: {a_sweep_dict}')
-
-        # for a_name, a_decoder in track_templates.get_decoders_dict().items():
-        #     decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
-
-
-        # output_alt_directional_merged_decoders_result[a_sweep_tuple] = _try_all_templates_decode(curr_active_pipeline, alt_directional_merged_decoders_result, **a_sweep_dict) # type: ignore
+        print(f'\ta_sweep_dict: {a_sweep_dict}')
 
         output_alt_directional_merged_decoders_result[a_sweep_tuple], (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = _try_all_templates_decode(curr_active_pipeline, alt_directional_merged_decoders_result, **a_sweep_dict)
         an_alt_dir_Pseudo2D_decoders_result = output_alt_directional_merged_decoders_result[a_sweep_tuple]
-
 
         ## Decode epochs for all four decoders:
         laps_time_bin_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.laps_time_bin_marginals_df.copy()
@@ -685,8 +641,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
         # `_decode_and_evaluate_epochs_using_directional_decoders` post compute ______________________________________________ #
 
-        # decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_merged_decoders_result, track_templates) # Dict[str, Optional[DecodedFilterEpochsResult]]
-
         ## Recompute the epoch scores/metrics such as radon transform and wcorr:
         (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(an_alt_dir_Pseudo2D_decoders_result, track_templates,
                                                                                                                                                                                             decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict,
@@ -730,14 +684,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     
     ## Call the subfunction to process the time_bin_size swept result and produce combined output dataframes:
-    if additional_session_context is not None:
-        if isinstance(additional_session_context, dict):
-            additional_session_context = IdentifyingContext(**additional_session_context)
-        active_context = (curr_active_pipeline.get_session_context() | additional_session_context)
-    else:
-        active_context = curr_active_pipeline.get_session_context()
-        
-        
     combined_multi_timebin_outputs_tuple = _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context=active_context)
     # Unpacking:    
     # (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple

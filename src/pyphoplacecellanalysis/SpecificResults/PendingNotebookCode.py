@@ -385,7 +385,18 @@ def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_str
     return custom_suffix
 
 
-@function_attributes(short_name=None, tags=['replay', 'new_replay', 'top'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=[])
+def _custom_replay_str_for_filename(new_replay_epochs: Epoch, *extras_strings):
+    assert new_replay_epochs.metadata is not None
+    with np.printoptions(precision=1, suppress=True, threshold=5):
+        metadata = deepcopy(new_replay_epochs.metadata)
+        # score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.   
+        return '-'.join([f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+        # return '-'.join([f"replaySource_{metadata['epochs_source']}", f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
+        
+
+
+
+@function_attributes(short_name=None, tags=['replay', 'new_replay', 'top'], input_requires=[], output_provides=[], uses=['replace_replay_epochs'], used_by=[], creation_date='2024-06-25 22:49', related_items=['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'])
 def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025, 
                                           num_wcorr_shuffles: int=25, fail_on_exception=True,
                                           enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, user_completion_dummy=None):
@@ -429,22 +440,22 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
     # spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
     # (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs) = compute_diba_quiescent_style_replay_events(curr_active_pipeline=curr_active_pipeline, directional_laps_results=directional_laps_results,
-    #                                                                                                                                                                             included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, spikes_df=spikes_df)
-    def str_for_filename(new_replay_epochs: Epoch, *extras_strings):
-        assert new_replay_epochs.metadata is not None
-        with np.printoptions(precision=1, suppress=True, threshold=5):
-            metadata = deepcopy(new_replay_epochs.metadata)
-            # score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.   
-            return '-'.join([f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
-            # return '-'.join([f"replaySource_{metadata['epochs_source']}", f"qclu_{metadata['included_qclu_values']}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
-            
+    #                       
     # 'epochs_source'
     custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=new_replay_epochs)
     print(f'custom_suffix: "{custom_suffix}"')
 
     assert (user_completion_dummy is not None), f"2024-07-04 - `user_completion_dummy` must be provided with a modified .BATCH_DATE_TO_USE to include the custom suffix!"
-    # if user_completion_dummy is None:
-    #     user_completion_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path)
+
+    additional_session_context = None
+    try:
+        if custom_suffix is not None:
+            additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
+            print(f'Using custom suffix: "{custom_suffix}" - additional_session_context: "{additional_session_context}"')
+    except NameError as err:
+        additional_session_context = None
+        print(f'NO CUSTOM SUFFIX.')    
+        
 
     ## OUTPUTS: new_replay_epochs, new_replay_epochs_df
     did_change, _backup_session_replay_epochs, _backup_session_configs = replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=new_replay_epochs)
@@ -496,15 +507,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 
         ## Export these new computations to .csv for across-session analysis:
         # Uses `perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function` to compute the new outputs:
-        additional_session_context = None
-        try:
-            if custom_suffix is not None:
-                additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
-                print(f'Using custom suffix: "{custom_suffix}" - additional_session_context: "{additional_session_context}"')
-        except NameError as err:
-            additional_session_context = None
-            print(f'NO CUSTOM SUFFIX.')    
-    
 
         # BEGIN normal data Export ___________________________________________________________________________________________ #
         return_full_decoding_results: bool = False
