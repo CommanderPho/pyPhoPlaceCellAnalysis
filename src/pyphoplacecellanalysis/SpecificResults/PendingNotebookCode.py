@@ -535,8 +535,22 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
         out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple = _across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
         (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
 
-        custom_save_filepaths['csv_out_path'] = out_path
-        custom_save_filepaths['ripple_csv_out_path'] = ripple_out_path
+        _out_file_paths_dict = {
+            'ripple_h5_out_path': out_path,
+            'ripple_csv_out_path': ripple_out_path,
+            'ripple_csv_time_bin_marginals': ripple_time_bin_marginals_out_path,
+            
+            ## Laps:
+            'laps_csv_out_path': laps_out_path,
+            'laps_csv_time_bin_marginals_out_path': laps_time_bin_marginals_out_path,
+        }
+
+        for a_name, a_path in _out_file_paths_dict.items():
+            custom_save_filepaths[a_name] = a_path
+
+        # custom_save_filepaths['csv_out_path'] = out_path # ends up being the .h5 path for some reason
+        # custom_save_filepaths['csv_out_path'] = out_path # ends up being the .h5 path for some reason
+        # custom_save_filepaths['ripple_csv_out_path'] = ripple_out_path
 
         # END Normal data Export _____________________________________________________________________________________________ #
 
