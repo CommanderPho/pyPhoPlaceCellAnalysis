@@ -1265,7 +1265,7 @@ from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv
 
 """
 
-
+@function_attributes(short_name=None, tags=['csv', 'filesystem', 'discovery'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:19', related_items=[])
 def find_csv_files(directory: str, recurrsive: bool=False):
     directory_path = Path(directory) # Convert string path to a Path object
     if recurrsive:
@@ -1274,6 +1274,7 @@ def find_csv_files(directory: str, recurrsive: bool=False):
         return list(directory_path.glob('*.csv')) # Return a list of all .csv files in the directory and its subdirectories
 
 
+@function_attributes(short_name=None, tags=['h5', 'filesystem', 'discovery'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:19', related_items=[])
 def find_HDF5_files(directory: str, recurrsive: bool=False):
     directory_path = Path(directory) # Convert string path to a Path object
     if recurrsive:
@@ -1484,7 +1485,7 @@ def convert_to_dataframe(csv_sessions: Dict[str, Dict[str, Tuple[Path, str, date
     return pd.DataFrame(_output_tuples, columns=['session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime'])
     # parsed_files_df
 
-
+@function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:19', related_items=[])
 def process_csv_file(file: str, session_name: str, curr_session_t_delta: Optional[float], time_col: str) -> pd.DataFrame:
     """ reads the CSV file and adds the 'session_name' column if it is missing.
 
@@ -1495,7 +1496,49 @@ def process_csv_file(file: str, session_name: str, curr_session_t_delta: Optiona
         df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
     return df
 
+@function_attributes(short_name=None, tags=['csv', 'df', 'intermediate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:20', related_items=[])
+def process_parsed_csv_files_df(parsed_csv_files_df, split_char='__'):
+    """
+        ## Split to get the specific override epoch names, e.g. ['__withNewKamranExportedReplays', '__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0', ...]
+        # 'kdiba_gor01_two_2006-6-08_21-16-25' 'kdiba_gor01_two_2006-6-08_21-16-25'
+        # 'kdiba_gor01_two_2006-6-08_21-16-25' 'kdiba_gor01_two_2006-6-08_21-16-25'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewKamranExportedReplays'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewKamranExportedReplays'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewKamranExportedReplays'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewKamranExportedReplays'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19' 'kdiba_gor01_two_2006-6-07_16-40-19'
+        # 'kdiba_gor01_two_2006-6-07_16-40-19' 'kdiba_gor01_two_2006-6-07_16-40-19'
 
+    Usage:
+        parsed_csv_files_df = process_parsed_csv_files_df(parsed_csv_files_df=parsed_csv_files_df)
+
+    """
+    assert 'replay_epoch_names' not in parsed_csv_files_df.columns, \
+        "if you run this twice, it will mess up the parsed names! Re-detect the CSVs and then run this part!"
+    
+    _session_names = []
+    _accrued_replay_epoch_names = []
+
+    for x in parsed_csv_files_df['session'].to_numpy():
+        _split_columns = x.split(split_char)
+        if len(_split_columns) > 1:
+            _session_names.append(_split_columns[0])
+            _accrued_replay_epoch_names.append(_split_columns[-1])
+        else:
+            _session_names.append(_split_columns[0])
+            _accrued_replay_epoch_names.append('')
+
+    parsed_csv_files_df['session'] = _session_names
+    parsed_csv_files_df['replay_epoch_names'] = _accrued_replay_epoch_names
+
+    return parsed_csv_files_df
+
+
+@function_attributes(short_name=None, tags=['csv', 'export', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:20', related_items=[])
 def export_across_session_CSVs(final_output_path: Path, TODAY_DAY_DATE:str, all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_all_scores_ripple_df, all_sessions_all_scores_laps_df=None):
     """ Exports the multi-session single CSVs after loading the CSVs for the individual sessions. Useful for plotting with RawGraphs/Orange, etc.
 
