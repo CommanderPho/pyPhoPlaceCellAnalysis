@@ -1307,20 +1307,27 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, s
     """
     filename: str = path.stem   # Get filename without extension
     final_parsed_output_dict = try_parse_chain(basename=filename)
-
     if final_parsed_output_dict is None:
         print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
-        return None, None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
+        return None, None, None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
+
+    ## Get the custom replay types:
+    if 'session_str' in final_parsed_output_dict:
+        _tmp_splits = final_parsed_output_dict['session_str'].split('__', maxsplit=1)
+        if len(_tmp_splits) > 1:
+            final_parsed_output_dict['session_str'] = _tmp_splits[0]
+            final_parsed_output_dict['custom_replay_name'] = _tmp_splits[1] # remainder of the list
 
     export_datetime, session_str, export_file_type = final_parsed_output_dict.get('export_datetime', None), final_parsed_output_dict.get('session_str', None), final_parsed_output_dict.get('export_file_type', None)
     decoding_time_bin_size_str = final_parsed_output_dict.get('decoding_time_bin_size_str', None)
+    custom_replay_name = final_parsed_output_dict.get('custom_replay_name', None)
 
     if export_file_type is not None:
         if export_file_type[0] == '(' and export_file_type[-1] == ')':
             # Trim the brackets from the file type if they're present:
             export_file_type = export_file_type[1:-1]
 
-    return export_datetime, session_str, export_file_type, decoding_time_bin_size_str
+    return export_datetime, session_str, custom_replay_name, export_file_type, decoding_time_bin_size_str
 
 
 def _OLD_parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, str]:
@@ -1411,10 +1418,11 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
         # Assign a boolean for each element, True if it's None, to ensure None values are sorted last.
         return (
             tup[0],                       # Sort by datetime first
-            tup[1] or '',                  # Then by the string, ensuring None becomes empty string
+            tup[1] or '',                  # Then by the session string, ensuring None becomes empty string
             tup[2] or '',                  # Then by the next string, ensuring None becomes empty string
-            tup[2] or '', #float('-inf') if tup[3] is None else tup[3],  # Then use -inf to ensure None ends up last
-            tup[4]                         # Finally by path which should handle None by itself
+            tup[3] or '',                  # Then by the next string, ensuring None becomes empty string
+            # tup[4] or '',                  #float('-inf') if tup[4] is None else tup[3],  # Then use -inf to ensure None ends up last
+            tup[-1]                         # Finally by path which should handle None by itself
         )
 
     # Now we sort the data using our custom sort key
@@ -1427,7 +1435,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
         print(f'parsed_paths: {parsed_paths}')
 
     sessions = {}
-    for export_datetime, session_str, file_type, decoding_time_bin_size_str, path in parsed_paths:
+    for export_datetime, session_str, custom_replay_name, file_type, decoding_time_bin_size_str, path in parsed_paths:
         if session_str not in sessions:
             sessions[session_str] = {}
 
@@ -1482,7 +1490,7 @@ def convert_to_dataframe(csv_sessions: Dict[str, Dict[str, Tuple[Path, str, date
             # path, decoding_time_bin_size_str, export_datetime = parse_tuple
             _output_tuples.append((session_str, file_type, *parse_tuple))
 
-    return pd.DataFrame(_output_tuples, columns=['session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime'])
+    return pd.DataFrame(_output_tuples, columns=['session', 'custom_replay_name', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime'])
     # parsed_files_df
 
 @function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=[], used_by=['_process_and_load_exported_file'], creation_date='2024-07-09 18:19', related_items=[])
