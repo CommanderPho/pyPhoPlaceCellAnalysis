@@ -14,6 +14,8 @@ Concerned with aggregating data (raw and computed results) across multiple sessi
 
 import sys
 import re
+from copy import deepcopy
+
 from pathlib import Path
 from typing import List, Dict, Optional,  Tuple
 import numpy as np
@@ -38,6 +40,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
 from neuropy.core.neuron_identities import  neuronTypesEnum, NeuronIdentityTable
 from neuropy.utils.mixins.HDF5_representable import HDF_Converter
+from neuropy.utils.indexing_helpers import PandasHelpers
 
 from pyphocorehelpers.Filesystem.metadata_helpers import  get_file_metadata
 
@@ -1290,7 +1293,7 @@ from pyphocorehelpers.Filesystem.path_helpers import try_parse_chain # used in `
 
 
 @function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=['try_parse_chain'], used_by=['find_most_recent_files'], creation_date='2024-03-28 10:16', related_items=[])
-def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, str]:
+def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, Optional[str], str, str]:
     """
     A revised version built on 2024-03-28 that uses `try_parse_chain` instead of nested for loops.
 
@@ -1311,12 +1314,6 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, s
         print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
         return None, None, None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
 
-    ## Get the custom replay types:
-    if 'session_str' in final_parsed_output_dict:
-        _tmp_splits = final_parsed_output_dict['session_str'].split('__', maxsplit=1)
-        if len(_tmp_splits) > 1:
-            final_parsed_output_dict['session_str'] = _tmp_splits[0]
-            final_parsed_output_dict['custom_replay_name'] = _tmp_splits[1] # remainder of the list
 
     export_datetime, session_str, export_file_type = final_parsed_output_dict.get('export_datetime', None), final_parsed_output_dict.get('session_str', None), final_parsed_output_dict.get('export_file_type', None)
     decoding_time_bin_size_str = final_parsed_output_dict.get('decoding_time_bin_size_str', None)
@@ -1390,6 +1387,69 @@ def _OLD_parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, s
     return export_datetime, session_str, export_file_type, decoding_time_bin_size_str
 
 
+top_level_parts_separators = ['-', '__']
+
+# def get_only_most_recent_output_files(a_file_df: pd.DataFrame) -> pd.DataFrame:
+#     """ returns a dataframe containing only the most recent '.err' and '.log' file for each session. 
+    
+#     from phoglobushelpers.compatibility_objects.Files import File, FilesystemDataType, FileList, get_only_most_recent_log_files
+    
+    
+#     """
+    
+
+#     df = deepcopy(a_file_df)
+
+#     required_cols = ['last_modified', 'parent_path', 'name'] # Replace with actual column names you require
+#     has_required_columns = PandasHelpers.require_columns(df, required_cols, print_missing_columns=True)
+#     assert has_required_columns
+
+#     df['last_modified'] = pd.to_datetime(df['last_modified'])
+
+#     # Separate .csv and .h5 files
+#     csv_files = df[df['name'].str.endswith('.csv')]
+#     h5_files = df[df['name'].str.endswith('.h5')]
+
+#     # Get the most recent .err and .log file for each parent_path
+#     most_recent_csv = csv_files.loc[csv_files.groupby('parent_path')['last_modified'].idxmax()]
+#     most_recent_h5 = h5_files.loc[h5_files.groupby('parent_path')['last_modified'].idxmax()]
+
+#     # Concatenate the results
+#     most_recent_files = pd.concat([most_recent_csv, most_recent_h5]).sort_values(by=['parent_path', 'last_modified'], ascending=[True, False])
+#     return most_recent_files
+
+
+def get_only_most_recent_csv_sessions(parsed_paths_df: pd.DataFrame) -> pd.DataFrame:
+    """ returns a dataframe containing only the most recent '.err' and '.log' file for each session. 
+    
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import get_only_most_recent_csv_sessions
+    
+    ['session', 'custom_replay_name', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime']
+
+    I now have a different dataframe where I want to get the most recent (according to the 'export_datetime' column) for each of the groups, grouped by the following columns:
+    ['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str']
+
+
+    """
+    df = deepcopy(parsed_paths_df)
+
+    required_cols = ['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'export_datetime'] # Replace with actual column names you require
+    has_required_columns = PandasHelpers.require_columns(df, required_cols, print_missing_columns=True)
+    assert has_required_columns
+
+    df['export_datetime'] = pd.to_datetime(df['export_datetime'])
+    # Replace NaN values with empty strings
+    df.fillna('', inplace=True)
+
+    # Get the most recent entry for each group
+    most_recent_entries_df: pd.DataFrame = df.loc[df.groupby(['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str'])['export_datetime'].idxmax()]
+    return most_recent_entries_df
+
+
+
+# most_recent_only_csv_file_df = get_only_most_recent_log_files(log_file_df=all_file_df)
+
+
 @function_attributes(short_name=None, tags=['recent', 'parse'], input_requires=[], output_provides=[], uses=['parse_filename'], used_by=[], creation_date='2024-04-15 09:18', related_items=['convert_to_dataframe'])
 def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False) -> Dict[str, Dict[str, Tuple[Path, str, datetime]]]:
     """
@@ -1411,7 +1471,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
 
     """
     # Function 'parse_filename' should be defined in the global scope
-    parsed_paths = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)] # note we append path p to the end of the tuple
+    parsed_paths: List[Tuple] = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)] # note we append path p to the end of the tuple
 
     # Function that helps sort tuples by handling None values.
     def sort_key(tup):
@@ -1427,12 +1487,19 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
 
     # Now we sort the data using our custom sort key
     parsed_paths = sorted(parsed_paths, key=sort_key, reverse=True)
-
     # parsed_paths.sort(key=lambda x: (x[3] is not None, x), reverse=True)
     # parsed_paths.sort(reverse=True) # old way
 
     if debug_print:
         print(f'parsed_paths: {parsed_paths}')
+
+    tuple_column_names = ['export_datetime', 'session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'path']
+    parsed_paths_df: pd.DataFrame = pd.DataFrame(parsed_paths, columns=tuple_column_names)
+    parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=parsed_paths_df)
+    # Drop rows with export_datetime less than or equal to cutoff_date
+    if cuttoff_date is not None:
+        parsed_paths_df = parsed_paths_df[parsed_paths_df['export_datetime'] > cuttoff_date]
+
 
     sessions = {}
     for export_datetime, session_str, custom_replay_name, file_type, decoding_time_bin_size_str, path in parsed_paths:
@@ -1465,7 +1532,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     #             _session_names.append(_split_columns[0])
                 # _accrued_replay_epoch_names.append('')
 
-    return sessions
+    return sessions, parsed_paths_df
 
 
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 09:18', related_items=['find_most_recent_files'])
@@ -1508,47 +1575,6 @@ def read_and_process_csv_file(file: str, session_name: str, curr_session_t_delta
     if curr_session_t_delta is not None:
         df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
     return df
-
-@function_attributes(short_name=None, tags=['csv', 'df', 'intermediate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:20', related_items=[])
-def process_parsed_csv_files_df(parsed_csv_files_df, split_char='__'):
-    """
-        ## Split to get the specific override epoch names, e.g. ['__withNewKamranExportedReplays', '__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0', ...]
-        # 'kdiba_gor01_two_2006-6-08_21-16-25' 'kdiba_gor01_two_2006-6-08_21-16-25'
-        # 'kdiba_gor01_two_2006-6-08_21-16-25' 'kdiba_gor01_two_2006-6-08_21-16-25'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewKamranExportedReplays'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewKamranExportedReplays'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewKamranExportedReplays'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewKamranExportedReplays'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19__withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19' 'kdiba_gor01_two_2006-6-07_16-40-19'
-        # 'kdiba_gor01_two_2006-6-07_16-40-19' 'kdiba_gor01_two_2006-6-07_16-40-19'
-
-    Usage:
-        parsed_csv_files_df = process_parsed_csv_files_df(parsed_csv_files_df=parsed_csv_files_df)
-
-    """
-    assert 'replay_epoch_names' not in parsed_csv_files_df.columns, \
-        "if you run this twice, it will mess up the parsed names! Re-detect the CSVs and then run this part!"
-    
-    _session_names = []
-    _accrued_replay_epoch_names = []
-
-    for x in parsed_csv_files_df['session'].to_numpy():
-        _split_columns = x.split(split_char)
-        if len(_split_columns) > 1:
-            _session_names.append(_split_columns[0])
-            _accrued_replay_epoch_names.append(_split_columns[-1])
-        else:
-            _session_names.append(_split_columns[0])
-            _accrued_replay_epoch_names.append('')
-
-    parsed_csv_files_df['session'] = _session_names
-    parsed_csv_files_df['replay_epoch_names'] = _accrued_replay_epoch_names
-
-    return parsed_csv_files_df
 
 
 @function_attributes(short_name=None, tags=['csv', 'export', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:20', related_items=[])
