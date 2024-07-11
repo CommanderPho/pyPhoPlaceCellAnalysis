@@ -1488,7 +1488,12 @@ def convert_to_dataframe(csv_sessions: Dict[str, Dict[str, Tuple[Path, str, date
                 print(f'\tfile_type: {file_type}')
                 print(f'\t\tparse_tuple: {parse_tuple}')
             # path, decoding_time_bin_size_str, export_datetime = parse_tuple
-            _output_tuples.append((session_str, file_type, *parse_tuple))
+            if len(parse_tuple) == 5:
+                _output_tuples.append((session_str, file_type, *parse_tuple))
+            else:
+                ## don't add to the list for now
+                print(f'\tWARNING: parse tuple skipped due to inadequazte length!')
+
 
     return pd.DataFrame(_output_tuples, columns=['session', 'custom_replay_name', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime'])
     # parsed_files_df
