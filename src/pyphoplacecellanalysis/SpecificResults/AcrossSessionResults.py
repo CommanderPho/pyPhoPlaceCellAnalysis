@@ -1500,6 +1500,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     if cuttoff_date is not None:
         parsed_paths_df = parsed_paths_df[parsed_paths_df['export_datetime'] > cuttoff_date]
 
+    ## parsed_paths_df is new 2024-07-11 output
 
     sessions = {}
     for export_datetime, session_str, custom_replay_name, file_type, decoding_time_bin_size_str, path in parsed_paths:
