@@ -2118,6 +2118,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
     2024-02-15 - Computed by `_decode_and_evaluate_epochs_using_directional_decoders`
     
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
     """ 
 
     _VersionedResultMixin_version: str = "2024.02.16_0" # to be updated in your IMPLEMENTOR to indicate its version
