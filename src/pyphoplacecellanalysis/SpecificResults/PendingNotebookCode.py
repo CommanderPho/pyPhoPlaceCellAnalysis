@@ -1032,72 +1032,7 @@ def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Di
 # 2024-05-23 - Restoring 'is_user_annotated_epoch' and 'is_valid_epoch' columns                                        #
 # ==================================================================================================================== #
 
-## INPUTS: an_active_df, all_sessions_all_scores_df, a_time_column_names = 'ripple_start_t'
-@function_attributes(short_name=None, tags=['IMPORTANT', 'missing-columns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-23 18:10', related_items=[])
-def recover_user_annotation_and_is_valid_columns(an_active_df, all_sessions_all_scores_df, a_time_column_names:str='ripple_start_t'):
-    """ Gets the proper 'is_user_annotated_epoch' and 'is_valid_epoch' columns for the epochs passed in 'an_active_df' evaluated with different time_bin_sizes
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import recover_user_annotation_and_is_valid_columns
-        
-        ## epoch-based ones:
-        all_sessions_ripple_df = recover_user_annotation_and_is_valid_columns(all_sessions_ripple_df, all_sessions_all_scores_df=all_sessions_all_scores_df, a_time_column_names='ripple_start_t')
-        all_sessions_ripple_df
 
-        # ## can't do the time_bin ones yet because it doesn't have 'ripple_start_t' to match on:
-        # an_active_df = all_sessions_ripple_time_bin_df
-        # a_time_column_names = 'delta_aligned_start_t'
-        # all_sessions_all_scores_df = all_sessions_all_scores_ripple_df
-    """
-    from neuropy.utils.misc import numpyify_array
-    from neuropy.core.user_annotations import UserAnnotationsManager
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
-
-    # ## METHOD 0:
-    # annotations_man = UserAnnotationsManager()
-    # user_annotations = annotations_man.get_user_annotations()
-
-    # # [k.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys()) for k, v in user_annotations.items()]
-
-    # ## recover/build the annotation contexts to find the annotations:
-    # recovered_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), k.split('_', maxsplit=3)))) for k in an_active_df.session_name.unique()]
-
-    # epochs_name = 'ripple'
-
-    # _out_any_good_selected_epoch_times = []
-
-    # for a_ctxt in recovered_session_contexts:    
-    #     loaded_selections_context_dict = {a_name:a_ctxt.adding_context_if_missing(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name, user_annotation='selections') for a_name in ('long_LR','long_RL','short_LR','short_RL')}
-    #     decoder_user_selected_epoch_times_dict = {a_name:numpyify_array(user_annotations.get(a_selections_ctx, [])) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
-    #     _out_any_good_selected_epoch_times.extend(decoder_user_selected_epoch_times_dict.values())
-
-    # # Find epochs that are present in any of the decoders:
-    # concatenated_selected_epoch_times = np.concatenate([v for v in _out_any_good_selected_epoch_times if (np.size(v) > 0)], axis=0)
-    # any_good_selected_epoch_times: NDArray = np.unique(concatenated_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
-    # print(f'METHOD 0: any_good_selected_epoch_times: {np.shape(any_good_selected_epoch_times)}')
-
-    # `is_user_annotated` ________________________________________________________________________________________________ #
-    # did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_selected_epoch_times, t_column_names=[a_time_column_names,])
-
-    if all_sessions_all_scores_df is not None:
-        ## Option 2 - the `all_sessions_all_scores_ripple_df` df column-based approach. get only the valid rows from the `all_sessions_all_scores_ripple_df` df
-        any_good_selected_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_user_annotated_epoch']][['start', 'stop']].to_numpy()
-        any_good_selected_epoch_times = np.unique(any_good_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
-        # print(f'METHOD 1: any_good_selected_epoch_times: {np.shape(any_good_selected_epoch_times)}') # interesting: difference of 1: (436, 2) v. (435, 2) 
-
-        did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_selected_epoch_times, t_column_names=[a_time_column_names,])
-
-        # `is_valid_epoch` ___________________________________________________________________________________________________ #
-        # get only the valid rows from the `all_sessions_all_scores_ripple_df` df
-        any_good_is_valid_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_valid_epoch']][['start', 'stop']].to_numpy()
-        any_good_is_valid_epoch_times = np.unique(any_good_is_valid_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
-        did_update_is_valid = DecoderDecodedEpochsResult.try_add_is_valid_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_is_valid_epoch_times, t_column_names=[a_time_column_names,])
-    else:
-        print(f'WARNING: no `all_sessions_all_scores_df` to get "is_valid_epoch" and "is_user_annotated_epoch" from!\n\tSetting "is_valid_epoch" all to True and "is_user_annotated_Epoch" all to False.')
-        an_active_df['is_valid_epoch'] = True # all True
-        an_active_df['is_user_annotated_epoch'] = False # all False
-
-    ## OUTPUTS: an_active_df
-    return an_active_df
 
 
 

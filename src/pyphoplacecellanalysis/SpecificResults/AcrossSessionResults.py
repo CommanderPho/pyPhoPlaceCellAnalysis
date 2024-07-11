@@ -2080,6 +2080,12 @@ def recover_user_annotation_and_is_valid_columns(an_active_df, all_sessions_all_
 
 
 def _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict):
+    """ 
+    
+    all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict)
+    all_sessions_ripple_df
+
+    """
     ## Build across_sessions join dataframes:
     all_sessions_laps_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_laps_dict.values()), axis='index', ignore_index=True)
     all_sessions_ripple_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_ripple_dict.values()), axis='index', ignore_index=True)
@@ -2201,10 +2207,20 @@ def _old_process_csv_files(csv_sessions, t_delta_dict, cuttoff_date=None, known_
 
     ## OUTPUTS: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict,
        
-    return final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict
+    # return (final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict)
+    
+    ## Build across_sessions join dataframes:
+    all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict)
+    ## OUTPUTS: all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df
+    
+    return (
+        (final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict),
+        (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df),
+    )
 
 
-def _new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> None:
+
+def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> None:
     try:
         # loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
 
@@ -2222,19 +2238,24 @@ def _new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session
             print(f'session "{session_name}", file_path: "{file_path}" - did not fully work. (error "{e}". Skipping.')
 
 
-@function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=['_new_df_process_and_load_exported_file', 'recover_user_annotation_and_is_valid_columns'], used_by=[], creation_date='2024-07-11 17:11', related_items=[])
-def _new_process_csv_files(parsed_csv_files_df, t_delta_dict, debug_print=False):
+def try_convert_to_float(a_str: str, default_val: float = np.nan) -> float:
+    """ allows trying to parse to a float, and fallsback to a default value if it fails.
     """
-    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _new_process_csv_files
+    try:
+        return float(a_str)
+    except:
+        return default_val
     
+
+@function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=['_new_df_process_and_load_exported_file', 'recover_user_annotation_and_is_valid_columns'], used_by=[], creation_date='2024-07-11 17:11', related_items=[])
+def _new_process_csv_files(parsed_csv_files_df, t_delta_dict, cuttoff_date=None, known_bad_session_strs=[], debug_print=False):
     """
-    # csv_sessions
     # We now have the correct and parsed filepaths for each of the exported .csvs, now we need to actually load them and concatenate them toggether across sessions.
     # Extract each of the separate files from the sessions:
     
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _new_process_csv_files
     
-
-
+    """
     # final_sessions: Dict[types.session_str, Dict[str, Path]] = {}
     final_sessions_loaded_laps_dict = {}
     final_sessions_loaded_ripple_dict = {}
@@ -2259,17 +2280,24 @@ def _new_process_csv_files(parsed_csv_files_df, t_delta_dict, debug_print=False)
 
     for index, row in parsed_csv_files_df.iterrows():
         session_str = str(row['session'])
+        if session_str in known_bad_session_strs:
+            print(f'Skipping "{session_str}" because it is in known_bad_session_strs.')
+            continue
+        
         custom_replay_name = row['custom_replay_name']
         file_type = row['file_type']
         decoding_time_bin_size_str = row['decoding_time_bin_size_str']
-        
+    
+        ## Setup:
         additional_columns_dict = {'custom_replay_name': custom_replay_name}
-        if decoding_time_bin_size_str is not None:
-            decoding_time_bin_size = float(decoding_time_bin_size_str)
-            additional_columns_dict['time_bin_size'] = decoding_time_bin_size
-            
+        additional_columns_dict['time_bin_size'] = try_convert_to_float(decoding_time_bin_size_str, default_val=np.nan)
 
         export_datetime = row['export_datetime']
+        if cuttoff_date is not None:
+            if export_datetime < cuttoff_date:
+                print(f'Skipping "{session_str}" because export_datetime = "{export_datetime}" is less than cuttoff_date = "{cuttoff_date}".')
+                continue
+            
         path = Path(row['path']).resolve()
         assert path.exists()
 
@@ -2283,25 +2311,25 @@ def _new_process_csv_files(parsed_csv_files_df, t_delta_dict, debug_print=False)
 
         # Process each file type with its corresponding details
         if file_type == 'laps_marginals_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         if file_type == 'ripple_marginals_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         elif file_type == 'laps_time_bin_marginals_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
         elif file_type == 'ripple_time_bin_marginals_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
         elif file_type == 'laps_simple_pf_pearson_merged_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         elif file_type == 'ripple_simple_pf_pearson_merged_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         elif file_type == 'laps_weighted_corr_merged_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_wcorr_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_wcorr_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         elif file_type == 'ripple_weighted_corr_merged_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_wcorr_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_wcorr_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         elif file_type == 'laps_all_scores_merged_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_all_scores_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_all_scores_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         elif file_type == 'ripple_all_scores_merged_df':
-            _new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_all_scores_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_all_scores_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         else:
             print(f'File type {file_type} not implemented.')
             # File type neuron_replay_stats_df not implemented.
@@ -2311,84 +2339,12 @@ def _new_process_csv_files(parsed_csv_files_df, t_delta_dict, debug_print=False)
     ## OUTPUTS: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict,
     
     ## Build across_sessions join dataframes:
-    all_sessions_laps_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_laps_dict.values()), axis='index', ignore_index=True)
-    all_sessions_ripple_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_ripple_dict.values()), axis='index', ignore_index=True)
-    # Add 'epoch_idx' column for compatibility:
-    if all_sessions_laps_df is not None:
-        all_sessions_laps_df['epoch_idx'] = all_sessions_laps_df['lap_idx']
-    if all_sessions_ripple_df is not None:
-        all_sessions_ripple_df['epoch_idx'] = all_sessions_ripple_df['ripple_idx']
-
-    # *_time_bin marginals:
-    all_sessions_laps_time_bin_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_laps_time_bin_dict.values()), axis='index', ignore_index=True)
-    all_sessions_ripple_time_bin_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_ripple_time_bin_dict.values()), axis='index', ignore_index=True)
-
-    # NEW ________________________________________________________________________________________________________________ #
-    all_sessions_simple_pearson_laps_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_simple_pearson_laps_dict.values()), axis='index', ignore_index=True)
-    all_sessions_simple_pearson_ripple_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_simple_pearson_ripple_dict.values()), axis='index', ignore_index=True)
-
-    if len(final_sessions_loaded_laps_wcorr_dict) > 0:
-        all_sessions_wcorr_laps_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_laps_wcorr_dict.values()), axis='index', ignore_index=True)
-    else:
-        all_sessions_wcorr_laps_df = None # empty df would be better
-
-    all_sessions_wcorr_ripple_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_ripple_wcorr_dict.values()), axis='index', ignore_index=True)
-
-    # `*_all_scores_*`: __________________________________________________________________________________________________ #
-    # all_sessions_all_score_laps_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_laps_all_scores_dict.values()), axis='index', ignore_index=True)
-    all_sessions_all_scores_ripple_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_ripple_all_scores_dict.values()), axis='index', ignore_index=True)
-
-    # dfs_list = (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df)
-    dfs_dict = dict(zip(('all_sessions_laps_df', 'all_sessions_ripple_df', 'all_sessions_laps_time_bin_df', 'all_sessions_ripple_time_bin_df'), (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df)))
-
-    # for a_df in dfs_list:
-    for a_df_name, a_df in dfs_dict.items():
-        if a_df is not None:
-            if 'time_bin_size' not in a_df:
-                print(f'Uh-oh! time_bin_size is missing for "{a_df_name}"! This must be old exports!')
-                # print(f'\tTry to determine the time_bin_size from the filenames: {csv_sessions}')
-                ## manual correction UwU
-                time_bin_size: float = 0.025
-                print(f'\tWARNING! MANUAL OVERRIDE TIME BIN SIZE SET: time_bin_size = {time_bin_size}. Assigning to dataframes....')
-                a_df['time_bin_size'] = time_bin_size
-            else:
-                # Filter rows based on column: 'time_bin_size'
-                a_df = a_df[a_df['time_bin_size'].notna()]
-
-    all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df = [_common_cleanup_operations(a_df) for a_df in (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df)]
-    all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df = [_common_cleanup_operations(a_df) for a_df in (all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df)]
-
-    # all_sessions_all_score_laps_df, all_sessions_all_scores_ripple_df = [_common_cleanup_operations(a_df) for a_df in (all_sessions_all_score_laps_df, all_sessions_all_scores_ripple_df)]
-    # all_sessions_all_score_laps_df = _common_cleanup_operations(all_sessions_all_score_laps_df)
-    all_sessions_all_scores_ripple_df = _common_cleanup_operations(all_sessions_all_scores_ripple_df)
-
-    all_sessions_simple_pearson_laps_df: pd.DataFrame = DecoderDecodedEpochsResult.merge_decoded_epochs_result_dfs(all_sessions_simple_pearson_laps_df, all_sessions_wcorr_laps_df, should_drop_directional_columns=False, start_t_idx_name='delta_aligned_start_t')
-    all_sessions_simple_pearson_ripple_df: pd.DataFrame = DecoderDecodedEpochsResult.merge_decoded_epochs_result_dfs(all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_ripple_df, should_drop_directional_columns=False, start_t_idx_name='ripple_start_t')
-    # all_sessions_laps_time_bin_df # 601845 rows × 9 column
-
-    ## epoch-based ones:
-    all_sessions_ripple_df = recover_user_annotation_and_is_valid_columns(all_sessions_ripple_df, all_sessions_all_scores_df=all_sessions_all_scores_ripple_df, a_time_column_names='ripple_start_t')
-
+    all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict)
+    ## OUTPUTS: all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df
+    
     return (
-        final_sessions_loaded_laps_dict,
-        final_sessions_loaded_ripple_dict,
-        final_sessions_loaded_laps_time_bin_dict,
-        final_sessions_loaded_ripple_time_bin_dict,
-        final_sessions_loaded_simple_pearson_laps_dict,
-        final_sessions_loaded_simple_pearson_ripple_dict,
-        final_sessions_loaded_laps_wcorr_dict,
-        final_sessions_loaded_ripple_wcorr_dict,
-        final_sessions_loaded_laps_all_scores_dict,
-        final_sessions_loaded_ripple_all_scores_dict,
-        all_sessions_laps_df,
-        all_sessions_ripple_df,
-        all_sessions_laps_time_bin_df,
-        all_sessions_ripple_time_bin_df,
-        all_sessions_simple_pearson_laps_df,
-        all_sessions_simple_pearson_ripple_df,
-        all_sessions_wcorr_laps_df,
-        all_sessions_wcorr_ripple_df,
-        all_sessions_all_scores_ripple_df
+        (final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict),
+        (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df),
     )
 
 
