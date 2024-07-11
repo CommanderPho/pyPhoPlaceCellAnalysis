@@ -1687,13 +1687,15 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
 
 @function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=['read_and_process_csv_file'], used_by=[], creation_date='2024-07-10 16:52', related_items=[])
-def _process_and_load_exported_file(session_dict, df_file_name_key: str, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str) -> None:
+def _process_and_load_exported_file(session_dict, df_file_name_key: str, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False) -> None:
     """ updates loaded_dict """
     try:
         file_path = session_dict[df_file_name_key]
         loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
     except BaseException as e:
-        print(f'session "{session_name}", df_file_name_key: "{df_file_name_key}" - did not fully work. (error "{e}". Skipping.')
+        if debug_print:
+            print(f'session "{session_name}", df_file_name_key: "{df_file_name_key}" - did not fully work. (error "{e}". Skipping.')
+
 
 def _common_cleanup_operations(a_df):
     """ post loading and concatenation across sessions dataframe cleanup """
