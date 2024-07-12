@@ -18,6 +18,8 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 
 from attrs import make_class
+
+
 SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path', 'fail_on_exception'])
 
 """
@@ -572,6 +574,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     # BEGIN BLOCK 2 - modernizing from `_perform_compute_custom_epoch_decoding`  ________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_lap_and_ripple_epochs_decoding_for_decoder, _perform_compute_custom_epoch_decoding, _compute_all_df_score_metrics
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
 
     # Uses: session_ctxt_key, all_param_sweep_options
     # output_alt_directional_merged_decoders_result: Dict[Tuple, Dict[types.DecoderName, DirectionalPseudo2DDecodersResult]] = {} # empty dict
@@ -727,6 +730,40 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 
     # 2024-07-12 - Export computed CSVs in here?!?! ______________________________________________________________________ #
+    ## INPUTS: active_context (from before), should be correct
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+    for a_sweep_tuple, a_directional_decoders_epochs_decode_result in output_directional_decoders_epochs_decode_results_dict.items():
+        # active_context = curr_active_pipeline.get_session_context()
+        # a_sweep_tuple
+        ## add the additional contexts:
+        # a_sweep_active_context = deepcopy(active_context).adding_context_if_missing(custom_replay_name='TESTNEW', time_bin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size)
+        # additional_session_context = None
+        # try:
+        # 	if custom_suffix is not None:
+        # 		additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
+        # 		print(f'Using custom suffix: "{custom_suffix}" - additional_session_context: "{additional_session_context}"')
+        # except NameError as err:
+        # 	additional_session_context = None
+        # 	print(f'NO CUSTOM SUFFIX.')    
+
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
+        print(f'\tComputation complete. Exporting .CSVs...')
+
+        # 2024-03-04 - Filter out the epochs based on the criteria: -- #TODO 2024-07-12 08:30: - [ ] This is nearly certainly going to ruin it
+        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+        filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
+
+        ## Export CSVs:
+        _output_csv_paths = a_directional_decoders_epochs_decode_result.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=curr_session_name, curr_session_t_delta=t_delta,
+                                                                                        user_annotation_selections={'ripple': any_good_selected_epoch_times},
+                                                                                        valid_epochs_selections={'ripple': filtered_valid_epoch_times},
+                                                                                    )
+
+
+
+
     print(f'>>\t done with {curr_session_context}')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
