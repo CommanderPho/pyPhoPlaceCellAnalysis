@@ -1268,6 +1268,35 @@ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import find_csv_
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv_files, find_HDF5_files, find_most_recent_files, read_and_process_csv_file
 
 """
+from typing import Dict, List, Tuple, Optional
+import neuropy.utils.type_aliases as types
+from attrs import define
+from pyphocorehelpers.Filesystem.path_helpers import try_parse_chain # used in `parse_filename`
+
+
+def build_session_t_delta(t_delta_csv_path: Path):
+    """
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import build_session_t_delta
+    t_delta_csv_path = collected_outputs_directory.joinpath('../2024-01-18_GL_t_split_df.csv').resolve() # GL
+    # t_delta_csv_path = collected_outputs_directory.joinpath('2024-06-11_GL_t_split_df.csv').resolve()
+
+    t_delta_df, t_delta_dict = build_session_t_delta(t_delta_csv_path=t_delta_csv_path)
+
+    """
+    assert t_delta_csv_path.exists(), f"t_split_df CSV at '{t_delta_csv_path}' does not exist!"
+    ## The CSV containing the session delta time:
+    t_delta_df = pd.read_csv(t_delta_csv_path, index_col=0) # Assuming that your CSV file has an index column
+    # adds `delta_aligned_t_start`, `delta_aligned_t_end` columns
+    t_delta_df['delta_aligned_t_start'] = t_delta_df['t_start'] - t_delta_df['t_delta']
+    t_delta_df['delta_aligned_t_end'] = t_delta_df['t_end'] - t_delta_df['t_delta']
+    
+    # computes `earliest_delta_aligned_t_start`, latest_delta_aligned_t_end
+    earliest_delta_aligned_t_start: float = np.nanmin(t_delta_df['delta_aligned_t_start'])
+    latest_delta_aligned_t_end: float = np.nanmax(t_delta_df['delta_aligned_t_end'])
+    print(f'earliest_delta_aligned_t_start: {earliest_delta_aligned_t_start}, latest_delta_aligned_t_end: {latest_delta_aligned_t_end}')
+    t_delta_dict = t_delta_df.to_dict(orient='index')
+    return t_delta_df, t_delta_dict, (earliest_delta_aligned_t_start, latest_delta_aligned_t_end)
+
 
 @function_attributes(short_name=None, tags=['csv', 'filesystem', 'discovery'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:19', related_items=[])
 def find_csv_files(directory: str, recurrsive: bool=False):
@@ -1287,10 +1316,6 @@ def find_HDF5_files(directory: str, recurrsive: bool=False):
         return list(directory_path.glob('*.h5')) # Return a list of all .h5 files in the directory and its subdirectories
 
 
-from typing import Dict, List, Tuple, Optional
-import neuropy.utils.type_aliases as types
-from attrs import define
-from pyphocorehelpers.Filesystem.path_helpers import try_parse_chain # used in `parse_filename`
 
 
 @function_attributes(short_name=None, tags=['parse'], input_requires=[], output_provides=[], uses=['try_parse_chain'], used_by=['find_most_recent_files'], creation_date='2024-03-28 10:16', related_items=[])
@@ -2011,6 +2036,14 @@ def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None,
 
 
 
+def try_convert_to_float(a_str: str, default_val: float = np.nan) -> float:
+    """ allows trying to parse to a float, and fallsback to a default value if it fails.
+    """
+    try:
+        return float(a_str)
+    except:
+        return default_val
+    
 ## INPUTS: an_active_df, all_sessions_all_scores_df, a_time_column_names = 'ripple_start_t'
 @function_attributes(short_name=None, tags=['IMPORTANT', 'missing-columns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-23 18:10', related_items=[])
 def recover_user_annotation_and_is_valid_columns(an_active_df, all_sessions_all_scores_df, a_time_column_names:str='ripple_start_t'):
@@ -2143,22 +2176,32 @@ def _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loa
     # all_sessions_laps_time_bin_df # 601845 rows × 9 column
 
     ## epoch-based ones:
-    all_sessions_ripple_df = recover_user_annotation_and_is_valid_columns(all_sessions_ripple_df, all_sessions_all_scores_df=all_sessions_all_scores_ripple_df, a_time_column_names='ripple_start_t')
+    if all_sessions_ripple_df is not None:
+        all_sessions_ripple_df = recover_user_annotation_and_is_valid_columns(all_sessions_ripple_df, all_sessions_all_scores_df=all_sessions_all_scores_ripple_df, a_time_column_names='ripple_start_t')
 
     return (
         all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df
     )
 
 
+@function_attributes(short_name=None, tags=['csv', 'OLD'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-11 18:06', related_items=[])
 def _old_process_csv_files(csv_sessions, t_delta_dict, cuttoff_date=None, known_bad_session_strs=[], debug_print=False):
-    """
-    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _new_process_csv_files, _old_process_csv_files
-    
+    """ OLD (pre 2024-07-11) method for processing CSV files.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _old_process_csv_files
+        
+        ## OLD (pre 2024-07-11):
+        ## INPUTS: csv_sessions
+        dict_results, df_results = _old_process_csv_files(csv_sessions=csv_sessions, t_delta_dict=t_delta_dict, cuttoff_date=cuttoff_date, known_bad_session_strs=known_bad_session_strs, debug_print=False)
+        (final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict) = dict_results
+        (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df) = df_results
+
     """
     # csv_sessions
     # We now have the correct and parsed filepaths for each of the exported .csvs, now we need to actually load them and concatenate them toggether across sessions.
     # Extract each of the separate files from the sessions:
-    ## OLD (pre 2024-07-11):
+    ## 
     ## INPUTS: csv_sessions
     # final_sessions: Dict[types.session_str, Dict[str, Path]] = {}
     final_sessions_loaded_laps_dict = {}
@@ -2223,38 +2266,41 @@ def _old_process_csv_files(csv_sessions, t_delta_dict, cuttoff_date=None, known_
 def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> None:
     try:
         # loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
-
         df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'])
         df['session_name'] = session_name
         if curr_session_t_delta is not None:
             df['delta_aligned_start_t'] = df[time_key] - curr_session_t_delta
+
+        # loaded_dict_key = session_name # old way, session only
+        loaded_dict_key = [session_name]
         for k, v in additional_columns.items():
             df[k] = v
+            loaded_dict_key.append(str(v))
+
+        loaded_dict_key = tuple(loaded_dict_key)
 
         ## update dict:
-        loaded_dict[session_name] = df
+        loaded_dict[loaded_dict_key] = df ## it's being overwritten here
+
     except BaseException as e:
         if debug_print:
             print(f'session "{session_name}", file_path: "{file_path}" - did not fully work. (error "{e}". Skipping.')
 
 
-def try_convert_to_float(a_str: str, default_val: float = np.nan) -> float:
-    """ allows trying to parse to a float, and fallsback to a default value if it fails.
-    """
-    try:
-        return float(a_str)
-    except:
-        return default_val
-    
-
 @function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=['_new_df_process_and_load_exported_file', 'recover_user_annotation_and_is_valid_columns'], used_by=[], creation_date='2024-07-11 17:11', related_items=[])
-def _new_process_csv_files(parsed_csv_files_df, t_delta_dict, cuttoff_date=None, known_bad_session_strs=[], debug_print=False):
-    """
+def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict, cuttoff_date=None, known_bad_session_strs=[], debug_print=False):
+    """  NEW `parsed_csv_files_df1-based approach 2024-07-11 
     # We now have the correct and parsed filepaths for each of the exported .csvs, now we need to actually load them and concatenate them toggether across sessions.
     # Extract each of the separate files from the sessions:
-    
-    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _new_process_csv_files
-    
+
+    Usage:  
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _new_process_csv_files
+        ## NEW `parsed_csv_files_df1-based approach 2024-07-11 - 
+        ## INPUTS: parsed_csv_files_df
+        dict_results, df_results = _new_process_csv_files(parsed_csv_files_df=parsed_csv_files_df, t_delta_dict=t_delta_dict, cuttoff_date=cuttoff_date, known_bad_session_strs=known_bad_session_strs, debug_print=False) # , known_bad_session_strs=known_bad_session_strs
+        (final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict) = dict_results
+        (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df) = df_results
+
     """
     # final_sessions: Dict[types.session_str, Dict[str, Path]] = {}
     final_sessions_loaded_laps_dict = {}
@@ -2271,12 +2317,6 @@ def _new_process_csv_files(parsed_csv_files_df, t_delta_dict, cuttoff_date=None,
 
     final_sessions_loaded_laps_all_scores_dict = {}
     final_sessions_loaded_ripple_all_scores_dict = {}
-
-    ## NEW `parsed_csv_files_df1-based approach 2024-07-11 - 
-    ## INPUTS: parsed_csv_files_df
-
-    # for session, custom_replay_name, file_type, decoding_time_bin_size_str, export_datetime in parsed_csv_files_df.iteritems()
-    #     # ...
 
     for index, row in parsed_csv_files_df.iterrows():
         session_str = str(row['session'])
@@ -2312,7 +2352,7 @@ def _new_process_csv_files(parsed_csv_files_df, t_delta_dict, cuttoff_date=None,
         # Process each file type with its corresponding details
         if file_type == 'laps_marginals_df':
             _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
-        if file_type == 'ripple_marginals_df':
+        elif file_type == 'ripple_marginals_df':
             _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         elif file_type == 'laps_time_bin_marginals_df':
             _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
