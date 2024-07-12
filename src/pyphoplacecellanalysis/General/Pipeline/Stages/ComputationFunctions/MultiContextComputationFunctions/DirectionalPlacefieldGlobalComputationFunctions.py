@@ -2502,12 +2502,51 @@ class DecoderDecodedEpochsResult(ComputedResult):
         # `common_shared_portion_df` the columns of the dataframe that is the same for all four decoders
         # common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][all_df_shared_column_names]) # copy it from the first dataframe
         common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][included_all_df_shared_column_names]) # copy it from the first dataframe
+        base_shape = np.shape(common_shared_portion_df)
+
+        included_merge_dfs_list = [common_shared_portion_df]
 
         #TODO 2024-07-12 07:06: - [ ] `self.ripple_weighted_corr_merged_df` is the problem it seems, it's of different size (more epochs) than all of the other dataframes
 
         ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
         conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_conditional_prob_column_names]) ## just use the columns from this
         # (k, v) = self.decoder_ripple_filter_epochs_decoder_result_dict.items()[0]
+        conditional_prob_df_shape = np.shape(conditional_prob_df)
+        if (base_shape[0] != conditional_prob_df_shape[0]):
+            print(f'warning: all dfs should have same number of rows, but conditional_prob_df_shape: {conditional_prob_df_shape} != base_shape: {base_shape}. Skipping adding `conditional_prob_df`.')
+        else:
+            ## add it 
+            included_merge_dfs_list.append(conditional_prob_df)
+
+        
+        ## Re-derive the correct conditional probs:
+        # ['P_LR', 'P_RL']
+        # ['P_Long', 'P_Short']
+
+        P_decoder_column_names = ['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL']
+        P_decoder_marginals_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
+
+        # if np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_column_names]):
+        if np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_marginals_column_names]):
+            # needs Marginalized Probability columns: ['P_LR', 'P_RL'], ['P_Long', 'P_Short']
+            print(f'needs Marginalized Probability columns. adding.')
+            assert np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_column_names]), f"missing marginals and cannot recompute them because we're also missing the raw probabilities. extracted_merged_scores_df.columns: {list(extracted_merged_scores_df.columns)}"
+            ## They remain normalized because they all already sum to one.
+            extracted_merged_scores_df['P_Long'] = extracted_merged_scores_df['P_decoder_long_LR'] + extracted_merged_scores_df['P_decoder_long_RL']
+            extracted_merged_scores_df['P_Short'] = extracted_merged_scores_df['P_decoder_short_LR'] + extracted_merged_scores_df['P_decoder_short_RL']
+
+            extracted_merged_scores_df['P_LR'] = extracted_merged_scores_df['P_decoder_long_LR'] + extracted_merged_scores_df['P_decoder_short_LR']
+            extracted_merged_scores_df['P_RL'] = extracted_merged_scores_df['P_decoder_long_RL'] + extracted_merged_scores_df['P_decoder_short_RL']
+
+
+        extracted_merged_scores_df_shape = np.shape(extracted_merged_scores_df)
+        if (base_shape[0] != extracted_merged_scores_df_shape[0]):
+            print(f'warning: all dfs should have same number of rows, but extracted_merged_scores_df_shape: {extracted_merged_scores_df_shape} != base_shape: {base_shape}. Skipping adding `extracted_merged_scores_df`.')
+        else:
+            ## add it
+            included_merge_dfs_list.append(extracted_merged_scores_df)
+
+
 
         # # Weighted correlations:
         # laps_weighted_corr_merged_df: pd.DataFrame = directional_decoders_epochs_decode_result.laps_weighted_corr_merged_df
@@ -2515,10 +2554,14 @@ class DecoderDecodedEpochsResult(ComputedResult):
         # decoder_laps_weighted_corr_df_dict: Dict[str, pd.DataFrame] = directional_decoders_epochs_decode_result.decoder_laps_weighted_corr_df_dict
         # decoder_ripple_weighted_corr_df_dict: Dict[str, pd.DataFrame] = directional_decoders_epochs_decode_result.decoder_ripple_weighted_corr_df_dict #TODO 2024-07-12 07:10: - [ ] So `directional_decoders_epochs_decode_result.decoder_ripple_weighted_corr_df_dict` is right but `self.ripple_weighted_corr_merged_df` is not
 
-        assert np.shape(conditional_prob_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of rows"
+        # assert np.shape(conditional_prob_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of rows but np.shape(conditional_prob_df)[0]: {np.shape(conditional_prob_df)[0]} and np.shape(extracted_merged_scores_df)[0]: {np.shape(extracted_merged_scores_df)[0]}"
+
+
+        # self.decoder_ripple_weighted_corr_df_dict
 
         # Build the final merged dataframe with the score columns for each of the four decoders but only one copy of the common columns.
-        extracted_merged_scores_df: pd.DataFrame = pd.concat((common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df), axis='columns')
+        extracted_merged_scores_df: pd.DataFrame = pd.concat(included_merge_dfs_list, axis='columns') # (common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df)
+        # extracted_merged_scores_df: pd.DataFrame = pd.concat((common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df), axis='columns')
         extracted_merged_scores_df['ripple_start_t'] = extracted_merged_scores_df['start']
 
         if np.any([(a_col not in extracted_merged_scores_df) for a_col in merged_wcorr_column_names]):
@@ -2540,7 +2583,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
         for a_score_col in all_df_score_column_names:
             extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
             added_column_names.extend(curr_added_column_name_tuple)
-
 
         extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)
 
