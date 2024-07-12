@@ -2486,7 +2486,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         # all_df_shared_column_names: List[str] = basic_df_column_names + selection_col_names # these are not replicated for each decoder, they're the same for the epoch
         # all_df_score_column_names: List[str] = decoder_bayes_prob_col_names + radon_transform_col_names + weighted_corr_col_names + pearson_col_names + heuristic_score_col_names 
         # all_df_column_names: List[str] = all_df_shared_column_names + all_df_score_column_names ## All included columns, includes the score columns which will not be replicated
-
+        print(f'build_complete_all_scores_merged_df(...):')
 
         all_df_shared_column_names, all_df_score_column_names, all_df_column_names, merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names = self.get_all_scores_column_names()
 
@@ -2513,7 +2513,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         # (k, v) = self.decoder_ripple_filter_epochs_decoder_result_dict.items()[0]
         conditional_prob_df_shape = np.shape(conditional_prob_df)
         if (base_shape[0] != conditional_prob_df_shape[0]):
-            print(f'warning: all dfs should have same number of rows, but conditional_prob_df_shape: {conditional_prob_df_shape} != base_shape: {base_shape}. Skipping adding `conditional_prob_df`.')
+            print(f'build_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but conditional_prob_df_shape: {conditional_prob_df_shape} != base_shape: {base_shape}. Skipping adding `conditional_prob_df`.')
         else:
             ## add it 
             included_merge_dfs_list.append(conditional_prob_df)
@@ -2530,7 +2530,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         if np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_marginals_column_names]):
             # needs Marginalized Probability columns: ['P_LR', 'P_RL'], ['P_Long', 'P_Short']
             print(f'needs Marginalized Probability columns. adding.')
-            assert np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_column_names]), f"missing marginals and cannot recompute them because we're also missing the raw probabilities. extracted_merged_scores_df.columns: {list(extracted_merged_scores_df.columns)}"
+            # assert np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_column_names]), f"missing marginals and cannot recompute them because we're also missing the raw probabilities. extracted_merged_scores_df.columns: {list(extracted_merged_scores_df.columns)}"
             ## They remain normalized because they all already sum to one.
             extracted_merged_scores_df['P_Long'] = extracted_merged_scores_df['P_decoder_long_LR'] + extracted_merged_scores_df['P_decoder_long_RL']
             extracted_merged_scores_df['P_Short'] = extracted_merged_scores_df['P_decoder_short_LR'] + extracted_merged_scores_df['P_decoder_short_RL']
@@ -2541,11 +2541,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         extracted_merged_scores_df_shape = np.shape(extracted_merged_scores_df)
         if (base_shape[0] != extracted_merged_scores_df_shape[0]):
-            print(f'warning: all dfs should have same number of rows, but extracted_merged_scores_df_shape: {extracted_merged_scores_df_shape} != base_shape: {base_shape}. Skipping adding `extracted_merged_scores_df`.')
+            print(f'build_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but extracted_merged_scores_df_shape: {extracted_merged_scores_df_shape} != base_shape: {base_shape}. Skipping adding `extracted_merged_scores_df`.')
         else:
             ## add it
             included_merge_dfs_list.append(extracted_merged_scores_df)
-
 
 
         # # Weighted correlations:
@@ -2566,7 +2565,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         if np.any([(a_col not in extracted_merged_scores_df) for a_col in merged_wcorr_column_names]):
             # needs wcorr columns
-            print(f'needs wcorr columns. adding.')
+            print(f'build_complete_all_scores_merged_df(...): needs wcorr columns. adding.')
             wcorr_columns_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_wcorr_column_names]) ## just use the columns from this
             assert np.shape(wcorr_columns_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of columns"
             extracted_merged_scores_df: pd.DataFrame = pd.concat((extracted_merged_scores_df, wcorr_columns_df), axis='columns')
@@ -2580,9 +2579,14 @@ class DecoderDecodedEpochsResult(ComputedResult):
         #     extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
         #     added_column_names.extend(curr_added_column_name_tuple)
         #     # (long_best_col_name, short_best_col_name, LS_diff_col_name)
-        for a_score_col in all_df_score_column_names:
-            extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
-            added_column_names.extend(curr_added_column_name_tuple)
+
+        try:
+            for a_score_col in all_df_score_column_names:
+                extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
+                added_column_names.extend(curr_added_column_name_tuple)
+        except BaseException as err:
+            print(f'build_complete_all_scores_merged_df(...): Encountered ERROR: {err} but trying to continue, so close!')
+
 
         extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)
 
