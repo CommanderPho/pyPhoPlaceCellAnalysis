@@ -2461,6 +2461,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
             extracted_merged_scores_df = build_complete_all_scores_merged_df(directional_decoders_epochs_decode_result)
             extracted_merged_scores_df
 
+
+        #TODO 2024-07-15 18:32: - [ ] Ending up with multiple 'P_LR' columns in the dataframe! Not sure how this can happen.
+
+
         """
         from neuropy.core.epoch import ensure_dataframe
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df
@@ -2510,7 +2514,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
         conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_conditional_prob_column_names]) ## just use the columns from this
-        # (k, v) = self.decoder_ripple_filter_epochs_decoder_result_dict.items()[0]
         conditional_prob_df_shape = np.shape(conditional_prob_df)
         if (base_shape[0] != conditional_prob_df_shape[0]):
             print(f'build_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but conditional_prob_df_shape: {conditional_prob_df_shape} != base_shape: {base_shape}. Skipping adding `conditional_prob_df`.')
@@ -2546,17 +2549,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
             ## add it
             included_merge_dfs_list.append(extracted_merged_scores_df)
 
-
         # # Weighted correlations:
-        # laps_weighted_corr_merged_df: pd.DataFrame = directional_decoders_epochs_decode_result.laps_weighted_corr_merged_df
-        # ripple_weighted_corr_merged_df: pd.DataFrame = directional_decoders_epochs_decode_result.ripple_weighted_corr_merged_df
-        # decoder_laps_weighted_corr_df_dict: Dict[str, pd.DataFrame] = directional_decoders_epochs_decode_result.decoder_laps_weighted_corr_df_dict
-        # decoder_ripple_weighted_corr_df_dict: Dict[str, pd.DataFrame] = directional_decoders_epochs_decode_result.decoder_ripple_weighted_corr_df_dict #TODO 2024-07-12 07:10: - [ ] So `directional_decoders_epochs_decode_result.decoder_ripple_weighted_corr_df_dict` is right but `self.ripple_weighted_corr_merged_df` is not
-
-        # assert np.shape(conditional_prob_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of rows but np.shape(conditional_prob_df)[0]: {np.shape(conditional_prob_df)[0]} and np.shape(extracted_merged_scores_df)[0]: {np.shape(extracted_merged_scores_df)[0]}"
-
-
-        # self.decoder_ripple_weighted_corr_df_dict
 
         # Build the final merged dataframe with the score columns for each of the four decoders but only one copy of the common columns.
         extracted_merged_scores_df: pd.DataFrame = pd.concat(included_merge_dfs_list, axis='columns') # (common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df)
@@ -2585,7 +2578,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
                 extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
                 added_column_names.extend(curr_added_column_name_tuple)
         except BaseException as err:
-            print(f'build_complete_all_scores_merged_df(...): Encountered ERROR: {err} but trying to continue, so close!')
+            print(f'build_complete_all_scores_merged_df(...): Encountered ERROR: {err} while trying to add "a_score_col": {a_score_col}, but trying to continue, so close!')
 
 
         extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)

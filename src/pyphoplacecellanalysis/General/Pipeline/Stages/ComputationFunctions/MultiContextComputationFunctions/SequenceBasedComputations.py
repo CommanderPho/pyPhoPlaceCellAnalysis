@@ -259,7 +259,6 @@ class WCorrShuffle(ComputedResult):
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
             track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
 
-
         directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
 
         ## INPUTS: curr_active_pipeline, global_epoch_name, track_templates
