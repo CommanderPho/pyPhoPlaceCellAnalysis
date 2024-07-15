@@ -272,9 +272,14 @@ class WCorrShuffle(ComputedResult):
         ## Adds 'is_most_likely_direction_LR', 'P_LR' to the `filtered_epochs_df` so we can determine which direction is most likely. This uses `directional_decoders_epochs_decode_result`
         ## INPUTS: directional_decoders_epochs_decode_result
 
+
         ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
         extracted_merged_scores_df: pd.DataFrame = directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df()
-        extracted_merged_scores_df['is_most_likely_direction_LR'] = (extracted_merged_scores_df['P_LR'] > 0.5)
+        
+        extracted_merged_scores_df = extracted_merged_scores_df.loc[:, ~extracted_merged_scores_df.columns.duplicated()] # drops the duplicate columns, keeping only the first instance
+
+
+        extracted_merged_scores_df['is_most_likely_direction_LR'] = (extracted_merged_scores_df['P_LR'] > 0.5) # ValueError: Cannot set a DataFrame with multiple columns to the single column is_most_likely_direction_LR. Have duplicate columns for 'P_LR' unfortunately.
 
         ## Find the correct indicies corresponding to the filtered events
         filtered_start_times = deepcopy(filtered_epochs_df['start'].to_numpy())
