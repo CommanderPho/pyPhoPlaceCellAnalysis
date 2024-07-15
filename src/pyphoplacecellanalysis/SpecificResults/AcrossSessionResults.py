@@ -18,6 +18,7 @@ from copy import deepcopy
 
 from pathlib import Path
 from typing import List, Dict, Optional,  Tuple
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 from attrs import define, field, Factory
@@ -2089,21 +2090,33 @@ def recover_user_annotation_and_is_valid_columns(an_active_df, all_sessions_all_
 
     # `is_user_annotated` ________________________________________________________________________________________________ #
     # did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_selected_epoch_times, t_column_names=[a_time_column_names,])
-
+    failed_to_find_columns = True
+    
     if all_sessions_all_scores_df is not None:
         ## Option 2 - the `all_sessions_all_scores_ripple_df` df column-based approach. get only the valid rows from the `all_sessions_all_scores_ripple_df` df
-        any_good_selected_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_user_annotated_epoch']][['start', 'stop']].to_numpy()
-        any_good_selected_epoch_times = np.unique(any_good_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
-        # print(f'METHOD 1: any_good_selected_epoch_times: {np.shape(any_good_selected_epoch_times)}') # interesting: difference of 1: (436, 2) v. (435, 2) 
+        
+        try:
+            any_good_selected_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_user_annotated_epoch']][['start', 'stop']].to_numpy()
+            any_good_selected_epoch_times = np.unique(any_good_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+            # print(f'METHOD 1: any_good_selected_epoch_times: {np.shape(any_good_selected_epoch_times)}') # interesting: difference of 1: (436, 2) v. (435, 2) 
 
-        did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_selected_epoch_times, t_column_names=[a_time_column_names,])
+            did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_selected_epoch_times, t_column_names=[a_time_column_names,])
 
-        # `is_valid_epoch` ___________________________________________________________________________________________________ #
-        # get only the valid rows from the `all_sessions_all_scores_ripple_df` df
-        any_good_is_valid_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_valid_epoch']][['start', 'stop']].to_numpy()
-        any_good_is_valid_epoch_times = np.unique(any_good_is_valid_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
-        did_update_is_valid = DecoderDecodedEpochsResult.try_add_is_valid_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_is_valid_epoch_times, t_column_names=[a_time_column_names,])
+            # `is_valid_epoch` ___________________________________________________________________________________________________ #
+            # get only the valid rows from the `all_sessions_all_scores_ripple_df` df
+            any_good_is_valid_epoch_times: NDArray = all_sessions_all_scores_df[all_sessions_all_scores_df['is_valid_epoch']][['start', 'stop']].to_numpy()
+            any_good_is_valid_epoch_times = np.unique(any_good_is_valid_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+            did_update_is_valid = DecoderDecodedEpochsResult.try_add_is_valid_epoch_column(an_active_df, any_good_selected_epoch_times=any_good_is_valid_epoch_times, t_column_names=[a_time_column_names,])
+            
+        except BaseException as err:
+            print(f"failed to find proper 'is_user_annotated_epoch' and 'is_valid_epoch' columns for the epochs passed with error: {err}. Skipping.")
+            failed_to_find_columns = True
+            # raise err
+
     else:
+        failed_to_find_columns = True
+
+    if failed_to_find_columns:
         print(f'WARNING: no `all_sessions_all_scores_df` to get "is_valid_epoch" and "is_user_annotated_epoch" from!\n\tSetting "is_valid_epoch" all to True and "is_user_annotated_Epoch" all to False.')
         an_active_df['is_valid_epoch'] = True # all True
         an_active_df['is_user_annotated_epoch'] = False # all False
