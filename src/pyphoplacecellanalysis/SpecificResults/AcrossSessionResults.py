@@ -1522,12 +1522,17 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
 
     tuple_column_names = ['export_datetime', 'session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'path']
     parsed_paths_df: pd.DataFrame = pd.DataFrame(parsed_paths, columns=tuple_column_names)
-    parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=parsed_paths_df)
+    # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
+    parsed_paths_df = parsed_paths_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
+
+    ## This is where we drop all but the most recent:
+    filtered_parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=deepcopy(parsed_paths_df))
+
     # Drop rows with export_datetime less than or equal to cutoff_date
     if cuttoff_date is not None:
-        parsed_paths_df = parsed_paths_df[parsed_paths_df['export_datetime'] > cuttoff_date]
+        filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] > cuttoff_date]
 
-    ## parsed_paths_df is new 2024-07-11 output
+    ## filtered_parsed_paths_df is new 2024-07-11 output
 
     sessions = {}
     for export_datetime, session_str, custom_replay_name, file_type, decoding_time_bin_size_str, path in parsed_paths:
@@ -1560,7 +1565,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     #             _session_names.append(_split_columns[0])
                 # _accrued_replay_epoch_names.append('')
 
-    return sessions, parsed_paths_df
+    return sessions, filtered_parsed_paths_df
 
 
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 09:18', related_items=['find_most_recent_files'])
@@ -2330,6 +2335,11 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
 
     final_sessions_loaded_laps_all_scores_dict = {}
     final_sessions_loaded_ripple_all_scores_dict = {}
+    
+    # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
+    parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
+    parsed_csv_files_df
+
 
     for index, row in parsed_csv_files_df.iterrows():
         session_str = str(row['session'])
