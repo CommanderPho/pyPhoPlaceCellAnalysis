@@ -2337,9 +2337,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     final_sessions_loaded_ripple_all_scores_dict = {}
     
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
-    parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
-    parsed_csv_files_df
-
+    parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True) # ensures all are sorted ascending except for export_datetime, which are sorted decending so the first value is the most recent.
 
     for index, row in parsed_csv_files_df.iterrows():
         session_str = str(row['session'])
