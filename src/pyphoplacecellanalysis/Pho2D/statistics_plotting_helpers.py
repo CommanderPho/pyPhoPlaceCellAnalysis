@@ -108,7 +108,7 @@ def _perform_stats_tests(valid_ripple_df, n_shuffles:int=10000, stats_level_of_s
 
     Usage:
 
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_stats_tests
+        from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import _perform_stats_tests
 
 
         shuffle_results, p_value, f_value, (dof1, dof2), (variance1, variance2) = _perform_stats_tests(valid_ripple_df, stats_variable_name='short_best_wcorr')
