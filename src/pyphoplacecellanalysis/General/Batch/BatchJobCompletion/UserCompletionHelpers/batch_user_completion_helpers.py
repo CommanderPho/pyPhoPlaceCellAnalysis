@@ -1,6 +1,7 @@
 from copy import deepcopy
 import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from neuropy.core.epoch import ensure_dataframe
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
@@ -1136,8 +1137,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     print(f'compute_and_export_session_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
     # desired_total_num_shuffles: int = 4096
-    desired_total_num_shuffles: int = 100
-    minimum_required_unique_num_shuffles: int = 100
+    desired_total_num_shuffles: int = 700
+    minimum_required_unique_num_shuffles: int = 700
 
     allow_update_global_result: bool = False
     callback_outputs = {
