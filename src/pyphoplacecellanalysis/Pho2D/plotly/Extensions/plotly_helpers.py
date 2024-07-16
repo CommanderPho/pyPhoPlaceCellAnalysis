@@ -131,7 +131,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     unique_time_bin_sizes: NDArray = np.unique(data_results_df.time_bin_size.to_numpy())
 
     print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
-    print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
     if num_unique_time_bin_sizes == 1:
         assert len(unique_time_bin_sizes) == 1
         figure_context_dict['t_bin_size'] = unique_time_bin_sizes[0]
@@ -184,6 +183,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
     for a_trace in pre_delta_fig.data:
         a_trace_name = a_trace.name
+        a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
         if a_trace_name in already_added_legend_entries:
             # For already added trace categories, set showlegend to False
             a_trace.showlegend = False
@@ -200,6 +200,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     # adding scatter plot
     if out_scatter_fig is not None:
         for a_trace in out_scatter_fig.data:
+            a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
             fig.add_trace(a_trace, row=1, col=2)
             # if forced_range_y is not None:
             #     fig.update_layout(yaxis=dict(range=forced_range_y))
@@ -210,6 +211,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
         for i, a_trace in enumerate(out_scatter_fig.data):
             a_trace_name = a_trace.name
+            a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
             if a_trace_name in already_added_legend_entries:
                 # For already added trace categories, set showlegend to False
                 a_trace.showlegend = False
@@ -236,6 +238,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     for a_trace in post_delta_fig.data:
         a_trace_name = a_trace.name
+        a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
         if a_trace_name in already_added_legend_entries:
             # For already added trace categories, set showlegend to False
             a_trace.showlegend = False
