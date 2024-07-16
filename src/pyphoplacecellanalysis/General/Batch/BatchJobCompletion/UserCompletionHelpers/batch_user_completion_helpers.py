@@ -935,8 +935,7 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
 
     # --------------------- Do for filtered sessions as well --------------------- #
 
-
-    did_change = did_change or np.any(ensure_dataframe(_backup_session_configs['sess']).to_numpy() != ensure_dataframe(new_replay_epochs).to_numpy())
+    # did_change = did_change or np.any(ensure_dataframe(_backup_session_configs['sess']).to_numpy() != ensure_dataframe(new_replay_epochs).to_numpy())
 
     _new_sessions = {}
 
