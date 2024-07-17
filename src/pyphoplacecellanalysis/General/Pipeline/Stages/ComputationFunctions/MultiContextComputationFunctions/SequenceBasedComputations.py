@@ -70,15 +70,17 @@ class ExportedWCorrShufflesPickleFilenameParser(BaseMatchParser):
     test_filenames = ["2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl",
         "2024-06-03_1035PM_standalone_wcorr_ripple_shuffle_data_only_1202.pkl",
         "2024-05-30_0755PM_standalone_wcorr_ripple_shuffle_data_only_1200.pkl",
+        "2024-06-28_0837PM_withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0_standalone_wcorr_ripple_shuffle_data_only_29.pkl",
+        ]
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import ExportedWCorrShufflesPickleFilenameParser
 
     """
     def try_parse(self, filename: str) -> Optional[Dict]:
         # Define the regex pattern for matching the filename
-        # pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<hour>0[1-9]|1[0-2])(?P<time_separator>.+)(?P<minute>00|05|10|15|20|25|30|35|40|45|50|55)(?P<meridian>AM|PM)_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)" # .pkl
-        # pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM)_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)"
-        pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(?:_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM))?_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)"
+        # pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(?:_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM))?_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)" ## extended 2024-07-17 to permit more characters
+        pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(?:_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM))?_(?P<data_name>[A-Za-z0-9_,.\[\] \-]+)_(?P<num_shuffles>\d+)" ## extended 2024-07-17 to permit more characters
+         
         match = re.match(pattern, filename)
 
         if match is None:
@@ -1052,7 +1054,7 @@ class WCorrShuffle(ComputedResult):
 
         found_pickle_paths = discover_data_files(basedir=save_directory , glob_pattern='*_wcorr_ripple_shuffle_data_*.pkl', recursive=True)
 
-        a_test_parser = ExportedWCorrShufflesPickleFilenameParser()
+        a_wcorr_filename_parser: ExportedWCorrShufflesPickleFilenameParser = ExportedWCorrShufflesPickleFilenameParser()
 
         # test_filenames = ["2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl",
         #                   "2024-06-03_1035PM_standalone_wcorr_ripple_shuffle_data_only_1202.pkl",
@@ -1063,11 +1065,11 @@ class WCorrShuffle(ComputedResult):
 
         for a_filepath in found_pickle_paths:
             basename: str = str(a_filepath.stem)
-            a_parsed_output_dict = a_test_parser.try_parse(basename)
+            a_parsed_output_dict = a_wcorr_filename_parser.try_parse(basename)
             if a_parsed_output_dict is not None:
                 ## best parser, stop here
                 if debug_print:
-                    print(f'got parsed output {a_test_parser} - result: {a_parsed_output_dict}, basename: {basename}')
+                    print(f'got parsed output {a_wcorr_filename_parser} - result: {a_parsed_output_dict}, basename: {basename}')
                 final_parsed_output_dict = a_parsed_output_dict
                 # a_valid_pkl_filepath = curr_active_pipeline.get_output_path().joinpath(a_filename).resolve()
                 a_valid_pkl_filepath = a_filepath.resolve()
