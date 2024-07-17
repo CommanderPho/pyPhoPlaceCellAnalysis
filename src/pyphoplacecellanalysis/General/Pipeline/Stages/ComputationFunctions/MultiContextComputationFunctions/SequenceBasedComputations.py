@@ -79,8 +79,8 @@ class ExportedWCorrShufflesPickleFilenameParser(BaseMatchParser):
     def try_parse(self, filename: str) -> Optional[Dict]:
         # Define the regex pattern for matching the filename
         # pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(?:_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM))?_(?P<data_name>[A-Za-z_]+)_(?P<num_shuffles>\d+)" ## extended 2024-07-17 to permit more characters
-        pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(?:_(?P<hour>[01][0-9])(?P<minute>[0-5][05])(?P<meridian>AM|PM))?_(?P<data_name>[A-Za-z0-9_,.\[\] \-]+)_(?P<num_shuffles>\d+)" ## extended 2024-07-17 to permit more characters
-         
+        pattern = r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(?:_(?P<hour>[01]\d)(?P<minute>[0-5]\d)(?P<meridian>AM|PM))?_(?P<data_name>[A-Za-z0-9_,.\[\] \-]+)_(?P<num_shuffles>\d+)" ## extended 2024-07-17 to permit more characters and handle minutes that don't end in 0 or 5.
+        
         match = re.match(pattern, filename)
 
         if match is None:
@@ -1037,11 +1037,20 @@ class WCorrShuffle(ComputedResult):
             raise e
 
     @function_attributes(short_name=None, tags=['discover', 'files'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 04:43', related_items=[])
-    def discover_load_and_append_shuffle_data_from_directory(self, save_directory, debug_print = False):
+    def discover_load_and_append_shuffle_data_from_directory(self, save_directory, newer_than: Optional[datetime]=None, with_data_name: Optional[str]=None, debug_print=False):
         """ searches the save_directory for pickled shuffle results and attempts to sequentially load them.
         
         
         wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
+
+        with_custom_suffix: Optional[str]=None
+
+        Usage:
+
+            yesterday = datetime.now() - timedelta(days=1)
+            # wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), debug_print=True)
+            # wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), with_data_name='standalone_wcorr_ripple_shuffle_data_only', debug_print=True)
+            wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), with_data_name='standalone_wcorr_ripple_shuffle_data_only', newer_than=yesterday, debug_print=True)
 
 
         """
@@ -1071,12 +1080,27 @@ class WCorrShuffle(ComputedResult):
                 if debug_print:
                     print(f'got parsed output {a_wcorr_filename_parser} - result: {a_parsed_output_dict}, basename: {basename}')
                 final_parsed_output_dict = a_parsed_output_dict
-                # a_valid_pkl_filepath = curr_active_pipeline.get_output_path().joinpath(a_filename).resolve()
-                a_valid_pkl_filepath = a_filepath.resolve()
-                assert a_valid_pkl_filepath.exists()
-                valid_filepaths.append(a_valid_pkl_filepath)
-                parsed_metadata_dict[a_valid_pkl_filepath] = final_parsed_output_dict
-                # return final_parsed_output_dict
+
+                should_add: bool = True
+
+                if newer_than is not None:
+                    # only include items newer than required date
+                    if final_parsed_output_dict['export_datetime'] < newer_than:
+                        should_add = False
+
+                if with_data_name is not None:
+                    # ensure the 'date_name' contains the custom suffix
+                    # if not (with_data_name in final_parsed_output_dict['data_name']):
+                    if (with_data_name != final_parsed_output_dict['data_name']):
+                        should_add = False
+
+                if should_add:
+                    # a_valid_pkl_filepath = curr_active_pipeline.get_output_path().joinpath(a_filename).resolve()
+                    a_valid_pkl_filepath = a_filepath.resolve()
+                    assert a_valid_pkl_filepath.exists()
+                    valid_filepaths.append(a_valid_pkl_filepath)
+                    parsed_metadata_dict[a_valid_pkl_filepath] = final_parsed_output_dict
+                    
             else:
                 print(f'could not parse basename: {basename}')
 
