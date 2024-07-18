@@ -162,7 +162,38 @@ def finalize_output_shuffled_wcorr(a_curr_active_pipeline, decoder_names, custom
     ## Gets the absolutely most extreme value from any of the four decoders and uses that
     best_wcorr_max_indices = np.abs(wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].values).argmax(axis=1)
     wcorr_ripple_shuffle_all_df[f'abs_best_wcorr'] = [wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].values[i, best_idx] for i, best_idx in enumerate(best_wcorr_max_indices)] #  np.where(direction_max_indices, wcorr_ripple_shuffle_all_df['long_LR'].filter_epochs[a_column_name].to_numpy(), wcorr_ripple_shuffle_all_df['long_RL'].filter_epochs[a_column_name].to_numpy())
+    
+    ## Add the worst direction for comparison (testing):
+    _out_worst_dir_indicies = []
+    _LR_indicies = [0, 2]
+    _RL_indicies = [1, 3]
+
+    for an_is_most_likely_direction_LR in wcorr_ripple_shuffle_all_df['is_most_likely_direction_LR']:
+        if an_is_most_likely_direction_LR:
+            _out_worst_dir_indicies.append(_RL_indicies)
+        else:
+            _out_worst_dir_indicies.append(_LR_indicies)
+
+    _out_worst_dir_indicies = np.vstack(_out_worst_dir_indicies)
+    # _out_best_dir_indicies
+
+    wcorr_ripple_shuffle_all_df['long_worst_dir_decoder_IDX'] = _out_worst_dir_indicies[:,0]
+    wcorr_ripple_shuffle_all_df['short_worst_dir_decoder_IDX'] = _out_worst_dir_indicies[:,1]
+
+    best_decoder_index = wcorr_ripple_shuffle_all_df['long_best_dir_decoder_IDX'] ## Kamran specified to restrict to the long-templates only for now
+    worst_decoder_index = wcorr_ripple_shuffle_all_df['long_worst_dir_decoder_IDX']
+
+    ## INPUTS: wcorr_ripple_shuffle_all_df, best_decoder_index
+    ## MODIFIES: wcorr_ripple_shuffle_all_df
+    curr_score_col_decoder_col_names = [f"wcorr_{a_decoder_name}" for a_decoder_name in ['long_LR', 'long_RL', 'short_LR', 'short_RL']]
+    wcorr_ripple_shuffle_all_df['wcorr_most_likely'] = [wcorr_ripple_shuffle_all_df[curr_score_col_decoder_col_names].to_numpy()[epoch_idx, a_decoder_idx] for epoch_idx, a_decoder_idx in zip(np.arange(np.shape(wcorr_ripple_shuffle_all_df)[0]), best_decoder_index.to_numpy())]
+    wcorr_ripple_shuffle_all_df['abs_most_likely_wcorr'] = np.abs(wcorr_ripple_shuffle_all_df['wcorr_most_likely'])
+    wcorr_ripple_shuffle_all_df['wcorr_least_likely'] = [wcorr_ripple_shuffle_all_df[curr_score_col_decoder_col_names].to_numpy()[epoch_idx, a_decoder_idx] for epoch_idx, a_decoder_idx in zip(np.arange(np.shape(wcorr_ripple_shuffle_all_df)[0]), worst_decoder_index.to_numpy())]
+    # wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].max(axis=1, skipna=True)
+
+    ## OUTPUTS: wcorr_ripple_shuffle_all_df
     wcorr_ripple_shuffle_all_df
+
 
     all_shuffles_only_best_decoder_wcorr_df = pd.concat([all_shuffles_wcorr_df[np.logical_and((all_shuffles_wcorr_df['epoch_idx'] == epoch_idx), (all_shuffles_wcorr_df['decoder_idx'] == best_idx))] for epoch_idx, best_idx in enumerate(best_wcorr_max_indices)])
 
