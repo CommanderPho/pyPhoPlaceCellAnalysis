@@ -2,6 +2,7 @@ from copy import deepcopy
 import numpy as np
 from pathlib import Path
 import pandas as pd
+from functools import partial
 from attrs import astuple, asdict, field, define # used in `UnpackableMixin`
 from silx.gui import qt
 from silx.gui.plot import Plot2D, Plot1D
@@ -108,6 +109,10 @@ def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False)
 
 ## Uses: xbin, t_start, pos_bin_size, time_bin_size
 
+# Define the partial function above the class
+plot1d_factory = partial(Plot1D)
+# plot1d_factory = partial(Plot1D, toolbar=False)
+
 @define(slots=False)
 class EpochHeuristicDebugger:
     """ 
@@ -151,10 +156,10 @@ class EpochHeuristicDebugger:
     a_cmap: Colormap = field(factory=(lambda *args, **kwargs: Colormap(name="viridis", vmin=0))) # , vmax=1    
     plot: Plot2D = field(factory=Plot2D)
     
-    plot_position: Plot1D = field(factory=Plot1D)
-    plot_velocity: Plot1D = field(factory=Plot1D)
-    plot_acceleration: Plot1D = field(factory=Plot1D)
-    plot_extra: Plot1D = field(factory=Plot1D)
+    plot_position: Plot1D = field(factory=plot1d_factory)
+    plot_velocity: Plot1D = field(factory=plot1d_factory)
+    plot_acceleration: Plot1D = field(factory=plot1d_factory)
+    plot_extra: Plot1D = field(factory=plot1d_factory)
 
 
     # most_likely_position_indicies
