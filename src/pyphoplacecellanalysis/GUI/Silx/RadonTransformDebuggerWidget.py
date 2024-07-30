@@ -188,7 +188,7 @@ def on_set_active_epoch_idx_changed(instance, attribute, new_value):
 
 @define(slots=False, repr=False)
 class RadonTransformDebugger:
-    """ interactive debugger
+    """ interactive debugger of Radon Transforms computed on Posteriors using Silx
     
     from pyphoplacecellanalysis.GUI.Silx.RadonTransformDebuggerWidget import RadonTransformDebugger, RadonDebugValue
 
