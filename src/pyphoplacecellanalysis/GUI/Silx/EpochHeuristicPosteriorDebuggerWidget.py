@@ -204,6 +204,7 @@ class EpochHeuristicDebugger:
         self.plot.addImage(self.p_x_given_n_masked, legend='p_x_given_n', replace=True, colormap=self.a_cmap, origin=img_origin, scale=img_scale, **label_kwargs, resetzoom=True) # , colormap="viridis", vmin=0, vmax=1
         prev_img: ImageBase = self.plot.getImage('p_x_given_n')
 
+        # Position Derivative Plots:
         empty_arr = np.array([], dtype='int64')
 
         common_plot_config_dict = dict(symbol='o', linestyle=':', color='blue')
@@ -343,28 +344,17 @@ class EpochHeuristicDebugger:
         # accel = np.diff(vel)
         
         # Update position plots
-        pos = deepcopy(self.active_most_likely_position_indicies)
-        _curve_pos_t = np.arange(len(pos)) + 0.5  # Move forward by a half bin
-
-        # Compute velocity
-        vel = np.diff(pos)
-        _curve_vel_t = _curve_pos_t[:-1] + 0.5  # Center between the original position x-values
-
-        # Compute acceleration
-        accel = np.diff(vel)
-        _curve_accel_t = _curve_vel_t[:-1] + 0.5  # Center between the velocity x-values
-
         
-        if self.debug_print:
-            print(f'_curve_t: {_curve_pos_t}')
-            print(f'pos: {pos}')
-            print(f'vel: {vel}')
-            print(f'accel: {accel}')
+        # if self.debug_print:
+        #     print(f'_curve_t: {_curve_pos_t}')
+        #     print(f'pos: {self.position_derivatives.pos}')
+        #     print(f'vel: {vel}')
+        #     print(f'accel: {accel}')
         
-        self.plot_position.getCurve("Position").setData(_curve_pos_t, pos)
-        self.plot_velocity.getCurve("Velocity").setData(_curve_vel_t, vel)
-        self.plot_acceleration.getCurve("Acceleration").setData(_curve_accel_t, accel)
-        self.plot_extra.getCurve("Extra").setData(_curve_accel_t, accel)
+        self.plot_position.getCurve("Position").setData(self.position_derivatives._curve_pos_t, self.position_derivatives.pos)
+        self.plot_velocity.getCurve("Velocity").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.vel)
+        self.plot_acceleration.getCurve("Acceleration").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
+        self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
 
         # self.plot_position.addCurve(_curve_pos_t, pos, legend="Position", xlabel='t (tbin)', ylabel='x (bin)', replace=True)
         # self.plot_velocity.addCurve(_curve_vel_t, vel, legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', replace=True)
