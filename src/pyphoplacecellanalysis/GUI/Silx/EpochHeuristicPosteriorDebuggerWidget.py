@@ -77,6 +77,35 @@ class PositionDerivativesContainer:
         self.total_energy: float = np.sum(self.kinetic_energy)
         
 
+def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False):
+	""" Updates the grid-size for the rendered grid:
+    Requires that Silx be using a matpltolib-based backend
+	
+    Usage:
+    
+        from pyphoplacecellanalysis.GUI.Silx.EpochHeuristicPosteriorDebuggerWidget import setup_plot_grid_ticks
+
+        # x_ticks_obj_list, y_ticks_obj_list = setup_plot_grid_ticks(a_plot=dbgr.plot)
+        x_ticks_obj_list, y_ticks_obj_list = setup_plot_grid_ticks(a_plot=dbgr.plot_position, minor_ticks=False)
+
+	"""
+	pos_x_range = a_plot.getXAxis().getLimits()
+	pos_y_range = a_plot.getYAxis().getLimits()
+
+	pos_x_range = (int(pos_x_range[0]), int(pos_x_range[1]))
+	pos_y_range = (int(pos_y_range[0]), int(pos_y_range[1]))
+
+	x_ticks = np.arange(pos_x_range[0], pos_x_range[-1], 1)
+	y_ticks = np.arange(pos_y_range[0], pos_y_range[-1], 1)
+
+	an_ax = a_plot.getBackend().ax # matplotlib ax (matplotlib.axes._axes.Axes)
+	x_ticks_obj_list: List = an_ax.set_xticks(x_ticks, minor=minor_ticks) # List[matplotlib.axis.XTick]
+	y_ticks_obj_list: List = an_ax.set_yticks(y_ticks, minor=minor_ticks) # List[matplotlib.axis.YTick]
+
+	a_plot.setGraphGrid(which='major')
+	return x_ticks_obj_list, y_ticks_obj_list
+
+
 ## Uses: xbin, t_start, pos_bin_size, time_bin_size
 
 @define(slots=False)
@@ -203,6 +232,14 @@ class EpochHeuristicDebugger:
         label_kwargs = dict(xlabel='t (tbin)', ylabel='x_pos (bin)')
         self.plot.addImage(self.p_x_given_n_masked, legend='p_x_given_n', replace=True, colormap=self.a_cmap, origin=img_origin, scale=img_scale, **label_kwargs, resetzoom=True) # , colormap="viridis", vmin=0, vmax=1
         prev_img: ImageBase = self.plot.getImage('p_x_given_n')
+        ## Setup grid:            
+        pos_x_range = self.plot.getXAxis().getLimits()
+        pos_y_range = self.plot.getYAxis().getLimits()
+        
+        pos_x_range = (int(pos_x_range[0]), int(pos_x_range[1]))
+        pos_y_range = (int(pos_y_range[0]), int(pos_y_range[1]))
+        self.plot.setGraphGrid(which=True)
+
 
         # Position Derivative Plots:
         empty_arr = np.array([], dtype='int64')
