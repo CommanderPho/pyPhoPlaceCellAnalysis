@@ -504,9 +504,6 @@ class EpochHeuristicDebugger:
         # Add the tab widget to the layout
         ctrl_layout_widget.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=2)
     
-        
-    
-
         # logTextEdit = LogViewer() # QTextEdit subclass
         # logTextEdit.setReadOnly(True)
         # logTextEdit.setObjectName("logTextEdit")
