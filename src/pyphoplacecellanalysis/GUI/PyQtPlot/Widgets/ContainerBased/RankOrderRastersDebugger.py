@@ -35,7 +35,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import DirectionalRankOrderLikelihoods, RankOrderComputationsContainer, RankOrderResult ## Circular import?
 
-from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel
+from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel, create_tabbed_table_widget
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot, ExportFiletype
 
 
@@ -60,43 +60,6 @@ __all__ = ['RankOrderRastersDebugger']
 # Helper functions                                                                                                     #
 # ==================================================================================================================== #
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
-
-def create_tabbed_table_widget(dataframes_dict):
-    """
-    Creates a tabbed widget with three tables within the given layout.
-
-    Args:
-    ctrl_layout: The layout to add the tab widget to.
-    dataframes: A list of three pandas.DataFrame objects to populate the tables.
-
-    Returns:
-    A QTabWidget containing the three tables.
-    """
-
-    # Create the tab widget and dictionaries
-    tab_widget = pg.QtWidgets.QTabWidget()
-    models_dict = {}
-    views_dict = {}
-
-    # Define tab names
-    
-    # Add tabs and corresponding views
-    for i, (a_name, df) in enumerate(dataframes_dict.items()):
-        # Create SimplePandasModel for each DataFrame
-        models_dict[a_name] = SimplePandasModel(df.copy())
-
-        # Create and associate view with model
-        view = pg.QtWidgets.QTableView()
-        view.setModel(models_dict[a_name])
-        views_dict[a_name] = view
-
-        # Add tab with view
-        tab_widget.addTab(view, a_name)
-
-    return tab_widget, views_dict, models_dict
-
-
-
 
 
 @metadata_attributes(short_name=None, tags=['gui', 'window', 'figure'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
