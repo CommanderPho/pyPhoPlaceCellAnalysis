@@ -39,7 +39,7 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidge
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController
 from neuropy.core.user_annotations import UserAnnotationsManager # used in `interactive_good_epoch_selections`
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # used in `interactive_good_epoch_selections`, `PhoPaginatedMultiDecoderDecodedEpochsWindow`
-
+from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
 
 
 """ 
@@ -1580,7 +1580,17 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         """ the list of plotting child widgets. """
         return {a_name:v.params.active_identifying_figure_ctx for a_name, v in self.pagination_controllers.items()} 
 
-
+        
+    @property
+    def global_thin_button_bar_widget(self) -> ThinButtonBarWidget:
+        """The global_thin_button_bar_widget property."""
+        return self.ui._contents.global_thin_button_bar_widget
+    
+    @property
+    def global_paginator_controller_widget(self) -> PaginationControlWidget:
+        """The global_thin_button_bar_widget property."""
+        return self.global_thin_button_bar_widget.ui.paginator_controller_widget
+ 
     # ==================================================================================================================== #
     # Initializers                                                                                                         #
     # ==================================================================================================================== #
@@ -1590,7 +1600,50 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         self.ui._contents = None
         # self.setup()
         # self.buildUI()
+
+
+    @classmethod
+    def _build_globally_controlled_pagination(cls, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict):
+        """ 2024-07-31: Connects the all four plotter's pagination controls to a newly-instantiated global paginator so that they are directly driven.
         
+        paginated_multi_decoder_decoded_epochs_window.ui._contents.global_thin_button_bar_widget.ui.paginator_controller_widget
+        
+        
+        """
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget, PaginationControlWidgetState
+        # from PyQt5 import QtWidgets
+        from qtpy import QtWidgets
+        
+        ## Gets the global bar
+        global_thin_button_bar_widget: ThinButtonBarWidget = paginated_multi_decoder_decoded_epochs_window.ui._contents.global_thin_button_bar_widget
+
+        ## Get the current page idx and things from the first pagination_controller:
+        a_controlling_pagination_controller = pagination_controller_dict['long_LR'] # DecodedEpochSlicesPaginatedFigureController
+        # copied_paginator_controller_widget: PaginationControlWidget = a_controlling_pagination_controller.paginator_controller_widget
+        curr_page_idx: int = int(a_controlling_pagination_controller.paginator_controller_widget.current_page_idx)
+        n_pages: int = int(a_controlling_pagination_controller.paginator_controller_widget.get_total_pages())
+
+        ## INPUTS: n_pages, curr_page_idx, global_thin_button_bar_widget
+        ## Creates a new PaginationControlWidget for the global (bottom bar) shared context:
+        global_paginator_controller_widget = PaginationControlWidget(n_pages=n_pages)
+        global_paginator_controller_widget.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        global_thin_button_bar_widget.horizontalLayout.insertWidget(0, global_paginator_controller_widget)
+        global_paginator_controller_widget.setFixedHeight(21)
+        ## Update the page_idx:
+        # global_paginator_controller_widget.update_page_idx(updated_page_idx=curr_page_idx)
+        global_paginator_controller_widget.update_page_idx(curr_page_idx) # throws a fit about positional arguments if you pass it as a kwarg
+        ## assign it so that it's internal to the `global_thin_button_bar_widget`
+        global_thin_button_bar_widget.ui.paginator_controller_widget = global_paginator_controller_widget
+
+        ## all four controllers are controlled:
+        controlled_pagination_controllers_list = (pagination_controller_dict['long_LR'], pagination_controller_dict['long_RL'], pagination_controller_dict['short_LR'], pagination_controller_dict['short_RL'])
+        new_connections_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow._perform_convert_decoder_pagination_controller_dict_to_controlled(a_controlling_pagination_controller_widget=global_paginator_controller_widget,
+                                                                                                                                            controlled_pagination_controllers_list=controlled_pagination_controllers_list)
+
+        return new_connections_dict
+
+
     @classmethod
     def init_from_pagination_controller_dict(cls, pagination_controller_dict, name = 'CombinedDirectionalDecoderDecodedEpochsWindow', title='Pho Combined Directional Decoder Decoded Epochs', defer_show=False):
         """ 2024-02-14 - Copied from `RankOrderRastersDebugger`'s approach. Merges the four separate decoded epoch windows into single figure with a separate dock for each decoder.
@@ -1612,7 +1665,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
 
         ## Convert to controlled first
-        new_connections_dict = cls.convert_decoder_pagination_controller_dict_to_controlled(pagination_controller_dict)
+        # new_connections_dict = cls.convert_decoder_pagination_controller_dict_to_controlled(pagination_controller_dict)
 
         # pagination_controller_dict = _obj.plots.rasters_display_outputs
         all_widgets = {a_decoder_name:a_pagination_controller.ui.mw for a_decoder_name, a_pagination_controller in pagination_controller_dict.items()}
@@ -1663,15 +1716,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         utility_footer_name: str = 'Utility'
         dock_configs[utility_footer_name] = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)        
 
-        global_thin_button_bar_widget = ThinButtonBarWidget()
+        global_thin_button_bar_widget: ThinButtonBarWidget = ThinButtonBarWidget()
         global_thin_button_bar_widget.setObjectName("global_thin_button_bar_widget")
-        # a_controlled_widget.ui.root_vbox.addWidget(global_thin_button_bar_widget) # add the pagination control widget
         global_thin_button_bar_widget.setFixedHeight(21)
-        
         global_thin_button_bar_widget.label_message = "<shared>"
-        
-        # cls._build_utility_controls(main_layout=root_dockAreaWindow)
-        
         _out_dock_widgets[utility_footer_name] = root_dockAreaWindow.add_display_dock(identifier=utility_footer_name, widget=global_thin_button_bar_widget, dockSize=(1200, 30), dockAddLocationOpts=['bottom'], display_config=dock_configs[utility_footer_name], autoOrientation=False)
 
         # #TODO 2024-02-14 18:44: - [ ] Comgbine the separate items into one of the single `DecodedEpochSlicesPaginatedFigureController` objects (or a new one)?
@@ -1685,6 +1733,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                     dock_widgets=_out_dock_widgets, dock_configs=dock_configs,
                                                     widgets=all_widgets, windows=all_windows, plots=all_separate_plots, plots_data=all_separate_plots_data, params=all_separate_params,
                                                     global_thin_button_bar_widget=global_thin_button_bar_widget) # do I need this extracted data or is it redundant?
+        
+
+        ## Convert to controlled by global paginator:
+        new_connections_dict = cls._build_globally_controlled_pagination(paginated_multi_decoder_decoded_epochs_window=root_dockAreaWindow, pagination_controller_dict=pagination_controller_dict)
         
         # _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
         #                             root_plots=all_separate_root_plots, grids=all_separate_grids, scatter_plots=all_separate_scatter_plots, debug_header_labels=all_separate_debug_header_labels,
@@ -1871,20 +1923,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         return pagination_controller_dict
 
+
     @classmethod
-    def convert_decoder_pagination_controller_dict_to_controlled(cls, pagination_controller_dict):
+    def _perform_convert_decoder_pagination_controller_dict_to_controlled(cls, a_controlling_pagination_controller_widget: PaginationControlWidget, controlled_pagination_controllers_list):
         """
         
         """
         from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
-
-        ## Connects the first plotter's pagination controls to the other three controllers so that they are directly driven, by the first.
-        a_controlling_pagination_controller = pagination_controller_dict['long_LR'] # DecodedEpochSlicesPaginatedFigureController
-        a_controlling_widget = a_controlling_pagination_controller.ui.mw # MatplotlibTimeSynchronizedWidget
-
-        # controlled widgets
-        controlled_pagination_controllers_list = (pagination_controller_dict['long_RL'], pagination_controller_dict['short_LR'], pagination_controller_dict['short_RL'])
-
+        
         new_connections_dict = []
 
         for a_controlled_pagination_controller in controlled_pagination_controllers_list:
@@ -1893,8 +1939,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
             if a_controlled_pagination_controller.params.get('isPaginatorControlWidgetBackedMode', True):
                 # a_controlled_widget.on_paginator_control_widget_jump_to_page(page_idx=0)
-                # a_connection = a_controlling_pagination_controller.ui.mw.ui.paginator_controller_widget.jump_to_page.connect(a_controlled_pagination_controller.on_paginator_control_widget_jump_to_page) # bind connection
-                a_connection = a_controlling_pagination_controller.paginator_controller_widget.jump_to_page.connect(a_controlled_pagination_controller.paginator_controller_widget.update_page_idx)
+                a_connection = a_controlling_pagination_controller_widget.jump_to_page.connect(a_controlled_pagination_controller.paginator_controller_widget.update_page_idx)
                 new_connections_dict.append(a_connection)
                 # a_controlled_widget.ui.connections['paginator_controller_widget_jump_to_page'] = _a_connection
                 a_controlled_widget.ui.paginator_controller_widget.hide()
@@ -1911,6 +1956,22 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 
 
         return new_connections_dict
+    
+
+    @classmethod
+    def convert_decoder_pagination_controller_dict_to_controlled(cls, pagination_controller_dict):
+        """
+        
+        """
+        ## Connects the first plotter's pagination controls to the other three controllers so that they are directly driven, by the first.
+        a_controlling_pagination_controller = pagination_controller_dict['long_LR'] # DecodedEpochSlicesPaginatedFigureController
+        # a_controlling_widget = a_controlling_pagination_controller.ui.mw # MatplotlibTimeSynchronizedWidget
+        a_controlling_pagination_controller_widget: PaginationControlWidget = a_controlling_pagination_controller.paginator_controller_widget
+        
+        # controlled widgets
+        controlled_pagination_controllers_list = (pagination_controller_dict['long_RL'], pagination_controller_dict['short_LR'], pagination_controller_dict['short_RL'])
+
+        return cls._perform_convert_decoder_pagination_controller_dict_to_controlled(a_controlling_pagination_controller_widget=a_controlling_pagination_controller_widget, controlled_pagination_controllers_list=controlled_pagination_controllers_list)
 
 
     ## ==================================================================================================================== #
