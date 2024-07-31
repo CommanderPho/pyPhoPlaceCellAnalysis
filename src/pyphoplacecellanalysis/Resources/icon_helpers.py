@@ -1,5 +1,6 @@
 from pyphoplacecellanalysis.External.breeze_style_sheets import breeze_resources as breeze
-from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons, silx_resources_rc
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 def try_get_icon(icon_path: str):
