@@ -23,6 +23,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
 from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_derivs
 
+from scipy.ndimage import convolve # used in `expand_peaks_mask`
 
 HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", 
                                                                                      "total_variation", "integral_second_derivative", "stddev_of_diff",
@@ -545,7 +546,9 @@ class HeuristicReplayScoring:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 08:00', related_items=[])
+    @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score', 'OLDER'], input_requires=[], output_provides=[],
+                         uses=['_compute_pos_derivs', 'partition_subsequences_ignoring_repeated_similar_positions', '_compute_total_variation', '_compute_integral_second_derivative', '_compute_stddev_of_diff', 'HeuristicScoresTuple'],
+                         used_by=['compute_all_heuristic_scores'], creation_date='2024-02-29 00:00', related_items=[])
     def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, **kwargs) -> HeuristicScoresTuple:
         """ 2024-02-29 - New smart replay heuristic scoring
 
@@ -724,6 +727,7 @@ class HeuristicReplayScoring:
             stddev_of_diff = _compute_stddev_of_diff(a_most_likely_positions_list)
 
             
+            
             return HeuristicScoresTuple(longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change,
                                         total_variation=total_variation, integral_second_derivative=integral_second_derivative, stddev_of_diff=stddev_of_diff,
                                         position_derivatives_df=position_derivatives_df)
@@ -793,7 +797,7 @@ class HeuristicReplayScoring:
         return a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df
 
     @classmethod
-    @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations'], used_by=[], creation_date='2024-03-12 00:59', related_items=[])
+    @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores'], used_by=[], creation_date='2024-03-12 00:59', related_items=[])
     def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]):
         """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
         
@@ -963,7 +967,7 @@ class HeuristicReplayScoring:
         all_score_computations_fn_dict = {'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
         a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df = cls._run_all_score_computations(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict=all_score_computations_fn_dict)
 
-        _out_new_scores = {}
+        _out_new_scores: Dict[str, pd.DataFrame] = {}
 
         for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
             _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
@@ -1092,8 +1096,7 @@ def compute_local_peak_probabilities(probs, n_adjacent: int):
 
 
 # For a decoded posterior probability matrix t `a_p_x_given_n` where `np.shape(a_p_x_given_n): (62, 9) = (n_pos_bins, n_time_bins)`, how do I get a boolean matrix with zeros everywhere except at the location of the position bin with the peak value for each time bin? How would I expand this peaks_mask_matrix to include the elements adjacent to the peaks?
-import numpy as np
-from scipy.ndimage import convolve
+
 
 def get_peaks_mask(a_p_x_given_n):
     """
