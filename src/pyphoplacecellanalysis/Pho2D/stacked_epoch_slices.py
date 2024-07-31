@@ -790,7 +790,9 @@ class ClickActionCallbacks:
                 # print(f'clicked widget at {clicked_ax}. Copying to clipboard...')
                 code_string: str = f"[{start_t}, {end_t}]"
                 try:
-                    self.ui.thin_button_bar_widget.label_message = f"<clicked> {code_string}"
+                    a_thin_button_bar_widget = self.ui.mw.ui.thin_button_bar_widget
+                    a_thin_button_bar_widget.label_message = f"<clicked> {code_string}"
+                    
                 except BaseException as e:
                     print(f"log_clicked_epoch_times_to_message_box_callback(...): err: {e}. Continuing.") # expected in leftmost (index 0) plot
                 self.show_message(message=f"{code_string}", durationMs=1000)
