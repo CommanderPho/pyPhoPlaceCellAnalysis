@@ -697,13 +697,13 @@ class ClickActionCallbacks:
                 print(f'done.')
 
 
-    def copy_to_epoch_times_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+    def copy_epoch_times_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
         """ called to copy the clicked epoch's start/end time to the clipboard
         
         captures: nothing
         """
         from pyphocorehelpers.programming_helpers import copy_to_clipboard
-        print(f'copy_to_epoch_times_to_clipboard_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+        print(f'copy_epoch_times_to_clipboard_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
         if clicked_epoch_start_stop_time is not None:
             if len(clicked_epoch_start_stop_time) == 2:
                 start_t, end_t = clicked_epoch_start_stop_time
@@ -712,6 +712,71 @@ class ClickActionCallbacks:
                 copy_to_clipboard(code_string, message_print=True)
                 print(f'done.')
 
+    def copy_click_time_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+        """ called to copy the clicked epoch's start/end time to the clipboard
+        
+        captures: nothing
+        """
+        from matplotlib.backend_bases import MouseButton, MouseEvent, LocationEvent, PickEvent
+        
+        from pyphocorehelpers.programming_helpers import copy_to_clipboard
+        print(f'copy_click_time_to_clipboard_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+        print(f'\tevent: {event}\n\ttype(event): {type(event)}\n') # event: button_press_event: xy=(245, 359) xydata=(65.00700367785453, 156.55817377538108) button=3 dblclick=False inaxes=Axes(0.0296913,0.314173;0.944584x0.0753216)
+        # type(event): <class 'matplotlib.backend_bases.MouseEvent'>
+        if clicked_epoch_start_stop_time is not None:
+            if len(clicked_epoch_start_stop_time) == 2:
+                start_t, end_t = clicked_epoch_start_stop_time
+                print(f'clicked widget at {clicked_ax}. Copying to clipboard...')
+                code_string: str = f"clicked_epoch = np.array([{start_t}, {end_t}])"
+                
+                # event_xy = event['xy']
+                # event_xydata = event['xydata']
+                # event_inaxes = event['inaxes']
+                event_dict = {}
+                
+                if isinstance(event, MouseEvent):
+                    # matplotlib mouse event
+                    if event.inaxes:
+                        print(f'data coords {event.xdata} {event.ydata},',
+                            f'pixel coords {event.x} {event.y}')
+                        
+                        event_dict = {               
+                            'data_x':event.xdata,
+                            'data_y':event.ydata,
+                            'pixel_x':event.x,
+                            'pixel_y':event.y,
+                        }
+                        for k, v in event_dict.items():
+                            code_string += f'\n\t{k}: {v}'
+                            
+                    else:
+                        print('event out of axes!')
+                        
+
+                else:
+                    # Other (PyQtGraph-based) event, untested:
+                    # event_xy = event.xy
+                    # event_xydata = event.xydata
+                    # event_inaxes = event.inaxes
+                    
+                    event_dict = {               
+                        'scenePos':event.scenePos(),
+                        'screenPos':event.screenPos(),
+                        'pos':event.pos(),
+                        'lastPos':event.lastPos(),
+                    }
+                    
+                    # code_string += f'\n\nevent: {event}'
+                    # code_string += f'\n\tevent_xy: {event_xy}'
+                    # code_string += f'\n\tevent_xydata: {event_xydata}'
+                    # code_string += f'\n\tevent_inaxes: {event_inaxes}'
+
+                for k, v in event_dict.items():
+                    code_string += f'\n\t{k}: {v}'
+
+                copy_to_clipboard(code_string, message_print=True)
+                print(f'done.')
+                
 
     def log_clicked_epoch_times_to_message_box_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
         """ called to copy the clicked epoch's start/end time to the clipboard
@@ -724,10 +789,14 @@ class ClickActionCallbacks:
                 start_t, end_t = clicked_epoch_start_stop_time
                 # print(f'clicked widget at {clicked_ax}. Copying to clipboard...')
                 code_string: str = f"[{start_t}, {end_t}]"
-                self.ui.thin_button_bar_widget.label_message = f"<clicked> {code_string}"
+                try:
+                    self.ui.thin_button_bar_widget.label_message = f"<clicked> {code_string}"
+                except BaseException as e:
+                    print(f"log_clicked_epoch_times_to_message_box_callback(...): err: {e}. Continuing.") # expected in leftmost (index 0) plot
                 self.show_message(message=f"{code_string}", durationMs=1000)
                 # print(f'done.')
 
+                
 
 
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
@@ -1043,8 +1112,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if not self.params.has_attr('on_secondary_click_item_callbacks'):
             self.params['on_secondary_click_item_callbacks'] = {}
 
-        self.params.on_secondary_click_item_callbacks['copy_to_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_to_epoch_times_to_clipboard_callback
-        self.params.on_secondary_click_item_callbacks['log_clicked_epoch_times_to_message_box_callback'] = ClickActionCallbacks.log_clicked_epoch_times_to_message_box_callback
+        self.params.on_secondary_click_item_callbacks['copy_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_epoch_times_to_clipboard_callback
+        # self.params.on_secondary_click_item_callbacks['log_clicked_epoch_times_to_message_box_callback'] = ClickActionCallbacks.log_clicked_epoch_times_to_message_box_callback
         
 
 
@@ -2225,9 +2294,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
 
             if is_enabled:
-                a_pagination_controller.params.on_middle_click_item_callbacks['copy_to_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_to_epoch_times_to_clipboard_callback
+                a_pagination_controller.params.on_middle_click_item_callbacks['copy_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_epoch_times_to_clipboard_callback
             else:
-                a_pagination_controller.params.on_middle_click_item_callbacks.pop('copy_to_epoch_times_to_clipboard_callback')
+                a_pagination_controller.params.on_middle_click_item_callbacks.pop('copy_epoch_times_to_clipboard_callback', None)
 
 
 def interactive_good_epoch_selections(annotations_man: UserAnnotationsManager, curr_active_pipeline) -> dict:
