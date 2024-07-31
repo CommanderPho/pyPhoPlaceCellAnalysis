@@ -29,6 +29,14 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, compute_local_peak_probabilities, get_peaks_mask, expand_peaks_mask, InversionCount, is_valid_sequence_index, _compute_sequences_spanning_ignored_intrusions
 from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _compute_diffusion_value, HeuristicScoresTuple
 
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.GUI.Qt.Widgets.ScrollBarWithSpinBox.ScrollBarWithSpinBox import ScrollBarWithSpinBox
+from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel, create_tabbed_table_widget
+from pyphoplacecellanalysis.GUI.Qt.Widgets.LogViewerTextEdit import LogViewer
+from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+
 
 @define(slots=False)
 class PositionDerivativesContainer:
@@ -163,6 +171,7 @@ class EpochHeuristicDebugger:
     
 
     ## Widgets/Plots:
+    ui: PhoUIContainer = field(default=None)    
     main_widget: qt.QWidget = field(default=None)
     main_layout: qt.QVBoxLayout = field(default=None)
     
@@ -233,6 +242,8 @@ class EpochHeuristicDebugger:
     def build_ui(self):
         """ builds the ui and plots. Called only once on startup.
         """
+        self.ui = PhoUIContainer()
+        
         ## Build Image:
         img_origin = (0.0, 0.0)
         # img_origin = (t_start, xbin[0]) # (origin X, origin Y)
@@ -304,6 +315,10 @@ class EpochHeuristicDebugger:
         self.main_layout.addWidget(self.plot_acceleration)
         self.main_layout.addWidget(self.plot_extra)
 
+        ## add the debugging controls
+        ui_dict = self._build_utility_controls(main_layout=self.main_layout)
+        self.ui = PhoUIContainer(**ui_dict) ## update with the ui_dict
+        
         # Show the main widget
         self.main_widget.show()
         
@@ -438,3 +453,74 @@ class EpochHeuristicDebugger:
         self.update_active_epoch(active_epoch_idx=active_epoch_idx)
         
 
+    def _build_utility_controls(self, main_layout):
+        """ Build the utility controls at the bottom """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
+        
+        ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
+
+        ctrls_widget = ScrollBarWithSpinBox()
+        ctrls_widget.setObjectName("ctrls_widget")
+        ctrls_widget.update_range(0, (self.n_epochs-1))
+        ctrls_widget.setValue(self.active_epoch_index)
+
+        def valueChanged(new_val:int):
+            print(f'ScrollBarWithSpinBox valueChanged(new_val: {new_val})')
+            self.update_active_epoch(active_epoch_idx=int(new_val))
+            
+
+        ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
+        ctrl_layout_widget = pg.LayoutWidget()
+        ctrl_layout_widget.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
+        ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
+
+        # Step 4: Create DataFrame and QTableView
+        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
+        # model = PandasModel(df)
+        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
+
+        # tableView = pg.QtWidgets.QTableView()
+        # tableView.setModel(pandasDataFrameTableModel)
+        # tableView.setObjectName("pandasTablePreview")
+        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
+        # ctrl_widgets_dict['tableView'] = tableView
+
+        # # Step 5: Add TableView to LayoutWidget
+        # ctrl_layout_widget.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
+
+        position_derivatives_df: pd.DataFrame = deepcopy(self.heuristic_scores.position_derivatives_df)
+        active_epochs_df: pd.DataFrame = self.filter_epochs
+
+        # Tabbled table widget:
+        tab_widget, views_dict, models_dict = create_tabbed_table_widget(dataframes_dict={'epochs': active_epochs_df.copy(),
+                                                                                                        'position_derivatives': position_derivatives_df.copy(), 
+                                                                                                        'combined_epoch_stats': pd.DataFrame()})
+        ctrl_widgets_dict['tables_tab_widget'] = tab_widget
+        ctrl_widgets_dict['views_dict'] = views_dict
+        ctrl_widgets_dict['models_dict'] = models_dict
+
+        # Add the tab widget to the layout
+        ctrl_layout_widget.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=2)
+    
+        
+    
+
+        # logTextEdit = LogViewer() # QTextEdit subclass
+        # logTextEdit.setReadOnly(True)
+        # logTextEdit.setObjectName("logTextEdit")
+        # # logTextEdit.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        # ctrl_layout_widget.addWidget(logTextEdit, row=3, rowspan=1, col=1, colspan=2)
+        # ctrl_widgets_dict['logTextEdit'] = logTextEdit
+        
+        # _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout_widget, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
+        # ctrls_dock_widgets_dict = {}
+        # ctrls_dock_widgets_dict['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout_widget, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
+
+        ## Add to main layout:
+        main_layout.addWidget(ctrl_layout_widget)
+    
+        ui_dict = dict(ctrl_layout=ctrl_layout_widget, **ctrl_widgets_dict, on_valueChanged=valueChanged)
+        return ui_dict
