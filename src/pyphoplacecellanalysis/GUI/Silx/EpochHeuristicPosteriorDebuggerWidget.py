@@ -51,7 +51,9 @@ class PositionDerivativesContainer:
     kinetic_energy: NDArray = field(default=None)
     total_energy: float = field(default=None)
 
-
+    applied_forces: NDArray = field(default=None)
+    total_applied_force: float = field(default=None)
+    
     def __attrs_post_init__(self):
         # Recompute all:
         self.compute()
@@ -76,6 +78,11 @@ class PositionDerivativesContainer:
 
         # Total energy needed to move the particle along the trajectory
         self.total_energy: float = np.sum(self.kinetic_energy)
+        
+        ## Forces
+        self.applied_forces = self.accel * self.mass
+        self.total_applied_force = np.sum(self.applied_forces)
+        
         
 
 def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False):
@@ -396,7 +403,9 @@ class EpochHeuristicDebugger:
         self.plot_position.getCurve("Position").setData(self.position_derivatives._curve_pos_t, self.position_derivatives.pos)
         self.plot_velocity.getCurve("Velocity").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.vel)
         self.plot_acceleration.getCurve("Acceleration").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
-        self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
+        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
+        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.kinetic_energy)
+        self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.applied_forces)        
 
         # self.plot_position.addCurve(_curve_pos_t, pos, legend="Position", xlabel='t (tbin)', ylabel='x (bin)', replace=True)
         # self.plot_velocity.addCurve(_curve_vel_t, vel, legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', replace=True)
