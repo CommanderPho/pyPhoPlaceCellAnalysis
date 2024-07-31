@@ -1433,16 +1433,19 @@ class WeightedCorrelationPlotData:
             column_formatting_fn_dict = {'start':None, 'stop':None, 'label':None, 'duration':None,
                 'wcorr': (lambda v:f"wcorr: {default_float_formatting_fn(v)}"),
                 'P_decoder':(lambda v:f"$P_i$: {default_float_formatting_fn(v)}"),
-                # 'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
-                # 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
-                # 'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
-                # 'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
-                # 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
+                'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
+                'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
+                'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
+                'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
+                'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
             }
 
+            # actually_present_column_formatting_fn_dict = {k:v for k, v in column_formatting_fn_dict.items() if k in actually_present_df_column_names} # this version requires all columns to be defined in the above  `column_formatting_fn_dict`, see below
+            actually_present_column_formatting_fn_dict = {k:column_formatting_fn_dict.get(k, None) for k in actually_present_df_column_names} # this version allows variables to be commented out in the above `column_formatting_fn_dict` if you don't want to display them
+            
             for i, a_tuple in enumerate(active_filter_epochs_df[actually_present_df_column_names].itertuples(name='EpochDataTuple')):
                 ## NOTE: uses a_tuple.start as the index in to the data dict:
-                wcorr_data[a_tuple.start] = cls.init_from_df_row_tuple_and_formatting_fn_dict(a_tuple=a_tuple, column_formatting_fn_dict=column_formatting_fn_dict)
+                wcorr_data[a_tuple.start] = cls.init_from_df_row_tuple_and_formatting_fn_dict(a_tuple=a_tuple, column_formatting_fn_dict=actually_present_column_formatting_fn_dict)
 
         return wcorr_data
 
@@ -1668,12 +1671,48 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
             return text_kwargs
         
+
+        def _helper_build_text_kwargs_adjacent_right_lots_of_text(a_curr_ax):
+            """ captures nothing. """
+            # Get the axes bounding box in figure coordinates
+            a_fig = a_curr_ax.get_figure()
+            bbox = a_curr_ax.get_position()
+            half_x_margin_width = (1.0 - bbox.width) / 2.0
+            half_y_margin_width = (1.0 - bbox.ymax) / 2.0
+            bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
+
+
+            # TEXT FORMATTING AND POSITIONING KWARGS _____________________________________________________________________________ #
+            text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
+
+            font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+                                weight='bold',
+                                )
+            text_kwargs['fontproperties'] = font_prop
+
+            ## Positioning kwargs:
+            text_kwargs |= dict(loc='upper right',
+                                    # horizontalalignment='center', ## DOES NOTHING?
+                                    #verticalalignment='center', ## BREAKS IT
+                                    # multialignment='r', ## BREAKS IT
+                                    horizontalalignment='right',  
+                                    # rotation=-45, #transform=a_curr_ax.transAxes,
+                                    # bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, ## good
+                                    bbox_to_anchor=(1.0, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure,
+                                    # bbox_to_anchor=((1.0 + bbox_offset_magnitude), (1.0 + bbox_offset_magnitude)), bbox_transform=a_curr_ax.transAxes,                        
+                                    ) # oriented in upper-right corner, at a diagonal angle
+
+            return text_kwargs
+        
+
+        
         
 
         # text_kwargs = _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax=curr_ax)
         # text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
-        text_kwargs = _helper_build_text_kwargs_adjacent_right(a_curr_ax=curr_ax)
-
+        # text_kwargs = _helper_build_text_kwargs_adjacent_right(a_curr_ax=curr_ax)
+        text_kwargs = _helper_build_text_kwargs_adjacent_right_lots_of_text(a_curr_ax=curr_ax)
+        
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
 
