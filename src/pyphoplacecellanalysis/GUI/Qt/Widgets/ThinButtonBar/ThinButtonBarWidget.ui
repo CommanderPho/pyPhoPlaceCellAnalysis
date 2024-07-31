@@ -33,11 +33,27 @@
    <string>thinButtonBarWidget</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">background-color: rgb(71, 58, 46);
+   <string notr="true">/*
+background-color: rgb(71, 58, 46);
 border-color: rgb(207, 207, 207);
 background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
-border-color: rgb(0, 0, 0);</string>
+border-color: rgb(0, 0, 0);
+*/
+QWidget {
+    background-color: rgb(71, 58, 46);
+    color: rgb(244, 244, 244);
+}
+QToolTip {
+    background-color: rgb(71, 58, 46);
+    color: rgb(244, 244, 244);
+    border: 1px solid rgb(207, 207, 207);
+}
+QStatusBar {
+    background-color: rgb(71, 58, 46);
+    color: rgb(244, 244, 244);
+}
+</string>
   </property>
   <layout class="QGridLayout" name="gridLayout" rowstretch="0" columnstretch="0">
    <property name="leftMargin">
@@ -125,6 +141,9 @@ border-color: rgb(0, 0, 0);</string>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::MinimumExpanding</enum>
+        </property>
         <property name="sizeHint" stdset="0">
          <size>
           <width>40</width>
@@ -142,8 +161,8 @@ border-color: rgb(0, 0, 0);</string>
          <string>Refresh</string>
         </property>
         <property name="icon">
-         <iconset theme="user-idle">
-          <normaloff>.</normaloff>.</iconset>
+         <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+          <normaloff>:/png/gui/icons/view-refresh.png</normaloff>:/png/gui/icons/view-refresh.png</iconset>
         </property>
        </widget>
       </item>
@@ -162,8 +181,8 @@ border-color: rgb(0, 0, 0);</string>
          <string>Copy Selections</string>
         </property>
         <property name="icon">
-         <iconset theme="edit-copy">
-          <normaloff>.</normaloff>.</iconset>
+         <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+          <normaloff>:/png/gui/icons/edit-copy.png</normaloff>:/png/gui/icons/edit-copy.png</iconset>
         </property>
        </widget>
       </item>
@@ -188,6 +207,7 @@ border-color: rgb(0, 0, 0);</string>
  </widget>
  <resources>
   <include location="../../../../Resources/GuiResources.qrc"/>
+  <include location="../../../../../../../silx/src/silx/resources/silx_resources.qrc"/>
   <include location="../../../../Resources/ActionIcons.qrc"/>
  </resources>
  <connections>
