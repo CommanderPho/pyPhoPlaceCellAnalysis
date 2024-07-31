@@ -1275,12 +1275,15 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         if curr_time_bin_container is not None:
             actual_time_bins = curr_time_bin_container.centers
-            print(f'actual_time_bins: {actual_time_bins}')
-            print(f'curr_time_bins: {curr_time_bins}')
+            if debug_print:
+                print(f'actual_time_bins: {actual_time_bins}')
+                print(f'curr_time_bins: {curr_time_bins}')
 
         else:
-            print(f'No actual time bins!')
-            print(f'curr_time_bins: {curr_time_bins}')
+            if debug_print:
+                print(f'No actual time bins!')
+                print(f'curr_time_bins: {curr_time_bins}')
+                
             actual_time_bins = deepcopy(curr_time_bins)
 
         ## Plot the line plot. Could update this like I did for the text?        
