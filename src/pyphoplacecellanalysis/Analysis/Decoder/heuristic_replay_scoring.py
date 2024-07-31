@@ -25,10 +25,24 @@ from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_de
 
 from scipy.ndimage import convolve # used in `expand_peaks_mask`
 
-HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", 
-                                                                                     "total_variation", "integral_second_derivative", "stddev_of_diff",
-                                                                                     "position_derivatives_df")}, bases=(UnpackableMixin, object,))
+
+# HeuristicScoresTuple = attrs.make_class("HeuristicScoresTuple", {k:field() for k in ("longest_sequence_length", "longest_sequence_length_ratio", "direction_change_bin_ratio", "congruent_dir_bins_ratio", "total_congruent_direction_change", 
+#                                                                                      "total_variation", "integral_second_derivative", "stddev_of_diff",
+#                                                                                      "position_derivatives_df")}, bases=(UnpackableMixin, object,))
 # longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change, total_variation, integral_second_derivative, stddev_of_diff, position_derivatives_df = a_tuple
+
+@define(slots=False)
+class HeuristicScoresTuple(UnpackableMixin, object):
+	longest_sequence_length: int = field(default=1),
+	longest_sequence_length_ratio: float = field(default=None),
+	direction_change_bin_ratio: float = field(default=None),
+	congruent_dir_bins_ratio: float = field(default=None),
+	total_congruent_direction_change: float = field(default=None),
+	total_variation: float = field(default=None),
+	integral_second_derivative: float = field(default=None),
+	stddev_of_diff: float = field(default=None),
+	position_derivatives_df: pd.DataFrame = field(default=None)
+    
 
 def is_valid_sequence_index(sequence, test_index: int) -> bool:
     """ checks if the passed index is a valid index without wrapping.        
