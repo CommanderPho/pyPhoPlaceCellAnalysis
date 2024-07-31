@@ -60,26 +60,47 @@ class ThinButtonBarWidget(QWidget):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self.ui.buttons_list = []
+        self.ui.buttons_dict = {}
         
         # _temp_ui_buttons = uic.loadUi(extraButtons_uiFile, self)
         # print(f"_temp_ui_buttons: {_temp_ui_buttons}")
 
-        self.ui, self.ui.buttons_list = add_buttons_to_existing_form(self.ui)
+        # self.ui, self.ui.buttons_list = add_buttons_to_existing_form(self.ui)
+        # self.ui.buttons_dict = {a_btn.objectName():a_btn for a_btn in self.ui.buttons_list}
+        self.ui, self.ui.buttons_list, self.ui.buttons_dict = add_buttons_to_existing_form(self.ui)
+        print(f'self.ui.buttons_dict.keys(): {list(self.ui.buttons_dict.keys())}') # self.ui.buttons_dict.keys(): ['Refresh', 'Clipboard', 'Copy Selections', 'Printer', 'Brush', 'Pencil', 'Eraser']
         
 
+        
         self.initUI()
         self.show() # Show the GUI
 
     def initUI(self):
         # self.ui.btnUnusedButton.hide()
         self.ui.btnUnusedButton.setVisible(False)
-        self.ui.btnCopySelectedEpochs.pressed.connect(self.on_copy_selections)
-        self.ui.btnRefresh.pressed.connect(self.on_perform_refresh)
+        # self.ui.btnCopySelectedEpochs.pressed.connect(self.on_copy_selections)
+        # self.ui.btnRefresh.pressed.connect(self.on_perform_refresh)
 
         # self.ui.toolButton_Printer.pressed.connect(self.on_click_print)
         
-        _button_callbacks_list = (self.on_click_print, self.on_click_brush, self.on_click_pencil, self.on_click_eraser)
+        _button_callbacks_list = (self.on_perform_refresh, self.on_click_clipboard, self.on_copy_selections, self.on_click_print, self.on_click_brush, self.on_click_pencil, self.on_click_eraser)
         assert len(_button_callbacks_list) == len(self.ui.buttons_list), f"len(_button_callbacks_list): {len(_button_callbacks_list)} != len(self.ui.buttons_list): {len(self.ui.buttons_list)}"
+
+        # hidden_buttons_list = ['Refresh', 'Clipboard', 'Copy Selections', 'Printer', 'Brush', 'Pencil', 'Eraser']
+        hidden_buttons_list = ['Clipboard', 'Brush', 'Pencil', 'Eraser']
+
+        for a_btn_name, a_btn in self.ui.buttons_dict.items():
+            if a_btn_name in hidden_buttons_list:
+                a_btn.setVisible(False)
+
+
+
+        is_spacer_visible: bool = self.perform_update_tool_spacer_visibility(self.ui)
+        print(f'is_spacer_visible: {is_spacer_visible}')
+        
+        # self.horizontalSpacer_fixedSmall.setVisible(False)
+        
+        ## connect buttons:
         for a_btn, a_fn in zip(self.ui.buttons_list, _button_callbacks_list):
             a_btn.pressed.connect(a_fn)
             
@@ -94,12 +115,7 @@ class ThinButtonBarWidget(QWidget):
         # currentTextChanged.connect(self.on_jump_combo_series_changed)
         pass
 
-    @pyqtExceptionPrintingSlot()
-    def on_copy_selections(self):
-        """ 
-        """
-        print(f'on_copy_selections()')
-        self.sigCopySelections.emit()
+
         
     @pyqtExceptionPrintingSlot()
     def on_perform_refresh(self):
@@ -108,14 +124,28 @@ class ThinButtonBarWidget(QWidget):
         print(f'on_perform_refresh()')
         self.sigRefresh.emit()
         
-
     @pyqtExceptionPrintingSlot()
     def on_click_print(self):
         """ 
         """
         print(f'on_click_print()')
+        
 
+    @pyqtExceptionPrintingSlot()
+    def on_click_clipboard(self):
+        """ 
+        """
+        print(f'on_click_clipboard()')
 
+    @pyqtExceptionPrintingSlot()
+    def on_copy_selections(self):
+        """ 
+        """
+        print(f'on_copy_selections()')
+        self.sigCopySelections.emit()
+        
+
+    # Tools ______________________________________________________________________________________________________________ #
     @pyqtExceptionPrintingSlot()
     def on_click_brush(self):
         """ 

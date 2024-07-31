@@ -97,12 +97,18 @@ QStatusBar {
        <height>21</height>
       </size>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,1">
+     <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,1,0">
+      <property name="spacing">
+       <number>4</number>
+      </property>
       <property name="topMargin">
-       <number>2</number>
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>5</number>
       </property>
       <property name="bottomMargin">
-       <number>2</number>
+       <number>0</number>
       </property>
       <item>
        <widget class="QToolButton" name="btnUnusedButton">
@@ -112,8 +118,8 @@ QStatusBar {
         <property name="text">
          <string>...</string>
         </property>
-        <property name="shortcut">
-         <string>Left</string>
+        <property name="popupMode">
+         <enum>QToolButton::MenuButtonPopup</enum>
         </property>
        </widget>
       </item>
@@ -152,40 +158,6 @@ QStatusBar {
         </property>
        </spacer>
       </item>
-      <item>
-       <widget class="QToolButton" name="btnRefresh">
-        <property name="toolTip">
-         <string>Refresh</string>
-        </property>
-        <property name="statusTip">
-         <string>Refresh</string>
-        </property>
-        <property name="icon">
-         <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
-          <normaloff>:/png/gui/icons/view-refresh.png</normaloff>:/png/gui/icons/view-refresh.png</iconset>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QToolButton" name="btnCopySelectedEpochs">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <property name="toolTip">
-         <string>Copy Selections</string>
-        </property>
-        <property name="statusTip">
-         <string>CopySelections</string>
-        </property>
-        <property name="text">
-         <string>Copy Selections</string>
-        </property>
-        <property name="icon">
-         <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
-          <normaloff>:/png/gui/icons/edit-copy.png</normaloff>:/png/gui/icons/edit-copy.png</iconset>
-        </property>
-       </widget>
-      </item>
      </layout>
     </widget>
    </item>
@@ -210,22 +182,5 @@ QStatusBar {
   <include location="../../../../../../../silx/src/silx/resources/silx_resources.qrc"/>
   <include location="../../../../Resources/ActionIcons.qrc"/>
  </resources>
- <connections>
-  <connection>
-   <sender>btnCopySelectedEpochs</sender>
-   <signal>triggered(QAction*)</signal>
-   <receiver>actionCopyEpochSelections</receiver>
-   <slot>trigger()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>122</x>
-     <y>10</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>-1</x>
-     <y>-1</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>
