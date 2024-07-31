@@ -243,7 +243,7 @@ class RadonTransformDebugger:
         return  np.squeeze(deepcopy(self.decoder_radon_transform_extras_dict[self.active_decoder_name]))[1]
     
     @property
-    def stats_measures(self):
+    def stats_measures(self) -> List[Tuple]:
         """define stats to display."""
         return [
             # ('sum', np.sum),
@@ -475,7 +475,6 @@ class RadonTransformDebugger:
         neighbors_arr = neighbors_arr[0]
         a_debug_info: RadonTransformDebugValue = debug_info[0]
 
-
         ## Get the correct band roi start/end points using the same equations as the absolute line:
         real_line_t = deepcopy(a_debug_info.t)
         best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in a_debug_info.best_y_line_idxs])
@@ -485,7 +484,6 @@ class RadonTransformDebugger:
         end_point = [real_line_t[-1], best_y_line[-1]]
         band_width = float(num_neighbours)
         
-
         ## upgrade to RadonDebugValue:
         return RadonDebugValue(active_decoded_epoch_container=single_epoch_result, active_debug_info=a_debug_info, score=score, velocity=velocity, intercept=intercept,
                             # active_num_neighbors=num_neighbours, active_neighbors_arr=neighbors_arr,
