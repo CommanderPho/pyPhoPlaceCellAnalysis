@@ -174,8 +174,25 @@ class EpochHeuristicDebugger:
     plot_velocity: Plot1D = field(factory=plot1d_factory)
     plot_acceleration: Plot1D = field(factory=plot1d_factory)
     plot_extra: Plot1D = field(factory=plot1d_factory)
+    
+    
 
 
+    # Computed Properties ________________________________________________________________________________________________ #
+    @property
+    def n_epochs(self) -> int:
+        return self.active_decoder_decoded_epochs_result.num_filter_epochs
+    
+
+    @property
+    def active_epoch_index(self) -> int:
+        return self.active_single_epoch_result.epoch_data_index
+    
+        
+    @property
+    def filter_epochs(self) -> pd.DataFrame:
+        return self.active_decoder_decoded_epochs_result.filter_epochs
+    
     # most_likely_position_indicies
     @property
     def active_most_likely_position_indicies(self) -> NDArray:
