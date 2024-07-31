@@ -86,9 +86,9 @@ class PositionDerivativesContainer:
         
 
 def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False):
-	""" Updates the grid-size for the rendered grid:
+    """ Updates the grid-size for the rendered grid:
     Requires that Silx be using a matpltolib-based backend
-	
+    
     Usage:
     
         from pyphoplacecellanalysis.GUI.Silx.EpochHeuristicPosteriorDebuggerWidget import setup_plot_grid_ticks
@@ -96,22 +96,22 @@ def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False)
         # x_ticks_obj_list, y_ticks_obj_list = setup_plot_grid_ticks(a_plot=dbgr.plot)
         x_ticks_obj_list, y_ticks_obj_list = setup_plot_grid_ticks(a_plot=dbgr.plot_position, minor_ticks=False)
 
-	"""
-	pos_x_range = a_plot.getXAxis().getLimits()
-	pos_y_range = a_plot.getYAxis().getLimits()
+    """
+    pos_x_range = a_plot.getXAxis().getLimits()
+    pos_y_range = a_plot.getYAxis().getLimits()
 
-	pos_x_range = (int(pos_x_range[0]), int(pos_x_range[1]))
-	pos_y_range = (int(pos_y_range[0]), int(pos_y_range[1]))
+    pos_x_range = (int(pos_x_range[0]), int(pos_x_range[1]))
+    pos_y_range = (int(pos_y_range[0]), int(pos_y_range[1]))
 
-	x_ticks = np.arange(pos_x_range[0], pos_x_range[-1], 1)
-	y_ticks = np.arange(pos_y_range[0], pos_y_range[-1], 1)
+    x_ticks = np.arange(pos_x_range[0], pos_x_range[-1], 1)
+    y_ticks = np.arange(pos_y_range[0], pos_y_range[-1], 1)
 
-	an_ax = a_plot.getBackend().ax # matplotlib ax (matplotlib.axes._axes.Axes)
-	x_ticks_obj_list: List = an_ax.set_xticks(x_ticks, minor=minor_ticks) # List[matplotlib.axis.XTick]
-	y_ticks_obj_list: List = an_ax.set_yticks(y_ticks, minor=minor_ticks) # List[matplotlib.axis.YTick]
+    an_ax = a_plot.getBackend().ax # matplotlib ax (matplotlib.axes._axes.Axes)
+    x_ticks_obj_list: List = an_ax.set_xticks(x_ticks, minor=minor_ticks) # List[matplotlib.axis.XTick]
+    y_ticks_obj_list: List = an_ax.set_yticks(y_ticks, minor=minor_ticks) # List[matplotlib.axis.YTick]
 
-	a_plot.setGraphGrid(which='major')
-	return x_ticks_obj_list, y_ticks_obj_list
+    a_plot.setGraphGrid(which='major')
+    return x_ticks_obj_list, y_ticks_obj_list
 
 
 ## Uses: xbin, t_start, pos_bin_size, time_bin_size
@@ -185,27 +185,12 @@ class EpochHeuristicDebugger:
         return dict(zip(['Position', 'Velocity', 'Acceleration', 'Extra'], position_plots_list))
 
 
-
-
     @classmethod
     def init_from_epoch_idx(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, active_epoch_idx: int=0, **kwargs) -> "EpochHeuristicDebugger":
         """ initializes to a specific epoch_idx
         
         """        
-
         _obj = cls(active_decoder_decoded_epochs_result=deepcopy(a_decoder_decoded_epochs_result), **kwargs)
-        
-        # time_bin_size: float = a_decoder_decoded_epochs_result.decoding_time_bin_size
-        
-
-        # time_bin_centers = deepcopy(active_captured_single_epoch_result.time_bin_container.centers)
-        # t_start, t_end = active_captured_single_epoch_result.time_bin_edges[0], active_captured_single_epoch_result.time_bin_edges[-1]
-
-        # p_x_given_n = deepcopy(active_captured_single_epoch_result.p_x_given_n)
-        # most_likely_positions = deepcopy(active_captured_single_epoch_result.most_likely_positions)
-        # most_likely_positionIndicies = deepcopy(active_captured_single_epoch_result.most_likely_position_indicies)
-        
-
         if _obj.active_single_epoch_result is None:
             active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=active_epoch_idx)
             _obj.active_single_epoch_result = deepcopy(active_captured_single_epoch_result)
@@ -215,18 +200,15 @@ class EpochHeuristicDebugger:
              
         if _obj.time_bin_centers is None:
              _obj.time_bin_centers = deepcopy(_obj.active_single_epoch_result.time_bin_container.centers)
-
-                                    
+               
         _obj.update_active_epoch_data(active_epoch_idx=active_epoch_idx)
         _obj.build_ui()
         _obj.update_active_epoch(active_epoch_idx=active_epoch_idx)
         return _obj
         
-
-
-
     def build_ui(self):
-        
+        """ builds the ui and plots. Called only once on startup.
+        """
         ## Build Image:
         img_origin = (0.0, 0.0)
         # img_origin = (t_start, xbin[0]) # (origin X, origin Y)
@@ -252,27 +234,21 @@ class EpochHeuristicDebugger:
         pos_y_range = (int(pos_y_range[0]), int(pos_y_range[1]))
         self.plot.setGraphGrid(which=True)
 
-
         # Position Derivative Plots:
         empty_arr = np.array([], dtype='int64')
 
         common_plot_config_dict = dict(symbol='o', linestyle=':', color='blue')
 
         plot_configs_dict = {"Position": dict(legend="Position", xlabel='t (tbin)', ylabel='x_pos (bin)', **common_plot_config_dict),
-            "Velocity": dict(legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', **common_plot_config_dict),
-            "Acceleration": dict(legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', **common_plot_config_dict),
-            "Extra": dict(legend="Extra", xlabel='t (tbin)', ylabel='Extra', **common_plot_config_dict),
+            "Velocity": dict(legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', baseline=0.0, fill=True, **common_plot_config_dict),
+            "Acceleration": dict(legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', baseline=0.0, fill=True, **common_plot_config_dict),
+            "Extra": dict(legend="Extra", xlabel='t (tbin)', ylabel='Extra', baseline=0.0, fill=True, **common_plot_config_dict),
         }
 
         position_plots_list = [self.plot_position, self.plot_velocity, self.plot_acceleration, self.plot_extra]
         position_plots_dict = dict(zip(list(plot_configs_dict.keys()), position_plots_list))
 
-        # Add data to the plots
-        # self.plot_position.addCurve(empty_arr, empty_arr, legend="Position", xlabel='t (tbin)', ylabel='x (bin)', replace=True)
-        # self.plot_velocity.addCurve(empty_arr, empty_arr, legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', replace=True)
-        # self.plot_acceleration.addCurve(empty_arr, empty_arr, legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', replace=True)
-        # self.plot_extra.addCurve(empty_arr, empty_arr, legend="Extra", xlabel='t (tbin)', ylabel='Extra', replace=True)
-
+        # Add data to the plots:
         for a_plot_name, a_plot in position_plots_dict.items():
             a_plot_config_dict = plot_configs_dict[a_plot_name]
             ## add curves
@@ -303,11 +279,10 @@ class EpochHeuristicDebugger:
 
         # Show the main widget
         self.main_widget.show()
-        # self.plot.show()
         
 
     # def recompute(self):
-    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=[], used_by=['update_active_epoch'], creation_date='2024-07-30 15:08', related_items=[])
+    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=['HeuristicReplayScoring.compute_pho_heuristic_replay_scores'], used_by=['update_active_epoch'], creation_date='2024-07-30 15:08', related_items=[])
     def update_active_epoch_data(self, active_epoch_idx: int):
         """ Data Update only - called after the time-bin is updated.
         
@@ -348,7 +323,6 @@ class EpochHeuristicDebugger:
             # print(f'heuristic_scores: {astuple(self.heuristic_scores)[:-1]}')
             print(f"heuristic_scores: {asdict(self.heuristic_scores, filter=(lambda an_attr, attr_value: an_attr.name not in ['position_derivatives_df']))}")
 
-        
         # Update position data:
         self.position_derivatives = PositionDerivativesContainer(pos=deepcopy(self.active_most_likely_position_indicies))
         
@@ -407,11 +381,7 @@ class EpochHeuristicDebugger:
         # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.kinetic_energy)
         self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.applied_forces)        
 
-        # self.plot_position.addCurve(_curve_pos_t, pos, legend="Position", xlabel='t (tbin)', ylabel='x (bin)', replace=True)
-        # self.plot_velocity.addCurve(_curve_vel_t, vel, legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', replace=True)
-        # self.plot_acceleration.addCurve(_curve_accel_t, accel, legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', replace=True)
-        # self.plot_extra.addCurve(_curve_accel_t, accel, legend="Extra", xlabel='t (tbin)', ylabel='Extra', replace=True)
-                
+        ## Update the limits:                
         src_plot = self.plot # main plot (Plot2D) is the source plot
         x_range = src_plot.getXAxis().getLimits()
         pos_y_range = src_plot.getYAxis().getLimits()
