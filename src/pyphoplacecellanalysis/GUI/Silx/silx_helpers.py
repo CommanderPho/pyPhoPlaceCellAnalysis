@@ -1,4 +1,14 @@
 import functools
+from functools import partial
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from nptyping import NDArray
+import numpy as np
+import pandas as pd
+
+from pyphocorehelpers.print_helpers import DocumentationFilePrinter, print_keys_if_possible # used in `DebugPrinterStat`
+
+from silx.gui.plot.stats.stats import StatBase
+from silx.gui.utils import concurrent
 
 from silx.gui import qt
 from silx.gui.data.DataViewerFrame import DataViewerFrame
@@ -140,3 +150,130 @@ class _RoiStatsDisplayExWindow(qt.QMainWindow):
     def addItem(self, item, roi):
         self._statsWidget.addItem(roi=roi, plotItem=item)
         
+
+# ==================================================================================================================== #
+# `StatBase` Subclasses                                                                                                #
+# ==================================================================================================================== #
+
+custom_value_formatting_fn = partial(DocumentationFilePrinter.string_rep_if_short_enough, max_length=280, max_num_lines=1)
+new_custom_item_formatter = partial(DocumentationFilePrinter._default_rich_text_formatter, value_formatting_fn=custom_value_formatting_fn)
+
+
+class DebugPrinterStat(StatBase):
+    """ Prints the context passed to `self.calculate(...)` to easily inspect incoming values
+    Simple calculation of the line integral
+    
+    Usage:
+        from pyphoplacecellanalysis.GUI.Silx.silx_helpers import DebugPrinterStat
+        
+    
+    context: silx.gui.plot.stats.stats._CurveContext
+	│   ├── _onlimits: NoneType
+	│   ├── _from_: NoneType
+	│   ├── _to_: NoneType
+	│   ├── kind: str
+	│   ├── min: int
+	│   ├── max: int
+	│   ├── data: tuple - (2, 6)
+	│   ├── roi: NoneType
+	│   ├── onlimits: bool
+	│   ├── values: numpy.ma.core.MaskedArray - (6,)
+	│   ├── axes: tuple - (1, 6)
+	│   ├── xData: numpy.ndarray - (6,)
+	│   ├── yData: numpy.ndarray - (6,)
+    
+    
+    - context: silx.gui.plot.stats._ImageContext = <silx.gui.plot.stats.stats._ImageContext object at 0x000001DD028B3F70>
+	- _mask_x_min: NoneType = None
+	- _mask_x_max: NoneType = None
+	- _mask_y_min: NoneType = None
+	- _mask_y_max: NoneType = None
+	- kind: str = image
+	- min: float = 0.0
+	- max: float = 0.17010370226218707
+	- data: ndarray = [[0 6.26086e-05 0 0 0 1.36084e-05]<br> [0 5.09288e-05 0 0 0 1.34711e-05]<br> [0 3.49613e-05 0 0 0 1.00388e-05]<br> [0 2.07753e-05 0 0 0 4.49698e-06]<br> [0 1.19496e-05 0 0 0 1.13178e-06]<br> [0 8.87921e-06 0 0 0 1.80649e-07]<br> [0 9.77556e-06 0 0 0 2.75724e-08]<br> [0 1.10077... - (57, 6)
+	- roi: NoneType = None
+	- onlimits: bool = False
+	- values: numpy.ma.MaskedArray = [[0.0 6.260861473791977e-05 0.0 0.0 0.0 1.3608427040290595e-05]<br> [0.0 5.092883650578533e-05 0.0 0.0 0.0 1.3471062013121828e-05]<br> [0.0 3.496131374127707e-05 0.0 0.0 0.0 1.0038814918889437e-05]<br> [0.0 2.0775284663506163e-05 0.0 0.0 0.0 4.4969817506273435e-06]<br> [0.0 1.... - (57, 6)
+	- axes: tuple = (array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56]), array([0, 1, 2, 3, 4, 5])) - (2,)
+	- origin: tuple = (0.0, 0.0) - (2,)
+	- scale: tuple = (1.0, 1.0) - (2,)
+    
+    """
+    def __init__(self):
+        StatBase.__init__(self, name='debug_printer', compatibleKinds=('curve', "image",)) # compatibleKinds= ("curve", "image", "scatter", "histogram")
+
+    def calculate(self, context):
+        print_keys_if_possible('context', context, max_depth=4, custom_item_formatter=new_custom_item_formatter)
+        return 'none'
+    
+
+
+class Integral(StatBase):
+    """
+    Simple calculation of the line integral
+    """
+    def __init__(self):
+        StatBase.__init__(self, name='integral', compatibleKinds=('curve',))
+
+    def calculate(self, context):
+        xData, yData = context.data
+        return np.trapz(x=xData, y=yData)
+
+
+class DispersionImageStat(StatBase):
+    """ Computes the dispersion in each time-bin
+
+    - context: silx.gui.plot.stats._ImageContext = <silx.gui.plot.stats.stats._ImageContext object at 0x000001DD028B3F70>
+	- _mask_x_min: NoneType = None
+	- _mask_x_max: NoneType = None
+	- _mask_y_min: NoneType = None
+	- _mask_y_max: NoneType = None
+	- kind: str = image
+	- min: float = 0.0
+	- max: float = 0.17010370226218707
+	- data: ndarray = [[0 6.26086e-05 0 0 0 1.36084e-05]<br> [0 5.09288e-05 0 0 0 1.34711e-05]<br> [0 3.49613e-05 0 0 0 1.00388e-05]<br> [0 2.07753e-05 0 0 0 4.49698e-06]<br> [0 1.19496e-05 0 0 0 1.13178e-06]<br> [0 8.87921e-06 0 0 0 1.80649e-07]<br> [0 9.77556e-06 0 0 0 2.75724e-08]<br> [0 1.10077... - (57, 6)
+	- roi: NoneType = None
+	- onlimits: bool = False
+	- values: numpy.ma.MaskedArray = [[0.0 6.260861473791977e-05 0.0 0.0 0.0 1.3608427040290595e-05]<br> [0.0 5.092883650578533e-05 0.0 0.0 0.0 1.3471062013121828e-05]<br> [0.0 3.496131374127707e-05 0.0 0.0 0.0 1.0038814918889437e-05]<br> [0.0 2.0775284663506163e-05 0.0 0.0 0.0 4.4969817506273435e-06]<br> [0.0 1.... - (57, 6)
+	- axes: tuple = (array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56]), array([0, 1, 2, 3, 4, 5])) - (2,)
+	- origin: tuple = (0.0, 0.0) - (2,)
+	- scale: tuple = (1.0, 1.0) - (2,)
+    
+    """
+    def __init__(self):
+        StatBase.__init__(self, name='dispersion', compatibleKinds=("image",)) # compatibleKinds= ("curve", "image", "scatter", "histogram")
+
+    def calculate(self, context):        
+        arrData = context.data # (57, 6)
+        # Assuming arr is your 2D numpy array
+        spatial_dispersion = np.var(arrData, axis=0)
+        return spatial_dispersion
+    
+
+class COM(StatBase):
+    """
+    Compute data center of mass
+    """
+    def __init__(self):
+        StatBase.__init__(self, name='COM', description="Center of mass")
+
+    def calculate(self, context):
+        if context.kind in ('curve', 'histogram'):
+            xData, yData = context.data
+            deno = np.sum(yData).astype(np.float32)
+            if deno == 0.0:
+                return 0.0
+            else:
+                return np.sum(xData * yData).astype(np.float32) / deno
+        elif context.kind == 'scatter':
+            xData, yData, values = context.data
+            values = values.astype(np.float64)
+            deno = np.sum(values)
+            if deno == 0.0:
+                return float('inf'), float('inf')
+            else:
+                comX = np.sum(xData * values) / deno
+                comY = np.sum(yData * values) / deno
+                return comX, comY
+            
