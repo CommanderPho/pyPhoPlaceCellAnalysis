@@ -114,6 +114,13 @@ def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False)
     return x_ticks_obj_list, y_ticks_obj_list
 
 
+def remove_all_plot_toolbars(a_plot: Union[Plot1D, Plot2D]):
+    _plot_toolbars = [a_plot.toolBar(), a_plot.getOutputToolBar(), a_plot.getInteractiveModeToolBar()]
+    for a_toolbar in _plot_toolbars:
+        a_plot.removeToolBar(a_toolbar)
+
+
+
 ## Uses: xbin, t_start, pos_bin_size, time_bin_size
 
 # Define the partial function above the class
@@ -233,6 +240,7 @@ class EpochHeuristicDebugger:
         pos_x_range = (int(pos_x_range[0]), int(pos_x_range[1]))
         pos_y_range = (int(pos_y_range[0]), int(pos_y_range[1]))
         self.plot.setGraphGrid(which=True)
+        # remove_all_plot_toolbars(self.plot)
 
         # Position Derivative Plots:
         empty_arr = np.array([], dtype='int64')
@@ -251,6 +259,8 @@ class EpochHeuristicDebugger:
         # Add data to the plots:
         for a_plot_name, a_plot in position_plots_dict.items():
             a_plot_config_dict = plot_configs_dict[a_plot_name]
+            remove_all_plot_toolbars(a_plot)
+            
             ## add curves
             a_plot.addCurve(empty_arr, empty_arr, **a_plot_config_dict, replace=True)
             
