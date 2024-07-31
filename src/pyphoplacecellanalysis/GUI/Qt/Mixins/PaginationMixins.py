@@ -159,7 +159,9 @@ class PaginatedPlotDataProvider:
         """ should be general I think.
 
         Adds the required information to the pagination_controller's .params, .plots, .plots_data, .ui
-
+        Also initializes the callbacks
+        
+        
         Uses: cls.provided_params
 
         """
