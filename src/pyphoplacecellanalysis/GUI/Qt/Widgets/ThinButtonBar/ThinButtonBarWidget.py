@@ -59,7 +59,8 @@ class ProgrammaticButtonConfig:
     """
     icon_path: str = field()
     name: str = field()
-    
+    callback: Optional[Callable] = field(default=None)
+
     @property
     def lower_name(self) -> str:
         """The lower_name property."""
@@ -77,67 +78,111 @@ class ProgrammaticButtonConfig:
         return asdict(self, filter=(lambda an_attr, attr_value: an_attr.name in ['icon_path', 'name']))
 
 
-def _create_on_click_fn(a_fn_name):
+def _create_on_click_fn(a_fn_name, a_fn_callback=None):
     def an_on_click_fn(self, *args, **kwargs):
         """ captures: a_fn_name """
         print(f'{a_fn_name}(*args: {args or []}, **kwargs: {kwargs or {}})')
         self.label_message = f'{a_fn_name}()'
+        if a_fn_callback is not None:
+            a_fn_callback(self, *args, **kwargs)
+            
     return an_on_click_fn
 
 
 
-def build_programmatic_buttons(global_thin_button_bar_widget, button_config_dict):
+def build_programmatic_buttons(global_thin_button_bar_widget, button_config_dict: Union[Dict, List], clear_all_existing:bool=False):
     """
+    Usage:
+        
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import build_programmatic_buttons, ProgrammaticButtonConfig
+        
+        global_thin_button_bar_widget: ThinButtonBarWidget = paginated_multi_decoder_decoded_epochs_window.global_thin_button_bar_widget
+
+        button_config_list = [
+            dict(icon_path=':/png/gui/icons/document-open.png', name="OpenFile"),
+            dict(icon_path=':/png/gui/icons/document-save.png', name="SaveFile"),
+            dict(icon_path=':/png/gui/icons/crosshair.png', name="Crosshairs"),
+            dict(icon_path=':/png/gui/icons/crop.png', name="Crop"),
+            dict(icon_path=':/png/gui/icons/selected.png', name="Selections"),
+            dict(icon_path=':/png/gui/icons/view-raw.png', name="CopyAsArray"),
+            #  dict(icon_path=':/png/gui/icons/crop.png', name="Crop"),
+            #  dict(icon_path=':/png/gui/icons/crop.png', name="Crop"),
+        ]
+        button_config_dict = {v['name']:v for v in button_config_list}
+
+        new_buttons_config_dict, new_buttons_dict = build_programmatic_buttons(global_thin_button_bar_widget, button_config_dict=button_config_dict, clear_all_existing=True)
+
+
+    """
+    if isinstance(button_config_dict, (list, tuple)):
+        button_config_dict = {v['name']:v for v in button_config_dict} # try converting to dict assuming a list
     
-    """
-    new_buttons_config_dict = {}
-    new_buttons_list = []
-    new_buttons_dict = {}
+    if clear_all_existing:
+        global_thin_button_bar_widget.clear_all_buttons()
+        
+    new_buttons_config_dict = {} # will always start fresh
+    # new_buttons_list = []
+    new_buttons_dict = global_thin_button_bar_widget.ui.buttons_dict
+    
 
     for k, a_btn_config_dict in button_config_dict.items():    
-        a_dummy_btn_config = ProgrammaticButtonConfig(**a_btn_config_dict)
-        new_buttons_config_dict[k] = a_dummy_btn_config
-
-        a_btn = build_button(**a_dummy_btn_config.to_dict(), parent=global_thin_button_bar_widget)
-        a_fn_name: str = a_dummy_btn_config.fn_name
+        a_btn_config: ProgrammaticButtonConfig = ProgrammaticButtonConfig(**a_btn_config_dict)
+        a_fn_name: str = a_btn_config.fn_name
+        a_fn_callback = a_btn_config.callback
         
-        ## add the widget:
-        global_thin_button_bar_widget.horizontalLayout_ButtonContainer.addWidget(a_btn)
-        new_buttons_dict[k] = a_btn
+        new_buttons_config_dict[k] = a_btn_config
 
-        def an_on_click_fn(self, *args, **kwargs):
-            """ captures: a_fn_name
-            """
-            print(f'{a_fn_name}(*args: {args or []}, **kwargs: {kwargs or {}})')
-            self.label_message = f'{a_fn_name}()'
-
+        extant_btn = global_thin_button_bar_widget.ui.buttons_dict.get(k, None)
+        if extant_btn is None:
+            ## add the widget:
+            a_btn = build_button(**a_btn_config.to_dict(), parent=global_thin_button_bar_widget)
+            global_thin_button_bar_widget.horizontalLayout_ButtonContainer.addWidget(a_btn)
+            new_buttons_dict[k] = a_btn
+        else:
+            print(f'button: "{k}" already exists!')
+            a_btn = extant_btn
+            a_btn.pressed.disconnect()
 
         ## add callback function to `global_thin_button_bar_widget`
-        # on_click_fn = an_on_click_fn 
-        # on_click_fn = pyqtExceptionPrintingSlot(a_dummy_btn_config.on_click_fn)
-        # on_click_fn = (lambda x, *args, **kwargs: an_on_click_fn(x, *args, **kwargs))
-        on_click_fn = _create_on_click_fn(a_fn_name)
-        
-        # ## Bind the method to the class
-        # bound_method = MethodType(on_click_fn, ThinButtonBarWidget) # add to type instead of instance
-        # print(f"bound_method: {bound_method}, type(bound_method): {type(bound_method)}")
-        # setattr(ThinButtonBarWidget, a_fn_name, bound_method)
-        # a_btn.pressed.connect(getattr(ThinButtonBarWidget, a_fn_name)) ## connect button
-        
+        on_click_fn = _create_on_click_fn(a_fn_name, a_fn_callback=a_fn_callback)
         ## Bind the method to the instance
         bound_method = MethodType(on_click_fn, global_thin_button_bar_widget) # add to type instead of instance
-        print(f"bound_method: {bound_method}, type(bound_method): {type(bound_method)}")
+        # print(f"bound_method: {bound_method}, type(bound_method): {type(bound_method)}")
         setattr(global_thin_button_bar_widget, a_fn_name, bound_method)
         a_btn.pressed.connect(getattr(global_thin_button_bar_widget, a_fn_name)) ## connect button
         
         
     ## update the buttons properties:
-    global_thin_button_bar_widget.ui.buttons_list = new_buttons_list
+    # global_thin_button_bar_widget.ui.buttons_list = new_buttons_list
     global_thin_button_bar_widget.ui.buttons_dict = new_buttons_dict
+
+    if (len(global_thin_button_bar_widget.ui.buttons_list) != len(global_thin_button_bar_widget.ui.buttons_dict)):
+        # rebuild the list from the dict:
+        global_thin_button_bar_widget.ui.buttons_list = list(global_thin_button_bar_widget.ui.buttons_dict.values())
 
     return new_buttons_config_dict, new_buttons_dict
 
 
+def set_trimmed_text(line_edit, full_text: str): # , max_length: int
+    """
+    line_edit = QLineEdit()
+    full_text = "This is a very long text that needs to be trimmed to fit in the QLineEdit."
+    set_trimmed_text(line_edit, full_text, 30)
+
+    """
+    # trimmed_text = full_text if len(full_text) <= max_length else full_text[:max_length] + '...'
+    # line_edit.setText(trimmed_text)
+    # line_edit.setToolTip(full_text)
+    line_edit.setToolTip(full_text)
+    
+    fm = line_edit.fontMetrics()
+    # available_width = line_edit.width() - 2  # Subtracting a small margin
+    available_width = int(round(line_edit.width() * 0.8))  - 2  # Subtracting a small margin
+    elided_text = fm.elidedText(full_text, Qt.ElideRight, available_width)
+    line_edit.setText(elided_text)
+    
+    
+    
 
 # ==================================================================================================================== #
 # Main ThinButtonBarWidget widget                                                                                      #
@@ -165,7 +210,10 @@ class ThinButtonBarWidget(QWidget):
     def label_message(self, value: str):
         try:
             # self.ui.txtLineEdit.text = value
-            self.ui.txtLineEdit.setText(value)
+            # self.ui.txtLineEdit.setText(value)            
+            # set_trimmed_text(line_edit=self.ui.txtLineEdit, full_text=value, 30)
+            set_trimmed_text(line_edit=self.ui.txtLineEdit, full_text=str(value))
+            
         except BaseException as e:
             print(f'WARN: no text box yet. err: {e}')
             pass
@@ -177,28 +225,14 @@ class ThinButtonBarWidget(QWidget):
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self.ui.buttons_list = []
         self.ui.buttons_dict = {}
-        
-        # _temp_ui_buttons = uic.loadUi(extraButtons_uiFile, self)
-        # print(f"_temp_ui_buttons: {_temp_ui_buttons}")
-
-        # self.ui, self.ui.buttons_list = add_buttons_to_existing_form(self.ui)
-        # self.ui.buttons_dict = {a_btn.objectName():a_btn for a_btn in self.ui.buttons_list}
         self.ui, self.ui.buttons_list, self.ui.buttons_dict = add_buttons_to_existing_form(self.ui)
         print(f'self.ui.buttons_dict.keys(): {list(self.ui.buttons_dict.keys())}') # self.ui.buttons_dict.keys(): ['Refresh', 'Clipboard', 'Copy Selections', 'Printer', 'Brush', 'Pencil', 'Eraser']
-        
-
-        
         self.initUI()
         self.show() # Show the GUI
 
     def initUI(self):
-        # self.ui.btnUnusedButton.hide()
         self.ui.btnUnusedButton.setVisible(False)
-        # self.ui.btnCopySelectedEpochs.pressed.connect(self.on_copy_selections)
-        # self.ui.btnRefresh.pressed.connect(self.on_perform_refresh)
 
-        # self.ui.toolButton_Printer.pressed.connect(self.on_click_print)
-        
         _button_callbacks_list = (self.on_perform_refresh, self.on_click_clipboard, self.on_copy_selections, self.on_click_print, self.on_click_brush, self.on_click_pencil, self.on_click_eraser)
         assert len(_button_callbacks_list) == len(self.ui.buttons_list), f"len(_button_callbacks_list): {len(_button_callbacks_list)} != len(self.ui.buttons_list): {len(self.ui.buttons_list)}"
 
@@ -209,27 +243,13 @@ class ThinButtonBarWidget(QWidget):
             if a_btn_name in hidden_buttons_list:
                 a_btn.setVisible(False)
 
-
-
         is_spacer_visible: bool = self.perform_update_tool_spacer_visibility(self.ui)
         print(f'is_spacer_visible: {is_spacer_visible}')
-        
-        # self.horizontalSpacer_fixedSmall.setVisible(False)
         
         ## connect buttons:
         for a_btn, a_fn in zip(self.ui.buttons_list, _button_callbacks_list):
             a_btn.pressed.connect(a_fn)
             
-        # all_buttons = [self.ui.btnUnusedButton, self.ui.btnCopySelectedEpochs, self.ui.btnRefresh]
-        # for a_btn in all_buttons:
-        #     a_btn.setEnabled(False)
-        #     a_btn.hide()
-
-        # self.ui.horizontalSpacer.hide()
-
-        # self.ui.txtLineEdit.
-        # currentTextChanged.connect(self.on_jump_combo_series_changed)
-        pass
 
     @classmethod
     def clear_layout(cls, a_layout):

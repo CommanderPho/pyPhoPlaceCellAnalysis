@@ -41,6 +41,8 @@ from neuropy.core.user_annotations import UserAnnotationsManager # used in `inte
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # used in `interactive_good_epoch_selections`, `PhoPaginatedMultiDecoderDecodedEpochsWindow`
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
 
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+
 
 """ 
 These functions help render a vertically stacked column of subplots that represent (potentially non-contiguous) slices of a time range. 
@@ -737,17 +739,14 @@ class ClickActionCallbacks:
                 if isinstance(event, MouseEvent):
                     # matplotlib mouse event
                     if event.inaxes:
-                        print(f'data coords {event.xdata} {event.ydata},',
-                            f'pixel coords {event.x} {event.y}')
-                        
+                        # print(f'data coords {event.xdata} {event.ydata},',
+                        #     f'pixel coords {event.x} {event.y}')                        
                         event_dict = {               
                             'data_x':event.xdata,
                             'data_y':event.ydata,
                             'pixel_x':event.x,
                             'pixel_y':event.y,
                         }
-                        for k, v in event_dict.items():
-                            code_string += f'\n\t{k}: {v}'
                             
                     else:
                         print('event out of axes!')
@@ -771,10 +770,20 @@ class ClickActionCallbacks:
                     # code_string += f'\n\tevent_xydata: {event_xydata}'
                     # code_string += f'\n\tevent_inaxes: {event_inaxes}'
 
+                code_string = f'clicked_data_index: {clicked_data_index}\n'
+
+                # render the `event_dict`
                 for k, v in event_dict.items():
                     code_string += f'\n\t{k}: {v}'
 
                 copy_to_clipboard(code_string, message_print=True)
+                self.thin_button_bar_widget.label_message = f"<clicked> {code_string}"
+                
+
+
+                # self.
+                self.ui.mw.copy_axis_to_clipboard(an_ax=clicked_ax)
+
                 print(f'done.')
                 
 
@@ -788,14 +797,16 @@ class ClickActionCallbacks:
             if len(clicked_epoch_start_stop_time) == 2:
                 start_t, end_t = clicked_epoch_start_stop_time
                 # print(f'clicked widget at {clicked_ax}. Copying to clipboard...')
-                code_string: str = f"[{start_t}, {end_t}]"
+                code_string: str = f"[{start_t}, {end_t}, {clicked_data_index}]"
                 try:
-                    a_thin_button_bar_widget = self.ui.mw.ui.thin_button_bar_widget
+                    # a_thin_button_bar_widget = self.ui.mw.ui.thin_button_bar_widget
+                    a_thin_button_bar_widget = self.thin_button_bar_widget
                     a_thin_button_bar_widget.label_message = f"<clicked> {code_string}"
                     
                 except BaseException as e:
                     print(f"log_clicked_epoch_times_to_message_box_callback(...): err: {e}. Continuing.") # expected in leftmost (index 0) plot
-                self.show_message(message=f"{code_string}", durationMs=1000)
+                    
+                # self.show_message(message=f"{code_string}", durationMs=1000)
                 # print(f'done.')
 
                 
@@ -823,9 +834,25 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(long_results_obj.active_filter_epochs, long_results_obj.all_included_filter_epochs_decoder_result, xbin=long_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name='TestDecodedEpochSlicesPaginationController', max_subplots_per_page=20)
         _out_pagination_controller
     """
+    @property
+    def selected_epoch_times(self):
+        """The Determine the Epochs that have actually been selected so they can be saved/stored somehow.
+        Returns: S x 2 array of epoch start/end times
+        """
+        assert np.shape(self.plots_data.epoch_slices)[0] == len(self.is_selected), f"Selection length must be the same as the number of epoch_slices, otherwise we do not know what we are selecting! np.shape(self.plots_data.epoch_slices): {np.shape(self.plots_data.epoch_slices)}, len(self.params.is_selected): {len(self.params.is_selected)}"
+        return self.plots_data.epoch_slices[self.is_selected] # returns an S x 2 array of epoch start/end times that are currently selected.
+
+    @property
+    def thin_button_bar_widget(self) -> ThinButtonBarWidget:
+        return self.ui.mw.ui.thin_button_bar_widget
+    
+    @property
+    def paginator_controller_widget(self) -> PaginationControlWidget:
+        return self.ui.mw.ui.paginator_controller_widget
+    
 
     @classmethod
-    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False, params_kwargs: Optional[Dict]=None, **kwargs):
+    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result: DecodedFilterEpochsResult, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False, params_kwargs: Optional[Dict]=None, **kwargs):
         """ new version (replacing `plot_paginated_decoded_epoch_slices`) calls `plot_decoded_epoch_slices` which produces the state variables (params, plots_data, plots, ui), a new instance of this object type is then initialized with those variables and then updated with any specific properties. """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
         
@@ -883,13 +910,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         return new_obj
     
     
-    @property
-    def selected_epoch_times(self):
-        """The Determine the Epochs that have actually been selected so they can be saved/stored somehow.
-        Returns: S x 2 array of epoch start/end times
-        """
-        assert np.shape(self.plots_data.epoch_slices)[0] == len(self.is_selected), f"Selection length must be the same as the number of epoch_slices, otherwise we do not know what we are selecting! np.shape(self.plots_data.epoch_slices): {np.shape(self.plots_data.epoch_slices)}, len(self.params.is_selected): {len(self.params.is_selected)}"
-        return self.plots_data.epoch_slices[self.is_selected] # returns an S x 2 array of epoch start/end times that are currently selected.
 
 
     def find_data_indicies_from_epoch_times(self, epoch_times: NDArray) -> NDArray:
@@ -1109,13 +1129,14 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if not self.params.has_attr('on_middle_click_item_callbacks'):
             self.params['on_middle_click_item_callbacks'] = {}
 
-        self.params.on_middle_click_item_callbacks['copy_axis_image_to_clipboard_callback'] = ClickActionCallbacks.copy_axis_image_to_clipboard_callback
+        # self.params.on_middle_click_item_callbacks['copy_axis_image_to_clipboard_callback'] = ClickActionCallbacks.copy_axis_image_to_clipboard_callback
+        self.params.on_middle_click_item_callbacks['copy_click_time_to_clipboard_callback'] = ClickActionCallbacks.copy_click_time_to_clipboard_callback
 
         if not self.params.has_attr('on_secondary_click_item_callbacks'):
             self.params['on_secondary_click_item_callbacks'] = {}
 
-        self.params.on_secondary_click_item_callbacks['copy_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_epoch_times_to_clipboard_callback
-        # self.params.on_secondary_click_item_callbacks['log_clicked_epoch_times_to_message_box_callback'] = ClickActionCallbacks.log_clicked_epoch_times_to_message_box_callback
+        # self.params.on_secondary_click_item_callbacks['copy_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_epoch_times_to_clipboard_callback
+        self.params.on_secondary_click_item_callbacks['log_clicked_epoch_times_to_message_box_callback'] = ClickActionCallbacks.log_clicked_epoch_times_to_message_box_callback
         
 
 
@@ -1508,8 +1529,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
     def show_message(self, message: str, durationMs:int=4000):
         """ show a toast message """
+        # try to show the toast message:
         self.ui.mw.toast.should_position_to_parent_window = False
         self.ui.mw.toast.show_message(message=message, durationMs=durationMs)
+
+        # try update set the footer label:
+        self.thin_button_bar_widget.label_message = message
 
 
     
@@ -1863,7 +1888,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
     @classmethod
-    def _subfn_prepare_plot_multi_decoders_stacked_epoch_slices(cls, curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict, epochs_name:str ='laps', included_epoch_indicies=None, defer_render=True, save_figure=True, **kwargs):
+    def _subfn_prepare_plot_multi_decoders_stacked_epoch_slices(cls, curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict: Dict[str, DecodedFilterEpochsResult], epochs_name:str ='laps', included_epoch_indicies=None, defer_render=True, save_figure=True, **kwargs):
         """ 2024-02-14 - Adapted from the function that plots the Long/Short decoded epochs side-by-side for comparsion and updated to work with the multi-decoder track templates.
         
         ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
@@ -1897,9 +1922,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                     curr_params_kwargs['disable_y_label'] = True
 
             # a_name: str = 
-            a_decoder_decoded_epochs_result = decoder_decoded_epochs_result_dict[a_name]
+            a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_decoded_epochs_result_dict[a_name] # DecodedFilterEpochsResult
             pagination_controller_dict[a_name] = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(a_decoder_decoded_epochs_result.filter_epochs,
-                                                                                                a_decoder_decoded_epochs_result,
+                                                                                                filter_epochs_decoder_result=a_decoder_decoded_epochs_result,
                                                                                                 xbin=a_decoder.xbin, global_pos_df=curr_active_pipeline.sess.position.df,
                                                                                                 a_name=f'DecodedEpochSlices[{a_name}]', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
                                                                                                 max_subplots_per_page=max_subplots_per_page, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
@@ -2245,38 +2270,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             self.draw()
             out_fig_paths_dict_list[a_page_idx] = self.export_decoder_pagination_controller_figure_page(curr_active_pipeline=curr_active_pipeline, **output_figure_kwargs)
 
-            # import matplotlib as mpl
-
-            # pagination_controller_dict = self.pagination_controllers
-
-            # page_idx_sweep = np.arange(total_num_pages)
-            # page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
-            
-            # # paginator_dict = {a_name:a_pagination_controller.paginator for a_name, a_pagination_controller in pagination_controller_dict.items()}
-
-            # for a_name, a_pagination_controller in pagination_controller_dict.items():
-            #     display_context = a_pagination_controller.params.get('active_identifying_figure_ctx', IdentifyingContext())
-
-            #     # Get context for current page of items:
-            #     current_page_idx: int = int(a_pagination_controller.current_page_idx)
-            #     a_paginator = a_pagination_controller.paginator
-            #     total_num_pages = int(a_paginator.num_pages)
-            #     page_context = display_context.overwriting_context(page=current_page_idx, num_pages=total_num_pages)
-            #     self.ui.print(page_context)
-
-            #     page_idx_sweep = np.arange(total_num_pages)
-            #     page_num_sweep = page_idx_sweep + 1 # switch to 1-indexed
-                
-
-            #     ## Get the figure/axes:
-            #     a_plots = a_pagination_controller.plots # RenderPlots
-            #     a_params = a_pagination_controller.params
-                
-            #     # with mpl.rc_context({'figure.figsize': (8.4, 4.8), 'figure.dpi': '220', 'savefig.transparent': True, 'ps.fonttype': 42, }):
-            #     with mpl.rc_context({'figure.figsize': (16.8, 4.8), 'figure.dpi': '420', 'savefig.transparent': True, 'ps.fonttype': 42, }):
-            #         figs = a_plots.fig
-            #         axs = a_plots.axs
-            #         curr_active_pipeline.output_figure(final_context=page_context, fig=figs, write_vector_format=True)
 
         print(f'\tdone.')
         return out_fig_paths_dict_list
