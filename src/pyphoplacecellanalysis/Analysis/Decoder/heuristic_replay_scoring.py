@@ -33,15 +33,17 @@ from scipy.ndimage import convolve # used in `expand_peaks_mask`
 
 @define(slots=False)
 class HeuristicScoresTuple(UnpackableMixin, object):
-	longest_sequence_length: int = field(default=1),
-	longest_sequence_length_ratio: float = field(default=None),
-	direction_change_bin_ratio: float = field(default=None),
-	congruent_dir_bins_ratio: float = field(default=None),
-	total_congruent_direction_change: float = field(default=None),
-	total_variation: float = field(default=None),
-	integral_second_derivative: float = field(default=None),
-	stddev_of_diff: float = field(default=None),
-	position_derivatives_df: pd.DataFrame = field(default=None)
+    """ the specific heuristic measures for a single decoded epoch
+    """
+    longest_sequence_length: int = field(default=1),
+    longest_sequence_length_ratio: float = field(default=None),
+    direction_change_bin_ratio: float = field(default=None),
+    congruent_dir_bins_ratio: float = field(default=None),
+    total_congruent_direction_change: float = field(default=None),
+    total_variation: float = field(default=None),
+    integral_second_derivative: float = field(default=None),
+    stddev_of_diff: float = field(default=None),
+    position_derivatives_df: pd.DataFrame = field(default=None)
     
 
 def is_valid_sequence_index(sequence, test_index: int) -> bool:
@@ -563,9 +565,13 @@ class HeuristicReplayScoring:
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score', 'OLDER'], input_requires=[], output_provides=[],
                          uses=['_compute_pos_derivs', 'partition_subsequences_ignoring_repeated_similar_positions', '_compute_total_variation', '_compute_integral_second_derivative', '_compute_stddev_of_diff', 'HeuristicScoresTuple'],
                          used_by=['compute_all_heuristic_scores'], creation_date='2024-02-29 00:00', related_items=[])
-    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, **kwargs) -> HeuristicScoresTuple:
+    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, **kwargs) -> HeuristicScoresTuple:
         """ 2024-02-29 - New smart replay heuristic scoring
 
+        
+        use_bin_units_instead_of_realworld: bool = True # if False, uses the real-world units (cm/seconds). If True, uses nbin units (n_posbins/n_timebins)
+        
+        
         For a single_decoder, single_epoch
 
         a_result: DecodedFilterEpochsResult = a_decoded_filter_epochs_decoder_result_dict['long_LR']
@@ -583,15 +589,29 @@ class HeuristicReplayScoring:
 
             _out_new_scores
 
+            
+            
+        #TODO 2024-08-01 07:44: - [ ] `np.sign(...)` does not do what I thought it did. It returns *three* possible values for each element: {-1, 0, +1}, not just two {-1, +1} like I thought
+        
         """
         same_thresh: float = kwargs.pop('same_thresh', 4.0)
 
-
-        a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+        # use_bin_units_instead_of_realworld: bool = True # if False, uses the real-world units (cm/seconds). If True, uses nbin units (n_posbins/n_timebins)
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
-        # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
-        time_window_centers = a_result.time_window_centers[an_epoch_idx]
+
+        if use_bin_units_instead_of_realworld:
+            time_window_centers = np.arange(n_time_bins) + 0.5 # time-bin units, plot range would then be from (0.0, (float(n_time_bins) + 0.5))
+            a_most_likely_positions_list = a_result.most_likely_position_indicies_list[an_epoch_idx] # pos-bins
+            if np.ndim(a_most_likely_positions_list) == 2:
+                a_most_likely_positions_list = a_most_likely_positions_list.flatten()
+                
+            
+        else:
+            # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
+            time_window_centers = a_result.time_window_centers[an_epoch_idx]
+            a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+            
 
         # a_p_x_given_n
         # a_result.p_x_given_n_list
@@ -630,11 +650,13 @@ class HeuristicReplayScoring:
 
             ## TODO: reuse the values computed (properly) in `position_derivatives_df` instead of doing it from scratch again here:
             # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[0.0])
-            a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+            a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]]) ## #TODO ⚠️ 2024-08-01 07:27: - [ ] :this diff represents the velocity doesn't it, so prepending the position in the first bin makes zero sense. UPDATE: prepend means its prepended to the input before the diff, meaning the first value should always be zero
+            
+            
             # a_first_order_diff
-            total_first_order_change: float = np.nansum(a_first_order_diff[1:])
+            total_first_order_change: float = np.nansum(a_first_order_diff[1:]) # the *NET* position change over all epoch bins
             # total_first_order_change
-            epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
+            epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0, the general direction trend for the entire epoch
             # epoch_change_direction
 
             # a_result
@@ -721,13 +743,14 @@ class HeuristicReplayScoring:
             #     a_split_first_order_diff_array
             #     np.nansum(a_split_first_order_diff_array)
 
+            ## a bin's direction is said to be "congruent" if it's consistent with the general trend in direction across the entire epoch duration:
             is_non_congruent_direction_bin = (a_first_order_diff_sign != epoch_change_direction)
             is_congruent_direction_bins = np.logical_not(is_non_congruent_direction_bin)
 
             congruent_bin_diffs = a_first_order_diff[is_congruent_direction_bins]
             incongruent_bin_diffs = a_first_order_diff[is_non_congruent_direction_bin]
 
-            congruent_dir_bins_ratio: float = float(len(congruent_bin_diffs)) / float(n_time_bins - 1)
+            congruent_dir_bins_ratio: float = float(len(congruent_bin_diffs)) / float(n_time_bins - 1) # the ratio of the number of tbins where the velocity is moving in the general direction of the trajectory across the whole event. Not a great metric because minor variations around a constant position can dramatically drop score despite not looking bad.
             if debug_print:
                 print(f'num_congruent_direction_bins_score: {congruent_dir_bins_ratio}')
             total_congruent_direction_change: float = np.nansum(np.abs(congruent_bin_diffs)) # the total quantity of change in the congruent direction
@@ -740,8 +763,6 @@ class HeuristicReplayScoring:
             integral_second_derivative = _compute_integral_second_derivative(a_most_likely_positions_list)
             stddev_of_diff = _compute_stddev_of_diff(a_most_likely_positions_list)
 
-            
-            
             return HeuristicScoresTuple(longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change,
                                         total_variation=total_variation, integral_second_derivative=integral_second_derivative, stddev_of_diff=stddev_of_diff,
                                         position_derivatives_df=position_derivatives_df)

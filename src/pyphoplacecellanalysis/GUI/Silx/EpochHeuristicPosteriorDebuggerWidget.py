@@ -62,6 +62,9 @@ class PositionDerivativesContainer:
     applied_forces: NDArray = field(default=None)
     total_applied_force: float = field(default=None)
     
+    should_use_prepending_method: bool = field(default=True)
+
+    
     def __attrs_post_init__(self):
         # Recompute all:
         self.compute()
@@ -72,14 +75,23 @@ class PositionDerivativesContainer:
         """
         self._curve_pos_t = np.arange(len(self.pos)) + 0.5  # Move forward by a half bin
 
-
         # Compute velocity
-        self.vel = np.diff(self.pos)
-        self._curve_vel_t = self._curve_pos_t[:-1] + 0.5  # Center between the original position x-values
+        if self.should_use_prepending_method:
+            self.vel = np.diff(self.pos, n=1, prepend=[self.pos[0]])
+            self._curve_vel_t = self._curve_pos_t - 0.5 # will have same number of tbins as pos
+            
+        else:
+            self.vel = np.diff(self.pos)
+            self._curve_vel_t = self._curve_pos_t[:-1] + 0.5  # Center between the original position x-values
 
         # Compute acceleration
-        self.accel = np.diff(self.vel)
-        self._curve_accel_t = self._curve_vel_t[:-1] + 0.5  # Center between the velocity x-values
+        if self.should_use_prepending_method:
+            #TODO 2024-08-01 07:38: - [ ] not 100% sure this is right
+            self.accel = np.diff(self.vel, n=1, prepend=self.vel[0]) # 1st order from vel, 2nd order from pos
+            self._curve_accel_t = deepcopy(self._curve_vel_t) # should be the same time bins as velocity
+        else:
+            self.accel = np.diff(self.vel)
+            self._curve_accel_t = self._curve_vel_t[:-1] + 0.5  # Center between the velocity x-values
 
         # Compute kinetic energy at each time step
         self.kinetic_energy: NDArray = 0.5 * self.mass * self.vel**2
@@ -123,6 +135,7 @@ def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False)
 
 
 def remove_all_plot_toolbars(a_plot: Union[Plot1D, Plot2D]):
+    """ removes the default plot-customization toolbars from the Plot*Ds """
     _plot_toolbars = [a_plot.toolBar(), a_plot.getOutputToolBar(), a_plot.getInteractiveModeToolBar()]
     for a_toolbar in _plot_toolbars:
         a_plot.removeToolBar(a_toolbar)
@@ -184,8 +197,8 @@ class EpochHeuristicDebugger:
     plot_acceleration: Plot1D = field(factory=plot1d_factory)
     plot_extra: Plot1D = field(factory=plot1d_factory)
     
+    use_bin_units_instead_of_realworld: bool = field(default=True, metadata={'notes': 'if False, uses the real-world units (cm/seconds). If True, uses nbin units (n_posbins/n_timebins)'})
     
-
 
     # Computed Properties ________________________________________________________________________________________________ #
     @property
@@ -324,7 +337,7 @@ class EpochHeuristicDebugger:
         
 
     # def recompute(self):
-    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=['HeuristicReplayScoring.compute_pho_heuristic_replay_scores'], used_by=['update_active_epoch'], creation_date='2024-07-30 15:08', related_items=[])
+    @function_attributes(short_name=None, tags=['update', 'data'], input_requires=[], output_provides=[], uses=['HeuristicReplayScoring.compute_pho_heuristic_replay_scores'], used_by=['update_active_epoch'], creation_date='2024-07-30 15:08', related_items=[])
     def update_active_epoch_data(self, active_epoch_idx: int):
         """ Data Update only - called after the time-bin is updated.
         
@@ -358,7 +371,7 @@ class EpochHeuristicDebugger:
 
         self.p_x_given_n_masked = ma.masked_array(p_x_given_n, mask=np.logical_not(is_higher_than_diffusion), fill_value=np.nan)
         
-        self.heuristic_scores = HeuristicReplayScoring.compute_pho_heuristic_replay_scores(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, debug_print=False)
+        self.heuristic_scores = HeuristicReplayScoring.compute_pho_heuristic_replay_scores(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, debug_print=False, use_bin_units_instead_of_realworld=self.use_bin_units_instead_of_realworld)
         # longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change, total_variation, integral_second_derivative, stddev_of_diff, position_derivatives_df = self.heuristic_scores
         # np.diff(active_captured_single_epoch_result.most_likely_position_indicies)
         if self.debug_print:
@@ -367,7 +380,35 @@ class EpochHeuristicDebugger:
 
         # Update position data:
         self.position_derivatives = PositionDerivativesContainer(pos=deepcopy(self.active_most_likely_position_indicies))
-        
+                
+
+
+    def _update_active_tables(self):
+        """ Updates the epoch-dependent tables after active_epoch_idx is changed.
+                
+        requires up-to-date `self.heuristic_scores`
+        Updates:
+            self.ui.models_dict[table_id_name]
+            self.ui.views_dict[table_id_name]'s models
+            Table appearance
+            
+        """
+        from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel
+
+        heuristic_scores_dict = asdict(self.heuristic_scores, filter=lambda a, v: a.name not in ['position_derivatives_df'])
+        df = pd.DataFrame(list(heuristic_scores_dict.values()), index=heuristic_scores_dict.keys(), columns=['Values'])
+
+        ## INPUTS: df
+
+        # Update the table:
+        table_id_name: str = 'combined_epoch_stats'
+        self.ui.models_dict[table_id_name] = SimplePandasModel(df.copy())
+
+        # Update the view's model:
+        table_view = self.ui.views_dict[table_id_name]
+        table_view.setModel(self.ui.models_dict[table_id_name])
+        # Adjust the column widths to fit the contents
+        table_view.resizeColumnsToContents()
 
 
     @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=['update_active_epoch_data'], used_by=['on_slider_change'], creation_date='2024-07-30 15:09', related_items=[])
@@ -438,10 +479,13 @@ class EpochHeuristicDebugger:
             else:
                 a_plot.resetZoom() # reset zoom resets the y-axis only
 
+        ## Update the tables:
+        self._update_active_tables()
+        
 
 
     def on_slider_change(self, change):
-        """Updates the active epoch via a slider:
+        """ Callback for the integrated slider that allows selecting the active epoch:
         
         """
 
@@ -474,22 +518,6 @@ class EpochHeuristicDebugger:
         ctrl_layout_widget.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
         ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
 
-        # Step 4: Create DataFrame and QTableView
-        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
-        # model = PandasModel(df)
-        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
-
-        # tableView = pg.QtWidgets.QTableView()
-        # tableView.setModel(pandasDataFrameTableModel)
-        # tableView.setObjectName("pandasTablePreview")
-        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-
-        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
-        # ctrl_widgets_dict['tableView'] = tableView
-
-        # # Step 5: Add TableView to LayoutWidget
-        # ctrl_layout_widget.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
-
         position_derivatives_df: pd.DataFrame = deepcopy(self.heuristic_scores.position_derivatives_df)
         active_epochs_df: pd.DataFrame = self.filter_epochs
 
@@ -503,7 +531,8 @@ class EpochHeuristicDebugger:
 
         # Add the tab widget to the layout
         ctrl_layout_widget.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=2)
-    
+        tab_widget.setMinimumHeight(400)
+        
         # logTextEdit = LogViewer() # QTextEdit subclass
         # logTextEdit.setReadOnly(True)
         # logTextEdit.setObjectName("logTextEdit")
