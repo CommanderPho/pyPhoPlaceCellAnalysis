@@ -277,3 +277,404 @@ class COM(StatBase):
                 comY = np.sum(yData * values) / deno
                 return comX, comY
             
+
+
+# ==================================================================================================================== #
+# Image Painting/Modification Tools built from the Mask Tools                                                          #
+# ==================================================================================================================== #
+"""
+
+NOTE: the parameters for the pencil are fairly entangled in the Silx library defns: `silx.src.silx.gui.plot.PlotInteraction.PlotInteraction._setInteractiveMode`
+
+"""
+
+import numpy as np
+from silx.gui import qt
+from silx.gui.plot import Plot1D
+from silx.gui.plot import Plot2D
+from silx.gui.plot._BaseMaskToolsWidget import BaseMask, BaseMaskToolsWidget, BaseMaskToolsDockWidget
+from silx.gui.plot.MaskToolsWidget import ImageMask, MaskToolsWidget, MaskToolsDockWidget
+
+from silx._utils import NP_OPTIONAL_COPY
+from silx.gui import qt, icons
+from silx.gui.widgets.FloatEdit import FloatEdit
+from silx.gui.colors import Colormap
+from silx.gui.colors import rgba
+from silx.gui.plot.actions.mode import PanModeAction
+
+
+class ContinuousImageMask(ImageMask):
+    """A 2D mask field with update operations.
+    Coords follows (row, column) convention and are in mask array coords.
+    This is meant for internal use by :class:`ContinuousMaskToolsWidget`.
+    
+    """
+    # sigChanged = qt.Signal()
+    # """Signal emitted when the mask has changed"""
+
+    # sigStateChanged = qt.Signal()
+    # """Signal emitted for each mask commit/undo/redo operation"""
+
+    # sigUndoable = qt.Signal(bool)
+    # """Signal emitted when undo becomes possible/impossible"""
+
+    # sigRedoable = qt.Signal(bool)
+    # """Signal emitted when redo becomes possible/impossible"""
+    
+    def __init__(self, image=None):
+        """
+        :param image: :class:`silx.gui.plot.items.ImageBase` instance
+        """
+        ImageMask.__init__(self, image)
+        self.reset(shape=(0, 0))  # Init the mask with a 2D shape
+
+class ContinuousMaskToolsWidget(MaskToolsWidget):
+    """Widget with tools for drawing mask on an image in a PlotWidget."""
+    _maxLevelNumber = 255
+    def __init__(self, parent=None, plot=None):
+        # super(ContinuousMaskToolsWidget, self).__init__(parent=parent, plot=plot, mask=ContinuousImageMask())
+        super(ContinuousMaskToolsWidget, self).__init__(parent=parent, plot=plot) # , mask=ContinuousImageMask()
+        self._mask = ContinuousImageMask()
+
+    # ==================================================================================================================== #
+    # Overrides                                                                                                            #
+    # ==================================================================================================================== #
+    def _initWidgets(self):
+        """OVERRIDE Create widgets"""
+        layout = qt.QBoxLayout(qt.QBoxLayout.LeftToRight)
+        layout.addWidget(self._initMaskGroupBox())
+        layout.addWidget(self._initDrawGroupBox())
+        layout.addWidget(self._initThresholdGroupBox())
+        layout.addWidget(self._initOtherToolsGroupBox())
+        layout.addStretch(1)
+        self.setLayout(layout)
+        
+    # Callback Overrides _________________________________________________________________________________________________ #        
+    def _pencilForceChanged(self, force: float):
+        """ 
+        self.pencilContinuousSpinBox.valueChanged.connect(self._pencilForceChanged)
+        self.pencilContinuousSlider.valueChanged.connect(self._pencilForceChanged)
+        """
+        old = self.pencilContinuousSpinBox.blockSignals(True)
+        try:
+            self.pencilContinuousSpinBox.setValue(force)
+        finally:
+            self.pencilContinuousSpinBox.blockSignals(old)
+
+        old = self.pencilContinuousSlider.blockSignals(True)
+        try:
+            self.pencilContinuousSlider.setValue(force)
+        finally:
+            self.pencilContinuousSlider.blockSignals(old)
+        self._updateInteractiveMode()
+        
+
+    def _getPencilForce(self) -> float:
+        """Returns the force of the pencil to use in data coordinates`
+
+        :rtype: float
+        """
+        return self.pencilContinuousSpinBox.value()
+
+    def _activePencilMode(self):
+        """OVERRIDE: Handle pencil action mode triggering. Overrides to provide force. 
+        """
+        self._releaseDrawingMode()
+        self._drawingMode = "pencil"
+        self.plot.sigPlotSignal.connect(self._plotDrawEvent)
+        color = self.getCurrentMaskColor()
+        width = self._getPencilWidth()
+        force = self._getPencilForce() # #TODO 2024-08-01 03:36: - [ ] make use of this
+        
+        self.plot.setInteractiveMode(
+            "draw", shape="pencil", source=self, color=color, width=width, # , force=force
+        )
+        self._updateDrawingModeWidgets()
+        
+
+    # Drawing Overrides: _________________________________________________________________________________________________ #
+    def _initDrawGroupBox(self):
+        """OVERRIDE: Init drawing tools widgets"""
+        layout = qt.QVBoxLayout()
+
+        self.browseAction = PanModeAction(self.plot, self.plot)
+        self.addAction(self.browseAction)
+
+        # Draw tools
+        self.rectAction = qt.QAction(
+            icons.getQIcon("shape-rectangle"), "Rectangle selection", self
+        )
+        self.rectAction.setToolTip(
+            "Rectangle selection tool: (Un)Mask a rectangular region <b>R</b>"
+        )
+        self.rectAction.setShortcut(qt.QKeySequence(qt.Qt.Key_R))
+        self.rectAction.setCheckable(True)
+        self.rectAction.triggered.connect(self._activeRectMode)
+        self.addAction(self.rectAction)
+
+        self.ellipseAction = qt.QAction(
+            icons.getQIcon("shape-ellipse"), "Circle selection", self
+        )
+        self.ellipseAction.setToolTip(
+            "Rectangle selection tool: (Un)Mask a circle region <b>R</b>"
+        )
+        self.ellipseAction.setShortcut(qt.QKeySequence(qt.Qt.Key_R))
+        self.ellipseAction.setCheckable(True)
+        self.ellipseAction.triggered.connect(self._activeEllipseMode)
+        self.addAction(self.ellipseAction)
+
+        self.polygonAction = qt.QAction(
+            icons.getQIcon("shape-polygon"), "Polygon selection", self
+        )
+        self.polygonAction.setShortcut(qt.QKeySequence(qt.Qt.Key_S))
+        self.polygonAction.setToolTip(
+            "Polygon selection tool: (Un)Mask a polygonal region <b>S</b><br>"
+            "Left-click to place new polygon corners<br>"
+            "Left-click on first corner to close the polygon"
+        )
+        self.polygonAction.setCheckable(True)
+        self.polygonAction.triggered.connect(self._activePolygonMode)
+        self.addAction(self.polygonAction)
+
+        self.pencilAction = qt.QAction(
+            icons.getQIcon("draw-pencil"), "Pencil tool", self
+        )
+        self.pencilAction.setShortcut(qt.QKeySequence(qt.Qt.Key_P))
+        self.pencilAction.setToolTip("Pencil tool: (Un)Mask using a pencil <b>P</b>")
+        self.pencilAction.setCheckable(True)
+        self.pencilAction.triggered.connect(self._activePencilMode)
+        self.addAction(self.pencilAction)
+
+        self.drawActionGroup = qt.QActionGroup(self)
+        self.drawActionGroup.setExclusive(True)
+        self.drawActionGroup.addAction(self.rectAction)
+        self.drawActionGroup.addAction(self.ellipseAction)
+        self.drawActionGroup.addAction(self.polygonAction)
+        self.drawActionGroup.addAction(self.pencilAction)
+
+        actions = (
+            self.browseAction,
+            self.rectAction,
+            self.ellipseAction,
+            self.polygonAction,
+            self.pencilAction,
+        )
+        drawButtons = []
+        for action in actions:
+            btn = qt.QToolButton()
+            btn.setDefaultAction(action)
+            drawButtons.append(btn)
+        container = self._hboxWidget(*drawButtons)
+        layout.addWidget(container)
+
+        # Mask/Unmask radio buttons
+        maskRadioBtn = qt.QRadioButton("Mask")
+        maskRadioBtn.setToolTip(
+            "Drawing masks with current level. Press <b>Ctrl</b> to unmask"
+        )
+        maskRadioBtn.setChecked(True)
+
+        unmaskRadioBtn = qt.QRadioButton("Unmask")
+        unmaskRadioBtn.setToolTip(
+            "Drawing unmasks with current level. Press <b>Ctrl</b> to mask"
+        )
+
+        self.maskStateGroup = qt.QButtonGroup()
+        self.maskStateGroup.addButton(maskRadioBtn, 1)
+        self.maskStateGroup.addButton(unmaskRadioBtn, 0)
+
+        self.maskStateWidget = self._hboxWidget(maskRadioBtn, unmaskRadioBtn)
+        layout.addWidget(self.maskStateWidget)
+
+        self.maskStateWidget.setHidden(True)
+
+        # Pencil settings
+        self.pencilSetting = self._createPencilSettings(None)
+        self.pencilSetting.setVisible(False)
+        layout.addWidget(self.pencilSetting)
+
+        layout.addStretch(1)
+
+        drawGroup = qt.QGroupBox("~Draw tools")
+        drawGroup.setLayout(layout)
+        return drawGroup
+
+    def _createPencilSettings(self, parent=None):
+        """ OVERRIDE: to define pencil settings widget """
+        pencilSetting = qt.QWidget(parent)
+
+        self.pencilSpinBox = qt.QSpinBox(parent=pencilSetting)
+        self.pencilSpinBox.setRange(1, 1024)
+        pencilToolTip = """Set pencil drawing tool size in pixels of the image on which to make the mask."""
+        self.pencilSpinBox.setToolTip(pencilToolTip)
+
+        self.pencilSlider = qt.QSlider(qt.Qt.Horizontal, parent=pencilSetting)
+        self.pencilSlider.setRange(1, 50)
+        self.pencilSlider.setToolTip(pencilToolTip)
+
+        pencilLabel = qt.QLabel("Pencil size:", parent=pencilSetting)
+
+        layout = qt.QGridLayout()
+        layout.addWidget(pencilLabel, 0, 0)
+        layout.addWidget(self.pencilSpinBox, 0, 1)
+        layout.addWidget(self.pencilSlider, 1, 1)
+        
+        ## continuous value spinbox:
+        self.pencilContinuousSpinBox = qt.QDoubleSpinBox(parent=pencilSetting)
+        self.pencilContinuousSpinBox.setRange(0.1, 10.0)
+        pencilContinuousToolTip = """Set pencil drawing tool 'force' which determines how much weight each draw operation changes."""
+        self.pencilContinuousSpinBox.setToolTip(pencilContinuousToolTip)
+
+        self.pencilContinuousSlider = qt.QSlider(qt.Qt.Horizontal, parent=pencilSetting)
+        self.pencilContinuousSlider.setRange(1, 10)
+        self.pencilContinuousSlider.setToolTip(pencilContinuousToolTip)
+
+        pencilForceLabel = qt.QLabel("Pencil force:", parent=pencilSetting)
+        layout.addWidget(pencilForceLabel, 1, 0)
+        layout.addWidget(self.pencilContinuousSpinBox, 1, 1)
+        layout.addWidget(self.pencilContinuousSlider, 2, 1)
+        
+        pencilSetting.setLayout(layout)
+
+        self.pencilSpinBox.valueChanged.connect(self._pencilWidthChanged)
+        self.pencilSlider.valueChanged.connect(self._pencilWidthChanged)
+
+        self.pencilContinuousSpinBox.valueChanged.connect(self._pencilForceChanged)
+        self.pencilContinuousSlider.valueChanged.connect(self._pencilForceChanged)
+
+        return pencilSetting
+
+    def _initThresholdGroupBox(self):
+        """Init thresholding widgets"""
+
+        self.belowThresholdAction = qt.QAction(
+            icons.getQIcon("plot-roi-below"), "Mask below threshold", self
+        )
+        self.belowThresholdAction.setToolTip(
+            "Mask image where values are below given threshold"
+        )
+        self.belowThresholdAction.setCheckable(True)
+        self.belowThresholdAction.setChecked(True)
+
+        self.betweenThresholdAction = qt.QAction(
+            icons.getQIcon("plot-roi-between"), "Mask within range", self
+        )
+        self.betweenThresholdAction.setToolTip(
+            "Mask image where values are within given range"
+        )
+        self.betweenThresholdAction.setCheckable(True)
+
+        self.aboveThresholdAction = qt.QAction(
+            icons.getQIcon("plot-roi-above"), "Mask above threshold", self
+        )
+        self.aboveThresholdAction.setToolTip(
+            "Mask image where values are above given threshold"
+        )
+        self.aboveThresholdAction.setCheckable(True)
+
+        self.thresholdActionGroup = qt.QActionGroup(self)
+        self.thresholdActionGroup.setExclusive(True)
+        self.thresholdActionGroup.addAction(self.belowThresholdAction)
+        self.thresholdActionGroup.addAction(self.betweenThresholdAction)
+        self.thresholdActionGroup.addAction(self.aboveThresholdAction)
+        self.thresholdActionGroup.triggered.connect(self._thresholdActionGroupTriggered)
+
+        self.loadColormapRangeAction = qt.QAction(
+            icons.getQIcon("view-refresh"), "Set min-max from colormap", self
+        )
+        self.loadColormapRangeAction.setToolTip(
+            "Set min and max values from current colormap range"
+        )
+        self.loadColormapRangeAction.setCheckable(False)
+        self.loadColormapRangeAction.triggered.connect(
+            self._loadRangeFromColormapTriggered
+        )
+
+        widgets = []
+        for action in self.thresholdActionGroup.actions():
+            btn = qt.QToolButton()
+            btn.setDefaultAction(action)
+            widgets.append(btn)
+
+        spacer = qt.QWidget(parent=self)
+        spacer.setSizePolicy(qt.QSizePolicy.Expanding, qt.QSizePolicy.Preferred)
+        widgets.append(spacer)
+
+        loadColormapRangeBtn = qt.QToolButton()
+        loadColormapRangeBtn.setDefaultAction(self.loadColormapRangeAction)
+        widgets.append(loadColormapRangeBtn)
+
+        toolBar = self._hboxWidget(*widgets, stretch=False)
+
+        config = qt.QGridLayout()
+        config.setContentsMargins(0, 0, 0, 0)
+
+        self.minLineLabel = qt.QLabel("Min:", self)
+        self.minLineEdit = FloatEdit(self, value=0)
+        config.addWidget(self.minLineLabel, 0, 0)
+        config.addWidget(self.minLineEdit, 0, 1)
+
+        self.maxLineLabel = qt.QLabel("Max:", self)
+        self.maxLineEdit = FloatEdit(self, value=0)
+        config.addWidget(self.maxLineLabel, 1, 0)
+        config.addWidget(self.maxLineEdit, 1, 1)
+
+        self.applyMaskBtn = qt.QPushButton("Apply mask")
+        self.applyMaskBtn.clicked.connect(self._maskBtnClicked)
+
+        layout = qt.QVBoxLayout()
+        layout.addWidget(toolBar)
+        layout.addLayout(config)
+        layout.addWidget(self.applyMaskBtn)
+        layout.addStretch(1)
+
+        self.thresholdGroup = qt.QGroupBox("Threshold")
+        self.thresholdGroup.setLayout(layout)
+
+        # Init widget state
+        self._thresholdActionGroupTriggered(self.belowThresholdAction)
+        return self.thresholdGroup
+
+        # track widget visibility and plot active image changes
+
+    def _initOtherToolsGroupBox(self):
+        layout = qt.QVBoxLayout()
+
+        self.maskNanBtn = qt.QPushButton("Mask not finite values")
+        self.maskNanBtn.setToolTip("Mask Not a Number and infinite values")
+        self.maskNanBtn.clicked.connect(self._maskNotFiniteBtnClicked)
+        layout.addWidget(self.maskNanBtn)
+        layout.addStretch(1)
+
+        self.otherToolGroup = qt.QGroupBox("Other tools")
+        self.otherToolGroup.setLayout(layout)
+        return self.otherToolGroup
+
+
+
+
+        
+class ContinuousMaskToolsDockWidget(MaskToolsDockWidget):
+    """:class:`ContinuousMaskToolsWidget` embedded in a QDockWidget.
+
+    For integration in a :class:`PlotWindow`.
+
+    :param parent: See :class:`QDockWidget`
+    :param plot: The PlotWidget this widget is operating on
+    :paran str name: The title of this widget
+    """
+
+    def __init__(self, parent=None, plot=None, name="Mask"):
+        widget = ContinuousMaskToolsWidget(plot=plot)
+        super(ContinuousMaskToolsDockWidget, self).__init__(parent=parent, widget=widget, name=name)
+
+
+def getMaskToolsDockWidget(self):
+    """DockWidget with image mask panel (lazy-loaded)."""
+    if self._maskToolsDockWidget is None:
+        self._maskToolsDockWidget = ContinuousMaskToolsDockWidget(plot=self, name="Mask")
+        self._maskToolsDockWidget.hide()
+        self._maskToolsDockWidget.toggleViewAction().triggered.connect(self._handleDockWidgetViewActionTriggered)
+        self._maskToolsDockWidget.visibilityChanged.connect(self._handleFirstDockWidgetShow)
+        return self._maskToolsDockWidget
+
