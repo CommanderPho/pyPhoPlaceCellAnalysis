@@ -2,23 +2,26 @@
 # ==================================================================================================================== #
 # Position Derivatives Plotting Helpers                                                                                #
 # ==================================================================================================================== #
-
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+from attrs import astuple, asdict, field, define # used in `UnpackableMixin`
 from copy import deepcopy
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any
-from typing_extensions import TypeAlias
-from nptyping import NDArray
-import neuropy.utils.type_aliases as types
 
 from scipy.interpolate import UnivariateSpline
-import numpy as np
 
 
+
+@function_attributes(short_name=None, tags=['position', 'velocity', 'acceleration', 'physics', 'interpolation'], input_requires=[], output_provides=[], uses=[], used_by=['_compute_pos_derivs'], creation_date='2024-08-01 14:53', related_items=[])
 def robust_velocity_and_acceleration(t: NDArray, x: NDArray) -> Tuple[NDArray, NDArray]:
+    """ a much improved computation for velocity and acceleration that uses smooth splines instead of instantaneous differences
+    
+    """
     # N = len(x)
     # v = np.zeros(N)
     # a = np.zeros(N)
@@ -77,10 +80,8 @@ def robust_velocity_and_acceleration(t: NDArray, x: NDArray) -> Tuple[NDArray, N
     return v, a
 
 
-
-
-@function_attributes(short_name=None, tags=['decode', 'position', 'derivitives'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 14:30', related_items=[])
-def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size: float, debug_print=False) -> pd.DataFrame:
+@function_attributes(short_name=None, tags=['decode', 'position', 'derivitives'], input_requires=[], output_provides=[], uses=['robust_velocity_and_acceleration'], used_by=[], creation_date='2024-03-07 14:30', related_items=[])
+def _compute_pos_derivs(time_window_centers, position, debug_print=False) -> pd.DataFrame:
     """try recomputing velocties/accelerations
     
     from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_derivs
@@ -237,7 +238,7 @@ def debug_plot_position_and_derivatives_figure(new_measured_pos_df, all_epochs_p
 # ==================================================================================================================== #
 # 2024-03-06 - measured vs. decoded position distribution comparison                                                   #
 # ==================================================================================================================== #
-## basically: does the distribution of positions/velocities/accelerations differ between the correct vs. incorrect decoder? Is it reliable enough to determine whether the decoder is correct or not?
+## My Question: basically: does the distribution of positions/velocities/accelerations differ between the correct vs. incorrect decoder? Is it reliable enough to determine whether the decoder is correct or not?
 ## for example using the wrong decoder might lead to wildly-off velocities.
 
 
@@ -422,4 +423,115 @@ def debug_plot_position_derivatives_stack(new_measured_pos_df, all_epochs_positi
     # fig.show()
     return fig
 
+
+
+# ==================================================================================================================== #
+# 2024-08-01 PositionDerivativesContainer                                                                              #
+# ==================================================================================================================== #
+
+
+@define(slots=False)
+class PositionDerivativesContainer:
+    """ 2024-08-01 Holds spatial derivative values
+
+    Used in `EpochHeuristicDebugger`
+
+    
+
+    from pyphoplacecellanalysis.Analysis.position_derivatives import PositionDerivativesContainer
+    
+    """
+    pos: NDArray = field()
+    mass: float = field(default=1.0)
+    
+    ## Computable:
+    _curve_pos_t: NDArray = field(default=None)
+    vel: NDArray = field(default=None)
+    _curve_vel_t: NDArray = field(default=None)
+    accel: NDArray = field(default=None)
+    _curve_accel_t: NDArray = field(default=None)
+    kinetic_energy: NDArray = field(default=None)
+    total_energy: float = field(default=None)
+
+    applied_forces: NDArray = field(default=None)
+    total_applied_force: float = field(default=None)
+    
+    should_use_prepending_method: bool = field(default=True)
+
+    
+    def __attrs_post_init__(self):
+        # Recompute all:
+        self.compute()
+        
+
+    def compute(self, debug_print=False):
+        """ called to recompute all computed properties after updating self.pos
+        """
+        
+        self._curve_pos_t = np.arange(len(self.pos)) + 0.5  # Move forward by a half bin
+
+        t = deepcopy(self._curve_pos_t)
+        position = deepcopy(self.pos)
+
+        # delta_t_diff = np.diff(time_window_centers, n=1, prepend=[0.0])
+        # a_first_order_diff = np.diff(position, n=1, prepend=[position[0]])
+        # assert len(delta_t_diff) == len(a_first_order_diff), f"len(delta_t_diff): {len(delta_t_diff)} != len(a_first_order_diff): {len(a_first_order_diff)}"
+        # velocity = a_first_order_diff / float(decoding_time_bin_size) # velocity with real world units of cm/sec
+
+        # velocity = a_first_order_diff / delta_t_diff # velocity with real world units of cm/sec
+        # acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
+
+        # Calculate the instantaneous velocities and accelerations
+        velocity, acceleration = robust_velocity_and_acceleration(t=t, x=position)
+
+        # position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': t, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
+        if debug_print:
+            print(f't: {t}')
+            print(f'position: {position}')
+            print(f'velocity: {velocity}')
+            print(f'acceleration: {acceleration}')
+            
+
+        ## Pre 2024-08-01 method:
+        # self._curve_pos_t = np.arange(len(self.pos)) + 0.5  # Move forward by a half bin
+
+        # # Compute velocity
+        # if self.should_use_prepending_method:
+        #     self.vel = np.diff(self.pos, n=1, prepend=[self.pos[0]])
+        #     self._curve_vel_t = self._curve_pos_t - 0.5 # will have same number of tbins as pos
+            
+        # else:
+        #     self.vel = np.diff(self.pos)
+        #     self._curve_vel_t = self._curve_pos_t[:-1] + 0.5  # Center between the original position x-values
+
+        # # Compute acceleration
+        # if self.should_use_prepending_method:
+        #     #TODO 2024-08-01 07:38: - [ ] not 100% sure this is right
+        #     self.accel = np.diff(self.vel, n=1, prepend=self.vel[0]) # 1st order from vel, 2nd order from pos
+        #     self._curve_accel_t = deepcopy(self._curve_vel_t) # should be the same time bins as velocity
+        # else:
+        #     self.accel = np.diff(self.vel)
+        #     self._curve_accel_t = self._curve_vel_t[:-1] + 0.5  # Center between the velocity x-values
+
+
+        # Compute velocity
+        self.vel = velocity
+        self._curve_vel_t = deepcopy(t)
+
+        # Compute acceleration
+        self.accel = acceleration
+        self._curve_accel_t = deepcopy(t)
+
+        ## COMMON:
+
+        # Compute kinetic energy at each time step
+        self.kinetic_energy: NDArray = 0.5 * self.mass * self.vel**2
+
+        # Total energy needed to move the particle along the trajectory
+        self.total_energy: float = np.sum(self.kinetic_energy)
+        
+        ## Forces
+        self.applied_forces = self.accel * self.mass
+        self.total_applied_force = np.sum(self.applied_forces)
+        
 

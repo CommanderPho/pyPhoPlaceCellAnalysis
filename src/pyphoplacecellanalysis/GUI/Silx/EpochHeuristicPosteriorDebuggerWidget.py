@@ -38,71 +38,8 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
-@define(slots=False)
-class PositionDerivativesContainer:
-    """
-    Holds 
-    
-    from pyphoplacecellanalysis.GUI.Silx.EpochHeuristicPosteriorDebuggerWidget import PositionDerivativesContainer
-    
-    
-    """
-    pos: NDArray = field()
-    mass: float = field(default=1.0)
-    
-    ## Computable:
-    _curve_pos_t: NDArray = field(default=None)
-    vel: NDArray = field(default=None)
-    _curve_vel_t: NDArray = field(default=None)
-    accel: NDArray = field(default=None)
-    _curve_accel_t: NDArray = field(default=None)
-    kinetic_energy: NDArray = field(default=None)
-    total_energy: float = field(default=None)
+from pyphoplacecellanalysis.Analysis.position_derivatives import PositionDerivativesContainer
 
-    applied_forces: NDArray = field(default=None)
-    total_applied_force: float = field(default=None)
-    
-    should_use_prepending_method: bool = field(default=True)
-
-    
-    def __attrs_post_init__(self):
-        # Recompute all:
-        self.compute()
-        
-
-    def compute(self):
-        """ called to recompute all computed properties after updating self.pos
-        """
-        self._curve_pos_t = np.arange(len(self.pos)) + 0.5  # Move forward by a half bin
-
-        # Compute velocity
-        if self.should_use_prepending_method:
-            self.vel = np.diff(self.pos, n=1, prepend=[self.pos[0]])
-            self._curve_vel_t = self._curve_pos_t - 0.5 # will have same number of tbins as pos
-            
-        else:
-            self.vel = np.diff(self.pos)
-            self._curve_vel_t = self._curve_pos_t[:-1] + 0.5  # Center between the original position x-values
-
-        # Compute acceleration
-        if self.should_use_prepending_method:
-            #TODO 2024-08-01 07:38: - [ ] not 100% sure this is right
-            self.accel = np.diff(self.vel, n=1, prepend=self.vel[0]) # 1st order from vel, 2nd order from pos
-            self._curve_accel_t = deepcopy(self._curve_vel_t) # should be the same time bins as velocity
-        else:
-            self.accel = np.diff(self.vel)
-            self._curve_accel_t = self._curve_vel_t[:-1] + 0.5  # Center between the velocity x-values
-
-        # Compute kinetic energy at each time step
-        self.kinetic_energy: NDArray = 0.5 * self.mass * self.vel**2
-
-        # Total energy needed to move the particle along the trajectory
-        self.total_energy: float = np.sum(self.kinetic_energy)
-        
-        ## Forces
-        self.applied_forces = self.accel * self.mass
-        self.total_applied_force = np.sum(self.applied_forces)
-        
         
 
 def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False):
@@ -180,8 +117,7 @@ class EpochHeuristicDebugger:
     time_bin_size: float = field(default=None)
     time_bin_centers: NDArray = field(default=None)
 
-    position_derivatives: PositionDerivativesContainer = field(default=None)
-    
+    position_derivatives: PositionDerivativesContainer = field(default=None)    
 
     ## Widgets/Plots:
     ui: PhoUIContainer = field(default=None)    
@@ -259,13 +195,7 @@ class EpochHeuristicDebugger:
         
         ## Build Image:
         img_origin = (0.0, 0.0)
-        # img_origin = (t_start, xbin[0]) # (origin X, origin Y)
-        # img_origin = (xbin[0], t_start) # (origin X, origin Y)
         img_scale = (1.0, 1.0)
-        # img_scale = ((1.0/(t_end - t_start)), (1.0/(xbin[-1] - xbin[0])))
-        # img_scale = (pos_bin_size, time_bin_size) # ??
-        # img_scale = (1.0/float(pos_bin_size), 1.0/float(time_bin_size))
-        # 
 
         print(f'img_origin: {img_origin}')
         print(f'img_scale: {img_scale}')
@@ -345,7 +275,8 @@ class EpochHeuristicDebugger:
 
         Updates: self.p_x_given_n_masked, self.heuristic_scores
         """
-        print(f'update_active_epoch_data(active_epoch_idx={active_epoch_idx})')
+        if self.debug_print:
+            print(f'update_active_epoch_data(active_epoch_idx={active_epoch_idx})')
         assert self.active_decoder_decoded_epochs_result is not None
         # Data Update Only ________________________________________________________________________________________________________ #
         # active_captured_single_epoch_result = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=active_epoch_idx) 
@@ -418,7 +349,8 @@ class EpochHeuristicDebugger:
         requires: self.active_decoder_decoded_epochs_result
         
         """
-        print(f'update_active_epoch(active_epoch_idx={active_epoch_idx})')
+        if self.debug_print:
+            print(f'update_active_epoch(active_epoch_idx={active_epoch_idx})')
         assert self.active_decoder_decoded_epochs_result is not None
         
         # Data Update ________________________________________________________________________________________________________ #
@@ -509,7 +441,8 @@ class EpochHeuristicDebugger:
         ctrls_widget.setValue(self.active_epoch_index)
 
         def valueChanged(new_val:int):
-            print(f'ScrollBarWithSpinBox valueChanged(new_val: {new_val})')
+            # if self.debug_print:
+            #     print(f'ScrollBarWithSpinBox valueChanged(new_val: {new_val})')
             self.update_active_epoch(active_epoch_idx=int(new_val))
             
 

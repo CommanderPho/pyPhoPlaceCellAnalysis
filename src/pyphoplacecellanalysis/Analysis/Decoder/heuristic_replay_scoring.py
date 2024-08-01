@@ -479,7 +479,7 @@ class HeuristicReplayScoring:
         # position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
         # # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
 
-        position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, decoding_time_bin_size=float(a_result.decoding_time_bin_size), debug_print=False)
+        position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, debug_print=False)
 
         # Now split the array at each point where a direction change occurs
         
@@ -646,7 +646,7 @@ class HeuristicReplayScoring:
         else:
 
             # The idea here was to look at the most-likely positions and their changes (derivatives) to see if these were predictive of good vs. bad ripples. For example, bad ripples might have extreme accelerations while good ones fall within a narrow window of physiologically consistent accelerations
-            position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, decoding_time_bin_size=float(a_result.decoding_time_bin_size), debug_print=debug_print)
+            position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, debug_print=debug_print)
 
             ## TODO: reuse the values computed (properly) in `position_derivatives_df` instead of doing it from scratch again here:
             # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[0.0])

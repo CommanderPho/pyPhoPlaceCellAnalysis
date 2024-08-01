@@ -90,7 +90,7 @@ class ScrollBarWithSpinBox(QWidget):
         if (not self.disable_emit_changed):
             # self.lastValEmitted = self.val
             # self.valueChanged.emit(float(self.val))
-            print(f'emitChanged(): self.val: {self.val}')
+            # print(f'emitChanged(): self.val: {self.val}')
             self.sigValueChanged.emit(int(self.val))
         else:
             print('WARN: self.disable_emit_changed = True')

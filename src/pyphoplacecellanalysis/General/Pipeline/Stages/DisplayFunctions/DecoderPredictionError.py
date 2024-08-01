@@ -41,6 +41,11 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlace
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions import DefaultComputationFunctions # TODO: I think it's bad to include computation functions here technically
 
 
+from neuropy.utils.matplotlib_helpers import find_first_available_matplotlib_font_name
+
+found_matplotlib_font_name: str = find_first_available_matplotlib_font_name(desired_fonts_list=['Source Sans Pro', 'Source Sans 3', 'DejaVu Sans Mono'])
+
+
 
 class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
@@ -1576,7 +1581,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
             text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
 
-            font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+            font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, # 'Source Code Pro'
                                 #   size=10,
                                 weight='bold',
                                 #   style='italic',
@@ -1613,7 +1618,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
             text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
 
-            font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+            font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, # 'Source Code Pro'
                                 #   size=10,
                                 weight='bold',
                                 #   style='italic',
@@ -1650,7 +1655,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
             text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
 
-            font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+            font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, # 'Source Code Pro'
                                 #   size=10,
                                 weight='bold',
                                 #   style='italic',
@@ -1685,7 +1690,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # TEXT FORMATTING AND POSITIONING KWARGS _____________________________________________________________________________ #
             text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
 
-            font_prop = font_manager.FontProperties(family='Source Sans Pro', # 'Source Code Pro'
+            font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, # 'Source Code Pro'
                                 weight='bold',
                                 )
             text_kwargs['fontproperties'] = font_prop
