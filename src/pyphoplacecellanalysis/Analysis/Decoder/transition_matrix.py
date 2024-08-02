@@ -153,7 +153,8 @@ class TransitionMatrixComputations:
 
 
     @function_attributes(short_name=None, tags=['transition_matrix', 'plot'], input_requires=[], output_provides=[], uses=['BasicBinnedImageRenderingWindow'], used_by=[], creation_date='2024-08-02 09:55', related_items=[])
-    def plot_transition_matricies(decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray], power_step:int=7, enable_all_titles=True) -> BasicBinnedImageRenderingWindow:
+    def plot_transition_matricies(decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray],
+                                   power_step:int=7, grid_opacity=0.4, enable_all_titles=True) -> BasicBinnedImageRenderingWindow:
         """ plots each decoder as a separate column
         each order of matrix as a separate row
         
@@ -189,7 +190,7 @@ class TransitionMatrixComputations:
                 ## only VERy first (0, 0) item
                 out = BasicBinnedImageRenderingWindow(a_binned_x_transition_matrix_higher_order_list[0], decoders_dict[a_decoder_name].xbin_centers, decoders_dict[a_decoder_name].xbin_centers,
                                                     **all_decoders_label_kwargs, scrollability_mode=LayoutScrollability.NON_SCROLLABLE,
-                                                    grid_opacity=0.4)
+                                                    grid_opacity=grid_opacity)
                 # add remaining rows for this decoder:
                 _subfn_plot_all_rows(start_idx=1)
                 
