@@ -597,6 +597,30 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
                                                                                 total_num_cells=a_n_neurons, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells) for k, a_n_neurons in decoder_num_neurons_dict.items()}
 
 
+    @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=['TransitionMatrixComputations'], used_by=[], creation_date='2024-08-02 07:33', related_items=[])
+    def compute_decoder_transition_matricies(self, n_powers:int=50) -> Dict[types.DecoderName, List[NDArray]]:
+        """ Computes the position transition matricies for each of the decoders 
+        returns a list of length n_powers for each decoder
+        
+        Usage:
+            binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray] = track_templates.compute_decoder_transition_matricies(n_powers=50)
+        
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
+        
+        ## INPUTS: track_templates
+        decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = self.get_decoders_dict()
+        binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray] = {}
+
+        for a_decoder_name, a_decoder in decoders_dict.items():
+            a_pf1D = deepcopy(a_decoder.pf)
+            binned_x_transition_matrix_higher_order_list_dict[a_decoder_name] = TransitionMatrixComputations._compute_position_transition_matrix(a_pf1D.xbin_labels, a_pf1D.filtered_pos_df['binned_x'].dropna().to_numpy(), n_powers=n_powers)
+
+        # OUTPUTS: binned_x_transition_matrix_higher_order_list_dict
+        return binned_x_transition_matrix_higher_order_list_dict
+
+
+
 
 @function_attributes(short_name=None, tags=['ESSENTIAL', 'filter', 'epoch_selection', 'user-annotations', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
 def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name: str, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):
