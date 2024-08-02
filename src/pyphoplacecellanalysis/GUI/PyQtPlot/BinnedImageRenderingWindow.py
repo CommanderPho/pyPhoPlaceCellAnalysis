@@ -1,5 +1,6 @@
-from typing import List
 import numpy as np
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from nptyping import NDArray
 import attrs
 from attrs import define, field, Factory, asdict, astuple
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -17,7 +18,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, _perform_build_root_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 
 
-def _add_bin_ticks(plot_item, xbins=None, ybins=None):
+def _add_bin_ticks(plot_item, xbins=None, ybins=None, grid_opacity:float=0.65):
     """ adds the ticks/grid for xbins and ybins to the plot_item """
     # show full frame, label tick marks at top and left sides, with some extra space for labels:
     plot_item.showAxes(True, showValues=(True, True, False, False), size=10)
@@ -32,12 +33,13 @@ def _add_bin_ticks(plot_item, xbins=None, ybins=None):
         for side in ('left','right'):
             plot_item.getAxis(side).setStyle(showValues=False)
             plot_item.getAxis(side).setTicks((yticks, [])) # add list of major ticks; no minor ticks
-    plot_item.showGrid(x = True, y = True, alpha = 0.65)
+    plot_item.showGrid(x = True, y = True, alpha=grid_opacity)
     return plot_item
 
 
-def _build_binned_imageItem(plot_item, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None):
-    """ 
+def _build_binned_imageItem(plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None, use_viewboxes=True) -> Tuple[RenderPlots, RenderPlotsData]:
+    """ Builds and wrap a new `pg.ImageItem` 
+    
     color_bar_mode: options for the colorbar of each image
         ### curr_cbar_mode: 'each', 'one', None
     """
@@ -120,9 +122,9 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
 
     def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity',
-                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, defer_show=False, **kwargs):
+                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity:float=0.65, defer_show=False, **kwargs):
         super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
-        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow')
+        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow', grid_opacity=grid_opacity)
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
         self.plots = RenderPlots(name='BasicBinnedImageRenderingWindow')
         self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
@@ -130,7 +132,6 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
         self.params.scrollability_mode = LayoutScrollability.init(scrollability_mode)
 
-        
         if isinstance(color_map, str):        
             self.params.colorMap = pg.colormap.get("viridis")
         else:
@@ -182,7 +183,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
     def add_data(self, row=1, col=0, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001):
         """ adds a new data subplot to the output
         """
-        newPlotItem = self.ui.graphics_layout.addPlot(title=title, row=row, col=col) # add PlotItem to the main GraphicsLayoutWidget
+        newPlotItem: pg.PlotItem = self.ui.graphics_layout.addPlot(title=title, row=row, col=col) # add PlotItem to the main GraphicsLayoutWidget
         
         # Set the plot title:
         formatted_title = self.build_formatted_title_string(title=title)        
@@ -190,7 +191,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         
         newPlotItem.setDefaultPadding(0.0)  # plot without padding data range
         newPlotItem.setMouseEnabled(x=False, y=False)
-        newPlotItem = _add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins)
+        newPlotItem = _add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins, grid_opacity=self.params.grid_opacity)
 
         if drop_below_threshold is not None:
             matrix = matrix.astype(float) # required because NaN isn't available in Integer dtype arrays (in case the matrix is of integer type, this prevents a ValueError)
