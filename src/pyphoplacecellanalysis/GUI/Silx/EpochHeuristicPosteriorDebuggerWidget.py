@@ -435,10 +435,10 @@ class EpochHeuristicDebugger:
         
         ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
 
-        ctrls_widget = ScrollBarWithSpinBox()
-        ctrls_widget.setObjectName("ctrls_widget")
-        ctrls_widget.update_range(0, (self.n_epochs-1))
-        ctrls_widget.setValue(self.active_epoch_index)
+        active_epoch_scrollbar_ctrl_widget = ScrollBarWithSpinBox()
+        active_epoch_scrollbar_ctrl_widget.setObjectName("ctrls_widget")
+        active_epoch_scrollbar_ctrl_widget.update_range(0, (self.n_epochs-1))
+        active_epoch_scrollbar_ctrl_widget.setValue(self.active_epoch_index)
 
         def valueChanged(new_val:int):
             # if self.debug_print:
@@ -446,10 +446,10 @@ class EpochHeuristicDebugger:
             self.update_active_epoch(active_epoch_idx=int(new_val))
             
 
-        ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
+        ctrls_widget_connection = active_epoch_scrollbar_ctrl_widget.sigValueChanged.connect(valueChanged)
         ctrl_layout_widget = pg.LayoutWidget()
-        ctrl_layout_widget.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
-        ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
+        ctrl_layout_widget.addWidget(active_epoch_scrollbar_ctrl_widget, row=1, rowspan=1, col=1, colspan=2)
+        ctrl_widgets_dict = dict(ctrls_widget=active_epoch_scrollbar_ctrl_widget, ctrls_widget_connection=ctrls_widget_connection)
 
         position_derivatives_df: pd.DataFrame = deepcopy(self.heuristic_scores.position_derivatives_df)
         active_epochs_df: pd.DataFrame = self.filter_epochs
