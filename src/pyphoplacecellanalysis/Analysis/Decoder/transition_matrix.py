@@ -13,7 +13,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 @metadata_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-14 00:00', related_items=[])
 class TransitionMatrixComputations:
     """ 
-    from PendingNotebookCode import TransitionMatrixComputations
+    from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
     
     # Visualization ______________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
