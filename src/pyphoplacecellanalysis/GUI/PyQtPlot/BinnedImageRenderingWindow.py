@@ -37,7 +37,7 @@ def _add_bin_ticks(plot_item, xbins=None, ybins=None, grid_opacity:float=0.65):
     return plot_item
 
 
-def _build_binned_imageItem(plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None, use_viewboxes=True) -> Tuple[RenderPlots, RenderPlotsData]:
+def _build_binned_imageItem(plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None) -> Tuple[RenderPlots, RenderPlotsData]:
     """ Builds and wrap a new `pg.ImageItem` 
     
     color_bar_mode: options for the colorbar of each image
