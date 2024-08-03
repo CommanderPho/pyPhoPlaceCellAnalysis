@@ -598,7 +598,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
 
     @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=['TransitionMatrixComputations'], used_by=[], creation_date='2024-08-02 07:33', related_items=[])
-    def compute_decoder_transition_matricies(self, n_powers:int=50) -> Dict[types.DecoderName, List[NDArray]]:
+    def compute_decoder_transition_matricies(self, n_powers:int=50, use_direct_observations_for_order:bool=True) -> Dict[types.DecoderName, List[NDArray]]:
         """ Computes the position transition matricies for each of the decoders 
         returns a list of length n_powers for each decoder
         
@@ -614,7 +614,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
         for a_decoder_name, a_decoder in decoders_dict.items():
             a_pf1D = deepcopy(a_decoder.pf)
-            binned_x_transition_matrix_higher_order_list_dict[a_decoder_name] = TransitionMatrixComputations._compute_position_transition_matrix(a_pf1D.xbin_labels, a_pf1D.filtered_pos_df['binned_x'].dropna().to_numpy(), n_powers=n_powers)
+            binned_x_transition_matrix_higher_order_list_dict[a_decoder_name] = TransitionMatrixComputations._compute_position_transition_matrix(a_pf1D.xbin_labels, binned_x=a_pf1D.filtered_pos_df['binned_x'].dropna().to_numpy(), n_powers=n_powers, use_direct_observations_for_order=use_direct_observations_for_order)
 
         # OUTPUTS: binned_x_transition_matrix_higher_order_list_dict
         return binned_x_transition_matrix_higher_order_list_dict
