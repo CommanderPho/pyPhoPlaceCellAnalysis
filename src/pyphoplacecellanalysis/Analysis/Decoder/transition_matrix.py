@@ -31,7 +31,7 @@ class TransitionMatrixComputations:
     """
     ### 1D Transition Matrix:
 
-    def _compute_position_transition_matrix(xbin_labels, binned_x_indicies: np.ndarray, n_powers:int=3, use_direct_observations_for_order:bool=True):
+    def _compute_position_transition_matrix(xbin_labels, binned_x_indicies: np.ndarray, n_powers:int=3, use_direct_observations_for_order:bool=True, should_validate_normalization:bool=True):
         """  1D Transition Matrix from binned positions (e.g. 'binned_x')
 
             pf1D.xbin_labels # array([  1,   2,   3,   4,  ...)
@@ -54,41 +54,48 @@ class TransitionMatrixComputations:
         assert max(binned_x_indicies) < num_position_states, f"VIOLATED! max(binned_x_indicies): {max(binned_x_indicies)} < num_position_states: {num_position_states}"
         # assert 0 in state_sequence, f"does not contain zero! Make sure that it is not a 1-indexed sequence!"
         
-        # binned_x = pos_1D.to_numpy()
-        # max_state_index
         # 0th order:
         binned_x_transition_matrix = transition_matrix(deepcopy(binned_x_indicies), markov_order=1, max_state_index=max_state_index, nan_entries_replace_value=0.0) # #TODO 2024-08-02 21:10: - [ ] max_state_index != num_position_states
-        
+        if should_validate_normalization:
+            _row_normalization_sum = np.sum(binned_x_transition_matrix, axis=1)
+            assert np.allclose(_row_normalization_sum, 1), f"0th order not row normalized!\n\t_row_normalization_sum: {_row_normalization_sum}"
+            
         if not use_direct_observations_for_order:
             ## use exponentiation version: only works if Markov Property is not violated!
             binned_x_transition_matrix_higher_order_list = [binned_x_transition_matrix] + [np.linalg.matrix_power(binned_x_transition_matrix, n) for n in np.arange(2, n_powers+1)]
         else:
             binned_x_transition_matrix_higher_order_list = [binned_x_transition_matrix] + [transition_matrix(deepcopy(binned_x_indicies), markov_order=n, max_state_index=max_state_index, nan_entries_replace_value=0.0) for n in np.arange(2, n_powers+1)]
             
+        if should_validate_normalization:
+            ## test row normalization:
+            _row_normalization_sums = [np.sum(a_mat, axis=1) for a_mat in binned_x_transition_matrix_higher_order_list]
+            _is_row_normalization_all_valid = [np.allclose(v, 1) for v in _row_normalization_sums]
+            assert np.alltrue(_is_row_normalization_all_valid), f"not row normalized!\n\t_is_row_normalization_all_valid: {_is_row_normalization_all_valid}\n\t_row_normalization_sums: {_row_normalization_sums}"
+
         # binned_x_transition_matrix.shape # (64, 64)
         return binned_x_transition_matrix_higher_order_list
 
-    def _build_decoded_positions_transition_matrix(active_one_step_decoder):
-        """ Compute the transition_matrix from the decoded positions 
+    # def _build_decoded_positions_transition_matrix(active_one_step_decoder):
+    #     """ Compute the transition_matrix from the decoded positions 
 
-        TODO: make sure that separate events (e.g. separate replays) are not truncated creating erronious transitions
+    #     TODO: make sure that separate events (e.g. separate replays) are not truncated creating erronious transitions
 
-        """
-        # active_time_window_variable = active_one_step_decoder.time_window_centers # get time window centers (n_time_window_centers,) # (4060,)
-        # active_most_likely_positions = active_one_step_decoder.most_likely_positions.T # (4060, 2) NOTE: the most_likely_positions for the active_one_step_decoder are tranposed compared to the active_two_step_decoder
-        # active_most_likely_positions = active_two_step_decoder.most_likely_positions # (2, 4060)
-        active_one_step_decoder.most_likely_position_flat_indicies
-        # active_most_likely_positions = active_one_step_decoder.revised_most_likely_positions.T
-        # active_most_likely_positions #.shape # (36246,)
+    #     """
+    #     # active_time_window_variable = active_one_step_decoder.time_window_centers # get time window centers (n_time_window_centers,) # (4060,)
+    #     # active_most_likely_positions = active_one_step_decoder.most_likely_positions.T # (4060, 2) NOTE: the most_likely_positions for the active_one_step_decoder are tranposed compared to the active_two_step_decoder
+    #     # active_most_likely_positions = active_two_step_decoder.most_likely_positions # (2, 4060)
+    #     active_one_step_decoder.most_likely_position_flat_indicies
+    #     # active_most_likely_positions = active_one_step_decoder.revised_most_likely_positions.T
+    #     # active_most_likely_positions #.shape # (36246,)
 
-        most_likely_position_indicies = np.squeeze(np.array(np.unravel_index(active_one_step_decoder.most_likely_position_flat_indicies, active_one_step_decoder.original_position_data_shape))) # convert back to an array
-        most_likely_position_xbins = most_likely_position_indicies + 1 # add 1 to convert back to a bin label from an index
-        # most_likely_position_indicies # (1, 36246)
+    #     most_likely_position_indicies = np.squeeze(np.array(np.unravel_index(active_one_step_decoder.most_likely_position_flat_indicies, active_one_step_decoder.original_position_data_shape))) # convert back to an array
+    #     most_likely_position_xbins = most_likely_position_indicies + 1 # add 1 to convert back to a bin label from an index
+    #     # most_likely_position_indicies # (1, 36246)
 
-        xbin_labels = np.arange(active_one_step_decoder.original_position_data_shape[0]) + 1
+    #     xbin_labels = np.arange(active_one_step_decoder.original_position_data_shape[0]) + 1
 
-        decoded_binned_x_transition_matrix_higher_order_list = TransitionMatrixComputations._compute_position_transition_matrix(xbin_labels, most_likely_position_indicies)
-        return decoded_binned_x_transition_matrix_higher_order_list, xbin_labels
+    #     decoded_binned_x_transition_matrix_higher_order_list = TransitionMatrixComputations._compute_position_transition_matrix(xbin_labels, most_likely_position_indicies)
+    #     return decoded_binned_x_transition_matrix_higher_order_list, xbin_labels
 
     # ==================================================================================================================== #
     # 2024-08-02 Likelihoods of observed transitions from transition matricies                                             #
