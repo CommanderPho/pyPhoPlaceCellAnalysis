@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, List, Tuple, Union, Optional
 from attrs import define, field, Factory
 from neuropy.analyses import Epoch
+from neuropy.core import Ratemap # for BasePositionDecoder
 from neuropy.core.epoch import ensure_dataframe
 from nptyping import NDArray # for DecodedFilterEpochsResult
 # import pathlib
@@ -774,32 +775,50 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
     # placefield properties:
     @property
-    def ratemap(self):
+    def ratemap(self) -> Ratemap:
         return self.pf.ratemap
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         return int(self.pf.ndim)
 
     @property
-    def num_neurons(self):
+    def num_neurons(self) -> int:
         """The num_neurons property."""
         return self.ratemap.n_neurons # np.shape(self.neuron_IDs) # or self.ratemap.n_neurons
 
     # ratemap properties (xbin & ybin)  
     @property
-    def xbin(self):
+    def xbin(self) -> NDArray:
         return self.ratemap.xbin
     @property
-    def ybin(self):
+    def ybin(self) -> NDArray:
         return self.ratemap.ybin
     @property
-    def xbin_centers(self):
+    def xbin_centers(self) -> NDArray:
         return self.ratemap.xbin_centers
     @property
-    def ybin_centers(self):
+    def ybin_centers(self) -> NDArray:
         return self.ratemap.ybin_centers
-    
+    @property
+    def n_xbin_edges(self) -> int:
+        return len(self.xbin) 
+    @property
+    def n_ybin_edges(self) -> Optional[int]:
+        """ the number of ybin edges. """
+        if self.ybin is None:
+            return None
+        else:
+             return len(self.ybin)
+    @property
+    def n_xbin_centers(self) -> int:
+        return (len(self.xbin) - 1) # the -1 is to get the counts for the centers only
+    @property
+    def n_ybin_centers(self) -> Optional[int]:
+        if self.ybin is None:
+            return None
+        else:
+             return (len(self.ybin) - 1) # the -1 is to get the counts for the centers only
     @property
     def pos_bin_size(self) -> Union[float, Tuple[float, float]]:
         """ extracts pos_bin_size: the size of the x_bin in [cm], from the decoder. 
