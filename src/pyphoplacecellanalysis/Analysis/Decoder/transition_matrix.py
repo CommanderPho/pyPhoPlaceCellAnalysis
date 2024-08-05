@@ -4,11 +4,15 @@
 # ==================================================================================================================== #
 
 from copy import deepcopy
+from pathlib import Path
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
+from scipy.ndimage import gaussian_filter1d
+from sklearn.preprocessing import normalize
 import neuropy.utils.type_aliases as types
+from attrs import define, field, Factory
 from neuropy.utils.mixins.binning_helpers import transition_matrix
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -16,7 +20,28 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder #typehinting only
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
 
+def vertical_gaussian_blur(arr, sigma:float=1, should_normalize=True, **kwargs):
+    """ blurs each column over the rows """
+    if should_normalize:
+        # row normalizes
+        return normalize(np.apply_along_axis(gaussian_filter1d, axis=0, arr=arr, sigma=sigma, **kwargs), axis=1, norm='l1')
+    else:
+        return np.apply_along_axis(gaussian_filter1d, axis=0, arr=arr, sigma=sigma, **kwargs)
 
+
+def horizontal_gaussian_blur(arr, sigma:float=1, should_normalize=True, **kwargs):
+    """ blurs each row over the columns """
+    if should_normalize:
+        # row normalizes
+        return normalize(np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs), axis=1, norm='l1')
+    else:
+        return np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs)
+    
+
+
+
+
+@define(slots=False, eq=False)
 @metadata_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-14 00:00', related_items=[])
 class TransitionMatrixComputations:
     """ 
@@ -29,9 +54,15 @@ class TransitionMatrixComputations:
     out
 
     """
-    ### 1D Transition Matrix:
+    binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[NDArray]] = field(factory=dict)
+    n_powers: int = field(default=20)
+    time_bin_size: float = field(default=None)
+    pos_bin_size: float = field(default=None)
+    
 
-    def _compute_position_transition_matrix(xbin_labels, binned_x_indicies: np.ndarray, n_powers:int=3, use_direct_observations_for_order:bool=True, should_validate_normalization:bool=True):
+    ### 1D Transition Matrix:
+    @classmethod
+    def _compute_position_transition_matrix(cls, xbin_labels, binned_x_indicies: np.ndarray, n_powers:int=3, use_direct_observations_for_order:bool=True, should_validate_normalization:bool=True):
         """  1D Transition Matrix from binned positions (e.g. 'binned_x')
 
             pf1D.xbin_labels # array([  1,   2,   3,   4,  ...)
@@ -101,9 +132,10 @@ class TransitionMatrixComputations:
     # ==================================================================================================================== #
     # 2024-08-02 Likelihoods of observed transitions from transition matricies                                             #
     # ==================================================================================================================== #
+    @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-02 09:53', related_items=[])
-    def _generate_testing_posteriors(decoders_dict, a_decoder_name, n_generated_t_bins: int = 4, test_time_bin_size: float = 0.25):
-        """ generates sample posteriors for testing 
+    def _generate_testing_posteriors(cls, decoders_dict, a_decoder_name, n_generated_t_bins: int = 4, test_time_bin_size: float = 0.25, test_posterior_type:str='directly_adjacent_pos_bins', debug_print=True):
+        """ generates sample position posteriors for testing 
         
         test_posterior, (test_tbins, test_pos_bins) = _generate_testing_posteriors(decoders_dict, a_decoder_name)
         n_xbins = len(test_pos_bins)
@@ -111,13 +143,13 @@ class TransitionMatrixComputations:
         """
         # number time bins in generated posterior
 
-        n_xbins = len(decoders_dict[a_decoder_name].xbin)
+        n_xbins = (len(decoders_dict[a_decoder_name].xbin) - 1) # the -1 is to get the counts for the centers only
         test_tbins = np.arange(n_generated_t_bins).astype(float) * test_time_bin_size
         # test_pos_bins = np.arange(n_xbins).astype(float)
-        test_pos_bins = deepcopy(decoders_dict[a_decoder_name].xbin)
+        test_pos_bins = deepcopy(decoders_dict[a_decoder_name].xbin_centers)
 
         print(f'{n_xbins =}, {n_generated_t_bins =}')
-        test_posterior = np.zeros((n_xbins, n_generated_t_bins))
+        test_posterior: NDArray = np.zeros((n_xbins, n_generated_t_bins))
 
         # ## Separated position bins 
         # positions_ratio_space = [0.75, 0.5, 0.4, 0.25]
@@ -125,18 +157,41 @@ class TransitionMatrixComputations:
         # for i, a_bin in enumerate(positions_bin_space):
         #     test_posterior[a_bin, i] = 1.0
             
-
+        known_test_posterior_types = ['directly_adjacent_pos_bins', 'step_adjacent_pos_bins']
         ## Directly adjacent position bins 
-        start_idx = 14
-        positions_bin_space = start_idx + np.arange(4)
-        positions_bin_space
-        for i, a_bin in enumerate(positions_bin_space):
-            test_posterior[a_bin, i] = 1.0
+        if test_posterior_type == 'directly_adjacent_pos_bins':
+            start_idx = 14
+            positions_bin_space = start_idx + np.arange(n_generated_t_bins)
+            for i, a_bin in enumerate(positions_bin_space):
+                test_posterior[a_bin, i] = 1.0
+        elif test_posterior_type == 'step_adjacent_pos_bins':
+            start_idx = 9
+            
+            ## Step mode:
+            step_size = 2
+            stop_idx = (n_generated_t_bins * step_size)
+            
+            # ## Span mode:
+            # span_size = 5 # span 5 bins sequentially, then step
+            # step_size = 1
+            # stop_idx = (n_generated_t_bins * step_size)
+            # step_arr = np.repeat(1.0, span_size) + np.repeat(0.0, step_size)
+            
+            positions_bin_space = start_idx + np.arange(start=0, stop=stop_idx, step=step_size)
+            for i, a_bin in enumerate(positions_bin_space):
+                test_posterior[a_bin, i] = 1.0
+                                
+        else:
+            raise NotImplementedError(f'test_posterior_type: "{test_posterior_type}" was not recognized! Known types: {known_test_posterior_types}')
 
+        if debug_print:
+            print(f"positions_bin_space: {positions_bin_space}")
+            
         return test_posterior, (test_tbins, test_pos_bins)
 
+    @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-02 09:53', related_items=[])
-    def _likelihood_of_observation(observed_posterior, pos_likelihoods) -> float:
+    def _likelihood_of_observation(cls, observed_posterior, pos_likelihoods) -> float:
         """ likelihood of the observed posterior for a single time bin """
         # Using numpy.dot() function
         assert np.shape(observed_posterior) == np.shape(pos_likelihoods)
@@ -146,8 +201,9 @@ class TransitionMatrixComputations:
 
         return np.dot(observed_posterior, pos_likelihoods)
 
+    @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-02 09:53', related_items=[])
-    def _predicted_probabilities_likelihood(a_binned_x_transition_matrix_higher_order_list, test_posterior, transition_matrix_order: int=5) -> NDArray:
+    def _predicted_probabilities_likelihood(cls, a_binned_x_transition_matrix_higher_order_list, test_posterior, transition_matrix_order: int=5) -> NDArray:
         """ Computes likelihoods giveen posteriors and transition matricies for a certain `transition_matrix_order`
         
         next_pos_likelihood = _predicted_probabilities_likelihood(a_binned_x_transition_matrix_higher_order_list, test_posterior, transition_matrix_order=5)
@@ -169,9 +225,9 @@ class TransitionMatrixComputations:
         next_pos_likelihood = np.hstack(next_pos_likelihood) # (n_x, 1)
         return next_pos_likelihood
 
-
+    @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix', 'plot'], input_requires=[], output_provides=[], uses=['BasicBinnedImageRenderingWindow'], used_by=[], creation_date='2024-08-02 09:55', related_items=[])
-    def plot_transition_matricies(decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray],
+    def plot_transition_matricies(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray],
                                    power_step:int=7, grid_opacity=0.4, enable_all_titles=True) -> BasicBinnedImageRenderingWindow:
         """ plots each decoder as a separate column
         each order of matrix as a separate row
@@ -218,3 +274,65 @@ class TransitionMatrixComputations:
                 
 
         return out
+    
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['transition_matrix', 'save'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
+    def save_transition_matricies(cls, binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[NDArray]], save_path:Path='transition_matrix_data.h5'): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+        """Save the transitiion matrix info to a file
+        
+        save_path = TransitionMatrixComputations.save_transition_matricies(binned_x_transition_matrix_higher_order_list_dict=binned_x_transition_matrix_higher_order_list_dict, save_path='output/transition_matrix_data.h5')
+        save_path
+        
+        """
+        if not isinstance(save_path, Path):
+            save_path = Path(save_path).resolve()
+        
+        import h5py
+        # Save to .h5 file
+        with h5py.File(save_path, 'w') as f:
+            for a_name, an_array_list in binned_x_transition_matrix_higher_order_list_dict.items():
+                decoder_prefix: str = a_name
+                for markov_order, array in enumerate(an_array_list):
+                    a_dset = f.create_dataset(f'{decoder_prefix}/array_{markov_order}', data=array)
+                    a_dset.attrs['decoder_name'] = a_name
+                    a_dset.attrs['markov_order'] = markov_order
+                    
+                                
+                # Add metadata
+                f.attrs['decoder_name'] = a_name
+
+            
+
+        return save_path
+    
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['transition_matrix', 'load'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
+    def load_transition_matrices(cls, load_path: Path) -> Dict[types.DecoderName, List[np.ndarray]]:
+        """
+        Load the transition matrix info from a file
+        
+        load_path = Path('output/transition_matrix_data.h5')
+        binned_x_transition_matrix_higher_order_list_dict = TransitionMatrixComputations.load_transition_matrices(load_path)
+        binned_x_transition_matrix_higher_order_list_dict
+        """
+        if not isinstance(load_path, Path):
+            load_path = Path(load_path).resolve()
+
+        import h5py
+        binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[np.ndarray]] = {}
+
+        with h5py.File(load_path, 'r') as f:
+            for decoder_prefix in f.keys():
+                arrays_list = []
+                group = f[decoder_prefix]
+                for dataset_name in group.keys():
+                    array = group[dataset_name][()]
+                    markov_order = group[dataset_name].attrs['markov_order']
+                    arrays_list.append((markov_order, array))
+                
+                arrays_list.sort(key=lambda x: x[0])  # Sort by markov_order
+                binned_x_transition_matrix_higher_order_list_dict[decoder_prefix] = [array for _, array in arrays_list]
+
+        return binned_x_transition_matrix_higher_order_list_dict
