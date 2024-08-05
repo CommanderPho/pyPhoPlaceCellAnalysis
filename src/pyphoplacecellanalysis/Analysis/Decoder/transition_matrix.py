@@ -20,22 +20,14 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder #typehinting only
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
 
-def vertical_gaussian_blur(arr, sigma:float=1, should_normalize=True, **kwargs):
+def vertical_gaussian_blur(arr, sigma:float=1, **kwargs):
     """ blurs each column over the rows """
-    if should_normalize:
-        # row normalizes
-        return normalize(np.apply_along_axis(gaussian_filter1d, axis=0, arr=arr, sigma=sigma, **kwargs), axis=1, norm='l1')
-    else:
-        return np.apply_along_axis(gaussian_filter1d, axis=0, arr=arr, sigma=sigma, **kwargs)
+    return np.apply_along_axis(gaussian_filter1d, axis=0, arr=arr, sigma=sigma, **kwargs)
 
 
-def horizontal_gaussian_blur(arr, sigma:float=1, should_normalize=True, **kwargs):
+def horizontal_gaussian_blur(arr, sigma:float=1, **kwargs):
     """ blurs each row over the columns """
-    if should_normalize:
-        # row normalizes
-        return normalize(np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs), axis=1, norm='l1')
-    else:
-        return np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs)
+    return np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs)
     
 
 
@@ -134,7 +126,8 @@ class TransitionMatrixComputations:
     # ==================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-02 09:53', related_items=[])
-    def _generate_testing_posteriors(cls, decoders_dict, a_decoder_name, n_generated_t_bins: int = 4, test_time_bin_size: float = 0.25, test_posterior_type:str='directly_adjacent_pos_bins', debug_print=True):
+    def _generate_testing_posteriors(cls, decoders_dict, a_decoder_name, n_generated_t_bins: int = 4, test_time_bin_size: float = 0.25, test_posterior_type:str='directly_adjacent_pos_bins', debug_print=True,
+                                     blur_vertical_std_dev=None, blur_horizontal_std_dev=None):
         """ generates sample position posteriors for testing 
         
         test_posterior, (test_tbins, test_pos_bins) = _generate_testing_posteriors(decoders_dict, a_decoder_name)
@@ -187,6 +180,20 @@ class TransitionMatrixComputations:
         if debug_print:
             print(f"positions_bin_space: {positions_bin_space}")
             
+        ## WARN: posteriors must be normalized over all possible positions in each time bin (all columns), the opposite of normalizing transition matricies
+        # Normalize posterior by columns (over all positions)
+        test_posterior = normalize(test_posterior, axis=0, norm='l1')
+        
+        ## apply vertical and horizontal blurs:
+        if (blur_vertical_std_dev is not None) and (blur_vertical_std_dev > 0.0):
+            # blur_vertical_std_dev: Standard deviation for Gaussian kernel
+            test_posterior = vertical_gaussian_blur(test_posterior, sigma=blur_vertical_std_dev)
+            test_posterior = normalize(test_posterior, axis=0, norm='l1') # ensure re-normalized posterior
+            
+        if (blur_horizontal_std_dev is not None) and (blur_horizontal_std_dev > 0.0):
+            test_posterior = horizontal_gaussian_blur(test_posterior, sigma=blur_horizontal_std_dev)
+            test_posterior = normalize(test_posterior, axis=0, norm='l1') # ensure re-normalized posterior
+    
         return test_posterior, (test_tbins, test_pos_bins)
 
     @classmethod
