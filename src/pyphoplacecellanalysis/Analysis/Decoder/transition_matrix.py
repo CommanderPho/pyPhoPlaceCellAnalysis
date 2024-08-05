@@ -55,21 +55,22 @@ class TransitionMatrixComputations:
         # assert 0 in state_sequence, f"does not contain zero! Make sure that it is not a 1-indexed sequence!"
         
         # 0th order:
-        binned_x_transition_matrix = transition_matrix(deepcopy(binned_x_indicies), markov_order=1, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=True) # #TODO 2024-08-02 21:10: - [ ] max_state_index != num_position_states
+        binned_x_transition_matrix = transition_matrix(deepcopy(binned_x_indicies), markov_order=1, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=should_validate_normalization) # #TODO 2024-08-02 21:10: - [ ] max_state_index != num_position_states
         if should_validate_normalization:
+            ## test row normalization (only considering non-zero entries):
             _row_normalization_sum = np.sum(binned_x_transition_matrix, axis=1)
-            assert np.allclose(_row_normalization_sum, 1), f"0th order not row normalized!\n\t_row_normalization_sum: {_row_normalization_sum}"
+            assert np.allclose(_row_normalization_sum[np.nonzero(_row_normalization_sum)], 1), f"0th order not row normalized!\n\t_row_normalization_sum: {_row_normalization_sum}"
             
         if not use_direct_observations_for_order:
             ## use exponentiation version: only works if Markov Property is not violated!
             binned_x_transition_matrix_higher_order_list = [binned_x_transition_matrix] + [np.linalg.matrix_power(binned_x_transition_matrix, n) for n in np.arange(2, n_powers+1)]
         else:
-            binned_x_transition_matrix_higher_order_list = [binned_x_transition_matrix] + [transition_matrix(deepcopy(binned_x_indicies), markov_order=n, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=True) for n in np.arange(2, n_powers+1)]
+            binned_x_transition_matrix_higher_order_list = [binned_x_transition_matrix] + [transition_matrix(deepcopy(binned_x_indicies), markov_order=n, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=should_validate_normalization) for n in np.arange(2, n_powers+1)]
             
         if should_validate_normalization:
-            ## test row normalization:
+            ## test row normalization (only considering non-zero entries):
             _row_normalization_sums = [np.sum(a_mat, axis=1) for a_mat in binned_x_transition_matrix_higher_order_list]
-            _is_row_normalization_all_valid = [np.allclose(v, 1.0) for v in _row_normalization_sums]
+            _is_row_normalization_all_valid = [np.allclose(v[np.nonzero(v)], 1.0) for v in _row_normalization_sums]
             assert np.alltrue(_is_row_normalization_all_valid), f"not row normalized!\n\t_is_row_normalization_all_valid: {_is_row_normalization_all_valid}\n\t_row_normalization_sums: {_row_normalization_sums}"
 
         # binned_x_transition_matrix.shape # (64, 64)
