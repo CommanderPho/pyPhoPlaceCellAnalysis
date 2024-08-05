@@ -469,6 +469,14 @@ class TrialByTrialActivity:
 
     @classmethod
     def plot_napari_trial_by_trial_correlation_matrix(cls, directional_active_lap_pf_results_dicts: Dict[str, "TrialByTrialActivity"], include_trial_by_trial_correlation_matrix:bool=True):
+        """ Produces 5 Napari windows to display the trial-by-trial correlation matricies for each of the decoders.
+
+        aTbyT:TrialByTrialActivity = a_trial_by_trial_result.directional_active_lap_pf_results_dicts['long_LR']
+        aTbyT.C_trial_by_trial_correlation_matrix.shape # (40, 21, 21)
+        aTbyT.z_scored_tuning_map_matrix.shape # (21, 40, 57) (n_epochs, n_neurons, n_pos_bins)
+
+        (directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict) = aTbyT.plot_napari_trial_by_trial_correlation_matrix(directional_active_lap_pf_results_dicts=a_trial_by_trial_result.directional_active_lap_pf_results_dicts)
+        """
         import napari
         from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_plot_directional_trial_by_trial_activity_viz, napari_trial_by_trial_activity_viz, napari_export_image_sequence
 
