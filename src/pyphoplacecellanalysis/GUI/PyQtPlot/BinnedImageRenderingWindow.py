@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from nptyping import NDArray
+from copy import deepcopy
 import attrs
 from attrs import define, field, Factory, asdict, astuple
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -88,6 +89,8 @@ def _build_binned_imageItem(plot_item: pg.PlotItem, params, xbins=None, ybins=No
 
 
 
+
+
 @metadata_attributes(short_name=None, tags=['binning', 'image', 'window', 'standalone', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-19 02:28', related_items=[])
 class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
     """ Renders a Matrix of binned data in the window.NonUniformImage and includes no histogram.
@@ -123,8 +126,14 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
     def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity',
                  drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity:float=0.65, defer_show=False, **kwargs):
+        row = kwargs.pop('row', 0)
+        col = kwargs.pop('col', 0)
+        window_title: str = kwargs.pop('window_title', title)
+        max_num_columns: int = kwargs.pop('max_num_columns', None)
+        max_num_rows: int = kwargs.pop('max_num_rows', None)
+        
         super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
-        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow', grid_opacity=grid_opacity)
+        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow', grid_opacity=grid_opacity, plot_row_offset=0, max_num_columns=max_num_rows, max_num_rows=max_num_rows)
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
         self.plots = RenderPlots(name='BasicBinnedImageRenderingWindow')
         self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
@@ -160,20 +169,103 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             self.setCentralWidget(self.ui.scrollAreaWidget)
         else:
             self.setCentralWidget(self.ui.graphics_layout)
+            self.ui.graphics_layout.resize(1000, 800)
 
         # Shared:
-        self.setWindowTitle(title)
+        self.setWindowTitle(window_title)
         self.resize(1000, 800)
         
         ## Add Label for debugging:
+        
         self.ui.mainLabel = pg.LabelItem(justify='right')
-        self.ui.graphics_layout.addItem(self.ui.mainLabel)
+        self.ui.graphics_layout.addItem(self.ui.mainLabel, row=0, col=1, rowspan=1, colspan=max_num_columns)
+        self.params.plot_row_offset = self.params.plot_row_offset + 1
+        print(f'self.params.plot_row_offset: {self.params.plot_row_offset}')
         
         # Add the item for the provided data:
-        self.add_data(row=0, col=0, matrix=matrix, xbins=xbins, ybins=ybins, name=name, title=title, variable_label=variable_label, drop_below_threshold=drop_below_threshold)
+        if matrix is not None:    
+            self.add_data(row=(self.params.plot_row_offset + row), col=col, matrix=matrix, xbins=xbins, ybins=ybins, name=name, title=title, variable_label=variable_label, drop_below_threshold=drop_below_threshold)
         
         if not defer_show:
             self.show()
+
+
+
+    @classmethod
+    def init_from_data_spec(cls, a_spec: List[List[Dict]], window_title=None, scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12, **_shared_kwargs) -> "BasicBinnedImageRenderingWindow":
+        """ adds all plots
+
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
+
+        Example 1:
+            ## Allow inline spec
+            a_spec = [
+                ({'measured':_measured}, {'markov_ideal':_markov_ideal}, {'diff':_diff}) # single row (3 columns)
+            ]
+            out_test_markov_test_compare = BasicBinnedImageRenderingWindow.init_from_data_spec(a_spec, xbins=test_pos_bins, ybins=test_pos_bins)
+
+        Example 2:            
+            window_title = 'Transform Matrix: Measured v. Markov Ideal'
+            a_spec = [ # two rows: (2 columns, 1 column)
+                ({'measured':_measured}, {'markov_ideal':_markov_ideal},), # single row (2 columns)
+                ({'diff':_diff}, )
+            ]
+            out_test_markov_test_compare = BasicBinnedImageRenderingWindow.init_from_data_spec(a_spec, window_title=window_title, xbins=test_pos_bins, ybins=test_pos_bins)
+
+
+        """
+        # curr_window_kwargs = dict(window_title='Test', scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12)
+        curr_window_kwargs = dict(window_title=window_title, scrollability_mode=scrollability_mode, grid_opacity=grid_opacity, drop_below_threshold=drop_below_threshold)
+
+        # _shared_kwargs = dict(xbins=test_pos_bins, ybins=test_pos_bins)
+        n_rows = len(a_spec)
+        n_cols_per_row = [len(a_row) for a_row in a_spec] # each row can have different number of columns
+        max_n_columns_per_row = np.max(n_cols_per_row)
+        curr_window_kwargs['max_num_columns'] = max_n_columns_per_row
+        curr_window_kwargs['max_num_rows'] = n_rows
+        
+        needs_built_window_title: bool = False
+        if window_title is None:
+            needs_built_window_title: bool = True
+            window_title = f"BasicBinnedImageRenderingWindow[rows: {n_rows}, n_cols: {max_n_columns_per_row}]"
+            subplot_titles = []
+            
+        out_binned_window = None
+
+        _built_add_data_kwargs = []
+        for row_idx, a_row in enumerate(a_spec):
+            for col_idx, a_row_col in enumerate(a_row):
+                # first key is always the name
+                _curr_identifier: str = list(a_row_col.keys())[0]
+                _curr_data = a_row_col.pop(_curr_identifier)
+                if needs_built_window_title:
+                    subplot_titles.append(_curr_identifier)
+                _curr_build_kwargs = dict(row=row_idx, col=col_idx, name=_curr_identifier, title=_curr_identifier, variable_label=_curr_identifier, matrix=_curr_data, **_shared_kwargs)
+                _built_add_data_kwargs.append(_curr_build_kwargs)
+
+                if out_binned_window is None:
+                    ## create new instance
+                    _curr_initialization_kwargs = deepcopy(_curr_build_kwargs)
+                    _curr_initialization_kwargs['matrix'] = None
+                    
+                    # out_binned_window = cls(_curr_build_kwargs.pop('matrix'), **_curr_build_kwargs, **curr_window_kwargs)
+                    out_binned_window = cls(**_curr_initialization_kwargs, **curr_window_kwargs) ## create the window, but don't set its data yet
+                    
+                                        
+                # already have a window, use .add_data	
+                out_binned_window.add_data(**_curr_build_kwargs)
+
+        # row=0, col=1, 
+        # _built_add_data_kwargs
+        if needs_built_window_title:
+            if len(subplot_titles) > 0:
+                window_title = window_title + ': ' + ', '.join(subplot_titles)
+            out_binned_window.setWindowTitle(window_title)
+
+        ## OUTPUTS: out_test_markov_test_compare, _built_add_data_kwargs
+        return out_binned_window
+    
 
 
     def build_formatted_title_string(self, title: str) -> str:
@@ -183,7 +275,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
     def add_data(self, row=1, col=0, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001):
         """ adds a new data subplot to the output
         """
-        newPlotItem: pg.PlotItem = self.ui.graphics_layout.addPlot(title=title, row=row, col=col) # add PlotItem to the main GraphicsLayoutWidget
+        newPlotItem: pg.PlotItem = self.ui.graphics_layout.addPlot(title=title, row=(self.params.plot_row_offset + row), col=col) # add PlotItem to the main GraphicsLayoutWidget
         
         # Set the plot title:
         formatted_title = self.build_formatted_title_string(title=title)        
