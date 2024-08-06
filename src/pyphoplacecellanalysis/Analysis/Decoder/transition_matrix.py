@@ -6,6 +6,7 @@
 from copy import deepcopy
 from pathlib import Path
 import numpy as np
+import pandas as pd
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
@@ -98,6 +99,38 @@ class TransitionMatrixComputations:
 
         # binned_x_transition_matrix.shape # (64, 64)
         return binned_x_transition_matrix_higher_order_list
+
+
+    @classmethod
+    def _compute_time_transition_matrix(cls, df: pd.DataFrame, bin_size=0.25): # "0.25S"
+        """ attempts to determine a spike transition matrix from continuously sampled events (like spike times) given a specified bin_size 
+        
+        """
+        from scipy.sparse import csr_matrix
+        
+        # df["bin"] = pd.cut(df["t_rel_seconds"], bins=pd.timedelta_range(df["t_rel_seconds"].min(), df["t_rel_seconds"].max(), freq=bin_size))
+        # df["bin"] = pd.cut(
+        # 	pd.to_timedelta(df["t_rel_seconds"], unit="s"),
+        # 	bins=pd.timedelta_range(df["t_rel_seconds"].min(), df["t_rel_seconds"].max(), freq=bin_size),
+        # )
+        def get_bin(seconds):
+            bin_number = int(seconds // bin_size)
+            return bin_number
+
+        df["bin"] = df["t_rel_seconds"].apply(get_bin) # .astype(np.int64)
+        # df = df.astype({'aclu': 'int64', 'bin': 'int64'})
+        df = df['aclu', 'bin'] # .astype({'aclu': 'float', 'bin': 'float'})
+        print(f'df.dtypes: {df.dtypes}')
+        # , dtype=np.int8
+        transition_matrix = csr_matrix((
+            counts, (i, j)
+        ) for i, (bin, group) in df.groupby(["bin", "aclu"]).agg(counts=("aclu", "count")).iterrows()
+            for j, counts in group.iteritems()
+        )
+        transition_matrix /= transition_matrix.sum(axis=1, keepdims=True)
+
+        return transition_matrix
+
 
     # def _build_decoded_positions_transition_matrix(active_one_step_decoder):
     #     """ Compute the transition_matrix from the decoded positions 
