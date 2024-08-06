@@ -123,6 +123,9 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         """The plot_names property."""
         return [v for v in list(self.plots.keys()) if v not in ('name', 'context')]
 
+    @property
+    def graphics_layout(self) -> pg.GraphicsLayoutWidget:
+        return self.ui.graphics_layout
 
     def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity',
                  drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity:float=0.65, defer_show=False, **kwargs):
