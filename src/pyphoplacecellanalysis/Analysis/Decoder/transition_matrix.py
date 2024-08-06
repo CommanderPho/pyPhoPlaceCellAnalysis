@@ -197,6 +197,72 @@ class TransitionMatrixComputations:
         return test_posterior, (test_tbins, test_pos_bins)
 
     @classmethod
+    def _generate_expected_replay_sequences(cls, a_binned_x_transition_matrix_higher_order_list, n_generated_events: int = 10, n_generated_t_bins: int = 4, test_time_bin_size: float = 0.25, transition_matrix_order_start_idx:int=0, debug_print=True, blur_vertical_std_dev=None, blur_horizontal_std_dev=None):
+        """ takes a a_binned_x_transition_matrix_higher_order_list and a position posterior
+        
+        Uses the first time bin to and the `a_binned_x_transition_matrix_higher_order_list` to predict the future bins:
+
+        Usage:        
+            predicited_posteriors = TransitionMatrixComputations._perform_forward_prediction(a_binned_x_transition_matrix_higher_order_list, test_posterior)
+            predicited_posteriors
+
+            # # Compare real:
+            ## Observed posteriors:
+            observed_posteriors = deepcopy(test_posterior[:, 1:])
+
+            assert np.shape(observed_posteriors) == np.shape(predicited_posteriors)
+            _prediction_observation_diff = observed_posteriors - predicited_posteriors
+            _prediction_observation_diff
+
+        """
+        print(f'n_generated_events: {n_generated_events}, n_generated_t_bins: {n_generated_t_bins}')
+        
+        generated_events = []
+        
+        n_pos_bins: int = np.shape(a_binned_x_transition_matrix_higher_order_list[0])[0]
+
+        for gen_evt_idx in np.arange(n_generated_events):
+            a_trans_prob_mat = a_binned_x_transition_matrix_higher_order_list[transition_matrix_order_start_idx] # (n_x, n_x)
+
+            # Generate a random start location:            
+            arr = np.zeros((n_pos_bins,))
+            arr[np.random.randint(0, len(arr))] = 1.0
+            an_observed_posterior = np.atleast_2d(arr).T # (n_x, 1)
+            ## Decode the posterior
+            n_time_bins: int = n_generated_t_bins
+            n_predicted_time_bins = n_time_bins - 1
+            # print(f'np.shape(test_posterior): {np.shape(an_observed_posterior)}, n_time_bins: {n_time_bins}, n_predicted_time_bins: {n_predicted_time_bins}')
+            predicited_posteriors = []
+            predicited_posteriors.append(an_observed_posterior) ## add randomly generated one:
+            # for a_tbin_idx in np.arange(start=1, stop=n_time_bins):
+            for i in np.arange(n_predicted_time_bins):
+                a_tbin_idx = i + 1
+                # an_observed_posterior = np.atleast_2d(test_posterior[:, i]).T # (n_x, 1)
+                # an_actual_observed_next_step_posterior = np.atleast_2d(test_posterior[:, a_tbin_idx]).T # (n_x, 1)
+                # an_observed_posterior
+
+                ## NOTE: transition_matrix_order does seem to do the identity transformation
+                transition_matrix_order_idx: int = transition_matrix_order_start_idx + a_tbin_idx
+                # transition_matrix_order: int = transition_matrix_order_idx + 1 ## order is index + 1
+
+                ## single time-bin
+                a_trans_prob_mat = a_binned_x_transition_matrix_higher_order_list[transition_matrix_order_idx] # (n_x, n_x)
+                # a_next_t_predicted_pos_probs = a_trans_prob_mat @ an_observed_posterior # (n_x, 1)
+                a_next_t_predicted_pos_probs = a_trans_prob_mat @ an_observed_posterior # (n_x, 1)
+
+                # a_next_t_predicted_pos_probs
+                predicited_posteriors.append(a_next_t_predicted_pos_probs)
+
+            predicited_posteriors = np.hstack(predicited_posteriors) # (n_x, n_predicted_time_bins)
+            generated_events.append(predicited_posteriors)
+            
+
+        return generated_events
+    
+
+
+
+    @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-02 09:53', related_items=[])
     def _likelihood_of_observation(cls, observed_posterior, pos_likelihoods) -> float:
         """ likelihood of the observed posterior for a single time bin """
@@ -232,6 +298,58 @@ class TransitionMatrixComputations:
         next_pos_likelihood = np.hstack(next_pos_likelihood) # (n_x, 1)
         return next_pos_likelihood
 
+    @classmethod
+    def _perform_forward_prediction(cls, a_binned_x_transition_matrix_higher_order_list, test_posterior, transition_matrix_order_start_idx:int=1):
+        """ takes a a_binned_x_transition_matrix_higher_order_list and a position posterior
+        
+        Uses the first time bin to and the `a_binned_x_transition_matrix_higher_order_list` to predict the future bins:
+
+        Usage:        
+            predicited_posteriors = TransitionMatrixComputations._perform_forward_prediction(a_binned_x_transition_matrix_higher_order_list, test_posterior)
+            predicited_posteriors
+
+            # # Compare real:
+            ## Observed posteriors:
+            observed_posteriors = deepcopy(test_posterior[:, 1:])
+
+            assert np.shape(observed_posteriors) == np.shape(predicited_posteriors)
+            _prediction_observation_diff = observed_posteriors - predicited_posteriors
+            _prediction_observation_diff
+
+        """
+        n_time_bins: int = np.shape(test_posterior)[1]
+        n_predicted_time_bins = n_time_bins - 1
+        print(f'np.shape(test_posterior): {np.shape(test_posterior)}, n_time_bins: {n_time_bins}, n_predicted_time_bins: {n_predicted_time_bins}')
+        # Only use the first posterior
+        an_observed_posterior = np.atleast_2d(test_posterior[:, 0]).T # (n_x, 1)
+
+
+        predicited_posteriors = []
+        # for a_tbin_idx in np.arange(start=1, stop=n_time_bins):
+        for i in np.arange(n_predicted_time_bins):
+            a_tbin_idx = i + 1
+            # an_observed_posterior = np.atleast_2d(test_posterior[:, i]).T # (n_x, 1)
+            # an_actual_observed_next_step_posterior = np.atleast_2d(test_posterior[:, a_tbin_idx]).T # (n_x, 1)
+            # an_observed_posterior
+
+            ## NOTE: transition_matrix_order does seem to do the identity transformation
+            transition_matrix_order_idx: int = transition_matrix_order_start_idx + a_tbin_idx
+            # transition_matrix_order: int = transition_matrix_order_idx + 1 ## order is index + 1
+
+            ## single time-bin
+            a_trans_prob_mat = a_binned_x_transition_matrix_higher_order_list[transition_matrix_order_idx] # (n_x, n_x)
+            # a_next_t_predicted_pos_probs = a_trans_prob_mat @ an_observed_posterior # (n_x, 1)
+            a_next_t_predicted_pos_probs = a_trans_prob_mat @ an_observed_posterior # (n_x, 1)
+
+            # a_next_t_predicted_pos_probs
+            predicited_posteriors.append(a_next_t_predicted_pos_probs)
+
+        predicited_posteriors = np.hstack(predicited_posteriors) # (n_x, n_predicted_time_bins)
+        return predicited_posteriors
+
+    # ==================================================================================================================== #
+    # Plot/Display                                                                                                         #
+    # ==================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix', 'plot'], input_requires=[], output_provides=[], uses=['BasicBinnedImageRenderingWindow'], used_by=[], creation_date='2024-08-02 09:55', related_items=[])
     def plot_transition_matricies(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray],
@@ -283,6 +401,9 @@ class TransitionMatrixComputations:
         return out
     
 
+    # ==================================================================================================================== #
+    # Save/Load                                                                                                            #
+    # ==================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix', 'save'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
     def save_transition_matricies(cls, binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[NDArray]], save_path:Path='transition_matrix_data.h5'): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
