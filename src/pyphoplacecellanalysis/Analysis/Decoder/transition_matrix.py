@@ -102,8 +102,11 @@ class TransitionMatrixComputations:
 
 
     @classmethod
-    def _compute_time_transition_matrix(cls, df: pd.DataFrame, bin_size=0.25): # "0.25S"
+    def _compute_time_transition_matrix(cls, df: pd.DataFrame, t_bin_size=0.25): # "0.25S"
         """ attempts to determine a spike transition matrix from continuously sampled events (like spike times) given a specified bin_size 
+        
+        #TODO 2024-08-06 08:50: - [ ] Unfinished
+        
         
         """
         from scipy.sparse import csr_matrix
@@ -114,12 +117,12 @@ class TransitionMatrixComputations:
         # 	bins=pd.timedelta_range(df["t_rel_seconds"].min(), df["t_rel_seconds"].max(), freq=bin_size),
         # )
         def get_bin(seconds):
-            bin_number = int(seconds // bin_size)
+            bin_number = int(seconds // t_bin_size)
             return bin_number
 
         df["bin"] = df["t_rel_seconds"].apply(get_bin) # .astype(np.int64)
         # df = df.astype({'aclu': 'int64', 'bin': 'int64'})
-        df = df['aclu', 'bin'] # .astype({'aclu': 'float', 'bin': 'float'})
+        df = df[['aclu', 'bin']] # .astype({'aclu': 'float', 'bin': 'float'})
         print(f'df.dtypes: {df.dtypes}')
         # , dtype=np.int8
         transition_matrix = csr_matrix((
