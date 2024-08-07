@@ -500,3 +500,26 @@ class TransitionMatrixComputations:
                 binned_x_transition_matrix_higher_order_list_dict[decoder_prefix] = [array for _, array in arrays_list]
 
         return binned_x_transition_matrix_higher_order_list_dict
+
+
+
+
+def _compute_expected_velocity_out_per_node(A):
+    num_states = np.shape(A)[0]
+    assert np.shape(A)[0] == np.shape(A)[1], f"must be a square matrix"
+    states = deepcopy(A)
+    expected_velocity = []
+    for i in np.arange(num_states):
+        _curr_node_vel = []
+        for j in np.arange(num_states):
+            rate = A[i][j]
+            ## TODO: decompose into forward and backward speeds so they don't average out?
+            distance_n_xbins: int = j - i # distance from current node     
+            _curr_node_vel.append(rate * distance_n_xbins)
+        # end j loop
+        _curr_node_vel = np.array(_curr_node_vel)
+        _curr_node_vel = np.sum(_curr_node_vel) # sum over all terms
+        expected_velocity.append(_curr_node_vel)
+    # end i loop
+    expected_velocity = np.array(expected_velocity)
+    return expected_velocity
