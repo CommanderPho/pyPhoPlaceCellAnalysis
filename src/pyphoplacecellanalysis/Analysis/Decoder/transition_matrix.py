@@ -504,22 +504,40 @@ class TransitionMatrixComputations:
 
 
 
-def _compute_expected_velocity_out_per_node(A):
-    num_states = np.shape(A)[0]
-    assert np.shape(A)[0] == np.shape(A)[1], f"must be a square matrix"
-    states = deepcopy(A)
-    expected_velocity = []
-    for i in np.arange(num_states):
-        _curr_node_vel = []
-        for j in np.arange(num_states):
-            rate = A[i][j]
-            ## TODO: decompose into forward and backward speeds so they don't average out?
-            distance_n_xbins: int = j - i # distance from current node     
-            _curr_node_vel.append(rate * distance_n_xbins)
-        # end j loop
-        _curr_node_vel = np.array(_curr_node_vel)
-        _curr_node_vel = np.sum(_curr_node_vel) # sum over all terms
-        expected_velocity.append(_curr_node_vel)
-    # end i loop
-    expected_velocity = np.array(expected_velocity)
-    return expected_velocity
+    def _compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities: bool=False):
+        num_states = np.shape(A)[0]
+        assert np.shape(A)[0] == np.shape(A)[1], "must be a square matrix"
+        states = deepcopy(A)
+        fwd_expected_velocity = []
+        bkwd_expected_velocity = []
+        combined_expected_velocity = []
+
+        for i in np.arange(num_states):
+            _curr_node_fwd_vel = []
+            _curr_node_bkwd_vel = []
+            _curr_node_combined_vel = []
+            for j in np.arange(num_states):
+                rate = A[i][j]
+                distance_n_xbins = j - i # distance from current node     
+                if distance_n_xbins > 0:
+                    _curr_node_fwd_vel.append(rate * distance_n_xbins)
+                elif distance_n_xbins < 0:
+                    _curr_node_bkwd_vel.append(rate * abs(distance_n_xbins))
+                _curr_node_combined_vel.append(rate * distance_n_xbins)
+            
+            _curr_node_fwd_vel = np.sum(np.array(_curr_node_fwd_vel)) # sum over all forward terms
+            _curr_node_bkwd_vel = np.sum(np.array(_curr_node_bkwd_vel)) # sum over all backward terms
+            _curr_node_combined_vel = np.sum(np.array(_curr_node_combined_vel)) # sum over all terms
+
+            fwd_expected_velocity.append(_curr_node_fwd_vel)
+            bkwd_expected_velocity.append(_curr_node_bkwd_vel)
+            combined_expected_velocity.append(_curr_node_combined_vel)
+        
+        fwd_expected_velocity = np.array(fwd_expected_velocity)
+        bkwd_expected_velocity = np.array(bkwd_expected_velocity)
+        combined_expected_velocity = np.array(combined_expected_velocity)
+        
+        if should_split_fwd_and_bkwd_velocities:
+            return combined_expected_velocity, (fwd_expected_velocity, bkwd_expected_velocity)
+        else:
+            return combined_expected_velocity
