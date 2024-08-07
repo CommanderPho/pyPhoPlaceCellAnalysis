@@ -31,8 +31,13 @@ def horizontal_gaussian_blur(arr, sigma:float=1, **kwargs):
     return np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs)
     
 
+from enum import Enum
 
-
+# used for `_compute_expected_velocity_out_per_node`
+class VelocityType(Enum):
+    OUTGOING = 1
+    INCOMING = 2
+    
 
 @define(slots=False, eq=False)
 @metadata_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-14 00:00', related_items=[])
@@ -504,10 +509,39 @@ class TransitionMatrixComputations:
 
 
 
-    def _compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities: bool=False):
+    def _compute_expected_velocity_out_per_node(A: np.ndarray, should_split_fwd_and_bkwd_velocities: bool = False, should_return_incoming_velocities: bool=False, velocity_type: VelocityType = VelocityType.OUTGOING) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]]:
+        """ 
+        Compute the expected velocity out per node from a transition matrix.
+
+        Parameters:
+        A (np.ndarray): A square transition matrix where A[i][j] represents the transition rate from node i to node j.
+        should_split_fwd_and_bkwd_velocities (bool): Flag to determine whether to return separate forward and backward velocities.
+
+        Returns:
+        Union[np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]]:
+            - If should_split_fwd_and_bkwd_velocities is False: returns the combined expected velocity as a numpy array.
+            - If should_split_fwd_and_bkwd_velocities is True: returns a tuple containing:
+                - combined_expected_velocity (np.ndarray): Combined expected velocity as a numpy array.
+                - (fwd_expected_velocity, bkwd_expected_velocity): A tuple of numpy arrays containing forward and backward expected velocities respectively.
+                
+
+        Usage:    
+            
+            combined_expected_velocity = TransitionMatrixComputations._compute_expected_velocity_out_per_node(A)
+            combined_expected_velocity
+        Example 2:
+            combined_expected_velocity, (fwd_expected_velocity, bkwd_expected_velocity) = TransitionMatrixComputations._compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities=True)
+            fwd_expected_velocity
+            bkwd_expected_velocity
+        """
         num_states = np.shape(A)[0]
         assert np.shape(A)[0] == np.shape(A)[1], "must be a square matrix"
-        states = deepcopy(A)
+        
+        if should_return_incoming_velocities:
+            # compute incoming instead by transposing the transition matrix
+            A = deepcopy(A).T
+            ## NOTE: fwd_expected_velocity and bkwd_expected_velocity will be swapped and will need to be exchanged after computation
+            
         fwd_expected_velocity = []
         bkwd_expected_velocity = []
         combined_expected_velocity = []
@@ -537,6 +571,12 @@ class TransitionMatrixComputations:
         bkwd_expected_velocity = np.array(bkwd_expected_velocity)
         combined_expected_velocity = np.array(combined_expected_velocity)
         
+        if should_return_incoming_velocities:
+            # swap "fwd"/"bkwd" velocity so they're correct relative to the track for incoming velocities as well
+            _tmp_expected_velocity = deepcopy(bkwd_expected_velocity)
+            bkwd_expected_velocity = deepcopy(fwd_expected_velocity)
+            fwd_expected_velocity = _tmp_expected_velocity
+
         if should_split_fwd_and_bkwd_velocities:
             return combined_expected_velocity, (fwd_expected_velocity, bkwd_expected_velocity)
         else:
