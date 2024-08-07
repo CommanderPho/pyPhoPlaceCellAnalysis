@@ -6,8 +6,8 @@ from copy import deepcopy
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any
-from typing_extensions import TypeAlias
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar
+from typing_extensions import TypeAlias  # "from typing_extensions" in Python 3.9 and earlier
 from nptyping import NDArray
 from scipy.ndimage import gaussian_filter1d
 from sklearn.preprocessing import normalize
@@ -22,17 +22,9 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import Basic
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeAlias, TypeVar #, NewType, Generic
-from typing_extensions import TypeAlias
-from nptyping import NDArray
-import neuropy.utils.type_aliases as types
-
+# Custom Type Definitions ____________________________________________________________________________________________ #
 T = TypeVar('T')
-DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]]
-# DecoderListDict = NewType('DecoderListDict', Dict[types.DecoderName, List[NDArray]])
-# DecoderListDict = NewType('DecoderListDict', Dict[types.DecoderName, List[T]])
-# Use like `v: DecoderListDict[NDArray]`
-
+DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]] # Use like `v: DecoderListDict[NDArray]`
 
 
 @define(slots=False, eq=False)
@@ -282,7 +274,7 @@ class TransitionMatrixComputations:
         return test_posterior, (test_tbins, test_pos_bins)
 
     @classmethod
-    def _generate_expected_replay_sequences(cls, a_binned_x_transition_matrix_higher_order_list, n_generated_events: int = 10, n_generated_t_bins: int = 4, test_time_bin_size: float = 0.25, transition_matrix_order_start_idx:int=0, debug_print=True, blur_vertical_std_dev=None, blur_horizontal_std_dev=None):
+    def _generate_expected_replay_sequences(cls, a_binned_x_transition_matrix_higher_order_list: List[NDArray], n_generated_events: int = 10, n_generated_t_bins: int = 4, test_time_bin_size: float = 0.25, transition_matrix_order_start_idx:int=0, debug_print=True, blur_vertical_std_dev=None, blur_horizontal_std_dev=None):
         """ takes a a_binned_x_transition_matrix_higher_order_list and a position posterior
         
         Uses the first time bin to and the `a_binned_x_transition_matrix_higher_order_list` to predict the future bins:
@@ -361,7 +353,7 @@ class TransitionMatrixComputations:
 
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-02 09:53', related_items=[])
-    def _predicted_probabilities_likelihood(cls, a_binned_x_transition_matrix_higher_order_list, test_posterior, transition_matrix_order: int=5) -> NDArray:
+    def _predicted_probabilities_likelihood(cls, a_binned_x_transition_matrix_higher_order_list: List[NDArray], test_posterior: NDArray, transition_matrix_order: int=5) -> NDArray:
         """ Computes likelihoods giveen posteriors and transition matricies for a certain `transition_matrix_order`
         
         next_pos_likelihood = _predicted_probabilities_likelihood(a_binned_x_transition_matrix_higher_order_list, test_posterior, transition_matrix_order=5)
@@ -384,7 +376,7 @@ class TransitionMatrixComputations:
         return next_pos_likelihood
 
     @classmethod
-    def _perform_forward_prediction(cls, a_binned_x_transition_matrix_higher_order_list, test_posterior, transition_matrix_order_start_idx:int=1):
+    def _perform_forward_prediction(cls, a_binned_x_transition_matrix_higher_order_list: List[NDArray], test_posterior: NDArray, transition_matrix_order_start_idx:int=1):
         """ takes a a_binned_x_transition_matrix_higher_order_list and a position posterior
         
         Uses the first time bin to and the `a_binned_x_transition_matrix_higher_order_list` to predict the future bins:
@@ -407,7 +399,6 @@ class TransitionMatrixComputations:
         print(f'np.shape(test_posterior): {np.shape(test_posterior)}, n_time_bins: {n_time_bins}, n_predicted_time_bins: {n_predicted_time_bins}')
         # Only use the first posterior
         an_observed_posterior = np.atleast_2d(test_posterior[:, 0]).T # (n_x, 1)
-
 
         predicited_posteriors = []
         # for a_tbin_idx in np.arange(start=1, stop=n_time_bins):
