@@ -77,7 +77,7 @@ def pho_plothelper(data, **kwargs):
     """ 2024-02-06 - Provides an interface like plotly's classes provide to extract keys fom DataFrame columns or dicts and generate kwargs to pass to a plotting function.
         
         Usage:
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import pho_plothelper
+            from pyphoplacecellanalysis.Pho2D.statistics_plotting_helpers import pho_plothelper
             extracted_value_kwargs = pho_plothelper(data=an_aclu_conv_overlap_output['valid_subset'], x='x', y='normalized_convolved_result')
             extracted_value_kwargs
 
