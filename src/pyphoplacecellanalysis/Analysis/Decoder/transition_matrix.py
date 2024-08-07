@@ -540,10 +540,10 @@ class TransitionMatrixComputations:
 
 
 
-
-    def _compute_expected_velocity_out_per_node(A: np.ndarray, should_split_fwd_and_bkwd_velocities: bool = False, velocity_type: Union[VelocityType, str] = VelocityType.OUTGOING) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]]:
+    @classmethod
+    def _compute_expected_velocity_out_per_node(cls, A: np.ndarray, should_split_fwd_and_bkwd_velocities: bool = False, velocity_type: Union[VelocityType, str] = VelocityType.OUTGOING) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]]:
         """ 
-        Compute the expected velocity out per node from a transition matrix.
+        Compute the expected velocity in/out per node (position bin) of the transition matrix.
 
         Parameters:
         A (np.ndarray): A square transition matrix where A[i][j] represents the transition rate from node i to node j.
@@ -577,7 +577,7 @@ class TransitionMatrixComputations:
         if isinstance(velocity_type, str):
             velocity_type = VelocityType(velocity_type)
             
-        if velocity_type == VelocityType.INCOMING:
+        if velocity_type.name == VelocityType.INCOMING.name:
             # compute incoming instead by transposing the transition matrix
             A = deepcopy(A).T
             ## NOTE: fwd_expected_velocity and bkwd_expected_velocity will be swapped and will need to be exchanged after computation
@@ -611,7 +611,7 @@ class TransitionMatrixComputations:
         bkwd_expected_velocity = np.array(bkwd_expected_velocity)
         combined_expected_velocity = np.array(combined_expected_velocity)
         
-        if velocity_type == VelocityType.INCOMING:
+        if velocity_type.name == VelocityType.INCOMING.name:
             # swap "fwd"/"bkwd" velocity so they're correct relative to the track for incoming velocities as well
             _tmp_expected_velocity = deepcopy(bkwd_expected_velocity)
             bkwd_expected_velocity = deepcopy(fwd_expected_velocity)
@@ -621,3 +621,35 @@ class TransitionMatrixComputations:
             return combined_expected_velocity, (fwd_expected_velocity, bkwd_expected_velocity)
         else:
             return combined_expected_velocity
+        
+
+    @classmethod
+    def _compute_expected_velocity_list_dict(cls, binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[NDArray]]) -> Dict[types.DecoderName, List[ExpectedVelocityTuple]]:
+        """ working expected velocity for each transition matrix.
+        
+        """
+        expected_velocity_list_dict: Dict[types.DecoderName, List[ExpectedVelocityTuple]] = {}
+
+        for a_decoder_name, a_transition_mat_list in binned_x_transition_matrix_higher_order_list_dict.items():
+            expected_velocity_list_dict[a_decoder_name] = []
+            for markov_order_idx, A in enumerate(a_transition_mat_list):
+                markov_order = markov_order_idx + 1
+                combined_expected_incoming_velocity, (fwd_expected_incoming_velocity, bkwd_expected_incoming_velocity) = cls._compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities=True, velocity_type='in')
+                # expected_velocity_list_dict[a_decoder_name].append(fwd_expected_incoming_velocity,
+                combined_expected_out_velocity, (fwd_expected_out_velocity, bkwd_expected_out_velocity) = cls._compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities=True, velocity_type='out')
+
+                # the order is O number of timesteps away
+                if markov_order > 1:
+                    ## #TODO 2024-08-07 11:12: - [ ] Not confidant about whether to divide by the number of distant timestamps or not
+                    combined_expected_incoming_velocity /= markov_order
+                    fwd_expected_incoming_velocity /= markov_order
+                    bkwd_expected_incoming_velocity /= markov_order
+                    combined_expected_out_velocity /= markov_order
+                    fwd_expected_out_velocity /= markov_order
+                    bkwd_expected_out_velocity /= markov_order
+                    
+                expected_velocity_list_dict[a_decoder_name].append(
+                    ExpectedVelocityTuple(in_fwd=fwd_expected_incoming_velocity, in_bkwd=bkwd_expected_incoming_velocity, in_combined=combined_expected_incoming_velocity,
+                                    out_fwd=fwd_expected_out_velocity, out_bkwd=bkwd_expected_out_velocity, out_combined=combined_expected_out_velocity)
+                )
+        return expected_velocity_list_dict
