@@ -2,7 +2,6 @@
 # ==================================================================================================================== #
 # 2023-11-14 - Transition Matrix                                                                                       #
 # ==================================================================================================================== #
-
 from copy import deepcopy
 from pathlib import Path
 import numpy as np
@@ -21,6 +20,39 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder #typehinting only
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
 
+
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+
+@define(slots=False, eq=False)
+class ExpectedVelocityTuple(UnpackableMixin, object):
+    """ the specific heuristic measures for a single decoded epoch
+    
+    from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import ExpectedVelocityTuple
+    
+    
+    """
+    # Incoming:
+    in_combined: NDArray = field()
+    in_fwd: NDArray = field()
+    in_bkwd: NDArray = field()
+
+    
+    # Outgoing
+    out_combined: NDArray = field()
+    out_fwd: NDArray = field()
+    out_bkwd: NDArray = field()
+
+    
+
+    @classmethod
+    def init_by_computing_from_transition_matrix(cls, A: NDArray) -> "ExpectedVelocityTuple":
+        """ computes all incomming/outgoing x fwd/bkwd velocities from a position bin transition matrix"""
+        combined_expected_incoming_velocity, (fwd_expected_incoming_velocity, bkwd_expected_incoming_velocity) = TransitionMatrixComputations._compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities=True, velocity_type='in')
+        combined_expected_out_velocity, (fwd_expected_out_velocity, bkwd_expected_out_velocity) = TransitionMatrixComputations._compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities=True, velocity_type='out')
+        return cls(in_fwd=fwd_expected_incoming_velocity, in_bkwd=bkwd_expected_incoming_velocity, in_combined=combined_expected_incoming_velocity,
+                              out_fwd=fwd_expected_out_velocity, out_bkwd=bkwd_expected_out_velocity, out_combined=combined_expected_out_velocity)
+        
+
 def vertical_gaussian_blur(arr, sigma:float=1, **kwargs):
     """ blurs each column over the rows """
     return np.apply_along_axis(gaussian_filter1d, axis=0, arr=arr, sigma=sigma, **kwargs)
@@ -35,8 +67,8 @@ from enum import Enum
 
 # used for `_compute_expected_velocity_out_per_node`
 class VelocityType(Enum):
-    OUTGOING = 1
-    INCOMING = 2
+    OUTGOING = 'out'
+    INCOMING = 'in'
     
 
 @define(slots=False, eq=False)
@@ -509,7 +541,7 @@ class TransitionMatrixComputations:
 
 
 
-    def _compute_expected_velocity_out_per_node(A: np.ndarray, should_split_fwd_and_bkwd_velocities: bool = False, should_return_incoming_velocities: bool=False, velocity_type: VelocityType = VelocityType.OUTGOING) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]]:
+    def _compute_expected_velocity_out_per_node(A: np.ndarray, should_split_fwd_and_bkwd_velocities: bool = False, velocity_type: Union[VelocityType, str] = VelocityType.OUTGOING) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]]:
         """ 
         Compute the expected velocity out per node from a transition matrix.
 
@@ -530,14 +562,22 @@ class TransitionMatrixComputations:
             combined_expected_velocity = TransitionMatrixComputations._compute_expected_velocity_out_per_node(A)
             combined_expected_velocity
         Example 2:
-            combined_expected_velocity, (fwd_expected_velocity, bkwd_expected_velocity) = TransitionMatrixComputations._compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities=True)
-            fwd_expected_velocity
-            bkwd_expected_velocity
+            combined_expected_incoming_velocity, (fwd_expected_incoming_velocity, bkwd_expected_incoming_velocity) = TransitionMatrixComputations._compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities=True, velocity_type='in')
+            fwd_expected_incoming_velocity
+            bkwd_expected_incoming_velocity
+
+            combined_expected_out_velocity, (fwd_expected_out_velocity, bkwd_expected_out_velocity) = TransitionMatrixComputations._compute_expected_velocity_out_per_node(A, should_split_fwd_and_bkwd_velocities=True, velocity_type='out')
+            fwd_expected_out_velocity
+            bkwd_expected_out_velocity
+
         """
         num_states = np.shape(A)[0]
         assert np.shape(A)[0] == np.shape(A)[1], "must be a square matrix"
         
-        if should_return_incoming_velocities:
+        if isinstance(velocity_type, str):
+            velocity_type = VelocityType(velocity_type)
+            
+        if velocity_type == VelocityType.INCOMING:
             # compute incoming instead by transposing the transition matrix
             A = deepcopy(A).T
             ## NOTE: fwd_expected_velocity and bkwd_expected_velocity will be swapped and will need to be exchanged after computation
@@ -571,7 +611,7 @@ class TransitionMatrixComputations:
         bkwd_expected_velocity = np.array(bkwd_expected_velocity)
         combined_expected_velocity = np.array(combined_expected_velocity)
         
-        if should_return_incoming_velocities:
+        if velocity_type == VelocityType.INCOMING:
             # swap "fwd"/"bkwd" velocity so they're correct relative to the track for incoming velocities as well
             _tmp_expected_velocity = deepcopy(bkwd_expected_velocity)
             bkwd_expected_velocity = deepcopy(fwd_expected_velocity)
