@@ -20,8 +20,20 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder #typehinting only
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
 
-
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeAlias, TypeVar #, NewType, Generic
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+
+T = TypeVar('T')
+DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]]
+# DecoderListDict = NewType('DecoderListDict', Dict[types.DecoderName, List[NDArray]])
+# DecoderListDict = NewType('DecoderListDict', Dict[types.DecoderName, List[T]])
+# Use like `v: DecoderListDict[NDArray]`
+
+
 
 @define(slots=False, eq=False)
 class ExpectedVelocityTuple(UnpackableMixin, object):
@@ -84,7 +96,7 @@ class TransitionMatrixComputations:
     out
 
     """
-    binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[NDArray]] = field(factory=dict)
+    binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray] = field(factory=dict)
     n_powers: int = field(default=20)
     time_bin_size: float = field(default=None)
     pos_bin_size: float = field(default=None)
@@ -425,7 +437,7 @@ class TransitionMatrixComputations:
     # ==================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix', 'plot'], input_requires=[], output_provides=[], uses=['BasicBinnedImageRenderingWindow'], used_by=[], creation_date='2024-08-02 09:55', related_items=[])
-    def plot_transition_matricies(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray],
+    def plot_transition_matricies(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray],
                                    power_step:int=7, grid_opacity=0.4, enable_all_titles=True) -> BasicBinnedImageRenderingWindow:
         """ plots each decoder as a separate column
         each order of matrix as a separate row
@@ -479,7 +491,7 @@ class TransitionMatrixComputations:
     # ==================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix', 'save'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
-    def save_transition_matricies(cls, binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[NDArray]], save_path:Path='transition_matrix_data.h5'): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+    def save_transition_matricies(cls, binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray], save_path:Path='transition_matrix_data.h5'): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
         """Save the transitiion matrix info to a file
         
         save_path = TransitionMatrixComputations.save_transition_matricies(binned_x_transition_matrix_higher_order_list_dict=binned_x_transition_matrix_higher_order_list_dict, save_path='output/transition_matrix_data.h5')
@@ -510,7 +522,7 @@ class TransitionMatrixComputations:
 
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix', 'load'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
-    def load_transition_matrices(cls, load_path: Path) -> Dict[types.DecoderName, List[np.ndarray]]:
+    def load_transition_matrices(cls, load_path: Path) -> DecoderListDict[NDArray]:
         """
         Load the transition matrix info from a file
         
@@ -522,7 +534,7 @@ class TransitionMatrixComputations:
             load_path = Path(load_path).resolve()
 
         import h5py
-        binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[np.ndarray]] = {}
+        binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray] = {}
 
         with h5py.File(load_path, 'r') as f:
             for decoder_prefix in f.keys():
@@ -624,7 +636,7 @@ class TransitionMatrixComputations:
         
 
     @classmethod
-    def _compute_expected_velocity_list_dict(cls, binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, List[NDArray]]) -> Dict[types.DecoderName, List[ExpectedVelocityTuple]]:
+    def _compute_expected_velocity_list_dict(cls, binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray]) -> Dict[types.DecoderName, List[ExpectedVelocityTuple]]:
         """ working expected velocity for each transition matrix.
         
         """
