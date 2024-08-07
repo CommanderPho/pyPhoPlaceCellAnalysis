@@ -179,9 +179,10 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         self.resize(1000, 800)
         
         ## Add Label for debugging:
+        self.params.max_num_columns = 1
         
         self.ui.mainLabel = pg.LabelItem(justify='right')
-        self.ui.graphics_layout.addItem(self.ui.mainLabel, row=0, col=1, rowspan=1, colspan=max_num_columns)
+        self.ui.graphics_layout.addItem(self.ui.mainLabel, row=0, col=0, rowspan=1, colspan=self.params.max_num_columns) # last column
         self.params.plot_row_offset = self.params.plot_row_offset + 1
         print(f'self.params.plot_row_offset: {self.params.plot_row_offset}')
         
@@ -257,7 +258,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
                     
                                         
                 # already have a window, use .add_data	
-                out_binned_window.add_data(**_curr_build_kwargs)
+                out_binned_window.add_data(**_curr_build_kwargs, defer_column_update=True) # defer_column_update=True to prevent columns updating each time. We call `update_columns_if_needed` when done
 
         # row=0, col=1, 
         # _built_add_data_kwargs
@@ -266,16 +267,27 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
                 window_title = window_title + ': ' + ', '.join(subplot_titles)
             out_binned_window.setWindowTitle(window_title)
 
+        out_binned_window.update_columns_if_needed(new_num_columns=max_n_columns_per_row)
+        
         ## OUTPUTS: out_test_markov_test_compare, _built_add_data_kwargs
         return out_binned_window
     
 
-
+    def update_columns_if_needed(self, new_num_columns: int):
+        """ called to update where the label is positioned """
+        if (new_num_columns > self.params.max_num_columns):
+            self.params.max_num_columns = new_num_columns
+            self.ui.graphics_layout.removeItem(self.ui.mainLabel)  # Remove the old item
+            self.ui.graphics_layout.addItem(self.ui.mainLabel, row=0, col=1, colspan=self.params.max_num_columns)
+            return True
+        else:
+            return False
+        
     def build_formatted_title_string(self, title: str) -> str:
         return f"<span style = 'font-size : 12px;' >{title}</span>"
         
 
-    def add_data(self, row=1, col=0, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001):
+    def add_data(self, row=1, col=0, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, defer_column_update:bool=False):
         """ adds a new data subplot to the output
         """
         newPlotItem: pg.PlotItem = self.ui.graphics_layout.addPlot(title=title, row=(self.params.plot_row_offset + row), col=col) # add PlotItem to the main GraphicsLayoutWidget
@@ -321,6 +333,11 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             self.ui.graphics_layout.setFixedHeight(self.params.all_plots_height)
             # self.ui.graphics_layout.setMinimumHeight(self.params.all_plots_height)
             
+        if (not defer_column_update):
+            _did_update = self.update_columns_if_needed(new_num_columns=col)
+        
+
+
     def _update_global_shared_colorbaritem(self):
         ## Add Global Colorbar for single colorbar mode:
         # Get all data for the purpose of computing global min/max:
