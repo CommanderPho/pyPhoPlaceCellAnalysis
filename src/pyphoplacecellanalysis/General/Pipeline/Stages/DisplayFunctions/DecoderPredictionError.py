@@ -335,7 +335,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         if ((not skip_plotting_measured_positions) and (measured_position_df is not None)):
             # Actual Position Plots (red line):
             # actual_postion_plot_kwargs = {'color': '#ff000066', 'alpha': 0.6, 'marker': '+', 'markersize': 4, 'animated': False}
-            actual_postion_plot_kwargs = {'color': '#ff000066', 'alpha': 0.6, 'marker': 'none', 'animated': False}
+            # actual_postion_plot_kwargs = {'color': '#ff000066', 'alpha': 0.6, 'marker': 'none', 'animated': False}
+            actual_postion_plot_kwargs = {'color': '#ff000066', 'alpha': 0.35, 'marker': 'none', 'animated': False}
             line_measured_position = ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', **actual_postion_plot_kwargs) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
         else:
             line_measured_position = None
