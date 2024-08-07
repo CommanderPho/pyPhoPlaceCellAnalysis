@@ -24,7 +24,8 @@ from neuropy.analyses.placefields import PfND # for BasePositionDecoder
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.general_helpers import OrderedMeta
-from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, build_spanning_grid_matrix, np_ffill_1D # for compute_corrected_positions(...)
+from pyphocorehelpers.indexing_helpers import np_ffill_1D # for compute_corrected_positions(...)
+from neuropy.utils.mixins.binning_helpers import compute_spanning_bins, build_spanning_grid_matrix # for compute_corrected_positions(...)
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable, safe_get_variable_shape
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
@@ -549,7 +550,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         """
         single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # a_decoder_decoded_epochs_result._test_find_fields_by_shape_metadata()
         fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'],
-            ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges']))
+            ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges'])) # maps list names to single-epoch specific field names
         
         # class_fields = self.__attrs_attrs__
         # single_epoch_fields = [field for field in class_fields if field.name in single_epoch_field_names]
