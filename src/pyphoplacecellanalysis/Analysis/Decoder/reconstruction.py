@@ -1352,9 +1352,40 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         if len(invalid_indicies_list) > 0:
             for invalid_idx in invalid_indicies_list:
                 ## find non matching indicies
-                # # recompute the centers
+                
+                # ==================================================================================================================== #
+                # SOLUTION 2024-08-07 20:08: - [ ] Recompute the Invalid Quantities with the known correct number of time bins:        #
+                # ==================================================================================================================== #
+                ## TODO 2024-08-07 20:27: - [ ] FUTURE: the core issue is being introduced in `spk_count` or whatever as a result of the strange slide. It may occur both n=1 and n=2 bins, maybe only n=2 now.
+                
+                # Steps:
+                ## 1. replace the edges/centers and their info in `filter_epochs_decoder_result.time_bin_containers`
+                ## 2. with correct number of bins, the computed values need to be fixed: most_likely_positions, most_likely_position_indicies, p_x_given_n, spkcount, and marginals
+        
                 filter_epochs_decoder_result.time_bin_containers[invalid_idx] = BinningContainer.init_from_edges(edges=filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges, edge_info=None)
+                ## Now time bin properties are valid - time_bin_containers, n_bins, time_bin_edges
+                
+                ## testing:
+                # invalid_p_x_given_n = deepcopy(filter_epochs_decoder_result.p_x_given_n_list[invalid_idx]).T 
+                # invalid_pos = deepcopy(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx]).T # all most_likely_positions_1D, most_likely_positions_1D, most_likely_positions_1D
+                
+                ## Fix known invalid quantities (with extra entries relative to time bins) -
+                good_indicies = deepcopy(filter_epochs_decoder_result.time_bin_containers[invalid_idx].center_info.bin_indicies)
+                
+                if filter_epochs_decoder_result.marginal_x_list[invalid_idx] is not None:
+                    filter_epochs_decoder_result.marginal_x_list[invalid_idx].most_likely_positions_1D = filter_epochs_decoder_result.marginal_x_list[invalid_idx].most_likely_positions_1D[good_indicies]
+                    filter_epochs_decoder_result.marginal_x_list[invalid_idx].p_x_given_n = filter_epochs_decoder_result.marginal_x_list[invalid_idx].p_x_given_n[:, good_indicies]
 
+                ## marginal_y_list
+                if filter_epochs_decoder_result.marginal_y_list[invalid_idx] is not None:
+                    filter_epochs_decoder_result.marginal_y_list[invalid_idx].most_likely_positions_1D = filter_epochs_decoder_result.marginal_y_list[invalid_idx].most_likely_positions_1D[good_indicies]
+                    filter_epochs_decoder_result.marginal_y_list[invalid_idx].p_x_given_n = filter_epochs_decoder_result.marginal_y_list[invalid_idx].p_x_given_n[:, good_indicies]
+                
+                filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx] = filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx][good_indicies] ## okay for 2D?
+                filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] = filter_epochs_decoder_result.most_likely_positions_list[invalid_idx][good_indicies] ## okay for 2D?
+                filter_epochs_decoder_result.p_x_given_n_list[invalid_idx] = filter_epochs_decoder_result.p_x_given_n_list[invalid_idx][:, good_indicies]
+                filter_epochs_decoder_result.spkcount[invalid_idx] = filter_epochs_decoder_result.spkcount[invalid_idx][good_indicies] ## okay for 2D?
+                ## do post-hoc checking:
                 assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
 
         assert np.all([(len(filter_epochs_decoder_result.most_likely_positions_list[i]) == len(filter_epochs_decoder_result.time_bin_containers[i].centers)) for i, a_n_bins in enumerate(filter_epochs_decoder_result.nbins)])
