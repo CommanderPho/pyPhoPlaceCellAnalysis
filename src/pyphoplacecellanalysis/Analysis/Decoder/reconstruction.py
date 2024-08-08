@@ -1313,15 +1313,26 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         
         """
         # Looks like we're iterating over each epoch in filter_epochs:
+        ## Validate the list lengths for the zip:
+        _arr_lengths = [len(v) for v in (np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers)]
+        assert np.allclose(_arr_lengths, filter_epochs_decoder_result.num_filter_epochs), f"all arrays should be equal or the zip will be limited to the fewest items, but _arr_lengths: {_arr_lengths}"
+        
         for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
-            filter_epochs_decoder_result.time_bin_edges.append(np.atleast_1d(curr_filter_epoch_time_bin_container.edges))
+            a_time_bin_edges = np.atleast_1d(curr_filter_epoch_time_bin_container.edges)
+            filter_epochs_decoder_result.time_bin_edges.append(a_time_bin_edges)
             if use_single_time_bin_per_epoch:
                 assert curr_filter_epoch_time_bin_container.num_bins == 1
                 curr_filter_epoch_time_bin_size: float = curr_filter_epoch_time_bin_container.edge_info.step # get the variable time_bin_size from the epoch object
             else:
                 curr_filter_epoch_time_bin_size: float = filter_epochs_decoder_result.decoding_time_bin_size
                 
+            # # validation:
+            # n_neurons, n_time_bins = np.shape(curr_filter_epoch_spkcount)
+            # assert curr_epoch_num_time_bins == n_time_bins, f"curr_epoch_num_time_bins: {curr_epoch_num_time_bins} != n_time_bins (from curr_filter_epoch_spkcount): {n_time_bins}"
+            # a_time_bin_edges_n_time_bins = np.shape(a_time_bin_edges)[0] - 1
+            # assert a_time_bin_edges_n_time_bins == n_time_bins, f"a_time_bin_edges_n_time_bins: {a_time_bin_edges_n_time_bins} != n_time_bins (from curr_filter_epoch_spkcount): {n_time_bins}\n\t {a_time_bin_edges}"
+            
             most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = active_decoder.decode(curr_filter_epoch_spkcount, time_bin_size=curr_filter_epoch_time_bin_size, output_flat_versions=False, debug_print=debug_print)
             most_likely_positions = np.atleast_1d(most_likely_positions)
             p_x_given_n = np.atleast_1d(p_x_given_n)
@@ -1335,13 +1346,16 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
             filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
         ## end for
+        
+        ## 2024-08-07: POST-HOC VALIDATE
         invalid_indicies_list = np.where([len(tc.centers) != len(xs) for tc, xs in zip(filter_epochs_decoder_result.time_bin_containers, filter_epochs_decoder_result.most_likely_positions_list)])[0]
         if len(invalid_indicies_list) > 0:
             for invalid_idx in invalid_indicies_list:
                 ## find non matching indicies
-                # recompute the centers
-                filter_epochs_decoder_result.time_bin_containers[invalid_idx].setup_from_edges(filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges)
-            assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
+                # # recompute the centers
+                filter_epochs_decoder_result.time_bin_containers[invalid_idx] = BinningContainer.init_from_edges(edges=filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges, edge_info=None)
+
+                assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
 
         assert np.all([(len(filter_epochs_decoder_result.most_likely_positions_list[i]) == len(filter_epochs_decoder_result.time_bin_containers[i].centers)) for i, a_n_bins in enumerate(filter_epochs_decoder_result.nbins)])
 
