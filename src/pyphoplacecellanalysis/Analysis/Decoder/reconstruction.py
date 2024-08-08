@@ -1372,6 +1372,14 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                 ## Fix known invalid quantities (with extra entries relative to time bins) -
                 good_indicies = deepcopy(filter_epochs_decoder_result.time_bin_containers[invalid_idx].center_info.bin_indicies)
                 
+                # time_bin_edges, epoch_description_list
+                if filter_epochs_decoder_result.time_bin_edges[invalid_idx] is not None:
+                    filter_epochs_decoder_result.time_bin_edges[invalid_idx] = deepcopy(filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges) # filter_epochs_decoder_result.time_bin_edges[invalid_idx][good_indicies]
+                    
+                # if filter_epochs_decoder_result.epoch_description_list[invalid_idx] is not None:
+                #     filter_epochs_decoder_result.epoch_description_list[invalid_idx] = filter_epochs_decoder_result.epoch_description_list[invalid_idx][good_indicies]
+                
+                # marginals:
                 if filter_epochs_decoder_result.marginal_x_list[invalid_idx] is not None:
                     filter_epochs_decoder_result.marginal_x_list[invalid_idx].most_likely_positions_1D = filter_epochs_decoder_result.marginal_x_list[invalid_idx].most_likely_positions_1D[good_indicies]
                     filter_epochs_decoder_result.marginal_x_list[invalid_idx].p_x_given_n = filter_epochs_decoder_result.marginal_x_list[invalid_idx].p_x_given_n[:, good_indicies]
