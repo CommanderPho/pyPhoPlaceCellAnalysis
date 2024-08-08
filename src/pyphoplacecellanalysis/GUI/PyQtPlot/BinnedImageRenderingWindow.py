@@ -44,14 +44,14 @@ def _build_binned_imageItem(plot_item: pg.PlotItem, params, xbins=None, ybins=No
     color_bar_mode: options for the colorbar of each image
         ### curr_cbar_mode: 'each', 'one', None
     """
-    local_plots_data = RenderPlotsData(name=name)
+    local_plots_data = RenderPlotsData(name=name, matrix=None, matrix_min=None, matrix_max=None)
     local_plots_data.matrix = matrix.copy()
     local_plots_data.matrix_min = np.nanmin(matrix)
     local_plots_data.matrix_max = np.nanmax(matrix)
     
     # plotItem.invertY(True)           # orient y axis to run top-to-bottom
     
-    local_plots = RenderPlots(name=name)
+    local_plots = RenderPlots(name=name, imageItem=None, colorBarItem=None)
     # Normal ImageItem():
     local_plots.imageItem = pg.ImageItem(matrix.T)
     plot_item.addItem(local_plots.imageItem)
@@ -286,42 +286,72 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
     def build_formatted_title_string(self, title: str) -> str:
         return f"<span style = 'font-size : 12px;' >{title}</span>"
         
-
-    def add_data(self, row=1, col=0, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, defer_column_update:bool=False):
+    # ==================================================================================================================== #
+    # Data Add/Remove Methods                                                                                              #
+    # ==================================================================================================================== #
+    def add_data(self, row=1, col=0, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', drop_below_threshold: float=0.0000001, defer_column_update:bool=False, replace:bool=False):
         """ adds a new data subplot to the output
-        """
-        newPlotItem: pg.PlotItem = self.ui.graphics_layout.addPlot(title=title, row=(self.params.plot_row_offset + row), col=col) # add PlotItem to the main GraphicsLayoutWidget
         
+        if it exists and `replace=True` it will be removed and then re-inserted
+        
+        """
+        # Format data:
+        if drop_below_threshold is not None:
+            matrix = matrix.astype(float) # required because NaN isn't available in Integer dtype arrays (in case the matrix is of integer type, this prevents a ValueError)
+            matrix[np.where(matrix < drop_below_threshold)] = np.nan # null out the occupancy
+            
+        ## Check for existance:
+        needs_create_new: bool = True
+        extant_local_plots_data = self.plots_data.get(name, None)
+        extant_local_plots = self.plots.get(name, None)
+        
+        if (extant_local_plots is not None) and (extant_local_plots_data is not None):
+            # Local plot exists:
+            print(f'local plot named "{name}" already exists!')
+            needs_create_new = False ## Set needs_create_new to False
+            newPlotItem = extant_local_plots['mainPlotItem'] # : pg.PlotItem
+            local_plots = extant_local_plots
+            local_plots_data = extant_local_plots_data
+            
+            if replace:
+                print(f'\t... but replace=True, so we will remove the old item and add a new one!')
+                ## remove old objects
+                self.remove_data(name=name)
+                local_plots = None
+                local_plots_data = None
+                # newPlotItem.removeItem(
+                needs_create_new = True
+                
+
+        if needs_create_new:
+            newPlotItem: pg.PlotItem = self.ui.graphics_layout.addPlot(title=title, row=(self.params.plot_row_offset + row), col=col) # add PlotItem to the main GraphicsLayoutWidget
+
+        ## Common formatting:    
         # Set the plot title:
         formatted_title = self.build_formatted_title_string(title=title)        
         newPlotItem.setTitle(formatted_title)
         
         newPlotItem.setDefaultPadding(0.0)  # plot without padding data range
         newPlotItem.setMouseEnabled(x=False, y=False)
-        newPlotItem = _add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins, grid_opacity=self.params.grid_opacity)
-
-        if drop_below_threshold is not None:
-            matrix = matrix.astype(float) # required because NaN isn't available in Integer dtype arrays (in case the matrix is of integer type, this prevents a ValueError)
-            matrix[np.where(matrix < drop_below_threshold)] = np.nan # null out the occupancy
-            
         
-        local_plots, local_plots_data = _build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
+        if needs_create_new:
+            newPlotItem = _add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins, grid_opacity=self.params.grid_opacity)
+
+
+        if needs_create_new:
+            local_plots, local_plots_data = _build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
+            
         self.plots_data[name] = local_plots_data
         self.plots[name] = local_plots
         self.plots[name].mainPlotItem = newPlotItem
 
-        # # Set the plot title:
-        # formatted_title = self.build_formatted_title_string(title=title)
-        # self.plots[name].mainPlotItem.setTitle(formatted_title)
-                
 
         if self.params.color_bar_mode == 'one':
             self.plots[name].colorBarItem = self.params.shared_colorBarItem # shared colorbar item
             self._update_global_shared_colorbaritem()
         
-        if self.params.wants_crosshairs:
+        if (needs_create_new and self.params.wants_crosshairs):
             self.add_crosshairs(newPlotItem, matrix, name=name)
-
 
         ## Scrollable-support:
         ## TODO: this assumes that provided `row` is the maximum row, or that we fill each column before filling rows
@@ -335,7 +365,59 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             
         if (not defer_column_update):
             _did_update = self.update_columns_if_needed(new_num_columns=col)
-        
+
+    def remove_data(self, name: str, remove_connections:bool=True) -> bool:
+        """ remove the data, but not the plot """
+        extant_local_plots_data = self.plots_data.pop(name, None)
+        extant_local_plots = self.plots.pop(name, None)
+        if remove_connections:
+            extant_local_connections = self.ui.connections.pop(name, None)
+        else:
+            extant_local_connections = None
+            
+        if (extant_local_plots is not None) and (extant_local_plots_data is not None):
+            # Local plot exists:
+            print(f'Removing data named "{name}"!')
+            mainPlotItem = extant_local_plots.get('mainPlotItem', None)
+            assert mainPlotItem is not None
+            
+            # mainPlotItem = extant_local_plots.pop('mainPlotItem', None)
+            # old_imageItem = extant_local_plots.pop('imageItem', None)
+            
+            ## Disconnect crosshairs signal:
+            if extant_local_connections is not None:
+                extant_local_connections.disconnect()
+                # extant_local_connections.delte
+
+            # # remove old image item:
+            # mainPlotItem.removeItem(old_imageItem)
+
+            removed_items_keys = []
+            for k, v in extant_local_plots.items():
+                if (k != 'mainPlotItem'):
+                    mainPlotItem.removeItem(v)
+                    removed_items_keys.append(k)
+                    
+            print(f'removed: {removed_items_keys}')
+            
+            # if self.params.color_bar_mode == 'one':
+            #     self.plots[name].colorBarItem = self.params.shared_colorBarItem # shared colorbar item
+            #     self._update_global_shared_colorbaritem()
+                
+            ## remove non-shared color bars
+            # remove old keys after finishing:
+            for k in removed_items_keys:
+                extant_local_plots.pop('k', None)
+
+            ## remove plot item:
+            self.ui.graphics_layout.removeItem(mainPlotItem)
+            # mainPlotItem.deleteLater()
+            
+            return True
+                            
+        else:
+            print(f'WARN: Cannot remove, no local plot named "{name}" exists!')
+            return False
 
 
     def _update_global_shared_colorbaritem(self):
@@ -371,6 +453,10 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value."""
         vLine = pg.InfiniteLine(angle=90, movable=False)
         hLine = pg.InfiniteLine(angle=0, movable=False)
+        
+        self.plots[name]['crosshairs_vLine'] = vLine
+        self.plots[name]['crosshairs_hLine'] = hLine
+
         plot_item.addItem(vLine, ignoreBounds=True)
         plot_item.addItem(hLine, ignoreBounds=True)
         vb = plot_item.vb
@@ -395,7 +481,7 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
                 hLine.setPos(mousePoint.y())
 
         self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, rateLimit=60, slot=mouseMoved)
-        
+
 
 
     def export_all_plots(self, curr_active_pipeline):
