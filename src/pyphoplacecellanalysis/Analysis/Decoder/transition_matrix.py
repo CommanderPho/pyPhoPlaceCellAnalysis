@@ -376,7 +376,7 @@ class TransitionMatrixComputations:
         return next_pos_likelihood
 
     @classmethod
-    def _perform_forward_prediction(cls, a_binned_x_transition_matrix_higher_order_list: List[NDArray], test_posterior: NDArray, transition_matrix_order_start_idx:int=1):
+    def _perform_forward_prediction(cls, a_binned_x_transition_matrix_higher_order_list: List[NDArray], test_posterior: NDArray, transition_matrix_order_start_idx:int=1, transition_matrix_order_growth_factor:float=1.0, debug_print=False):
         """ takes a a_binned_x_transition_matrix_higher_order_list and a position posterior
         
         Uses the first time bin to and the `a_binned_x_transition_matrix_higher_order_list` to predict the future bins:
@@ -396,7 +396,9 @@ class TransitionMatrixComputations:
         """
         n_time_bins: int = np.shape(test_posterior)[1]
         n_predicted_time_bins = n_time_bins - 1
-        print(f'np.shape(test_posterior): {np.shape(test_posterior)}, n_time_bins: {n_time_bins}, n_predicted_time_bins: {n_predicted_time_bins}')
+        max_required_transition_matrix_order: int = transition_matrix_order_start_idx + int(round(transition_matrix_order_growth_factor * n_predicted_time_bins)) 
+        print(f'np.shape(test_posterior): {np.shape(test_posterior)}, n_time_bins: {n_time_bins}, n_predicted_time_bins: {n_predicted_time_bins}, max_required_transition_matrix_order: {max_required_transition_matrix_order}')
+        assert len(a_binned_x_transition_matrix_higher_order_list) > max_required_transition_matrix_order, f"Not enough len(a_binned_x_transition_matrix_higher_order_list): {len(a_binned_x_transition_matrix_higher_order_list)} to meet max_required_transition_matrix_order: {max_required_transition_matrix_order}"
         # Only use the first posterior
         an_observed_posterior = np.atleast_2d(test_posterior[:, 0]).T # (n_x, 1)
 
@@ -408,9 +410,15 @@ class TransitionMatrixComputations:
             # an_actual_observed_next_step_posterior = np.atleast_2d(test_posterior[:, a_tbin_idx]).T # (n_x, 1)
             # an_observed_posterior
 
-            ## NOTE: transition_matrix_order does seem to do the identity transformation
-            transition_matrix_order_idx: int = transition_matrix_order_start_idx + a_tbin_idx
-            # transition_matrix_order: int = transition_matrix_order_idx + 1 ## order is index + 1
+            if transition_matrix_order_growth_factor is not None:
+                transition_matrix_order_idx: int = transition_matrix_order_start_idx + int(round(transition_matrix_order_growth_factor * a_tbin_idx))
+            else:
+                ## NOTE: transition_matrix_order does seem to do the identity transformation
+                transition_matrix_order_idx: int = transition_matrix_order_start_idx + a_tbin_idx
+                # transition_matrix_order: int = transition_matrix_order_idx + 1 ## order is index + 1
+                
+            if debug_print:
+                print(f'\t{i = }, {a_tbin_idx = }, {transition_matrix_order_idx = }')
 
             ## single time-bin
             a_trans_prob_mat = a_binned_x_transition_matrix_higher_order_list[transition_matrix_order_idx] # (n_x, n_x)
