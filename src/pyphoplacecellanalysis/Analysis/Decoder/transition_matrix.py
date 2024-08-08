@@ -422,7 +422,6 @@ class TransitionMatrixComputations:
 
             ## single time-bin
             a_trans_prob_mat = a_binned_x_transition_matrix_higher_order_list[transition_matrix_order_idx] # (n_x, n_x)
-            # a_next_t_predicted_pos_probs = a_trans_prob_mat @ an_observed_posterior # (n_x, 1)
             a_next_t_predicted_pos_probs = a_trans_prob_mat @ an_observed_posterior # (n_x, 1)
 
             # a_next_t_predicted_pos_probs
