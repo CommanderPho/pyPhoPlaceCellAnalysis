@@ -165,7 +165,7 @@ def napari_export_video_frames(viewer: napari.viewer.Viewer, time_intervals, ima
     return imageseries_output_directory
 
 
-
+@function_attributes(short_name=None, tags=['napari', 'config'], input_requires=[], output_provides=[], uses=[], used_by=['napari_extract_layers_info'], creation_date='2024-08-12 08:54', related_items=[])
 def extract_layer_info(a_layer):
     """ Extracts info as a dict from a single Napari layer. 
     by default Napari layers print like: `<Shapes layer 'Shapes' at 0x1635a1e8460>`: without any properties that can be easily referenced.
@@ -184,6 +184,8 @@ def extract_layer_info(a_layer):
         out_properties_dict['positioning'][a_property_name] = getattr(a_layer, a_property_name)
     return out_properties_dict
 
+
+@function_attributes(short_name=None, tags=['napari', 'config'], input_requires=[], output_provides=[], uses=['extract_layer_info'], used_by=[], creation_date='2024-08-12 08:54', related_items=[])
 def napari_extract_layers_info(layers):
 	"""extracts info dict from each layer as well.
 	Usage:

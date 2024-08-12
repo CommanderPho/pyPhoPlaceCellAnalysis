@@ -4,6 +4,7 @@
 # ==================================================================================================================== #
 from copy import deepcopy
 from pathlib import Path
+from enum import Enum
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar
@@ -26,6 +27,12 @@ from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 T = TypeVar('T')
 DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]] # Use like `v: DecoderListDict[NDArray]`
 
+
+# used for `_compute_expected_velocity_out_per_node`
+class VelocityType(Enum):
+    OUTGOING = 'out'
+    INCOMING = 'in'
+    
 
 @define(slots=False, eq=False)
 class ExpectedVelocityTuple(UnpackableMixin, object):
@@ -67,12 +74,7 @@ def horizontal_gaussian_blur(arr, sigma:float=1, **kwargs):
     return np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs)
     
 
-from enum import Enum
 
-# used for `_compute_expected_velocity_out_per_node`
-class VelocityType(Enum):
-    OUTGOING = 'out'
-    INCOMING = 'in'
     
 
 @define(slots=False, eq=False)
@@ -488,13 +490,14 @@ class TransitionMatrixComputations:
     # Save/Load                                                                                                            #
     # ==================================================================================================================== #
     @classmethod
-    @function_attributes(short_name=None, tags=['transition_matrix', 'save'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
-    def save_transition_matricies(cls, binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray], save_path:Path='transition_matrix_data.h5'): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+    @function_attributes(short_name=None, tags=['transition_matrix', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
+    def save_transition_matricies(cls, binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray], save_path:Path='transition_matrix_data.h5', out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
         """Save the transitiion matrix info to a file
         
-        save_path = TransitionMatrixComputations.save_transition_matricies(binned_x_transition_matrix_higher_order_list_dict=binned_x_transition_matrix_higher_order_list_dict, save_path='output/transition_matrix_data.h5')
-        save_path
-        
+        _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_transition_matricies')
+        _save_path = TransitionMatrixComputations.save_transition_matricies(binned_x_transition_matrix_higher_order_list_dict=binned_x_transition_matrix_higher_order_list_dict, out_context=_save_context, save_path='output/transition_matrix_data.h5')
+        _save_path
+
         """
         if not isinstance(save_path, Path):
             save_path = Path(save_path).resolve()
@@ -502,12 +505,49 @@ class TransitionMatrixComputations:
         import h5py
         # Save to .h5 file
         with h5py.File(save_path, 'w') as f:
+            if out_context is not None:
+                # add context to the file
+                if not isinstance(out_context, dict):
+                    flat_context_desc: str = out_context.get_description(separator='|') # 'kdiba|gor01|one|2006-6-08_14-26-15|save_transition_matricies'
+                    _out_context_dict = out_context.to_dict() | {'session_context_desc': flat_context_desc}
+                else:
+                    # it is a raw dict
+                    _out_context_dict = deepcopy(out_context)
+                    
+                for k, v in _out_context_dict.items():
+                    ## add the context as file-level metadata
+                    f.attrs[k] = v
+
+
+
             for a_name, an_array_list in binned_x_transition_matrix_higher_order_list_dict.items():
                 decoder_prefix: str = a_name
-                for markov_order, array in enumerate(an_array_list):
-                    a_dset = f.create_dataset(f'{decoder_prefix}/array_{markov_order}', data=array)
+                if isinstance(an_array_list, NDArray):
+                    ## 3D NDArray version:
+                    assert np.ndim(an_array_list) == 3, f"np.ndim(an_array_list): {np.ndim(an_array_list)}, np.shape(an_array_list): {np.shape(an_array_list)}"
+                    n_markov_orders, n_xbins, n_xbins2 = np.shape(an_array_list)
+                    assert n_xbins == n_xbins2, f"n_xbins: {n_xbins} != n_xbins2: {n_xbins2}" 
+                    a_dset = f.create_dataset(f'{decoder_prefix}/binned_x_transition_matrix_higher_order_mat', data=an_array_list)
                     a_dset.attrs['decoder_name'] = a_name
-                    a_dset.attrs['markov_order'] = markov_order
+                    a_dset.attrs['max_markov_order'] = n_markov_orders
+                    a_dset.attrs['n_xbins'] = n_xbins
+
+                else:
+                    # list
+                    assert isinstance(an_array_list, (list, tuple)), f"type(an_array_list): {type(an_array_list)}\nan_array_list: {an_array_list}\n"
+                    # Determine how much zero padding is needed so that the array entries sort correctly
+                    max_markov_order: int = np.max([len(an_array_list) for an_array_list in binned_x_transition_matrix_higher_order_list_dict.values()])
+                    if debug_print:
+                        print(f'max_markov_order: {max_markov_order}')
+                    padding_length: int = len(str(max_markov_order)) + 1 ## how long is the string?
+                    if debug_print:
+                        print(f'padding_length: {padding_length}')
+                        
+                    for markov_order, array in enumerate(an_array_list):
+                        _markov_order_str: str = f"{markov_order:0{padding_length}d}" # Determine how much zero padding is needed so that the array entries sort correctly
+                        a_dset = f.create_dataset(f'{decoder_prefix}/array_{_markov_order_str}', data=array)
+                        a_dset.attrs['decoder_name'] = a_name
+                        a_dset.attrs['markov_order'] = markov_order
                     
                                 
                 # Add metadata
