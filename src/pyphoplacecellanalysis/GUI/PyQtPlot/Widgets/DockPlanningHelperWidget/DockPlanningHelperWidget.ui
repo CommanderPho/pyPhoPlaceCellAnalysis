@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>300</height>
+    <height>310</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -62,6 +62,16 @@
        </property>
       </widget>
      </item>
+     <item row="1" column="1">
+      <widget class="QLineEdit" name="txtDockIdentifier">
+       <property name="text">
+        <string>Position Decoder</string>
+       </property>
+       <property name="placeholderText">
+        <string>Position Decoder</string>
+       </property>
+      </widget>
+     </item>
      <item row="1" column="0">
       <widget class="QLabel" name="label_2">
        <property name="text">
@@ -72,15 +82,82 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="1">
-      <widget class="QLineEdit" name="txtDockIdentifier">
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_3">
        <property name="text">
-        <string>Position Decoder</string>
+        <string>dockSize</string>
        </property>
-       <property name="placeholderText">
-        <string>Position Decoder</string>
+       <property name="buddy">
+        <cstring>spinBox_Width</cstring>
        </property>
       </widget>
+     </item>
+     <item row="2" column="1">
+      <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="1,1,1">
+       <property name="spacing">
+        <number>3</number>
+       </property>
+       <item>
+        <spacer name="horizontalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="spinBox_Width">
+         <property name="toolTip">
+          <string notr="true">DockWidth</string>
+         </property>
+         <property name="statusTip">
+          <string notr="true">DockWidth</string>
+         </property>
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>2000</number>
+         </property>
+         <property name="singleStep">
+          <number>100</number>
+         </property>
+         <property name="value">
+          <number>600</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="spinBox_Height">
+         <property name="toolTip">
+          <string notr="true">Height</string>
+         </property>
+         <property name="statusTip">
+          <string notr="true">Height</string>
+         </property>
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>8000</number>
+         </property>
+         <property name="value">
+          <number>300</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
    </item>
@@ -172,6 +249,13 @@
        <number>2</number>
       </property>
       <item>
+       <widget class="QPushButton" name="btnRefresh">
+        <property name="text">
+         <string>Refresh</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -202,7 +286,29 @@
     </widget>
    </item>
   </layout>
+  <action name="actionActionEditingFinished">
+   <property name="text">
+    <string>actionEditingFinished</string>
+   </property>
+   <property name="toolTip">
+    <string>Editing Finished</string>
+   </property>
+  </action>
  </widget>
+ <tabstops>
+  <tabstop>txtDockTitle</tabstop>
+  <tabstop>txtDockIdentifier</tabstop>
+  <tabstop>spinBox_Width</tabstop>
+  <tabstop>spinBox_Height</tabstop>
+  <tabstop>radBtnOrientation_Auto</tabstop>
+  <tabstop>btnSave</tabstop>
+  <tabstop>btnAddWidgetBelow</tabstop>
+  <tabstop>btnAddWidgetRight</tabstop>
+  <tabstop>radBtnOrientation_Horizontal</tabstop>
+  <tabstop>btnLog</tabstop>
+  <tabstop>radBtnOrientation_Vertical</tabstop>
+  <tabstop>txtExtendedLabel</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

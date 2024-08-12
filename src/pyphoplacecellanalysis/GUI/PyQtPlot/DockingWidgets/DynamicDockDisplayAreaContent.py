@@ -342,7 +342,11 @@ class DynamicDockDisplayAreaContentMixin:
             
         # {'autoOrientation':True}
         dDisplayItem = Dock(unique_identifier, size=dockSize, widget=widget, display_config=display_config, **kwargs) # add the new display item
-        
+        if isinstance(dockAddLocationOpts, str):
+            print(f'WARN: dockAddLocationOpts should be a tuple containing a string (like `("left", )`), not a string itself! Interpretting dockAddLocationOpts: "{dockAddLocationOpts}" as `dockAddLocationOpts = ("{dockAddLocationOpts}", )`')
+            dockAddLocationOpts = (dockAddLocationOpts, )
+            assert isinstance(dockAddLocationOpts, tuple)
+    
         if len(dockAddLocationOpts) < 1:
             dockAddLocationOpts = [dDisplayItem, 'bottom']
         elif len(dockAddLocationOpts) == 1:
@@ -365,6 +369,8 @@ class DynamicDockDisplayAreaContentMixin:
             else:
                 raise NotImplementedError
         else:
+
+                
             raise NotImplementedError
         
         # print(f'dockAddLocationOpts: {dockAddLocationOpts}')

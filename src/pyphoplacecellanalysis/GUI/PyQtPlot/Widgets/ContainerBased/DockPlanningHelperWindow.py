@@ -15,30 +15,20 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
-
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import plot_multi_sort_raster_browser, plot_raster_plot
-
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
-from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState
 
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
 
-from neuropy.utils.indexing_helpers import find_desired_sort_indicies
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ScrollBarWithSpinBox.ScrollBarWithSpinBox import ScrollBarWithSpinBox
 from pyphoplacecellanalysis.GUI.Qt.Widgets.LogViewerTextEdit import LogViewer
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import DirectionalRankOrderLikelihoods, RankOrderComputationsContainer, RankOrderResult ## Circular import?
-
 from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel, create_tabbed_table_widget
-from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot, ExportFiletype
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
 
 __all__ = ['DockPlanningHelperWindow']
 
@@ -73,10 +63,40 @@ class DockPlanningHelperWindow:
     #     return self.plots_data.seperate_new_sorted_rasters_dict
 
 
-    # @property
-    # def root_plots_dict(self) -> Dict[str, pg.PlotItem]:
-    #     return {k:v['root_plot'] for k,v in self.plots.all_separate_plots.items()} # PlotItem 
+    @property
+    def dock_helper_widgets_container(self) -> PhoUIContainer:
+        return self.ui.dock_helper_widgets
+
+    @property
+    def dock_helper_widgets(self) -> Dict[str, DockPlanningHelperWidget]:
+        return self.ui.dock_helper_widgets.dock_helper_widgets
+    @dock_helper_widgets.setter
+    def dock_helper_widgets(self, value: Dict):
+        self.ui.dock_helper_widgets.dock_helper_widgets = value
+
+    @property
+    def dock_widgets(self) -> Dict:
+        """The dock_widgets property."""
+        return self.plots.dock_widgets
+    @dock_widgets.setter
+    def dock_widgets(self, value: Dict):
+        self.plots.dock_widgets = value
+
+    @property
+    def dock_configs(self) -> Dict[str, CustomDockDisplayConfig]:
+        return self.ui.dock_configs
+    @dock_configs.setter
+    def dock_configs(self, value: Dict[str, CustomDockDisplayConfig]):
+        self.ui.dock_configs = value
+
+
+
+
+    @property
+    def root_dockAreaWindow(self) -> PhoDockAreaContainingWindow:
+        return self.ui.root_dockAreaWindow
     
+
     @classmethod
     def init_dock_area_builder(cls, n_dock_planning_helper_widgets:int=4, dock_add_locations=None, **param_kwargs):
         """
@@ -86,36 +106,12 @@ class DockPlanningHelperWindow:
         global_laps_epochs_df = global_laps.to_dataframe()
 
         """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
 
         _obj = cls()
 
         name:str = 'DockPlanningHelperWindow'
-
-        ## 2023-11-30 - Newest Version using separate rasters:
-        # _obj.plots_data, _obj.plots = cls._build_internal_raster_plots(_obj.global_spikes_df, _obj.active_epochs_df, _obj.track_templates, debug_print=True)
-        # #TODO 2023-11-30 15:14: - [ ] Unpacking and putting in docks and such not yet finished. Update functions would need to be done separately.
-        # rasters_display_outputs = _obj.plots.rasters_display_outputs
-        # all_apps = {a_decoder_name:a_raster_setup_tuple.app for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_windows = {a_decoder_name:a_raster_setup_tuple.win for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_separate_plots = {a_decoder_name:a_raster_setup_tuple.plots for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_separate_plots_data = {a_decoder_name:a_raster_setup_tuple.plots_data for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-
-        # main_plot_identifiers_list = list(all_windows.keys()) # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-
-        # ## Extract the data items:
-        # all_separate_data_all_spots = {a_decoder_name:a_raster_setup_tuple.plots_data.all_spots for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_separate_data_all_scatterplot_tooltips_kwargs = {a_decoder_name:a_raster_setup_tuple.plots_data.all_scatterplot_tooltips_kwargs for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_separate_data_new_sorted_rasters = {a_decoder_name:a_raster_setup_tuple.plots_data.new_sorted_raster for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_separate_data_spikes_dfs = {a_decoder_name:a_raster_setup_tuple.plots_data.spikes_df for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-
-        # # Extract the plot/renderable items
-        # all_separate_root_plots = {a_decoder_name:a_raster_setup_tuple.plots.root_plot for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_separate_grids = {a_decoder_name:a_raster_setup_tuple.plots.grid for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_separate_scatter_plots = {a_decoder_name:a_raster_setup_tuple.plots.scatter_plot for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-        # all_separate_debug_header_labels = {a_decoder_name:a_raster_setup_tuple.plots.debug_header_label for a_decoder_name, a_raster_setup_tuple in rasters_display_outputs.items()}
-
         # Embedding in docks:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title='Pho DockPlanningHelperWindow')
         # icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
@@ -127,6 +123,8 @@ class DockPlanningHelperWindow:
         for i in np.arange(n_dock_planning_helper_widgets):
             dock_id_str: str = f'dock[{i}]'
             a_dock_helper_widget = DockPlanningHelperWidget(dock_title=dock_id_str, dock_id=dock_id_str, defer_show=True)
+            # _a_conn = a_dock_helper_widget.sigCreateNewDock.connect(_obj.on_click_create_new_dock)
+            
             # _dock_helper_widgets.append(a_dock_helper_widget)
             _dock_helper_widgets_dict[dock_id_str] = a_dock_helper_widget
 
@@ -213,30 +211,9 @@ class DockPlanningHelperWindow:
                                             # **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']},
                                             )
         # _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
-        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references=None)
+        dock_helper_widgets = PhoUIContainer(name=f'{name}.dock_helper_widgets', dock_helper_widgets=_dock_helper_widgets_dict)
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, dock_helper_widgets=dock_helper_widgets, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references=None)
         _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, **param_kwargs)
-
-        # ## Cleanup when done:
-        # for a_decoder_name, a_root_plot in _obj.plots.root_plots.items():
-        #     a_root_plot.setTitle(title=a_decoder_name)
-        #     # a_root_plot.setTitle(title="")
-        #     a_left_axis = a_root_plot.getAxis('left')# axisItem
-        #     a_left_axis.setLabel(a_decoder_name)
-        #     a_left_axis.setStyle(showValues=False)
-        #     a_left_axis.setTicks([])
-        #     # a_root_plot.hideAxis('bottom')
-        #     # a_root_plot.hideAxis('bottom')
-        #     a_root_plot.hideAxis('left')
-        #     # a_root_plot.setYRange(-0.5, float(_obj.max_n_neurons))
-            
-
-        # for a_decoder_name, a_scatter_plot_item in _obj.plots.scatter_plots.items():
-        #     a_scatter_plot_item.hideAxis('left')
-
-        # # Hide the debugging labels
-        # for a_decoder_name, a_label in _obj.plots.debug_header_labels.items():
-        #     # a_label.setText('NEW')
-        #     a_label.hide() # hide the labels unless we need them.
 
         _obj.register_internal_callbacks()
 
@@ -250,7 +227,7 @@ class DockPlanningHelperWindow:
             # AttributeError: 'NoneType' object has no attribute 'ripple_combined_epoch_stats_df'
             print(f'WARNING: {e}')
 
-        except Exception as e:
+        except BaseException as e:
             raise e
 
         
@@ -321,15 +298,47 @@ class DockPlanningHelperWindow:
         return ui_dict, ctrls_dock_widgets_dict
 
 
-
-
     def register_internal_callbacks(self):
         """ registers all internally-owned callback functions. """
         # self.on_idx_changed_callback_function_dict['update_plot_titles_with_stats'] = self.update_plot_titles_with_stats
         pass
 
 
-    
+    def perform_create_new_dock_widget(self, dock_id_str:str=None, active_dock_add_location:str='bottom'):
+        """ 
+        a_dock_helper_widget, a_dock_config, a_dock_widget = _out.perform_create_new_dock_widget()
+        
+        """
+        if dock_id_str is None:
+            num_helper_widgets: int = len(self.dock_helper_widgets)
+            next_helper_widget_idx: int = num_helper_widgets
+            dock_id_str: str = f'dock[{next_helper_widget_idx}]'
+            
+        if active_dock_add_location is None:
+            active_dock_add_location:str = 'bottom'
+            
+        extant_dock_helper_widget = self.dock_helper_widgets.get(dock_id_str, None)
+        extant_config = self.dock_configs.get(dock_id_str, None)
+        extant_dock_widget = self.dock_widgets.get(dock_id_str, None)
+        assert extant_dock_helper_widget is None
+        assert extant_config is None
+        assert extant_dock_widget is None
+        
+        ## make new:
+        a_dock_helper_widget = DockPlanningHelperWidget(dock_title=dock_id_str, dock_id=dock_id_str, defer_show=True)
+        a_dock_helper_widget.sigCreateNewDock.connect(self.on_click_create_new_dock)
+        ## Updates: self.dock_helper_widgets, self.dock_configs, self.dock_widgets
+        self.dock_helper_widgets[dock_id_str] = a_dock_helper_widget
+        self.dock_configs[dock_id_str] = CustomDockDisplayConfig(showCloseButton=False)
+        self.dock_widgets[dock_id_str] = self.root_dockAreaWindow.add_display_dock(identifier=dock_id_str, widget=a_dock_helper_widget, dockSize=(300,600), dockAddLocationOpts=active_dock_add_location, display_config=self.dock_configs[dock_id_str], autoOrientation=False)
+        return self.dock_helper_widgets[dock_id_str], self.dock_configs[dock_id_str], self.dock_widgets[dock_id_str]
+
+
+    def on_click_create_new_dock(self, child_widget: DockPlanningHelperWidget, relative_location: str):
+        # [self.embedding_dock_item, 'bottom']
+        print(f'.on_click_create_new_dock(child_widget: {child_widget}, relative_location: "{relative_location}")')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
+        # self.action_create_new_dock.emit(self, 'bottom')
 
     # ==================================================================================================================== #
     # Other Functions                                                                                                      #

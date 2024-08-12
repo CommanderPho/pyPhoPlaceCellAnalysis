@@ -9,6 +9,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AU
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 class DockPlanningHelperWidget(QtWidgets.QWidget):
     """ This widget is meant to be embedded in a pyqtgraph.dockarea.Dock to easily prototype/modify its properties. Allows you to create a layout interactively and then save it.
@@ -16,12 +17,13 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
     
     """
-    action_save = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
-    action_log = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial
+    sigSave = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
+    sigLog = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial
+    sigRefresh = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial
     
-    action_create_new_dock = QtCore.pyqtSignal(object, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
+    sigCreateNewDock = QtCore.pyqtSignal(object, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
     
-    close_signal = QtCore.pyqtSignal() # Called when the window is closing. 
+    sigClose = QtCore.pyqtSignal() # Called when the window is closing. 
     
     
     def __init__(self, dock_title='Position Decoder', dock_id='Position Decoder', defer_show=False, parent=None):
@@ -141,10 +143,17 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         
         self.ui.btnLog.clicked.connect(self.on_log)
         self.ui.btnSave.clicked.connect(self.on_save)
+        self.ui.btnRefresh.clicked.connect(self.on_refresh)
         
         self.ui.btnAddWidgetRight.clicked.connect(self.on_click_create_new_dock_right)
         self.ui.btnAddWidgetBelow.clicked.connect(self.on_click_create_new_dock_below)
         
+        # self.ui.spinBox_Width.valueChanged.connect(self.on_values_updated)
+
+        self.ui.spinBox_Width.editingFinished.connect(self.on_values_updated)        
+        self.ui.spinBox_Height.editingFinished.connect(self.on_values_updated)
+        
+
         self.rebuild_output()
         
         # self.ui.lblInfoTextLine.setText()
@@ -172,31 +181,41 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         if self.embedding_dock_item is not None:
             self.embedding_dock_item.setOrientation(self.dock_orientation)
         
-    @QtCore.pyqtSlot()
+    pyqtExceptionPrintingSlot()
     def on_log(self):
         log_string = self.rebuild_output()
         print(f'on_log: {log_string}')
-        self.action_log.emit(self.identifier, self.title, log_string)
+        print(f'DockPlanningHelperWidget.on_log(...):\n\tout_string: {log_string}')
+        self.sigLog.emit(self.identifier, self.title, log_string)
     
-    @QtCore.pyqtSlot()
+    pyqtExceptionPrintingSlot()
     def on_save(self):
         # TODO: finish
         out_string = self.rebuild_output()
-        self.action_save.emit(self.identifier, self.title, out_string)
+        print(f'DockPlanningHelperWidget.on_save(...):\n\tout_string: {out_string}')
+        self.sigSave.emit(self.identifier, self.title, out_string)
         
-    @QtCore.pyqtSlot()
+
+    @pyqtExceptionPrintingSlot()
+    def on_refresh(self, *args, **kwargs):
+        out_string = self.rebuild_output()
+        print(f'DockPlanningHelperWidget.on_refresh(...):\n\tout_string: {out_string}')
+        self.sigRefresh.emit(self.identifier, self.title, out_string)
+        
+
+    @pyqtExceptionPrintingSlot()
     def on_click_create_new_dock_below(self):
         # [self.embedding_dock_item, 'bottom']
-        print(f'on_click_create_new_dock_below()')
+        print(f'DockPlanningHelperWidget.on_click_create_new_dock_below()')
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
-        self.action_create_new_dock.emit(self, 'bottom')
+        self.sigCreateNewDock.emit(self, 'bottom')
 
-    @QtCore.pyqtSlot()        
+    @pyqtExceptionPrintingSlot()
     def on_click_create_new_dock_right(self):
         # [self.embedding_dock_item, 'right']
-        print(f'on_click_create_new_dock_right()')
+        print(f'DockPlanningHelperWidget.on_click_create_new_dock_right()')
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
-        self.action_create_new_dock.emit(self, 'right')
+        self.sigCreateNewDock.emit(self, 'right')
 
     def __str__(self):
          return 
