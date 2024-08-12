@@ -13,6 +13,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 class DockPlanningHelperWidget(QtWidgets.QWidget):
     """ This widget is meant to be embedded in a pyqtgraph.dockarea.Dock to easily prototype/modify its properties. Allows you to create a layout interactively and then save it.
     
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
     
     """
     action_save = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
