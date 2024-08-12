@@ -1,6 +1,6 @@
 import builtins
 from copy import deepcopy
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from matplotlib.backend_bases import MouseButton
 from neuropy.utils.result_context import IdentifyingContext
 import numpy as np
@@ -56,7 +56,8 @@ These functions help render a vertically stacked column of subplots that represe
 # Stacked Epoch Slices View                                                                                            #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['helper', 'common', 'setup', 'axes', 'figure', 'stacked'], input_requires=[], output_provides=[], uses=[], used_by=['stacked_epoch_slices_view'], creation_date='2023-03-28 00:00', related_items=[])
-def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, single_plot_fixed_width=200.0, debug_test_max_num_variants=64, should_use_MatplotlibTimeSynchronizedWidget=True, debug_print=False, **additional_params_kwargs):
+def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epoch_slices_view', plot_function_name='Stacked Epoch Slices View - PlotItem Version', single_plot_fixed_height=100.0, debug_test_max_num_slices=70, single_plot_fixed_width=200.0, debug_test_max_num_variants=64,
+                             should_use_MatplotlibTimeSynchronizedWidget=True, debug_print=False, **additional_params_kwargs) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
     """ Builds the common setup/containers for all stacked-epoch type plots:
     
     epoch_description_list: list of length 
@@ -116,7 +117,7 @@ def stacked_epoch_basic_setup(epoch_slices, epoch_labels=None, name='stacked_epo
 # PyQtGraph-based Versions                                                                                             #
 # ==================================================================================================================== #
 @function_attributes(short_name='stacked_epoch_slices_view', tags=['display','slices','stacked', 'scrollable'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'build_scrollable_graphics_layout_widget_ui'], used_by=[], creation_date='2023-03-29 18:01')
-def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view', debug_print=False):
+def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view', debug_print=False) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
     """ I think this version displays line plots of the position traces, but it's not explicitly used anywhere that I know of.
 
     position_times_list: list of timestamps
@@ -226,7 +227,7 @@ def stacked_epoch_slices_view(epoch_slices, position_times_list, position_traces
     
     return params, plots_data, plots, ui
 
-def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view_viewbox', debug_print=False):
+def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, position_traces_list, epoch_description_list, name='stacked_epoch_slices_view_viewbox', debug_print=False) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
     """ The viewbox version - not primarily used
     
     epoch_description_list: list of length 
@@ -409,7 +410,7 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
 def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None,
                                                 single_plot_fixed_height=100.0, debug_test_max_num_slices=127,
                                                 size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, should_use_MatplotlibTimeSynchronizedWidget=True,
-                                                debug_print=False, **kwargs):
+                                                debug_print=False, **kwargs) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -452,8 +453,6 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
 
     plots.fig.suptitle(plots.name)
 
-    # plots.axs = plots.fig.subplots(ncols=1, nrows=params.active_num_slices, sharex=False, sharey=False)
-
     ## Begin to support a separate column for showing labels
     subplots_kwargs = dict()
     params.setdefault('should_use_separate_details_column', False)
@@ -485,11 +484,11 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     return params, plots_data, plots, ui
 
 
-@function_attributes(short_name=None, tags=['matplotlib', 'plot', 'figure', 'variant', 'helper'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget'], used_by=[], creation_date='2023-05-30 10:06', related_items=[])
+@function_attributes(short_name=None, tags=['matplotlib', 'plot', 'figure', 'variant', 'helper'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget', 'inset_axes'], used_by=[], creation_date='2023-05-30 10:06', related_items=[])
 def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, epoch_labels=None,
                                                         single_plot_fixed_height=100.0, debug_test_max_num_slices=12,
                                                         size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, should_use_MatplotlibTimeSynchronizedWidget=True,
-                                                        debug_print=False, **kwargs):
+                                                        debug_print=False, **kwargs) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -540,13 +539,12 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     if not params.should_use_MatplotlibTimeSynchronizedWidget:
         ## Basic Matplotlib Version:
         plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False) # , constrained_layout=True, frameon=False
-        # plots.fig, plots.parent_ax = plt.subplots(**({'num': plots.figure_id, 'ncols': 1, 'nrows': 1, 'dpi': 72, 'clear': True, 'sharex': False, 'sharey': False, 'constrained_layout': constrained_layout, 'frameon': False} | kwargs))
         ui.mw = None
     else:
         ## MatplotlibTimeSynchronizedWidget-embedded Version:
-        ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name, **kwargs) # , clear=True
+        ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name, **kwargs)
         plots.fig = ui.mw.getFigure()
-        plots.parent_ax = plots.fig.subplots(ncols=1, nrows=1, sharex=False, sharey=False) # , figsize=(15,15), clear=True, constrained_layout=True
+        plots.parent_ax = plots.fig.subplots(ncols=1, nrows=1, sharex=False, sharey=False)
 
     # Remove frames/spines:
     plots.parent_ax.axis('off')
@@ -869,6 +867,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         disable_toolbar = params_kwargs.pop('disable_toolbar', True)
         kwargs['disable_toolbar'] = disable_toolbar
 
+        
+        
 
         params, plots_data, plots, ui = plot_decoded_epoch_slices(filter_epochs=deepcopy(active_filter_epochs), filter_epochs_decoder_result=deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, params_kwargs=params_kwargs, **kwargs)
@@ -1139,9 +1139,11 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         self.params.on_secondary_click_item_callbacks['log_clicked_epoch_times_to_message_box_callback'] = ClickActionCallbacks.log_clicked_epoch_times_to_message_box_callback
         
 
-
+    @function_attributes(short_name=None, tags=['update', 'jump-to-page', 'page', 'callback'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_pagination_helper_plot_single_epoch_slice'], used_by=[], creation_date='2023-08-12 00:00', related_items=[])
     def on_jump_to_page(self, page_idx: int):
         """ Called when the page index is changed to update the figure
+        
+        Iterates through each of the axes on the page and calls `plot_1D_most_likely_position_comparsions` on them
         
         Performs `self.params.on_render_page_callbacks`
 
@@ -1312,7 +1314,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             clicked_epoch_start_stop_time = None
         return clicked_epoch_start_stop_time, clicked_epoch_is_selected
             
-
     def on_primary_click(self, event, clicked_ax=None, clicked_data_index=None):
         """ a primary (Usually left)-click event. Called manually from self.on_click(...) for appropriate mouse button events.
         """
@@ -1323,7 +1324,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.on_selected_epochs_changed(clicked_ax=clicked_ax, clicked_data_index=clicked_data_index)
 
     
-
     def on_middle_click(self, event, clicked_ax=None, clicked_data_index=None):
         """ a middle-click event. Called manually from self.on_click(...) for appropriate mouse button events.
         """
@@ -1340,7 +1340,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 a_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time)
 
 
-
     def on_secondary_click(self, event, clicked_ax=None, clicked_data_index=None):
         """ a secondary (usually right)-click event. Called manually from self.on_click(...) for appropriate mouse button events.
         """
@@ -1355,8 +1354,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
             with ExceptionPrintingContext(suppress=self.params.get("should_suppress_callback_exceptions", True), exception_print_fn=(lambda formatted_exception_str: self.ui.print(f'\t\t WARNING: encountered exception in callback with name "{a_callback_name}" for clicked_data_index: {clicked_data_index}, clicked_ax: {clicked_ax}: exception: {formatted_exception_str}'))):        
                 a_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time)
-
-
 
 
     def perform_update_ax_selected_state(self, ax, is_selected: bool):
@@ -1423,7 +1420,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.draw()
 
 
-
+    # Draw/Display _______________________________________________________________________________________________________ #
     def draw(self):
         """ Calls .draw() on child MatplotlibTimeSynchronizedWidget.
         """
@@ -1440,6 +1437,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     # Single pagination_controller versions of PhoPaginatedMultiDecoderDecodedEpochsWindow's methods                       #
     # ==================================================================================================================== #
 
+    @function_attributes(short_name=None, tags=['data-overlays', 'add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['remove_data_overlays'])
     def add_data_overlays(self, decoder_decoded_epochs_result, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
         
@@ -1477,6 +1475,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             self.refresh_current_page()
 
 
+    @function_attributes(short_name=None, tags=['data-overlays', 'remove'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['add_data_overlays'])
     def remove_data_overlays(self, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
         """
@@ -1837,7 +1836,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         self.draw()
         
-
+    @function_attributes(short_name=None, tags=['data-overlays', 'add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['remove_data_overlays'])
     def add_data_overlays(self, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data and adds them to the plot.
         
@@ -1873,7 +1872,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             self.refresh_current_page()
 
 
-
+    @function_attributes(short_name=None, tags=['data-overlays', 'remove'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['add_data_overlays'])
     def remove_data_overlays(self, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
         """
