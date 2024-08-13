@@ -245,6 +245,8 @@ class Dock(QtWidgets.QWidget, DockDrop):
     def resizeEvent(self, ev):
         self.setOrientation()
         self.resizeOverlay(self.size())
+        super().resizeEvent(ev) ## call super
+        
 
     def name(self):
         return self._name
