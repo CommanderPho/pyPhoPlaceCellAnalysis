@@ -120,6 +120,7 @@ class LayoutScrollability(ExtendedEnum):
         return cls.build_member_value_dict([False, True])
 
 
+@function_attributes(short_name=None, tags=['pyqtgraph', 'build'], input_requires=[], output_provides=[], uses=['pg.GraphicsLayoutWidget'], used_by=['BasicBinnedImageRenderingWindow'], creation_date='2023-04-18 00:00', related_items=[])
 def _perform_build_root_graphics_layout_widget_ui(ui:PhoUIContainer, is_scrollable: bool = True) -> PhoUIContainer:
     """ just adds the widgets required to make the main graphics layoutr scrollable
 
