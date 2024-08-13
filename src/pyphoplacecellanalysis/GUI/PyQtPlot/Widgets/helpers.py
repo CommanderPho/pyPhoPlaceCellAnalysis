@@ -56,6 +56,7 @@ def recover_graphics_layout_widget_item_indicies(graphics_layout_widget, debug_p
     """ ✅WORKS✅ Recovers the row/column indicies for the items of a graphics_layout_widget 
     
     Example:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import recover_graphics_layout_widget_item_indicies
         
         found_item_rows, found_item_cols, found_items_list, (found_max_row, found_max_col) = recover_graphics_layout_widget_item_indicies(main_graphics_layout_widget, debug_print=True)
         
