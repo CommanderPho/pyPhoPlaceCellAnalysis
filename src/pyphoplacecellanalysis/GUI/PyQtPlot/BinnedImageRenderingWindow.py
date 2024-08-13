@@ -19,132 +19,106 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, _perform_build_root_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 
 
-def _add_bin_ticks(plot_item, xbins=None, ybins=None, grid_opacity:float=0.65):
-    """ adds the ticks/grid for xbins and ybins to the plot_item """
-    # show full frame, label tick marks at top and left sides, with some extra space for labels:
-    plot_item.showAxes(True, showValues=(True, True, False, False), size=10)
-    # define major tick marks and labels:
-    if xbins is not None:
-        xticks = [(idx, label) for idx, label in enumerate(xbins)]
-        for side in ('top','bottom'):
-            plot_item.getAxis(side).setStyle(showValues=False)
-            plot_item.getAxis(side).setTicks((xticks, [])) # add list of major ticks; no minor ticks        
-    if ybins is not None:
-        yticks = [(idx, label) for idx, label in enumerate(ybins)]
-        for side in ('left','right'):
-            plot_item.getAxis(side).setStyle(showValues=False)
-            plot_item.getAxis(side).setTicks((yticks, [])) # add list of major ticks; no minor ticks
-    plot_item.showGrid(x = True, y = True, alpha=grid_opacity)
-    return plot_item
+class BasicBinnedImageRenderingHelpers:
+    def _add_bin_ticks(plot_item, xbins=None, ybins=None, grid_opacity:float=0.65):
+        """ adds the ticks/grid for xbins and ybins to the plot_item """
+        # show full frame, label tick marks at top and left sides, with some extra space for labels:
+        plot_item.showAxes(True, showValues=(True, True, False, False), size=10)
+        # define major tick marks and labels:
+        if xbins is not None:
+            xticks = [(idx, label) for idx, label in enumerate(xbins)]
+            for side in ('top','bottom'):
+                plot_item.getAxis(side).setStyle(showValues=False)
+                plot_item.getAxis(side).setTicks((xticks, [])) # add list of major ticks; no minor ticks        
+        if ybins is not None:
+            yticks = [(idx, label) for idx, label in enumerate(ybins)]
+            for side in ('left','right'):
+                plot_item.getAxis(side).setStyle(showValues=False)
+                plot_item.getAxis(side).setTicks((yticks, [])) # add list of major ticks; no minor ticks
+        plot_item.showGrid(x = True, y = True, alpha=grid_opacity)
+        return plot_item
 
 
-def _build_binned_imageItem(plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None) -> Tuple[RenderPlots, RenderPlotsData]:
-    """ Builds and wrap a new `pg.ImageItem` 
-    
-    color_bar_mode: options for the colorbar of each image
-        ### curr_cbar_mode: 'each', 'one', None
-    """
-    local_plots_data = RenderPlotsData(name=name, matrix=None, matrix_min=None, matrix_max=None)
-    local_plots_data.matrix = matrix.copy()
-    local_plots_data.matrix_min = np.nanmin(matrix)
-    local_plots_data.matrix_max = np.nanmax(matrix)
-    
-    n_xbins, n_ybins = np.shape(local_plots_data.matrix)
-    if xbins is None:
-        x_min = 0
-        x_max = n_xbins
-
-    if ybins is None:
-        y_min = 0
-        y_max = n_ybins
+    def _build_binned_imageItem(plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None) -> Tuple[RenderPlots, RenderPlotsData]:
+        """ Builds and wrap a new `pg.ImageItem` 
         
-    # plotItem.invertY(True)           # orient y axis to run top-to-bottom
-    
-    local_plots = RenderPlots(name=name, imageItem=None, colorBarItem=None, matrixBoundaryRectItem=None)
-    # Normal ImageItem():
-    local_plots.imageItem = pg.ImageItem(matrix.T)
-    plot_item.addItem(local_plots.imageItem)
-
-    plot_item.setAspectLocked(lock=True, ratio=1)
-    # Set up the view range
-    plot_item.setXRange(x_min, x_max)
-    plot_item.setYRange(y_min, y_max)
-
-    # Disable auto range
-    plot_item.enableAutoRange(axis=pg.ViewBox.XAxis, enable=False)
-    plot_item.enableAutoRange(axis=pg.ViewBox.YAxis, enable=False)
-
-    # Draw the boundary as a thick rectangle
-    rect = QtCore.QRectF(x_min, y_min, (x_max - x_min), (y_max - y_min))
-    matrix_boundary_pen_color: QtCore.QColor = pg.mkColor('#ffffff')
-    matrix_boundary_pen_color.setAlphaF(0.7)
-    pen = pg.mkPen(matrix_boundary_pen_color, width=4)  # Adjust the color and thickness as needed
-    local_plots.matrixBoundaryRectItem = pg.QtGui.QGraphicsRectItem(rect)
-    local_plots.matrixBoundaryRectItem.setPen(pen)
-    plot_item.addItem(local_plots.matrixBoundaryRectItem)
-
-    # Mask the outside area to be transparent
-    plot_item.setClipToView(True)
-
-    # Color Map:
-    if hasattr(params, 'colorMap'):
-        colorMap = params.colorMap
-    else:
-        colorMap = pg.colormap.get("viridis")      
+        color_bar_mode: options for the colorbar of each image
+            ### curr_cbar_mode: 'each', 'one', None
+        """
+        local_plots_data = RenderPlotsData(name=name, matrix=None, matrix_min=None, matrix_max=None)
+        local_plots_data.matrix = matrix.copy()
+        local_plots_data.matrix_min = np.nanmin(matrix)
+        local_plots_data.matrix_max = np.nanmax(matrix)
         
-    if color_bar_mode is None:
-        local_plots.colorBarItem = None # no colorbar item
-        ## Still need to setup the colormap on the image
-        lut = colorMap.getLookupTable(0.0, 1.0)
-        local_plots.imageItem.setLookupTable(lut)
-        local_plots.imageItem.setLevels([local_plots_data.matrix_min, local_plots_data.matrix_max])
+        n_xbins, n_ybins = np.shape(local_plots_data.matrix)
+        if xbins is None:
+            x_min = 0
+            x_max = n_xbins
+
+        if ybins is None:
+            y_min = 0
+            y_max = n_ybins
+            
+        # plotItem.invertY(True)           # orient y axis to run top-to-bottom
         
-    else:
-        if color_bar_mode == 'each':   
-            # generate an adjustabled color bar
-            local_plots.colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=colorMap, label=data_label)
-            # link color bar and color map to correlogram, and show it in plotItem:
-            local_plots.colorBarItem.setImageItem(local_plots.imageItem, insert_in=plot_item)        
-            # Set the colorbar to the range:
-            local_plots.colorBarItem.setLevels(low=local_plots_data.matrix_min, high=local_plots_data.matrix_max)
+        local_plots = RenderPlots(name=name, imageItem=None, colorBarItem=None, matrixBoundaryRectItem=None)
+        # Normal ImageItem():
+        local_plots.imageItem = pg.ImageItem(matrix.T)
+        plot_item.addItem(local_plots.imageItem)
+
+        plot_item.setAspectLocked(lock=True, ratio=1)
+        # Set up the view range
+        plot_item.setXRange(x_min, x_max)
+        plot_item.setYRange(y_min, y_max)
+
+        # Disable auto range
+        plot_item.enableAutoRange(axis=pg.ViewBox.XAxis, enable=False)
+        plot_item.enableAutoRange(axis=pg.ViewBox.YAxis, enable=False)
+
+        # Draw the boundary as a thick rectangle
+        rect = QtCore.QRectF(x_min, y_min, (x_max - x_min), (y_max - y_min))
+        matrix_boundary_pen_color: QtCore.QColor = pg.mkColor('#ffffff')
+        matrix_boundary_pen_color.setAlphaF(0.7)
+        pen = pg.mkPen(matrix_boundary_pen_color, width=4)  # Adjust the color and thickness as needed
+        local_plots.matrixBoundaryRectItem = pg.QtGui.QGraphicsRectItem(rect)
+        local_plots.matrixBoundaryRectItem.setPen(pen)
+        plot_item.addItem(local_plots.matrixBoundaryRectItem)
+
+        # Mask the outside area to be transparent
+        plot_item.setClipToView(True)
+
+        # Color Map:
+        if hasattr(params, 'colorMap'):
+            colorMap = params.colorMap
         else:
-            ## TODO: globally shared colorbar item:
-            # local_plots.colorBarItem = self.params.shared_colorBarItem # shared colorbar item
-            local_plots.colorBarItem = None # shared colorbar item
+            colorMap = pg.colormap.get("viridis")      
             
-    return local_plots, local_plots_data
-
-
-
-
-
-@metadata_attributes(short_name=None, tags=['binning', 'image', 'window', 'standalone', 'widget'], input_requires=[], output_provides=[], uses=['_perform_build_root_graphics_layout_widget_ui', 'LayoutScrollability'], used_by=[], creation_date='2023-10-19 02:28', related_items=[])
-class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
-    """ Renders a Matrix of binned data in the window.NonUniformImage and includes no histogram.
-        NOTE: uses basic pg.ImageItem instead of pg.
-        Observed to work well to display simple binned heatmaps/grids such as avg velocity across spatial bins, etc.    
-        
-        History:
-            Based off of pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_Matrix.MatrixRenderingWindow
+        if color_bar_mode is None:
+            local_plots.colorBarItem = None # no colorbar item
+            ## Still need to setup the colormap on the image
+            lut = colorMap.getLookupTable(0.0, 1.0)
+            local_plots.imageItem.setLookupTable(lut)
+            local_plots.imageItem.setLevels([local_plots_data.matrix_min, local_plots_data.matrix_max])
             
-        Usage:
-            from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
-            out = BasicBinnedImageRenderingWindow(active_eloy_analysis.avg_2D_speed_per_pos, active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', scrollability_mode=LayoutScrollability.SCROLLABLE)
-            out.add_data(row=1, col=0, matrix=active_eloy_analysis.pf_overlapDensity_2D, xbins=active_pf_2D_dt.xbin_labels, ybins=active_pf_2D_dt.ybin_labels, name='pf_overlapDensity', title='pf overlapDensity metric', variable_label='pf overlapDensity')
-            out.add_data(row=2, col=0, matrix=active_pf_2D.ratemap.occupancy, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='occupancy_seconds', title='Seconds Occupancy', variable_label='seconds')
-            out.add_data(row=3, col=0, matrix=active_simpler_pf_densities_analysis.n_neurons_meeting_firing_critiera_by_position_bins_2D, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='n_neurons_meeting_firing_critiera_by_position_bins_2D', title='# neurons > 1Hz per Pos (X, Y)', variable_label='# neurons')
+        else:
+            if color_bar_mode == 'each':   
+                # generate an adjustabled color bar
+                local_plots.colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=colorMap, label=data_label)
+                # link color bar and color map to correlogram, and show it in plotItem:
+                local_plots.colorBarItem.setImageItem(local_plots.imageItem, insert_in=plot_item)        
+                # Set the colorbar to the range:
+                local_plots.colorBarItem.setLevels(low=local_plots_data.matrix_min, high=local_plots_data.matrix_max)
+            else:
+                ## TODO: globally shared colorbar item:
+                # local_plots.colorBarItem = self.params.shared_colorBarItem # shared colorbar item
+                local_plots.colorBarItem = None # shared colorbar item
+                
+        return local_plots, local_plots_data
 
-            
-        NOTE:
-            Label for `title` is too large, needs to changed to a smaller font
 
 
-        from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
-        out = BasicBinnedImageRenderingWindow(active_eloy_analysis.avg_2D_speed_per_pos, active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity')
 
-
-    """
-
+class BasicBinnedImageRenderingMixin:
     @property
     def plot_names(self) -> List[str]:
         """The plot_names property."""
@@ -153,151 +127,6 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
     @property
     def graphics_layout(self) -> pg.GraphicsLayoutWidget:
         return self.ui.graphics_layout
-
-    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity',
-                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity:float=0.65, defer_show=False, **kwargs):
-        row = kwargs.pop('row', 0)
-        col = kwargs.pop('col', 0)
-        window_title: str = kwargs.pop('window_title', title)
-        max_num_columns: int = kwargs.pop('max_num_columns', None)
-        max_num_rows: int = kwargs.pop('max_num_rows', None)
-        
-        super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
-        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow', grid_opacity=grid_opacity, plot_row_offset=0, max_num_columns=max_num_rows, max_num_rows=max_num_rows)
-        self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
-        self.plots = RenderPlots(name='BasicBinnedImageRenderingWindow')
-        self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow', connections=None)
-        self.ui.connections = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
-
-        self.params.scrollability_mode = LayoutScrollability.init(scrollability_mode)
-
-        if isinstance(color_map, str):        
-            self.params.colorMap = pg.colormap.get("viridis")
-        else:
-            # better be a ColorMap object directly
-            assert isinstance(color_map, ColorMap)
-            self.params.colorMap = color_map
-            
-        self.params.color_bar_mode = color_bar_mode
-        if self.params.color_bar_mode == 'one':
-            # Single shared color_bar between all items:
-            self.params.shared_colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=self.params.colorMap, label='all_pf_2Ds')
-        else:
-            self.params.shared_colorBarItem = None
-            
-        self.params.wants_crosshairs = wants_crosshairs
-
-        pg.setConfigOption('imageAxisOrder', 'row-major') # Switch default order to Row-major
-
-        ## Old (non-scrollable) way:        
-        # self.ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
-        # self.setCentralWidget(self.ui.graphics_layout)
-
-        ## Build scrollable UI version:
-        self.ui = _perform_build_root_graphics_layout_widget_ui(self.ui, is_scrollable=self.params.scrollability_mode.is_scrollable)
-        if self.params.scrollability_mode.is_scrollable:
-            self.setCentralWidget(self.ui.scrollAreaWidget)
-        else:
-            self.setCentralWidget(self.ui.graphics_layout)
-            self.ui.graphics_layout.resize(1000, 800)
-
-        # Shared:
-        self.setWindowTitle(window_title)
-        self.resize(1000, 800)
-        
-        ## Add Label for debugging:
-        self.params.max_num_columns = 1
-        
-        self.ui.mainLabel = pg.LabelItem(justify='right')
-        self.ui.graphics_layout.addItem(self.ui.mainLabel, row=0, col=0, rowspan=1, colspan=self.params.max_num_columns) # last column
-        self.params.plot_row_offset = self.params.plot_row_offset + 1
-        print(f'self.params.plot_row_offset: {self.params.plot_row_offset}')
-        
-        # Add the item for the provided data:
-        if matrix is not None:    
-            self.add_data(row=(self.params.plot_row_offset + row), col=col, matrix=matrix, xbins=xbins, ybins=ybins, name=name, title=title, variable_label=variable_label, drop_below_threshold=drop_below_threshold)
-        
-        if not defer_show:
-            self.show()
-
-
-
-    @classmethod
-    def init_from_data_spec(cls, a_spec: List[List[Dict]], window_title=None, scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12, **_shared_kwargs) -> "BasicBinnedImageRenderingWindow":
-        """ adds all plots
-
-        Usage:
-            from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
-
-        Example 1:
-            ## Allow inline spec
-            a_spec = [
-                ({'measured':_measured}, {'markov_ideal':_markov_ideal}, {'diff':_diff}) # single row (3 columns)
-            ]
-            out_test_markov_test_compare = BasicBinnedImageRenderingWindow.init_from_data_spec(a_spec, xbins=test_pos_bins, ybins=test_pos_bins)
-
-        Example 2:            
-            window_title = 'Transform Matrix: Measured v. Markov Ideal'
-            a_spec = [ # two rows: (2 columns, 1 column)
-                ({'measured':_measured}, {'markov_ideal':_markov_ideal},), # single row (2 columns)
-                ({'diff':_diff}, )
-            ]
-            out_test_markov_test_compare = BasicBinnedImageRenderingWindow.init_from_data_spec(a_spec, window_title=window_title, xbins=test_pos_bins, ybins=test_pos_bins)
-
-
-        """
-        # curr_window_kwargs = dict(window_title='Test', scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12)
-        curr_window_kwargs = dict(window_title=window_title, scrollability_mode=scrollability_mode, grid_opacity=grid_opacity, drop_below_threshold=drop_below_threshold)
-
-        # _shared_kwargs = dict(xbins=test_pos_bins, ybins=test_pos_bins)
-        n_rows = len(a_spec)
-        n_cols_per_row = [len(a_row) for a_row in a_spec] # each row can have different number of columns
-        max_n_columns_per_row = np.max(n_cols_per_row)
-        curr_window_kwargs['max_num_columns'] = max_n_columns_per_row
-        curr_window_kwargs['max_num_rows'] = n_rows
-        
-        needs_built_window_title: bool = False
-        if window_title is None:
-            needs_built_window_title: bool = True
-            window_title = f"BasicBinnedImageRenderingWindow[rows: {n_rows}, n_cols: {max_n_columns_per_row}]"
-            subplot_titles = []
-            
-        out_binned_window = None
-
-        _built_add_data_kwargs = []
-        for row_idx, a_row in enumerate(a_spec):
-            for col_idx, a_row_col in enumerate(a_row):
-                # first key is always the name
-                _curr_identifier: str = list(a_row_col.keys())[0]
-                _curr_data = a_row_col.pop(_curr_identifier)
-                if needs_built_window_title:
-                    subplot_titles.append(_curr_identifier)
-                _curr_build_kwargs = dict(row=row_idx, col=col_idx, name=_curr_identifier, title=_curr_identifier, variable_label=_curr_identifier, matrix=_curr_data, **_shared_kwargs)
-                _built_add_data_kwargs.append(_curr_build_kwargs)
-
-                if out_binned_window is None:
-                    ## create new instance
-                    _curr_initialization_kwargs = deepcopy(_curr_build_kwargs)
-                    _curr_initialization_kwargs['matrix'] = None
-                    
-                    # out_binned_window = cls(_curr_build_kwargs.pop('matrix'), **_curr_build_kwargs, **curr_window_kwargs)
-                    out_binned_window = cls(**_curr_initialization_kwargs, **curr_window_kwargs) ## create the window, but don't set its data yet
-                    
-                                        
-                # already have a window, use .add_data	
-                out_binned_window.add_data(**_curr_build_kwargs, defer_column_update=True) # defer_column_update=True to prevent columns updating each time. We call `update_columns_if_needed` when done
-
-        # row=0, col=1, 
-        # _built_add_data_kwargs
-        if needs_built_window_title:
-            if len(subplot_titles) > 0:
-                window_title = window_title + ': ' + ', '.join(subplot_titles)
-            out_binned_window.setWindowTitle(window_title)
-
-        out_binned_window.update_columns_if_needed(new_num_columns=max_n_columns_per_row)
-        
-        ## OUTPUTS: out_test_markov_test_compare, _built_add_data_kwargs
-        return out_binned_window
     
 
     def update_columns_if_needed(self, new_num_columns: int):
@@ -378,11 +207,11 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
         newPlotItem.setMouseEnabled(x=False, y=False)
         
         if needs_create_new:
-            newPlotItem = _add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins, grid_opacity=self.params.grid_opacity)
+            newPlotItem = BasicBinnedImageRenderingHelpers._add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins, grid_opacity=self.params.grid_opacity)
 
 
         if needs_create_new:
-            local_plots, local_plots_data = _build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
+            local_plots, local_plots_data = BasicBinnedImageRenderingHelpers._build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
             
         self.plots_data[name] = local_plots_data
         self.plots[name] = local_plots
@@ -532,8 +361,6 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
 
         self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, rateLimit=60, slot=mouseMoved)
 
-
-
     def export_all_plots(self, curr_active_pipeline):
         """ Exports each subplot individually to file using `curr_active_pipeline.output_figure(final_context, a_plot.getViewBox())`
         
@@ -564,3 +391,299 @@ class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow):
             out_figs_dict[a_name] = curr_active_pipeline.output_figure(final_context, a_plot.getViewBox())
             
         return out_figs_dict
+    
+
+    def init_UI(self):
+        raise NotImplementedError('Inheritors must override!')
+            
+
+    @classmethod
+    def init_from_data_spec(cls, a_spec: List[List[Dict]], window_title=None, scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12, **_shared_kwargs) -> "BasicBinnedImageRenderingMixin":
+        """ adds all plots
+
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
+
+        Example 1:
+            ## Allow inline spec
+            a_spec = [
+                ({'measured':_measured}, {'markov_ideal':_markov_ideal}, {'diff':_diff}) # single row (3 columns)
+            ]
+            out_test_markov_test_compare = BasicBinnedImageRenderingWindow.init_from_data_spec(a_spec, xbins=test_pos_bins, ybins=test_pos_bins)
+
+        Example 2:            
+            window_title = 'Transform Matrix: Measured v. Markov Ideal'
+            a_spec = [ # two rows: (2 columns, 1 column)
+                ({'measured':_measured}, {'markov_ideal':_markov_ideal},), # single row (2 columns)
+                ({'diff':_diff}, )
+            ]
+            out_test_markov_test_compare = BasicBinnedImageRenderingWindow.init_from_data_spec(a_spec, window_title=window_title, xbins=test_pos_bins, ybins=test_pos_bins)
+
+
+        """
+        # curr_window_kwargs = dict(window_title='Test', scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12)
+        curr_window_kwargs = dict(window_title=window_title, scrollability_mode=scrollability_mode, grid_opacity=grid_opacity, drop_below_threshold=drop_below_threshold)
+
+        # _shared_kwargs = dict(xbins=test_pos_bins, ybins=test_pos_bins)
+        n_rows = len(a_spec)
+        n_cols_per_row = [len(a_row) for a_row in a_spec] # each row can have different number of columns
+        max_n_columns_per_row = np.max(n_cols_per_row)
+        curr_window_kwargs['max_num_columns'] = max_n_columns_per_row
+        curr_window_kwargs['max_num_rows'] = n_rows
+        
+        needs_built_window_title: bool = False
+        if window_title is None:
+            needs_built_window_title: bool = True
+            window_title = f"BasicBinnedImageRenderingMixin[rows: {n_rows}, n_cols: {max_n_columns_per_row}]"
+            subplot_titles = []
+            
+        out_binned_window = None
+
+        _built_add_data_kwargs = []
+        for row_idx, a_row in enumerate(a_spec):
+            for col_idx, a_row_col in enumerate(a_row):
+                # first key is always the name
+                _curr_identifier: str = list(a_row_col.keys())[0]
+                _curr_data = a_row_col.pop(_curr_identifier)
+                if needs_built_window_title:
+                    subplot_titles.append(_curr_identifier)
+                _curr_build_kwargs = dict(row=row_idx, col=col_idx, name=_curr_identifier, title=_curr_identifier, variable_label=_curr_identifier, matrix=_curr_data, **_shared_kwargs)
+                _built_add_data_kwargs.append(_curr_build_kwargs)
+
+                if out_binned_window is None:
+                    ## create new instance
+                    _curr_initialization_kwargs = deepcopy(_curr_build_kwargs)
+                    _curr_initialization_kwargs['matrix'] = None
+                    
+                    # out_binned_window = cls(_curr_build_kwargs.pop('matrix'), **_curr_build_kwargs, **curr_window_kwargs)
+                    out_binned_window = cls(**_curr_initialization_kwargs, **curr_window_kwargs) ## create the window, but don't set its data yet
+                    
+                                        
+                # already have a window, use .add_data	
+                out_binned_window.add_data(**_curr_build_kwargs, defer_column_update=True) # defer_column_update=True to prevent columns updating each time. We call `update_columns_if_needed` when done
+
+        # row=0, col=1, 
+        # _built_add_data_kwargs
+        if needs_built_window_title:
+            if len(subplot_titles) > 0:
+                window_title = window_title + ': ' + ', '.join(subplot_titles)
+            out_binned_window.setWindowTitle(window_title)
+
+        out_binned_window.update_columns_if_needed(new_num_columns=max_n_columns_per_row)
+        
+        ## OUTPUTS: out_test_markov_test_compare, _built_add_data_kwargs
+        return out_binned_window
+    
+
+
+
+
+
+class BasicBinnedImageRenderingWidget(QtWidgets.QWidget, BasicBinnedImageRenderingMixin):
+    """ 
+    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWidget
+    
+    
+    """
+    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title=None, variable_label=None,
+                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity:float=0.65, defer_show=False, **kwargs):
+        row = kwargs.pop('row', 0)
+        col = kwargs.pop('col', 0)
+        window_title: str = kwargs.pop('window_title', title)
+        max_num_columns: int = kwargs.pop('max_num_columns', None)
+        max_num_rows: int = kwargs.pop('max_num_rows', None)
+        
+        super(BasicBinnedImageRenderingWidget, self).__init__(**kwargs)
+        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWidget', grid_opacity=grid_opacity, plot_row_offset=0, max_num_columns=max_num_rows, max_num_rows=max_num_rows, window_title=window_title)
+        self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWidget')
+        self.plots = RenderPlots(name='BasicBinnedImageRenderingWidget')
+        self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWidget', connections=None, root_layout=None)
+        self.ui.connections = PhoUIContainer(name='BasicBinnedImageRenderingWidget')
+
+        self.params.scrollability_mode = LayoutScrollability.init(scrollability_mode)
+
+        # name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity'
+        if variable_label is None:
+            variable_label = name.strip("'").replace('_', ' ').title() # Convert to a title-case, space-separated string
+
+        if title is None:
+            title = name.strip("'").replace('_', ' ').title() # Convert to a title-case, space-separated string
+
+        if isinstance(color_map, str):        
+            self.params.colorMap = pg.colormap.get("viridis")
+        else:
+            # better be a ColorMap object directly
+            assert isinstance(color_map, ColorMap)
+            self.params.colorMap = color_map
+            
+        self.params.color_bar_mode = color_bar_mode
+        self.params.wants_crosshairs = wants_crosshairs
+        pg.setConfigOption('imageAxisOrder', 'row-major') # Switch default order to Row-major        
+
+        self.init_UI()
+        
+        # Add the item for the provided data:
+        if matrix is not None:    
+            self.add_data(row=(self.params.plot_row_offset + row), col=col, matrix=matrix, xbins=xbins, ybins=ybins, name=name, title=title, variable_label=variable_label, drop_below_threshold=drop_below_threshold)
+    
+        if not defer_show:
+            self.show()
+
+
+    def init_UI(self):
+        """ init_UI
+        
+        """
+        if self.params.color_bar_mode == 'one':
+            # Single shared color_bar between all items:
+            self.params.shared_colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=self.params.colorMap, label='all_pf_2Ds')
+        else:
+            self.params.shared_colorBarItem = None
+            
+        ## Old (non-scrollable) way:        
+        # self.ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
+        # self.setCentralWidget(self.ui.graphics_layout)
+        
+        ## Build scrollable UI version:
+        self.ui = _perform_build_root_graphics_layout_widget_ui(self.ui, is_scrollable=self.params.scrollability_mode.is_scrollable)
+        # widget only:
+        self.ui.root_layout = QtWidgets.QVBoxLayout(self)  # or any other layout            
+        self.ui.root_layout.setContentsMargins(0, 0, 0, 0)
+        self.ui.root_layout.setSpacing(0)            
+
+        if self.params.scrollability_mode.is_scrollable:
+            # self.setCentralWidget(self.ui.scrollAreaWidget)
+            self.ui.root_layout.addWidget(self.ui.scrollAreaWidget)
+            self.setLayout(self.ui.root_layout)
+
+        else:
+            # self.setCentralWidget(self.ui.graphics_layout)
+            self.ui.root_layout.addWidget(self.ui.graphics_layout)
+            self.setLayout(self.ui.root_layout)
+            self.ui.graphics_layout.resize(1000, 800)
+
+        # Shared:
+        self.setWindowTitle(self.params.window_title)
+        self.resize(1000, 800)
+        
+        ## Add Label for debugging:
+        self.params.max_num_columns = 1
+        
+        self.ui.mainLabel = pg.LabelItem(justify='right')
+        self.ui.graphics_layout.addItem(self.ui.mainLabel, row=0, col=0, rowspan=1, colspan=self.params.max_num_columns) # last column
+        self.params.plot_row_offset = self.params.plot_row_offset + 1
+        print(f'self.params.plot_row_offset: {self.params.plot_row_offset}')
+        
+
+
+
+# @metadata_attributes(short_name=None, tags=['binning', 'image', 'window', 'standalone', 'widget'], input_requires=[], output_provides=[], uses=['_perform_build_root_graphics_layout_widget_ui', 'LayoutScrollability'], used_by=[], creation_date='2023-10-19 02:28', related_items=[])
+class BasicBinnedImageRenderingWindow(QtWidgets.QMainWindow, BasicBinnedImageRenderingMixin):
+    """ Renders a Matrix of binned data in the window.NonUniformImage and includes no histogram.
+        NOTE: uses basic pg.ImageItem instead of pg.
+        Observed to work well to display simple binned heatmaps/grids such as avg velocity across spatial bins, etc.    
+        
+        History:
+            Based off of pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_Matrix.MatrixRenderingWindow
+            
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+            out = BasicBinnedImageRenderingWindow(active_eloy_analysis.avg_2D_speed_per_pos, active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity', scrollability_mode=LayoutScrollability.SCROLLABLE)
+            out.add_data(row=1, col=0, matrix=active_eloy_analysis.pf_overlapDensity_2D, xbins=active_pf_2D_dt.xbin_labels, ybins=active_pf_2D_dt.ybin_labels, name='pf_overlapDensity', title='pf overlapDensity metric', variable_label='pf overlapDensity')
+            out.add_data(row=2, col=0, matrix=active_pf_2D.ratemap.occupancy, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='occupancy_seconds', title='Seconds Occupancy', variable_label='seconds')
+            out.add_data(row=3, col=0, matrix=active_simpler_pf_densities_analysis.n_neurons_meeting_firing_critiera_by_position_bins_2D, xbins=active_pf_2D.xbin, ybins=active_pf_2D.ybin, name='n_neurons_meeting_firing_critiera_by_position_bins_2D', title='# neurons > 1Hz per Pos (X, Y)', variable_label='# neurons')
+
+            
+        NOTE:
+            Label for `title` is too large, needs to changed to a smaller font
+
+
+        from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+        out = BasicBinnedImageRenderingWindow(active_eloy_analysis.avg_2D_speed_per_pos, active_pf_2D_dt.xbin_labels, active_pf_2D_dt.ybin_labels, name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity')
+
+
+    """
+    def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title=None, variable_label=None,
+                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity:float=0.65, defer_show=False, **kwargs):
+        row = kwargs.pop('row', 0)
+        col = kwargs.pop('col', 0)
+        window_title: str = kwargs.pop('window_title', title)
+        max_num_columns: int = kwargs.pop('max_num_columns', None)
+        max_num_rows: int = kwargs.pop('max_num_rows', None)
+        
+        super(BasicBinnedImageRenderingWindow, self).__init__(**kwargs)
+        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWindow', grid_opacity=grid_opacity, plot_row_offset=0, max_num_columns=max_num_rows, max_num_rows=max_num_rows, window_title=window_title)
+        self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWindow')
+        self.plots = RenderPlots(name='BasicBinnedImageRenderingWindow')
+        self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWindow', connections=None)
+        self.ui.connections = PhoUIContainer(name='BasicBinnedImageRenderingWindow')
+
+        self.params.scrollability_mode = LayoutScrollability.init(scrollability_mode)
+
+        # name='avg_velocity', title="Avg Velocity per Pos (X, Y)", variable_label='Avg Velocity'
+        if variable_label is None:
+            variable_label = name.strip("'").replace('_', ' ').title() # Convert to a title-case, space-separated string
+
+        if title is None:
+            title = name.strip("'").replace('_', ' ').title() # Convert to a title-case, space-separated string
+
+        if isinstance(color_map, str):        
+            self.params.colorMap = pg.colormap.get("viridis")
+        else:
+            # better be a ColorMap object directly
+            assert isinstance(color_map, ColorMap)
+            self.params.colorMap = color_map
+            
+        self.params.color_bar_mode = color_bar_mode
+        self.params.wants_crosshairs = wants_crosshairs
+        pg.setConfigOption('imageAxisOrder', 'row-major') # Switch default order to Row-major        
+
+        self.init_UI()
+        
+        # Add the item for the provided data:
+        if matrix is not None:    
+            self.add_data(row=(self.params.plot_row_offset + row), col=col, matrix=matrix, xbins=xbins, ybins=ybins, name=name, title=title, variable_label=variable_label, drop_below_threshold=drop_below_threshold)
+    
+        if not defer_show:
+            self.show()
+
+
+    def init_UI(self):
+        """ init_UI
+        
+        """
+        if self.params.color_bar_mode == 'one':
+            # Single shared color_bar between all items:
+            self.params.shared_colorBarItem = pg.ColorBarItem(values=(0,1), colorMap=self.params.colorMap, label='all_pf_2Ds')
+        else:
+            self.params.shared_colorBarItem = None
+            
+        ## Old (non-scrollable) way:        
+        # self.ui.graphics_layout = pg.GraphicsLayoutWidget(show=True)
+        # self.setCentralWidget(self.ui.graphics_layout)
+        
+        ## Build scrollable UI version:
+        self.ui = _perform_build_root_graphics_layout_widget_ui(self.ui, is_scrollable=self.params.scrollability_mode.is_scrollable)
+        if self.params.scrollability_mode.is_scrollable:
+            self.setCentralWidget(self.ui.scrollAreaWidget)
+        else:
+            self.setCentralWidget(self.ui.graphics_layout)
+            self.ui.graphics_layout.resize(1000, 800)
+
+        # Shared:
+        self.setWindowTitle(self.params.window_title)
+        self.resize(1000, 800)
+        
+        ## Add Label for debugging:
+        self.params.max_num_columns = 1
+        
+        self.ui.mainLabel = pg.LabelItem(justify='right')
+        self.ui.graphics_layout.addItem(self.ui.mainLabel, row=0, col=0, rowspan=1, colspan=self.params.max_num_columns) # last column
+        self.params.plot_row_offset = self.params.plot_row_offset + 1
+        print(f'self.params.plot_row_offset: {self.params.plot_row_offset}')
+        
+
+        
+
+
