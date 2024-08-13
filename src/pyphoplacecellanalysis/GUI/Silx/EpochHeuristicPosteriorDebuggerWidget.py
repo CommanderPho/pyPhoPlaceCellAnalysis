@@ -20,6 +20,7 @@ from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
@@ -41,7 +42,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.Analysis.position_derivatives import PositionDerivativesContainer
 
         
-
+@function_attributes(short_name=None, tags=['Silx', 'grid', 'matrix'], input_requires=[], output_provides=[], uses=[], used_by=['EpochHeuristicDebugger'], creation_date='2024-08-13 06:06', related_items=[])
 def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False):
     """ Updates the grid-size for the rendered grid:
     Requires that Silx be using a matpltolib-based backend
@@ -71,6 +72,7 @@ def setup_plot_grid_ticks(a_plot: Union[Plot1D, Plot2D], minor_ticks:bool=False)
     return x_ticks_obj_list, y_ticks_obj_list
 
 
+@function_attributes(short_name=None, tags=['Silx', 'remove', 'toolbar', 'gui'], input_requires=[], output_provides=[], uses=[], used_by=['EpochHeuristicDebugger'], creation_date='2024-08-13 06:07', related_items=[])
 def remove_all_plot_toolbars(a_plot: Union[Plot1D, Plot2D]):
     """ removes the default plot-customization toolbars from the Plot*Ds """
     _plot_toolbars = [a_plot.toolBar(), a_plot.getOutputToolBar(), a_plot.getInteractiveModeToolBar()]
@@ -85,6 +87,8 @@ def remove_all_plot_toolbars(a_plot: Union[Plot1D, Plot2D]):
 plot1d_factory = partial(Plot1D)
 # plot1d_factory = partial(Plot1D, toolbar=False)
 
+
+@metadata_attributes(short_name=None, tags=['Silx', 'gui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-13 06:06', related_items=[])
 @define(slots=False)
 class EpochHeuristicDebugger:
     """ 

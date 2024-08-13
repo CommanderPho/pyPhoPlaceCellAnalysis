@@ -11,6 +11,8 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.core.epoch import ensure_dataframe
 from neuropy.analyses.decoders import RadonTransformDebugValue
 
@@ -43,7 +45,7 @@ Uses Silx
 
 """
 
-
+@metadata_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-13 00:00', related_items=[])
 @define(slots=False)
 class RadonDebugValue:
     """ Values for a single epoch. Class to hold debugging information for a transformation process """
@@ -185,7 +187,7 @@ def on_set_active_epoch_idx_changed(instance, attribute, new_value):
     print(f'\tdone.')
     return new_value
 
-
+@metadata_attributes(short_name=None, tags=['radon', 'debugger', 'gui', 'Silx'], input_requires=[], output_provides=[], uses=['Silx'], used_by=[], creation_date='2024-08-13 00:00', related_items=[])
 @define(slots=False, repr=False)
 class RadonTransformDebugger:
     """ interactive debugger of Radon Transforms computed on Posteriors using Silx

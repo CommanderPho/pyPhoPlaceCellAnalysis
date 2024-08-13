@@ -429,7 +429,7 @@ def debug_plot_position_derivatives_stack(new_measured_pos_df, all_epochs_positi
 # 2024-08-01 PositionDerivativesContainer                                                                              #
 # ==================================================================================================================== #
 
-
+@metadata_attributes(short_name=None, tags=['position', 'velocity', 'acceleration', 'derivative'], input_requires=[], output_provides=[], uses=[], used_by=['EpochHeuristicDebugger'], creation_date='2024-03-07 00:00', related_items=[])
 @define(slots=False)
 class PositionDerivativesContainer:
     """ 2024-08-01 Holds spatial derivative values
