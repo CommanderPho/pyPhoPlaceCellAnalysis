@@ -36,11 +36,11 @@ class BasicBinnedImageRenderingHelpers:
             for side in ('left','right'):
                 plot_item.getAxis(side).setStyle(showValues=False)
                 plot_item.getAxis(side).setTicks((yticks, [])) # add list of major ticks; no minor ticks
-        plot_item.showGrid(x = True, y = True, alpha=grid_opacity)
+        plot_item.showGrid(x=True, y=True, alpha=grid_opacity)
         return plot_item
 
     @classmethod
-    def _build_binned_imageItem(cls, plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None) -> Tuple[RenderPlots, RenderPlotsData]:
+    def _build_binned_imageItem(cls, plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None, use_bin_index_axes:bool=True) -> Tuple[RenderPlots, RenderPlotsData]:
         """ Builds and wrap a new `pg.ImageItem` 
         
         color_bar_mode: options for the colorbar of each image
@@ -52,14 +52,20 @@ class BasicBinnedImageRenderingHelpers:
         local_plots_data.matrix_max = np.nanmax(matrix)
         
         n_xbins, n_ybins = np.shape(local_plots_data.matrix)
-        if xbins is None:
+        if use_bin_index_axes or (xbins is None):
             x_min = 0
             x_max = n_xbins
+        else:
+            x_min = np.nanmin(xbins)
+            x_max = np.nanmax(xbins)
 
-        if ybins is None:
+        if use_bin_index_axes or (ybins is None):
             y_min = 0
             y_max = n_ybins
-            
+        else:
+            y_min = np.nanmin(ybins)
+            y_max = np.nanmax(ybins)
+        
         # plotItem.invertY(True)           # orient y axis to run top-to-bottom
         
         local_plots = RenderPlots(name=name, imageItem=None, colorBarItem=None, matrixBoundaryRectItem=None)
@@ -368,6 +374,8 @@ class BasicBinnedImageRenderingMixin:
 
         if needs_create_new:
             newPlotItem: pg.PlotItem = target_layout.addPlot(title=title, row=(self.params.plot_row_offset + row), col=col, rowspan=rowspan, colspan=colspan) # add PlotItem to the main GraphicsLayoutWidget
+            newPlotItem.setDefaultPadding(0.0)  # plot without padding data range
+            
 
         ## Common formatting:    
         # Set the plot title:
