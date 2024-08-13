@@ -6,6 +6,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget import DockPlanningHelperWidget
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AUTOGEN_DockPlanningHelperWidget import Ui_Form
+# from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AUTOGEN_TinyDockPlanningHelperWidget import Ui_Form
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
@@ -29,7 +30,7 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     sigClose = QtCore.pyqtSignal() # Called when the window is closing. 
     
     
-    def __init__(self, dock_title='Position Decoder', dock_id='Position Decoder', defer_show=False, parent=None):
+    def __init__(self, dock_title='Position Decoder', dock_id='PositionDecoder', defer_show=False, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = Ui_Form()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
@@ -169,6 +170,24 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         self.ui.spinBox_Width.editingFinished.connect(self.on_values_updated)        
         self.ui.spinBox_Height.editingFinished.connect(self.on_values_updated)
         
+        ## hide non-needed widgets:
+        self.ui.txtExtendedLabel.setEnabled(False)
+        self.ui.txtExtendedLabel.setHidden(True)
+        self.ui.btnLog.setEnabled(False)
+        self.ui.btnLog.setHidden(True)
+        self.ui.lblInfoTextLine.setHidden(True)
+        self.ui.line.setHidden(True)
+        self.ui.groupBox.setHidden(True)
+        self.ui.groupBoxActions.setHidden(True)                
+        self.ui.txtDockIdentifier.setHidden(True)
+        self.ui.label_2.setHidden(True)
+        self.ui.lblInfoTextLine.setHidden(True)
+        
+        # self.ui.label_3.setHidden(True)
+        # self.ui.horizontalLayout_Size.
+        for v in (self.ui.label_3, self.ui.spinBox_Width, self.ui.spinBox_Height): # self.ui.horizontalSpacer_2
+            v.setHidden(True)
+            
 
         self.rebuild_output()
         
@@ -266,7 +285,7 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         """
         new_size = event.size()
         # Handle the resize event here
-        print(f"Widget resized to: {new_size.width()}x{new_size.height()}")
+        # print(f"Widget resized to: {new_size.width()}x{new_size.height()}")
         
         self.dockHeight = new_size.height()
         self.dockWidth = new_size.width()

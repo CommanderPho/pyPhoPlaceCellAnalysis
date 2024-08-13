@@ -154,132 +154,56 @@ class DockPlanningHelperWindow:
             _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_widget, dockSize=(300,600), dockAddLocationOpts=active_dock_add_location, display_config=dock_configs[a_decoder_name], autoOrientation=False)
 
 
-
-        # Build callback functions:
-
-
-        ## Build the utility controls at the bottom:
-        utility_controls_ui_dict, ctrls_dock_widgets_dict = _obj._build_utility_controls(root_dockAreaWindow)
-        _out_dock_widgets = ctrls_dock_widgets_dict | _out_dock_widgets
+        # ## Build the utility controls at the bottom:
+        # utility_controls_ui_dict, ctrls_dock_widgets_dict = _obj._build_utility_controls(root_dockAreaWindow)
+        # _out_dock_widgets = ctrls_dock_widgets_dict | _out_dock_widgets
         
         
-        # Top Info Bar: ______________________________________________________________________________________________________ #
-        ## Add two labels in the top row that show the Long/Short column values:
-        long_short_info_layout = pg.LayoutWidget()
-        long_short_info_layout.setObjectName('layoutLongShortInfo')
+        # # Top Info Bar: ______________________________________________________________________________________________________ #
+        # ## Add two labels in the top row that show the Long/Short column values:
+        # long_short_info_layout = pg.LayoutWidget()
+        # long_short_info_layout.setObjectName('layoutLongShortInfo')
 
-        long_info_label = long_short_info_layout.addLabel(text='LONG', row=0, col=0)
-        long_info_label.setObjectName('lblLongInfo')
-        # long_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
-        long_info_label.setAlignment(pg.QtCore.Qt.AlignLeft)
+        # long_info_label = long_short_info_layout.addLabel(text='LONG', row=0, col=0)
+        # long_info_label.setObjectName('lblLongInfo')
+        # # long_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
+        # long_info_label.setAlignment(pg.QtCore.Qt.AlignLeft)
 
-        short_info_label = long_short_info_layout.addLabel(text='SHORT', row=0, col=1)
-        short_info_label.setObjectName('lblShortInfo')
-        # short_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
-        short_info_label.setAlignment(pg.QtCore.Qt.AlignRight)
+        # short_info_label = long_short_info_layout.addLabel(text='SHORT', row=0, col=1)
+        # short_info_label.setObjectName('lblShortInfo')
+        # # short_info_label.setAlignment(pg.QtCore.Qt.AlignCenter)
+        # short_info_label.setAlignment(pg.QtCore.Qt.AlignRight)
 
-        _out_dock_widgets['LongShortColumnsInfo_dock'] = root_dockAreaWindow.add_display_dock(identifier='LongShortColumnsInfo_dock', widget=long_short_info_layout, dockSize=(600,60), dockAddLocationOpts=['top'], display_config=CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False, corner_radius='0px'))
-        _out_dock_widgets['LongShortColumnsInfo_dock'][1].hideTitleBar() # hide the dock title bar
+        # _out_dock_widgets['LongShortColumnsInfo_dock'] = root_dockAreaWindow.add_display_dock(identifier='LongShortColumnsInfo_dock', widget=long_short_info_layout, dockSize=(600,60), dockAddLocationOpts=['top'], display_config=CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False, corner_radius='0px'))
+        # _out_dock_widgets['LongShortColumnsInfo_dock'][1].hideTitleBar() # hide the dock title bar
 
-        # Add the widgets to the .ui:
-        long_short_info_layout = long_short_info_layout
-        long_info_label = long_info_label
-        short_info_label = short_info_label
-        info_labels_widgets_dict = dict(long_short_info_layout=long_short_info_layout, long_info_label=long_info_label, short_info_label=short_info_label)
+        # # Add the widgets to the .ui:
+        # long_short_info_layout = long_short_info_layout
+        # long_info_label = long_info_label
+        # short_info_label = short_info_label
+        # info_labels_widgets_dict = dict(long_short_info_layout=long_short_info_layout, long_info_label=long_info_label, short_info_label=short_info_label)
 
         root_dockAreaWindow.resize(600, 900)
 
         ## Build final .plots and .plots_data:
-        _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow,
-                                  dock_widgets=_out_dock_widgets, text_items_dict=None) # , ctrl_widgets={'slider': slider}
+        _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, dock_widgets=_out_dock_widgets, text_items_dict=None) # , ctrl_widgets={'slider': slider}
         _obj.plots_data = RenderPlotsData(name=name, 
                                             # **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']},
                                             )
         dock_helper_widgets = PhoUIContainer(name=f'{name}.dock_helper_widgets', dock_helper_widgets=_dock_helper_widgets_dict)
-        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, dock_helper_widgets=dock_helper_widgets, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references=None, connections=ConnectionsContainer())
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, dock_helper_widgets=dock_helper_widgets, dock_configs=dock_configs, controlled_references=None, connections=ConnectionsContainer()) # , **utility_controls_ui_dict, **info_labels_widgets_dict
         _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, **param_kwargs)
 
         _obj.register_internal_callbacks()
 
-        try:
-            ctrl_widgets_dict = _obj.ui
-            ctrl_widgets_dict['models_dict']['combined_epoch_stats'] = SimplePandasModel(pd.DataFrame())
-            # Create and associate view with model
-            ctrl_widgets_dict['views_dict']['combined_epoch_stats'].setModel(ctrl_widgets_dict['models_dict']['combined_epoch_stats'])
-
-        except AttributeError as e:
-            # AttributeError: 'NoneType' object has no attribute 'ripple_combined_epoch_stats_df'
-            print(f'WARNING: {e}')
-
-        except BaseException as e:
-            raise e
-
-        
-
+    
         return _obj
 
 
 
-    
     def _build_utility_controls(self, root_dockAreaWindow):
         """ Build the utility controls at the bottom """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
-
-        ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
-
-        ctrls_widget = ScrollBarWithSpinBox()
-        ctrls_widget.setObjectName("ctrls_widget")
-        ctrls_widget.update_range(0, 100)
-        ctrls_widget.setValue(10)
-
-        def valueChanged(new_val:int):
-            print(f'ScrollBarWithSpinBox valueChanged(new_val: {new_val})')
-            self.on_update_epoch_IDX(int(new_val))
-
-        ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
-        ctrl_layout = pg.LayoutWidget()
-        ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
-        ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
-
-        # Step 4: Create DataFrame and QTableView
-        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
-        # model = PandasModel(df)
-        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
-
-        # tableView = pg.QtWidgets.QTableView()
-        # tableView.setModel(pandasDataFrameTableModel)
-        # tableView.setObjectName("pandasTablePreview")
-        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-
-        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
-        # ctrl_widgets_dict['tableView'] = tableView
-
-        # # Step 5: Add TableView to LayoutWidget
-        # ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
-
-
-        # Tabbled table widget:
-        tab_widget, views_dict, models_dict = create_tabbed_table_widget(dataframes_dict={'epochs': pd.DataFrame(), 'spikes': pd.DataFrame(), 'combined_epoch_stats': pd.DataFrame()})
-        ctrl_widgets_dict['tables_tab_widget'] = tab_widget
-        ctrl_widgets_dict['views_dict'] = views_dict
-        ctrl_widgets_dict['models_dict'] = models_dict
-
-        # Add the tab widget to the layout
-        ctrl_layout.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=1)
-    
-        logTextEdit = LogViewer() # QTextEdit subclass
-        logTextEdit.setReadOnly(True)
-        logTextEdit.setObjectName("logTextEdit")
-        # logTextEdit.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-
-        ctrl_layout.addWidget(logTextEdit, row=2, rowspan=1, col=2, colspan=1)
-
-        # _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
-        ctrls_dock_widgets_dict = {}
-        ctrls_dock_widgets_dict['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
-
-        ui_dict = dict(ctrl_layout=ctrl_layout, **ctrl_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit)
-        return ui_dict, ctrls_dock_widgets_dict
+        return {}, {}
 
 
     def register_internal_callbacks(self):
