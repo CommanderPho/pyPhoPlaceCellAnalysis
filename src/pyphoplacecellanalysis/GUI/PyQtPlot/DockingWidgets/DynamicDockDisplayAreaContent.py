@@ -34,7 +34,6 @@ class CustomDockDisplayConfig(DockDisplayConfig):
         self._custom_get_colors_callback_fn = value
 
 
-
     @property
     def orientation(self) -> str:
         """The orientation property."""

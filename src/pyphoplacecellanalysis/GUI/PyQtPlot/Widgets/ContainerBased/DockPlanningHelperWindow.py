@@ -14,6 +14,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
@@ -28,7 +29,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel, create_tabbed_table_widget
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
-from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomCyclicColorsDockDisplayConfig, CustomDockDisplayConfig, get_utility_dock_colors
 
 __all__ = ['DockPlanningHelperWindow']
 
@@ -118,29 +119,20 @@ class DockPlanningHelperWindow:
         # if icon is not None:
         #     root_dockAreaWindow.setWindowIcon(icon)
 
-        # _dock_helper_widgets = []
         _dock_helper_widgets_dict = {}
         for i in np.arange(n_dock_planning_helper_widgets):
             dock_id_str: str = f'dock[{i}]'
             a_dock_helper_widget = DockPlanningHelperWidget(dock_title=dock_id_str, dock_id=dock_id_str, defer_show=True)
             # _a_conn = a_dock_helper_widget.sigCreateNewDock.connect(_obj.on_click_create_new_dock)
-            
-            # _dock_helper_widgets.append(a_dock_helper_widget)
             _dock_helper_widgets_dict[dock_id_str] = a_dock_helper_widget
 
         _out_dock_widgets = {}
-        dock_configs = {k:CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False) for k, v in _dock_helper_widgets_dict.items()}
-        # dock_add_locations = (['left'], ['left'], ['right'], ['right'])
-        # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right'])))
-        # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
+        dock_configs = {k:CustomCyclicColorsDockDisplayConfig(showCloseButton=False) for k, v in _dock_helper_widgets_dict.items()} # named_color_scheme=DisplayColorsEnum.Laps.get_LR_dock_colors
 
         if (dock_add_locations is None):
             # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
             # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), ((lambda a_decoder_name: ['left']), (lambda a_decoder_name: ['bottom']), (lambda a_decoder_name: ['right']), (lambda a_decoder_name: ['bottom', root_dockAreaWindow.find_display_dock('short_LR')]))))
             dock_add_locations = {k:(lambda a_decoder_name: ['bottom']) for k, v in _dock_helper_widgets_dict.items()}
-            
-            # _dock_helper_widgets
-
         else:
             assert len(dock_add_locations) == len(dock_configs), f"len(dock_add_locations): {len(dock_add_locations)} != len(dock_configs): {len(dock_configs)}"
 
@@ -159,7 +151,6 @@ class DockPlanningHelperWindow:
             #     dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
             #     print(f'using overriden dock location.')
 
-            # _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name], autoOrientation=False)
             _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_widget, dockSize=(300,600), dockAddLocationOpts=active_dock_add_location, display_config=dock_configs[a_decoder_name], autoOrientation=False)
 
 
@@ -200,19 +191,12 @@ class DockPlanningHelperWindow:
 
         ## Build final .plots and .plots_data:
         _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow,
-                                #   apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
-                                #   root_plots=all_separate_root_plots, grids=all_separate_grids, scatter_plots=all_separate_scatter_plots, debug_header_labels=all_separate_debug_header_labels,
                                   dock_widgets=_out_dock_widgets, text_items_dict=None) # , ctrl_widgets={'slider': slider}
         _obj.plots_data = RenderPlotsData(name=name, 
-                                        #   main_plot_identifiers_list=main_plot_identifiers_list,
-                                        #    seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs,
-                                            # seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
-                                        #    on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs,
                                             # **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']},
                                             )
-        # _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
         dock_helper_widgets = PhoUIContainer(name=f'{name}.dock_helper_widgets', dock_helper_widgets=_dock_helper_widgets_dict)
-        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, dock_helper_widgets=dock_helper_widgets, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references=None)
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, dock_helper_widgets=dock_helper_widgets, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references=None, connections=ConnectionsContainer())
         _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, **param_kwargs)
 
         _obj.register_internal_callbacks()
@@ -301,10 +285,21 @@ class DockPlanningHelperWindow:
     def register_internal_callbacks(self):
         """ registers all internally-owned callback functions. """
         # self.on_idx_changed_callback_function_dict['update_plot_titles_with_stats'] = self.update_plot_titles_with_stats
-        pass
+        for i, (dock_id_str, a_dock_helper_widget) in enumerate(self.ui.dock_helper_widgets.dock_helper_widgets.items()):
+            # dock_id_str: str = f'dock[{i}]'
+            extant_connection = self.ui.connections.pop(dock_id_str, None)
+            if extant_connection is not None:
+                a_dock_helper_widget.sigCreateNewDock.disconnect() ## disconnect
+                
+            ## create a new one:
+            _a_conn = a_dock_helper_widget.sigCreateNewDock.connect(self.on_click_create_new_dock)
+            self.ui.connections[dock_id_str] = {'sigCreateNewDock': _a_conn} # create a new connection
+            
+        
+        
 
 
-    def perform_create_new_dock_widget(self, dock_id_str:str=None, active_dock_add_location:str='bottom'):
+    def perform_create_new_dock_widget(self, dock_id_str:str=None, active_dock_add_location:str='bottom', dockSize=None, autoOrientation=False):
         """ 
         a_dock_helper_widget, a_dock_config, a_dock_widget = _out.perform_create_new_dock_widget()
         
@@ -317,6 +312,9 @@ class DockPlanningHelperWindow:
         if active_dock_add_location is None:
             active_dock_add_location:str = 'bottom'
             
+        if dockSize is None:
+            dockSize = (300,600)
+            
         extant_dock_helper_widget = self.dock_helper_widgets.get(dock_id_str, None)
         extant_config = self.dock_configs.get(dock_id_str, None)
         extant_dock_widget = self.dock_widgets.get(dock_id_str, None)
@@ -326,17 +324,44 @@ class DockPlanningHelperWindow:
         
         ## make new:
         a_dock_helper_widget = DockPlanningHelperWidget(dock_title=dock_id_str, dock_id=dock_id_str, defer_show=True)
-        a_dock_helper_widget.sigCreateNewDock.connect(self.on_click_create_new_dock)
+        
+        ## connections:
+        an_extant_dock_helper_widget_connections_dict = self.ui.connections.get(dock_id_str, None)
+        assert an_extant_dock_helper_widget_connections_dict is None
+        _a_conn = a_dock_helper_widget.sigCreateNewDock.connect(self.on_click_create_new_dock)
+        self.ui.connections[dock_id_str] = {'sigCreateNewDock': _a_conn}
+
         ## Updates: self.dock_helper_widgets, self.dock_configs, self.dock_widgets
         self.dock_helper_widgets[dock_id_str] = a_dock_helper_widget
         self.dock_configs[dock_id_str] = CustomDockDisplayConfig(showCloseButton=False)
-        self.dock_widgets[dock_id_str] = self.root_dockAreaWindow.add_display_dock(identifier=dock_id_str, widget=a_dock_helper_widget, dockSize=(300,600), dockAddLocationOpts=active_dock_add_location, display_config=self.dock_configs[dock_id_str], autoOrientation=False)
+        self.dock_widgets[dock_id_str] = self.root_dockAreaWindow.add_display_dock(identifier=dock_id_str, widget=a_dock_helper_widget, dockSize=dockSize, dockAddLocationOpts=active_dock_add_location, display_config=self.dock_configs[dock_id_str], autoOrientation=autoOrientation)
         return self.dock_helper_widgets[dock_id_str], self.dock_configs[dock_id_str], self.dock_widgets[dock_id_str]
 
 
     def on_click_create_new_dock(self, child_widget: DockPlanningHelperWidget, relative_location: str):
+        """ called with the child_widget to create a new relative widget
+        
+        """
         # [self.embedding_dock_item, 'bottom']
-        print(f'.on_click_create_new_dock(child_widget: {child_widget}, relative_location: "{relative_location}")')
+        print(f'DockPlanningHelperWindow.on_click_create_new_dock(...)')
+        # print(f'\t')
+        print(f'\trelative_location: {relative_location}')
+        
+        if child_widget is None:
+            print(f'\t child_widget is None!')
+        else:
+            print(f'\tchild_widget.identifier: {child_widget.identifier}')
+            log_string = child_widget.rebuild_output()
+            print(f'\tchild_widget: {log_string}') # TypeError: __str__ returned non-string (type NoneType)
+            new_dock_config = child_widget.rebuild_config()
+            new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
+            new_dock_config['widget'] = child_widget
+            print(f'\t creating new child widget with config: {new_dock_config}\n')
+            a_dock_helper_widget, a_dock_config, a_dock_widget = self.perform_create_new_dock_widget(active_dock_add_location=new_dock_config.get('dockAddLocationOpts', None), dockSize=new_dock_config.get('dockSize', None), autoOrientation=new_dock_config.get('autoOrientation', None))
+            print(f'\t done.')
+
+        
+        # print(f'DockPlanningHelperWindow.on_click_create_new_dock(child_widget: {child_widget or 'None'}, relative_location: "{relative_location or None}")')
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
         # self.action_create_new_dock.emit(self, 'bottom')
 
@@ -576,3 +601,17 @@ class DockPlanningHelperWindow:
 # # CALLBACKS:                                                                                                           #
 # # ==================================================================================================================== #
 
+## Start Qt event loop
+if __name__ == '__main__':
+    from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
+    from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
+    from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.DockPlanningHelperWindow import DockPlanningHelperWindow
+
+    app = pg.mkQApp("DockPlanningHelperWindow Example")
+    widget: DockPlanningHelperWindow = DockPlanningHelperWindow.init_dock_area_builder(n_dock_planning_helper_widgets=4)
+    a_dock_helper_widget, a_dock_config, a_dock_widget = widget.perform_create_new_dock_widget()
+    
+    # widget.show()
+    pg.exec()

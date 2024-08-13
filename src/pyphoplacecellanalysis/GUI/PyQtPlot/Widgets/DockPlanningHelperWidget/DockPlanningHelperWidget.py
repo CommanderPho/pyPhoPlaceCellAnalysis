@@ -1,5 +1,6 @@
 # DockPlanningHelperWidget.py
 # Generated from c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\DockPlanningHelperWidget\DockPlanningHelperWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
+from typing import Dict
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 ## IMPORTS:
@@ -8,8 +9,10 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AU
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+
 
 class DockPlanningHelperWidget(QtWidgets.QWidget):
     """ This widget is meant to be embedded in a pyqtgraph.dockarea.Dock to easily prototype/modify its properties. Allows you to create a layout interactively and then save it.
@@ -94,9 +97,22 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
             raise NotImplementedError
 
 
+    @property
+    def dockHeight(self) -> int:
+        return self.ui.spinBox_Height.value()
+    @dockHeight.setter
+    def dockHeight(self, value):
+        self.ui.spinBox_Height.setValue(int(round(value)))
         
-        
-    
+    @property
+    def dockWidth(self) -> int:
+        return self.ui.spinBox_Width.value()
+    @dockWidth.setter
+    def dockWidth(self, value):
+        self.ui.spinBox_Width.setValue(int(round(value)))
+
+
+
     @property
     def embedding_dock_item(self):
         """Tries to get the Dock that embeds this widget."""
@@ -168,7 +184,28 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         if debug_print:
             print(f'rebuild_output: {log_string}')
         return log_string
+
+
+    @function_attributes(short_name=None, tags=['TODO'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 20:00', related_items=[])
+    def rebuild_config(self) -> Dict:
+        """ 
+        returns the kwarg parameters that would be passed to `parent.add_display_dock(...)`
+        `root_dockAreaWindow.add_display_dock(identifier='LongShortColumnsInfo_dock', widget=long_short_info_layout, dockSize=(600,60), dockAddLocationOpts=['top'], display_config=CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False, corner_radius='0px'))`
         
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+        
+        _custom_display_config = CustomDockDisplayConfig(showCloseButton=False, corner_radius='0px') # custom_get_colors_callback_fn=get_utility_dock_colors,
+        # width = self.ui.spinBox_Width.value
+        # height = self.ui.spinBox_Height.value
+        # _geometry = self.geometry()
+        width = int(self.width())
+        height = int(self.height())
+        # missing keys: dict(widget=self, dockAddLocationOpts=None)
+        # return dict(identifier=self.identifier, widget=self, dockSize=(width,height), dockAddLocationOpts=None, display_config=_custom_display_config, autoOrientation=False)
+        return dict(identifier=self.identifier, dockSize=(width,height), display_config=_custom_display_config, autoOrientation=False)
+           
+
     def on_values_updated(self):
         print(f'on_values_updated()')
         self.rebuild_output()
@@ -181,6 +218,7 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         if self.embedding_dock_item is not None:
             self.embedding_dock_item.setOrientation(self.dock_orientation)
         
+
     pyqtExceptionPrintingSlot()
     def on_log(self):
         log_string = self.rebuild_output()
@@ -203,22 +241,38 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         self.sigRefresh.emit(self.identifier, self.title, out_string)
         
 
-    @pyqtExceptionPrintingSlot()
+    # @pyqtExceptionPrintingSlot(object)
+    # @QtCore.Slot()
     def on_click_create_new_dock_below(self):
         # [self.embedding_dock_item, 'bottom']
         print(f'DockPlanningHelperWidget.on_click_create_new_dock_below()')
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
         self.sigCreateNewDock.emit(self, 'bottom')
 
-    @pyqtExceptionPrintingSlot()
+    # @pyqtExceptionPrintingSlot(object)
+    # @QtCore.
     def on_click_create_new_dock_right(self):
         # [self.embedding_dock_item, 'right']
         print(f'DockPlanningHelperWidget.on_click_create_new_dock_right()')
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
         self.sigCreateNewDock.emit(self, 'right')
 
-    def __str__(self):
-         return 
+    # def __str__(self):
+    #      return 
+
+
+    def resizeEvent(self, event):
+        """ default resize event 
+        """
+        new_size = event.size()
+        # Handle the resize event here
+        print(f"Widget resized to: {new_size.width()}x{new_size.height()}")
+        
+        self.dockHeight = new_size.height()
+        self.dockWidth = new_size.width()
+        
+        super().resizeEvent(event)
+        
 
 
 ## Start Qt event loop
