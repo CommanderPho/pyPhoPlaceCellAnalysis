@@ -1919,6 +1919,72 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
 # 2024-01-23 - Writes the posteriors out to file                                                                       #
 # ==================================================================================================================== #
 
+def save_posterior_to_video(a_decoder_continuously_decoded_result: DecodedFilterEpochsResult, result_name: str='a_decoder_continuously_decoded_result'):
+    """ 
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import save_posterior_to_video
+        
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+        spikes_df = directional_decoders_decode_result.spikes_df
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
+        print(F'previously_decoded time_bin_sizes: {previously_decoded_keys}')
+        # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+        print(f'time_bin_size: {time_bin_size}')
+
+        continuously_decoded_dict = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+        pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = continuously_decoded_dict.get('pseudo2D', None)
+        pseudo2D_decoder_continuously_decoded_result
+
+        a_decoder_continuously_decoded_result: DecodedFilterEpochsResult = continuously_decoded_dict.get('long_LR', None)
+
+        a_decoder_continuously_decoded_result: DecodedFilterEpochsResult = continuously_decoded_dict.get('long_LR', None)
+        save_posterior_to_video(a_decoder_continuously_decoded_result=a_decoder_continuously_decoded_result, result_name='continuous_long_LR')
+
+        save_posterior_to_video(a_decoder_continuously_decoded_result=pseudo2D_decoder_continuously_decoded_result, result_name='continuous_pseudo2D')
+
+    """
+    from pyphocorehelpers.plotting.media_output_helpers import save_array_as_video
+    
+
+    a_p_x_given_n = deepcopy(a_decoder_continuously_decoded_result.p_x_given_n_list[0]) # (57, 4, 83755) (n_x_bins, n_decoders, n_time_bins)
+    if np.ndim(a_p_x_given_n) > 2:
+        n_x_bins, n_decoders, n_time_bins = np.shape(a_p_x_given_n)
+        transpose_axes_tuple = (2, 1, 0,)
+    else:
+        assert np.ndim(a_p_x_given_n) == 2, f"np.ndim(a_p_x_given_n): {np.ndim(a_p_x_given_n)}"
+        n_x_bins, n_time_bins = np.shape(a_p_x_given_n)
+        a_p_x_given_n = a_p_x_given_n[:, np.newaxis, :]
+        assert np.ndim(a_p_x_given_n) == 3, f"np.ndim(a_p_x_given_n): {np.ndim(a_p_x_given_n)}"
+        # transpose_axes_tuple = (1, 0,)
+        transpose_axes_tuple = (2, 1, 0,)
+    
+        a_p_x_given_n = np.tile(a_p_x_given_n, (1, 8, 1,))
+        # display(a_p_x_given_n)
+    # time_window_centers = deepcopy(a_decoder_continuously_decoded_result.time_window_centers[0])
+
+    ## get tiny portion just to test
+    # a_p_x_given_n = a_p_x_given_n[:, :, :2000]
+    # a_p_x_given_n
+
+    # a_p_x_given_n = np.reshape(a_p_x_given_n, (n_time_bins, n_decoders, n_x_bins))
+    a_p_x_given_n = np.transpose(a_p_x_given_n, transpose_axes_tuple)
+    # display(a_p_x_given_n)
+
+    decoding_realtime_FPS: float = 1.0 / float(a_decoder_continuously_decoded_result.decoding_time_bin_size)
+    print(f'decoding_realtime_FPS: {decoding_realtime_FPS}')
+    ## save video
+    video_out_path = save_array_as_video(array=a_p_x_given_n, video_filename=f'output/videos/{result_name}.avi', isColor=False, fps=decoding_realtime_FPS)
+    print(f'video_out_path: {video_out_path}')
+    # reveal_in_system_file_manager(video_out_path)
+    return video_out_path
+
+
+
 @function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-23 00:00', related_items=[])
 def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, laps_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point,
      parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9, debug_print:bool=True):

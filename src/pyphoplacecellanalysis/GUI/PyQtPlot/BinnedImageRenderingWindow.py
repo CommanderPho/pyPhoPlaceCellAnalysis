@@ -322,7 +322,7 @@ class BasicBinnedImageRenderingMixin:
     # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 23:51', related_items=['remove_data'])
     def add_data(self, row=1, col=0, rowspan=1, colspan=1,
-                 matrix=None, xbins=None, ybins=None, name='avg_velocity', title=None, variable_label=None, drop_below_threshold: float=0.0000001,
+                 matrix=None, xbins=None, ybins=None, name='avg_velocity', title=None, variable_label=None, drop_below_threshold:float=None,
                  target_layout=None,
                  defer_column_update:bool=False, replace:bool=False):
         """ adds a new data subplot to the output
@@ -330,11 +330,15 @@ class BasicBinnedImageRenderingMixin:
         if it exists and `replace=True` it will be removed and then re-inserted
         
         """
+        if drop_below_threshold is None:
+            drop_below_threshold: float = self.params.get('drop_below_threshold', 0.0000001) # try to get the default from params, otherwise fallback
+                    
+
         if target_layout is None:
             target_layout = self.ui.graphics_layout
         
         # Format data:
-        if drop_below_threshold is not None:
+        if (drop_below_threshold is not None) and (drop_below_threshold > 0):
             matrix = matrix.astype(float) # required because NaN isn't available in Integer dtype arrays (in case the matrix is of integer type, this prevents a ValueError)
             matrix[np.where(matrix < drop_below_threshold)] = np.nan # null out the occupancy
 
@@ -739,7 +743,8 @@ class BasicBinnedImageRenderingWidget(QtWidgets.QWidget, BasicBinnedImageRenderi
         max_num_rows: int = kwargs.pop('max_num_rows', None)
         debug_print: int = kwargs.pop('debug_print', False)
         super(BasicBinnedImageRenderingWidget, self).__init__(**kwargs)
-        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWidget', grid_opacity=grid_opacity, plot_row_offset=0, max_num_columns=max_num_rows, max_num_rows=max_num_rows, window_title=window_title, debug_print=debug_print)
+        self.params = VisualizationParameters(name='BasicBinnedImageRenderingWidget', grid_opacity=grid_opacity, drop_below_threshold=drop_below_threshold,
+                                               plot_row_offset=0, max_num_columns=max_num_columns, max_num_rows=max_num_rows, window_title=window_title, debug_print=debug_print)
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWidget')
         self.plots = RenderPlots(name='BasicBinnedImageRenderingWidget')
         self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWidget', connections=None, root_layout=None)

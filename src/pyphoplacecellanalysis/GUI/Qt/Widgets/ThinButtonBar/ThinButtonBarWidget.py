@@ -352,7 +352,7 @@ QStatusBar {
         */
     """)
     
-    widget.label_message = "TEST TEXT LINE!"
+    # widget.label_message = "TEST TEXT LINE!"
     # widget.ui.txtLineEdit.text = "TEST TEXT LINE!"
     widget.show()
     print(f"widget.label_message: {widget.label_message}")

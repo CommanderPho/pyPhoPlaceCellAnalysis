@@ -2200,6 +2200,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     # ==================================================================================================================== #
     
     # Export/Output ______________________________________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=[], used_by=['export_all_pages'], creation_date='2024-08-13 13:05', related_items=[])
     def export_decoder_pagination_controller_figure_page(self, curr_active_pipeline, **kwargs):
         """ exports each pages single-decoder figures separately
 
@@ -2239,6 +2240,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         return out_fig_paths_dict
 
+    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
     def export_all_pages(self, curr_active_pipeline, **kwargs):
         """ exports each pages single-decoder figures separately
 
