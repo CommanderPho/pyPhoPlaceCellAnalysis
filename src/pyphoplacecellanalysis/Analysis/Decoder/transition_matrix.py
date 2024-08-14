@@ -49,7 +49,7 @@ class ExpectedVelocityTuple(UnpackableMixin, object):
 
     
     # Outgoing
-    out_combined: NDArray = field()
+    out_combined: NDArray = field() # this seems to be combined incorrectly when fwd or bkwd is NaN, it becomes NaN
     out_fwd: NDArray = field()
     out_bkwd: NDArray = field()
 
@@ -649,9 +649,9 @@ class TransitionMatrixComputations:
                     _curr_node_bkwd_vel.append(rate * abs(distance_n_xbins))
                 _curr_node_combined_vel.append(rate * distance_n_xbins)
             
-            _curr_node_fwd_vel = np.sum(np.array(_curr_node_fwd_vel)) # sum over all forward terms
-            _curr_node_bkwd_vel = np.sum(np.array(_curr_node_bkwd_vel)) # sum over all backward terms
-            _curr_node_combined_vel = np.sum(np.array(_curr_node_combined_vel)) # sum over all terms
+            _curr_node_fwd_vel = np.nansum(np.array(_curr_node_fwd_vel)) # sum over all forward terms
+            _curr_node_bkwd_vel = np.nansum(np.array(_curr_node_bkwd_vel)) # sum over all backward terms
+            _curr_node_combined_vel = np.nansum(np.array(_curr_node_combined_vel)) # sum over all terms
 
             fwd_expected_velocity.append(_curr_node_fwd_vel)
             bkwd_expected_velocity.append(_curr_node_bkwd_vel)

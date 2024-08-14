@@ -165,7 +165,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
         img_item_array.append(img_item)
         plot_array.append(curr_plot)
-        other_components_array.append({'color_bar':bar})
+        other_components_array.append({'color_bar':bar}) # note this is a list of Dicts, one for every image
         
     # Post images loop:
     enable_show = False
