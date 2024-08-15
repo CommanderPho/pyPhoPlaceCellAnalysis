@@ -30,7 +30,7 @@ class BasicBinnedImageRenderingHelpers:
             xticks = [(idx, label) for idx, label in enumerate(xbins)]
             for side in ('top','bottom'):
                 plot_item.getAxis(side).setStyle(showValues=False)
-                plot_item.getAxis(side).setTicks((xticks, [])) # add list of major ticks; no minor ticks        
+                plot_item.getAxis(side).setTicks((xticks, [])) # add list of major ticks; no minor ticks
         if ybins is not None:
             yticks = [(idx, label) for idx, label in enumerate(ybins)]
             for side in ('left','right'):
@@ -46,25 +46,39 @@ class BasicBinnedImageRenderingHelpers:
         color_bar_mode: options for the colorbar of each image
             ### curr_cbar_mode: 'each', 'one', None
         """
-        local_plots_data = RenderPlotsData(name=name, matrix=None, matrix_min=None, matrix_max=None)
+        local_plots_data = RenderPlotsData(name=name, matrix=None, matrix_min=None, matrix_max=None, xbins=None, ybins=None, x_min=None, x_max=None, y_min=None, y_max=None)
         local_plots_data.matrix = matrix.copy()
         local_plots_data.matrix_min = np.nanmin(matrix)
         local_plots_data.matrix_max = np.nanmax(matrix)
         
         n_xbins, n_ybins = np.shape(local_plots_data.matrix)
-        if use_bin_index_axes or (xbins is None):
-            x_min = 0
-            x_max = n_xbins
-        else:
-            x_min = np.nanmin(xbins)
-            x_max = np.nanmax(xbins)
 
-        if use_bin_index_axes or (ybins is None):
-            y_min = 0
-            y_max = n_ybins
+        if xbins is None:
+            local_plots_data.xbins = np.arange(n_xbins)
         else:
-            y_min = np.nanmin(ybins)
-            y_max = np.nanmax(ybins)
+            assert len(xbins) == n_xbins
+            local_plots_data.xbins = deepcopy(xbins)
+
+        if ybins is None:
+            local_plots_data.ybins = np.arange(n_ybins)
+        else:
+            assert len(ybins) == n_ybins
+            local_plots_data.ybins = deepcopy(ybins)
+
+
+        if use_bin_index_axes or (local_plots_data.xbins is None):
+            local_plots_data.x_min = 0
+            local_plots_data.x_max = n_xbins
+        else:
+            local_plots_data.x_min = np.nanmin(local_plots_data.xbins)
+            local_plots_data.x_max = np.nanmax(local_plots_data.xbins)
+
+        if use_bin_index_axes or (local_plots_data.ybins is None):
+            local_plots_data.y_min = 0
+            local_plots_data.y_max = n_ybins
+        else:
+            local_plots_data.y_min = np.nanmin(local_plots_data.ybins)
+            local_plots_data.y_max = np.nanmax(local_plots_data.ybins)
         
         # plotItem.invertY(True)           # orient y axis to run top-to-bottom
         
@@ -77,15 +91,15 @@ class BasicBinnedImageRenderingHelpers:
 
         plot_item.setAspectLocked(lock=True, ratio=1)
         # Set up the view range
-        plot_item.setXRange(x_min, x_max, padding=0)
-        plot_item.setYRange(y_min, y_max, padding=0)
+        plot_item.setXRange(local_plots_data.x_min, local_plots_data.x_max, padding=0)
+        plot_item.setYRange(local_plots_data.y_min, local_plots_data.y_max, padding=0)
 
         # Disable auto range
         plot_item.enableAutoRange(axis=pg.ViewBox.XAxis, enable=False)
         plot_item.enableAutoRange(axis=pg.ViewBox.YAxis, enable=False)
 
         # Draw the boundary as a thick rectangle
-        rect = QtCore.QRectF(x_min, y_min, (x_max - x_min), (y_max - y_min))
+        rect = QtCore.QRectF(local_plots_data.x_min, local_plots_data.y_min, (local_plots_data.x_max - local_plots_data.x_min), (local_plots_data.y_max - local_plots_data.y_min))
         matrix_boundary_pen_color: QtCore.QColor = pg.mkColor('#ffffff')
         matrix_boundary_pen_color.setAlphaF(0.7)
         pen = pg.mkPen(matrix_boundary_pen_color, width=4)  # Adjust the color and thickness as needed
@@ -392,9 +406,8 @@ class BasicBinnedImageRenderingMixin:
         if needs_create_new:
             newPlotItem = BasicBinnedImageRenderingHelpers._add_bin_ticks(plot_item=newPlotItem, xbins=xbins, ybins=ybins, grid_opacity=self.params.grid_opacity)
 
-
         if needs_create_new:
-            local_plots, local_plots_data = BasicBinnedImageRenderingHelpers._build_binned_imageItem(newPlotItem, self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
+            local_plots, local_plots_data = BasicBinnedImageRenderingHelpers._build_binned_imageItem(newPlotItem, params=self.params, xbins=xbins, ybins=ybins, matrix=matrix, name=name, data_label=variable_label, color_bar_mode=self.params.color_bar_mode)
             
         self.plots_data[name] = local_plots_data
         self.plots[name] = local_plots
@@ -406,7 +419,7 @@ class BasicBinnedImageRenderingMixin:
             self._update_global_shared_colorbaritem()
         
         if (needs_create_new and self.params.wants_crosshairs):
-            self.add_crosshairs(newPlotItem, matrix, name=name)
+            self.add_crosshairs(newPlotItem, matrix, xbins=xbins, ybins=ybins, name=name)
 
         ## Scrollable-support:
         ## TODO: this assumes that provided `row` is the maximum row, or that we fill each column before filling rows
@@ -512,7 +525,7 @@ class BasicBinnedImageRenderingMixin:
         shared_colorBarItem.setLevels(low=global_data_min, high=global_data_max)
 
 
-    def add_crosshairs(self, plot_item, matrix, name):
+    def add_crosshairs(self, plot_item, matrix, name, xbins=None, ybins=None):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value."""
         vLine = pg.InfiniteLine(angle=90, movable=False)
         hLine = pg.InfiniteLine(angle=0, movable=False)
@@ -524,13 +537,26 @@ class BasicBinnedImageRenderingMixin:
         plot_item.addItem(hLine, ignoreBounds=True)
         vb = plot_item.vb
 
+        should_force_discrete_to_bins: bool = self.params.get('crosshairs_discrete', True)
+
         def mouseMoved(evt):
             pos = evt[0]  ## using signal proxy turns original arguments into a tuple
             if plot_item.sceneBoundingRect().contains(pos):
                 mousePoint = vb.mapSceneToView(pos)
+
+                if should_force_discrete_to_bins:
+                    x_point = float(int(round(mousePoint.x())))
+                    y_point = float(int(round(mousePoint.y())))
+
+                    x_point = x_point + 0.5 # Snap point to center. Does not affect indexing because it truncates
+                    y_point = y_point + 0.5 
+                else:
+                    x_point = mousePoint.x()
+                    y_point = mousePoint.y()
+                
                 # Note that int(...) truncates towards zero (floor effect)
-                index_x = int(mousePoint.x())
-                index_y = int(mousePoint.y())
+                index_x = int(x_point)
+                index_y = int(y_point)
                 
                 matrix_shape = np.shape(matrix)
                 # is_valid_x_index = (index_x > 0 and index_x < matrix_shape[0])
@@ -539,9 +565,22 @@ class BasicBinnedImageRenderingMixin:
                 is_valid_y_index = (index_y >= 0 and index_y < matrix_shape[1])
                 
                 if is_valid_x_index and is_valid_y_index:
-                    self.ui.mainLabel.setText("<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y]))
-                vLine.setPos(mousePoint.x())
-                hLine.setPos(mousePoint.y())
+                    if should_force_discrete_to_bins:
+                        if (xbins is not None) and (ybins is not None):
+                            # Display special xbins/ybins if we have em
+                            bin_x = xbins[index_x]
+                            bin_y = ybins[index_y]
+                            value_str = "<span style='font-size: 12pt'>(x[%d]=%0.3f, y[%d]=%0.3f), <span style='color: green'>value=%0.3f</span>" % (index_x, bin_x, index_y, bin_y, matrix[index_x][index_y])
+                        else:
+                            value_str = "<span style='font-size: 12pt'>(x=%d, y=%d), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y])
+
+                        self.ui.mainLabel.setText(value_str)
+                    else:
+                        self.ui.mainLabel.setText("<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y]))
+
+                ## Move the lines:
+                vLine.setPos(x_point)
+                hLine.setPos(y_point)
 
         self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, rateLimit=60, slot=mouseMoved)
 
@@ -735,7 +774,7 @@ class BasicBinnedImageRenderingWidget(QtWidgets.QWidget, BasicBinnedImageRenderi
     
     """
     def __init__(self, matrix=None, xbins=None, ybins=None, name='avg_velocity', title=None, variable_label=None,
-                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity:float=0.65, defer_show=False, **kwargs):
+                 drop_below_threshold: float=0.0000001, color_map='viridis', color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity:float=0.65, crosshairs_discrete:bool=True, defer_show=False, **kwargs):
         row = kwargs.pop('row', 0)
         col = kwargs.pop('col', 0)
         window_title: str = kwargs.pop('window_title', title)
@@ -744,7 +783,7 @@ class BasicBinnedImageRenderingWidget(QtWidgets.QWidget, BasicBinnedImageRenderi
         debug_print: int = kwargs.pop('debug_print', False)
         super(BasicBinnedImageRenderingWidget, self).__init__(**kwargs)
         self.params = VisualizationParameters(name='BasicBinnedImageRenderingWidget', grid_opacity=grid_opacity, drop_below_threshold=drop_below_threshold,
-                                               plot_row_offset=0, max_num_columns=max_num_columns, max_num_rows=max_num_rows, window_title=window_title, debug_print=debug_print)
+                                               plot_row_offset=0, max_num_columns=max_num_columns, max_num_rows=max_num_rows, window_title=window_title, debug_print=debug_print, crosshairs_discrete=crosshairs_discrete)
         self.plots_data = RenderPlotsData(name='BasicBinnedImageRenderingWidget')
         self.plots = RenderPlots(name='BasicBinnedImageRenderingWidget')
         self.ui = PhoUIContainer(name='BasicBinnedImageRenderingWidget', connections=None, root_layout=None)
