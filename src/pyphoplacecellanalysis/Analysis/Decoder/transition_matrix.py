@@ -589,6 +589,45 @@ class TransitionMatrixComputations:
         return binned_x_transition_matrix_higher_order_list_dict
 
 
+    @classmethod
+    def _compute_expected_velocity_list_dict(cls, binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray]) -> Dict[types.DecoderName, List[ExpectedVelocityTuple]]:
+        """ working expected velocity for each transition matrix.
+        
+        """
+
+    @classmethod
+    def compute_expected_positions(cls, binned_x_transition_matrix_higher_order_mat_dict, decoders_dict):
+        """ working expected positions <x> in real position coordinates
+         
+        """
+                
+        _expected_x_dict = {}
+        for a_decoder_name, arr in binned_x_transition_matrix_higher_order_mat_dict.items():
+            
+            arr = deepcopy(arr)
+            # decoders_dict['long_LR'].xbin
+            xbin_centers = deepcopy(decoders_dict[a_decoder_name].xbin_centers) # (57, )
+            n_x_bins = len(xbin_centers)
+            # xbin_centers
+            # n_x_bins
+
+            _expected_x = []
+            
+            for row_i in np.arange(n_x_bins):
+                # arr = binned_x_transition_matrix_higher_order_mat_dict['long_LR']
+                _expected_val = arr[:,row_i,:] @ xbin_centers # (200, 57) @ (57, ) = (200, )
+                _expected_x.append(_expected_val)
+                
+
+            _expected_x = np.stack(_expected_x).T # (57, 200)
+            _expected_x_dict[a_decoder_name] = _expected_x
+            # _expected_x    
+            # binned_x_transition_matrix_higher_order_mat_dict['long_LR'] * xbin_centers
+            
+        ## OUTPUT: _expected_x_dict
+        return _expected_x_dict
+
+
 
     @classmethod
     def _compute_expected_velocity_out_per_node(cls, A: np.ndarray, should_split_fwd_and_bkwd_velocities: bool = False, velocity_type: Union[VelocityType, str] = VelocityType.OUTGOING) -> Union[np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]]:
