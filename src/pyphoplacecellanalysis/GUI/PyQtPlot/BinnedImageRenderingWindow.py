@@ -21,10 +21,10 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaCo
 
 class BasicBinnedImageRenderingHelpers:
     @classmethod
-    def _add_bin_ticks(cls, plot_item, xbins=None, ybins=None, grid_opacity:float=0.65):
+    def _add_bin_ticks(cls, plot_item, xbins=None, ybins=None, grid_opacity:float=0.65, extra_space_for_labels=12):
         """ adds the ticks/grid for xbins and ybins to the plot_item """
         # show full frame, label tick marks at top and left sides, with some extra space for labels:
-        plot_item.showAxes(True, showValues=(True, True, False, False), size=10)
+        plot_item.showAxes(True, showValues=(True, True, False, False), size=extra_space_for_labels)
         # define major tick marks and labels:
         if xbins is not None:
             xticks = [(idx, label) for idx, label in enumerate(xbins)]
@@ -90,9 +90,12 @@ class BasicBinnedImageRenderingHelpers:
         plot_item.disableAutoRange()
 
         plot_item.setAspectLocked(lock=True, ratio=1)
+
+        view_padding: float = 0
+
         # Set up the view range
-        plot_item.setXRange(local_plots_data.x_min, local_plots_data.x_max, padding=0)
-        plot_item.setYRange(local_plots_data.y_min, local_plots_data.y_max, padding=0)
+        plot_item.setXRange(local_plots_data.x_min, local_plots_data.x_max, padding=view_padding)
+        plot_item.setYRange(local_plots_data.y_min, local_plots_data.y_max, padding=view_padding)
 
         # Disable auto range
         plot_item.enableAutoRange(axis=pg.ViewBox.XAxis, enable=False)
