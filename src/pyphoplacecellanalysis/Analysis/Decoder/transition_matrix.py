@@ -98,7 +98,7 @@ class TransitionMatrixComputations:
 
     ### 1D Transition Matrix:
     @classmethod
-    def _compute_position_transition_matrix(cls, xbin_labels, binned_x_indicies: np.ndarray, n_powers:int=3, use_direct_observations_for_order:bool=True, should_validate_normalization:bool=True):
+    def _compute_position_transition_matrix(cls, xbin_labels, binned_x_index_sequence: np.ndarray, n_powers:int=3, use_direct_observations_for_order:bool=True, should_validate_normalization:bool=True):
         """  1D Transition Matrix from binned positions (e.g. 'binned_x')
 
             pf1D.xbin_labels # array([  1,   2,   3,   4,  ...)
@@ -117,12 +117,12 @@ class TransitionMatrixComputations:
         max_state_index: int = num_position_states - 1
 
         # validate the state sequences are indeed consistent:    
-        assert max(binned_x_indicies) <= max_state_index, f"VIOLATED! max(binned_x_indicies): {max(binned_x_indicies)} <= max_state_index: {max_state_index}"
-        assert max(binned_x_indicies) < num_position_states, f"VIOLATED! max(binned_x_indicies): {max(binned_x_indicies)} < num_position_states: {num_position_states}"
+        assert max(binned_x_index_sequence) <= max_state_index, f"VIOLATED! max(binned_x_index_sequence): {max(binned_x_index_sequence)} <= max_state_index: {max_state_index}"
+        assert max(binned_x_index_sequence) < num_position_states, f"VIOLATED! max(binned_x_index_sequence): {max(binned_x_index_sequence)} < num_position_states: {num_position_states}"
         # assert 0 in state_sequence, f"does not contain zero! Make sure that it is not a 1-indexed sequence!"
         
         # 0th order:
-        binned_x_transition_matrix = transition_matrix(deepcopy(binned_x_indicies), markov_order=1, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=should_validate_normalization) # #TODO 2024-08-02 21:10: - [ ] max_state_index != num_position_states
+        binned_x_transition_matrix = transition_matrix(deepcopy(binned_x_index_sequence), markov_order=1, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=should_validate_normalization) # #TODO 2024-08-02 21:10: - [ ] max_state_index != num_position_states
         if should_validate_normalization:
             ## test row normalization (only considering non-zero entries):
             _row_normalization_sum = np.sum(binned_x_transition_matrix, axis=1)
@@ -132,7 +132,7 @@ class TransitionMatrixComputations:
             ## use exponentiation version: only works if Markov Property is not violated!
             binned_x_transition_matrix_higher_order_list = [binned_x_transition_matrix] + [np.linalg.matrix_power(binned_x_transition_matrix, n) for n in np.arange(2, n_powers+1)]
         else:
-            binned_x_transition_matrix_higher_order_list = [binned_x_transition_matrix] + [transition_matrix(deepcopy(binned_x_indicies), markov_order=n, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=should_validate_normalization) for n in np.arange(2, n_powers+1)]
+            binned_x_transition_matrix_higher_order_list = [binned_x_transition_matrix] + [transition_matrix(deepcopy(binned_x_index_sequence), markov_order=n, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=should_validate_normalization) for n in np.arange(2, n_powers+1)]
             
         if should_validate_normalization:
             ## test row normalization (only considering non-zero entries):

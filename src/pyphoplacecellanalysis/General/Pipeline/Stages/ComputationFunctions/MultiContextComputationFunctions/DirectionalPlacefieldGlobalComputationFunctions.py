@@ -614,7 +614,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
         for a_decoder_name, a_decoder in decoders_dict.items():
             a_pf1D = deepcopy(a_decoder.pf)
-            binned_x_transition_matrix_higher_order_list_dict[a_decoder_name] = TransitionMatrixComputations._compute_position_transition_matrix(a_pf1D.xbin_labels, binned_x_indicies=(a_pf1D.filtered_pos_df['binned_x'].dropna().to_numpy()-1), n_powers=n_powers, use_direct_observations_for_order=use_direct_observations_for_order) # the -1 here is to convert to (binned_x_indicies = binned_x - 1)
+            binned_x_transition_matrix_higher_order_list_dict[a_decoder_name] = TransitionMatrixComputations._compute_position_transition_matrix(a_pf1D.xbin_labels, binned_x_index_sequence=(a_pf1D.filtered_pos_df['binned_x'].dropna().to_numpy()-1), n_powers=n_powers, use_direct_observations_for_order=use_direct_observations_for_order) # the -1 here is to convert to (binned_x_index_sequence = binned_x - 1)
 
         # OUTPUTS: binned_x_transition_matrix_higher_order_list_dict
         return binned_x_transition_matrix_higher_order_list_dict
