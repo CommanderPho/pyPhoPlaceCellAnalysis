@@ -46,6 +46,8 @@ class BasicBinnedImageRenderingHelpers:
         color_bar_mode: options for the colorbar of each image
             ### curr_cbar_mode: 'each', 'one', None
         """
+        assert color_bar_mode in ('each', 'one', None)
+        
         local_plots_data = RenderPlotsData(name=name, matrix=None, matrix_min=None, matrix_max=None, xbins=None, ybins=None, x_min=None, x_max=None, y_min=None, y_max=None)
         local_plots_data.matrix = matrix.copy()
         local_plots_data.matrix_min = np.nanmin(matrix)
@@ -640,7 +642,7 @@ class BasicBinnedImageRenderingMixin:
             
 
     @classmethod
-    def init_from_data_spec(cls, a_spec: List[List[Dict]], window_title=None, scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12, **_shared_kwargs) -> "BasicBinnedImageRenderingMixin":
+    def init_from_data_spec(cls, a_spec: List[List[Dict]], window_title=None, scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12, color_bar_mode=None, **_shared_kwargs) -> "BasicBinnedImageRenderingMixin":
         """ adds all plots
 
         Usage:
@@ -663,8 +665,9 @@ class BasicBinnedImageRenderingMixin:
 
 
         """
+        # _default_window_kwargs = dict(color_bar_mode=None, wants_crosshairs=True, scrollability_mode=LayoutScrollability.SCROLLABLE, grid_opacity=0.65, defer_show=False) ## KWARGS specific to window, not data spec        
         # curr_window_kwargs = dict(window_title='Test', scrollability_mode=LayoutScrollability.NON_SCROLLABLE, grid_opacity=0.4, drop_below_threshold=1e-12)
-        curr_window_kwargs = dict(window_title=window_title, scrollability_mode=scrollability_mode, grid_opacity=grid_opacity, drop_below_threshold=drop_below_threshold)
+        curr_window_kwargs = dict(window_title=window_title, scrollability_mode=scrollability_mode, grid_opacity=grid_opacity, drop_below_threshold=drop_below_threshold, color_bar_mode=color_bar_mode)
 
         # _shared_kwargs = dict(xbins=test_pos_bins, ybins=test_pos_bins)
         n_rows = len(a_spec)
