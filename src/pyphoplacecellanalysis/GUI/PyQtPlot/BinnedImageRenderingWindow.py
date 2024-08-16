@@ -12,6 +12,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.colormap import ColorMap
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.NonUniformImage import NonUniformImage
 
+from neuropy.utils.mixins.binning_helpers import get_bin_centers
+
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
@@ -41,7 +43,7 @@ class BasicBinnedImageRenderingHelpers:
 
     @classmethod
     def _build_binned_imageItem(cls, plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None, use_bin_index_axes:bool=True) -> Tuple[RenderPlots, RenderPlotsData]:
-        """ Builds and wrap a new `pg.ImageItem` 
+        """ Builds and wraps a new `pg.ImageItem` 
         
         color_bar_mode: options for the colorbar of each image
             ### curr_cbar_mode: 'each', 'one', None
@@ -58,12 +60,20 @@ class BasicBinnedImageRenderingHelpers:
         if xbins is None:
             local_plots_data.xbins = np.arange(n_xbins)
         else:
+            if (len(xbins) == (n_xbins + 1)):
+                # have edges, get centers
+                xbins = get_bin_centers(xbins)
+                
             assert len(xbins) == n_xbins
             local_plots_data.xbins = deepcopy(xbins)
 
         if ybins is None:
             local_plots_data.ybins = np.arange(n_ybins)
         else:
+            if (len(ybins) == (n_ybins + 1)):
+                # have edges, get centers
+                ybins = get_bin_centers(ybins)
+        
             assert len(ybins) == n_ybins
             local_plots_data.ybins = deepcopy(ybins)
 
