@@ -758,9 +758,32 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             a_n_bins_n_time_bins: int = self.nbins[an_epoch_idx]
             # a_most_likely_positions_list_n_time_bins, a_most_likely_positions_list_n_pos_bins = np.shape(a_most_likely_positions_list)
             a_most_likely_positions_list_n_time_bins: int = np.shape(a_most_likely_positions_list)[0]
-            assert np.ndim(a_p_x_given_n) == 2, epoch_lbl_str + f"np.ndim(a_p_x_given_n): {np.ndim(a_p_x_given_n)}"
-            n_pos_bins_posterior, n_time_bins_posterior = np.shape(a_p_x_given_n) # np.shape(a_p_x_given_n): (62, 9)
-            # print(f'np.shape(a_p_x_given_n): {np.shape(a_p_x_given_n)}')
+            
+
+            ## Everything is valid only for 1D, don't check 2D at all:
+            # assert np.ndim(a_p_x_given_n) == 2, epoch_lbl_str + f"np.ndim(a_p_x_given_n): {np.ndim(a_p_x_given_n)}"
+            
+            if np.ndim(a_p_x_given_n) == 2:            
+                ## 1D position:
+                n_pos_bins_posterior, n_time_bins_posterior = np.shape(a_p_x_given_n) # np.shape(a_p_x_given_n): (62, 9)
+            elif np.ndim(a_p_x_given_n) == 3:
+                # 2D position
+                n_pos_x_bins_posterior, n_pos_y_bins_posterior, n_time_bins_posterior = np.shape(a_p_x_given_n) # np.shape(a_p_x_given_n): (62, 9)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-1])
+                # (57, 4, 3)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-2])
+                # (57, 4, 5)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-0])
+                # (57, 1, 16)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-2])
+                # (57, 4, 5)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-9])
+                # (57, 4, 2)
+
+
+            else:
+                raise NotImplementedError(f'Unexpected number of dimensions in posteriors! {epoch_lbl_str} np.ndim(a_p_x_given_n): {np.ndim(a_p_x_given_n)}"')
+            
             assert a_n_bins_n_time_bins == n_time_bins_posterior, epoch_lbl_str + f"a_n_bins_n_time_bins: {a_n_bins_n_time_bins} != n_time_bins_posterior: {n_time_bins_posterior}\n\ta_train_decoded_results.nbins: {self.nbins}"
             
             ## Check position bin agreement:
