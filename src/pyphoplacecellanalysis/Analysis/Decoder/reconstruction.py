@@ -1416,12 +1416,30 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                     filter_epochs_decoder_result.marginal_y_list[invalid_idx].most_likely_positions_1D = filter_epochs_decoder_result.marginal_y_list[invalid_idx].most_likely_positions_1D[good_indicies]
                     filter_epochs_decoder_result.marginal_y_list[invalid_idx].p_x_given_n = filter_epochs_decoder_result.marginal_y_list[invalid_idx].p_x_given_n[:, good_indicies]
                 
-                filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx] = filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx][good_indicies] ## okay for 2D?
-                filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] = filter_epochs_decoder_result.most_likely_positions_list[invalid_idx][good_indicies] ## okay for 2D?
-                filter_epochs_decoder_result.p_x_given_n_list[invalid_idx] = filter_epochs_decoder_result.p_x_given_n_list[invalid_idx][:, good_indicies]
-                filter_epochs_decoder_result.spkcount[invalid_idx] = filter_epochs_decoder_result.spkcount[invalid_idx][good_indicies] ## okay for 2D?
-                ## do post-hoc checking:
-                assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
+
+                ndim = np.ndim(filter_epochs_decoder_result.p_x_given_n_list[invalid_idx]) # np.shape(filter_epochs_decoder_result.p_x_given_n_list[invalid_idx]) (57, 4, 16)
+
+                if ndim == 3:
+                    ## 2D Position Case (less tested)
+                    assert np.shape(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx])[0] == 2, f"filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx] expected to be of shape (2, n_t_bins), but shape {np.shape(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx])}"
+                    filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx] = filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx][:, good_indicies] ## (2, n_t_bins) - (2, 16)  -> (2, 1) DONE
+                    
+                    assert np.shape(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])[1] == 2, f"filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] expected to be of shape (n_t_bins, 2), but shape {np.shape(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx])}"
+                    filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] = filter_epochs_decoder_result.most_likely_positions_list[invalid_idx][good_indicies, :] ## (2, n_t_bins): (16, 2) -> (2, 1)
+
+                    filter_epochs_decoder_result.p_x_given_n_list[invalid_idx] = filter_epochs_decoder_result.p_x_given_n_list[invalid_idx][:, :, good_indicies]
+                    filter_epochs_decoder_result.spkcount[invalid_idx] = filter_epochs_decoder_result.spkcount[invalid_idx][:, good_indicies] ## okay for 2D? (80, 16) -> (80, 1)
+                    ## do post-hoc checking:
+                    assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
+                    
+                else:
+                    ## 1D Position Case (what this validation and fix was designed for)
+                    filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx] = filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx][good_indicies] ## (n_epoch_time_bins, ) one position for each time bin in the replay
+                    filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] = filter_epochs_decoder_result.most_likely_positions_list[invalid_idx][good_indicies] ## okay for 2D?
+                    filter_epochs_decoder_result.p_x_given_n_list[invalid_idx] = filter_epochs_decoder_result.p_x_given_n_list[invalid_idx][:, good_indicies]
+                    filter_epochs_decoder_result.spkcount[invalid_idx] = filter_epochs_decoder_result.spkcount[invalid_idx][good_indicies] ## okay for 2D?
+                    ## do post-hoc checking:
+                    assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
 
         assert np.all([(len(filter_epochs_decoder_result.most_likely_positions_list[i]) == len(filter_epochs_decoder_result.time_bin_containers[i].centers)) for i, a_n_bins in enumerate(filter_epochs_decoder_result.nbins)])
 
