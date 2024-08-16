@@ -81,7 +81,7 @@ def robust_velocity_and_acceleration(t: NDArray, x: NDArray) -> Tuple[NDArray, N
 
 
 @function_attributes(short_name=None, tags=['decode', 'position', 'derivitives'], input_requires=[], output_provides=[], uses=['robust_velocity_and_acceleration'], used_by=[], creation_date='2024-03-07 14:30', related_items=[])
-def _compute_pos_derivs(time_window_centers, position, debug_print=False) -> pd.DataFrame:
+def _compute_pos_derivs(time_window_centers, position, decoding_time_bin_size=None, debug_print=False) -> pd.DataFrame:
     """try recomputing velocties/accelerations
     
     from pyphoplacecellanalysis.Analysis.position_derivatives import _compute_pos_derivs
