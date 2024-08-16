@@ -524,6 +524,12 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
     global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
     epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
+
+    ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end. These never get updated tho
+    epoch_durations = np.array(list(reversed(epoch_durations.tolist())))   
+
+    print("WARNING 2024-08-16 - the 'insets' version built by `stacked_epoch_slices_matplotlib_build_insets_view(...)` is not ready for paginated output as the widths cannot be updated. Furthermore there is a weird axis reversal issue.")
+    
     # epoch_durations
     epoch_slices_max_duration = np.max(epoch_durations) # 28.95714869396761
     epoch_slice_relative_durations = epoch_durations / epoch_slices_max_duration # computes the relative duration/xlength foe ach epoch slice as a range from 0.0-1.0 to determine relative sizes to parent
@@ -569,8 +575,15 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         if debug_print:
             print(f'\tcurr_percent_width: {curr_percent_width}, curr_percent_height: {curr_percent_height}')
         curr_ax = inset_axes(plots.parent_ax, width=curr_percent_width, height=curr_percent_height,
-                            bbox_transform=plots.parent_ax.transData, bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height]
-                            loc='lower left', borderpad=1.0)
+                            bbox_transform=plots.parent_ax.transData,
+                            loc='lower left', bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] #TODO 2024-08-16 04:36: - [ ] WRONG, in bottom to top order
+                            # loc='upper left', bbox_to_anchor=(0.0, -float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] 
+                            borderpad=1.0)
+        
+
+        # loc : str, default: 'upper right' - Location to place the inset axes. Valid locations are 'upper left', 'upper center', 'upper right', 'center left', 'center', 'center right', 'lower left', 'lower center', 'lower right'. For backward compatibility, numeric values are accepted as well. See the parameter *loc* of .Legend for details.
+
+
         
         curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
         curr_ax.tick_params(labelleft=False, labelbottom=False)
@@ -579,6 +592,9 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
 
         # Appends:
         plots.axs.append(curr_ax)
+    
+
+    plots.axs.reverse()
     
     if params.should_use_MatplotlibTimeSynchronizedWidget:
         ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
