@@ -7,6 +7,8 @@ from pathlib import Path
 from enum import Enum
 import numpy as np
 import pandas as pd
+from scipy.sparse import coo_matrix, csr_matrix
+
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar
 from typing_extensions import TypeAlias  # "from typing_extensions" in Python 3.9 and earlier
 from nptyping import NDArray
@@ -350,8 +352,10 @@ class TransitionMatrixComputations:
         # Squeeze to remove single-dimensional entries
         observed_posterior = np.squeeze(observed_posterior)  # Shape (3,)
         pos_likelihoods = np.squeeze(pos_likelihoods)  # Shape (3,)
-
-        return np.dot(observed_posterior, pos_likelihoods)
+        
+        ## Euclidian Distance
+        return np.sqrt(np.sum(np.power((pos_likelihoods - observed_posterior), 2)))
+        # return np.dot(observed_posterior, pos_likelihoods)
 
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-02 09:53', related_items=[])
@@ -589,11 +593,161 @@ class TransitionMatrixComputations:
         return binned_x_transition_matrix_higher_order_list_dict
 
 
+    # ==================================================================================================================== #
+    # Sampling Sequences                                                                                                   #
+    # ==================================================================================================================== #
+    @classmethod
+    def sample_sequences(cls, transition_matrix_mat: NDArray, sequence_length: int, num_sequences: int, initial_P_x: Optional[NDArray]=None, initial_state: Optional[int]=None) -> NDArray:
+        """ Generates sample sequences given a transition_matrix_mat of order O
+
+        USage 1:
+        
+            T_mat = deepcopy(binned_x_transition_matrix_higher_order_mat_dict['long_LR']) # (200, 57, 57)
+        
+            initial_state = 0  # Starting from state 0
+            sequence_length = 10  # Length of each sequence
+            num_sequences = 1000  # Number of sequences to generate        
+            sequences, num_states = TransitionMatrixComputations.sample_sequences(T_mat.copy(), initial_state=10, sequence_length=sequence_length, num_sequences=num_sequences) # (1000, 10)
+            sequences
+        
+        Usage 2:
+        
+            T_mat = deepcopy(binned_x_transition_matrix_higher_order_mat_dict['long_LR']) # (200, 57, 57)
+            probability_normalized_occupancy = deepcopy(decoders_dict['long_LR'].pf.probability_normalized_occupancy) # BasePositionDecoder
+
+            sequence_length = 10  # Length of each sequence
+            num_sequences = 1000  # Number of sequences to generate
+            sequences, num_states = TransitionMatrixComputations.sample_sequences(T_mat.copy(), sequence_length=sequence_length, num_sequences=num_sequences, initial_P_x=probability_normalized_occupancy) # (1000, 10)
+            sequences
+
+
+        """
+        n_orders, n_x_bins, _n_x_bins2 = np.shape(transition_matrix_mat)
+        assert n_x_bins == _n_x_bins2
+        assert n_orders > sequence_length
+        
+        num_states = n_x_bins
+        sequences = np.zeros((num_sequences, sequence_length), dtype=int)
+
+        for i in range(num_sequences):
+            ## Start from the initial constrained sequences:
+            if initial_state is None:
+                assert initial_P_x is not None
+                assert len(initial_P_x) == num_states
+                current_state = np.random.choice(num_states, p=initial_P_x)
+                a_sequence = [current_state]
+
+            else:
+                assert initial_P_x is None, "initial_P_x will not be used if initial_state is provided!"
+                current_state = initial_state
+                a_sequence = [current_state]
+
+            len_initial_constrained_sequence: int = len(a_sequence) # 1
+            
+
+            for an_order in range(sequence_length - len_initial_constrained_sequence):
+                next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, current_state, :])
+                a_sequence.append(next_state)
+                current_state = next_state
+                
+            sequences[i] = a_sequence # append to the output array
+
+        return sequences, num_states
+        
+
+    @classmethod
+    def sample_sequences_stationary(cls, transition_matrix: NDArray, initial_state: int, sequence_length: int, num_sequences: int) -> NDArray: 
+        """
+        
+        # Example usage:
+        # transition_matrix = np.array([[0.1, 0.9], [0.5, 0.5]])  # Example transition matrix
+        transition_matrix = T_mat[0, :, :].copy()
+
+        initial_state = 0  # Starting from state 0
+        sequence_length = 10  # Length of each sequence
+        num_sequences = 1000  # Number of sequences to generate
+
+        sequences = TransitionMatrixComputations.sample_sequences_stationary(transition_matrix, initial_state=initial_state, sequence_length=sequence_length, num_sequences=num_sequences) # (1000, 10)
+        sequences
+
+        """
+        num_states = transition_matrix.shape[0]
+        sequences = np.zeros((num_sequences, sequence_length), dtype=int)
+
+        for i in range(num_sequences):
+            current_state = initial_state
+            sequence = [current_state]
+            for _ in range(sequence_length - 1):
+                next_state = np.random.choice(num_states, p = transition_matrix[current_state])
+                sequence.append(next_state)
+                current_state = next_state
+            sequences[i] = sequence
+
+        return sequences
+
+
+    @classmethod
+    def _sequences_index_list_to_matrix_occupancy(cls, sequences: NDArray, num_states:int) -> NDArray:
+        """Turn `sequences`, a list of x_bin indicies, into a flattened matrix occupancy representation for visualization of the path frequency
+        
+        sequence_frames_occupancy = TransitionMatrixComputations._sequences_index_list_to_matrix_occupancy(sequences=sequences, num_states=num_states)
+        sequence_frames_occupancy
+
+        """
+        num_sequences, sequence_length = np.shape(sequences)
+
+        sequences_mat = np.zeros((num_states, sequence_length))
+        for sample_idx in np.arange(num_sequences):
+            # sequences_mat[sequences[i, :]] += 1
+            for t in np.arange(sequence_length):
+                # sequences_mat[sequences[sample_idx, t], t] += 1
+                # for x_idx in np.arange(num_states):0
+                sequences_mat[sequences[sample_idx, t], t] += 1
+            
+        return sequences_mat
+
+
+
+    
+    @classmethod
+    def _sequences_index_list_to_sparse_matrix_stack(cls, sequences: NDArray, num_states:int) -> List[csr_matrix]:
+        """Turn `sequences`, a list of x_bin indicies, into a flattened matrix occupancy representation for visualization of the path frequency
+        
+        Usage:
+            sequence_frames_sparse = TransitionMatrixComputations._sequences_index_list_to_sparse_matrix_stack(sequences=sequences, num_states=num_states)
+            sequence_frames_sparse
+
+        """
+        num_sequences, sequence_length = np.shape(sequences)
+
+        sequence_frames_list = []
+        for sample_idx in np.arange(num_sequences):
+            a_sequence_mat = np.zeros((num_states, sequence_length))
+            for t in np.arange(sequence_length):
+                a_sequence_mat[sequences[sample_idx, t], t] = 1
+            # end sequence
+            sequence_frames_list.append(csr_matrix(a_sequence_mat))
+            
+        # seq_indicies = np.arange(num_sequences)
+        # seq_t_indicies = np.arange(sequence_length)
+        # col_indices = np.arange(num_states)
+
+        # coo = coo_matrix((sequences, (seq_indicies, seq_t_indicies, col_indices)), shape=(num_sequences, sequence_length, num_states))
+        # return coo.tocsr()
+        return sequence_frames_list
+
+
+    # ==================================================================================================================== #
+    # Expected Position/Velocity                                                                                           #
+    # ==================================================================================================================== #
     @classmethod
     def _compute_expected_velocity_list_dict(cls, binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray]) -> Dict[types.DecoderName, List[ExpectedVelocityTuple]]:
         """ working expected velocity for each transition matrix.
         
         """
+        raise NotImplementedError
+    
+
 
     @classmethod
     def compute_expected_positions(cls, binned_x_transition_matrix_higher_order_mat_dict, decoders_dict):
