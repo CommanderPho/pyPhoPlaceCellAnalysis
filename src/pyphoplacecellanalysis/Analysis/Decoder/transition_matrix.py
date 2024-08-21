@@ -858,15 +858,48 @@ class TransitionMatrixComputations:
                 a_sequence = [current_state]
                 a_sequence_probability = [1.0] # specified
                 
-
+            ## Begin sequence generation:
             len_initial_constrained_sequence: int = len(a_sequence) # 1
-            
+
+            # ## (Initial Position , Increasing Order) Dependent:
+            # fixed_initial_state = current_state ## capture the initial state
+            # for an_order in range(sequence_length - len_initial_constrained_sequence):
+            #     next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, fixed_initial_state, :]) # always `initial_state` with increasing timesteps
+            #     next_state_likelihood = transition_matrix_mat[an_order, fixed_initial_state, next_state] # always `initial_state`
+            #     a_sequence.append(next_state)
+            #     a_sequence_probability.append(next_state_likelihood)
+
+
+            # (Fixed Order, Previous Timestep's Position) Dependent:
             for an_order in range(sequence_length - len_initial_constrained_sequence):
-                next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, current_state, :])
-                next_state_likelihood = transition_matrix_mat[an_order, current_state, next_state]
+                next_state = np.random.choice(num_states, p = transition_matrix_mat[0, current_state, :])
+                next_state_likelihood = transition_matrix_mat[0, current_state, next_state]
                 a_sequence.append(next_state)
                 a_sequence_probability.append(next_state_likelihood)
                 current_state = next_state
+                
+
+            # # TODO: (All time lags, All Positions) Dependent:
+            # for a_max_order in range(sequence_length - len_initial_constrained_sequence):
+            #     a_sub_sequence = []
+            #     a_sub_sequence_likelihoods = []
+                
+            #     for prev_t_idx, an_order in np.arange(a_max_order):
+            #         next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, current_state, :])
+            #         next_state_likelihood = transition_matrix_mat[an_order, current_state, next_state]
+            #         a_sub_sequence.append(next_state)
+            #         a_sub_sequence_likelihoods.append(next_state_likelihood)
+            #         current_state = next_state
+                    
+            #     a_sequence.append(a_sub_sequence)
+            #     a_sequence_probability.append(a_sub_sequence_likelihoods)
+
+            # for an_order in range(sequence_length - len_initial_constrained_sequence):
+            #     next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, current_state, :])
+            #     next_state_likelihood = transition_matrix_mat[an_order, current_state, next_state]
+            #     a_sequence.append(next_state)
+            #     a_sequence_probability.append(next_state_likelihood)
+            #     current_state = next_state
                 
             sequences[i] = a_sequence # append to the output array
             sequence_likelihoods[i] = a_sequence_probability
