@@ -27,6 +27,15 @@ from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
+from skimage.feature import hessian_matrix, hessian_matrix_eigvals
+from scipy.ndimage import gaussian_filter
+from ipywidgets import interact, FloatSlider
+from copy import deepcopy
+import numpy as np
+
+from ipywidgets import interact, FloatSlider, fixed
+from IPython.display import display
+
 # Custom Type Definitions ____________________________________________________________________________________________ #
 T = TypeVar('T')
 DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]] # Use like `v: DecoderListDict[NDArray]`
@@ -133,4 +142,31 @@ class ComputerVisionComputations:
         else:
             return posterior_out_folder, _save_out_paths
                 
+        
+
+
+    @classmethod
+    def interactive_image_preview(cls, input_img, blur_v_sigma, blur_h_sigma, hessian_sigma):
+        # Perform Gaussian blur
+        blurred_img = gaussian_filter(input_img.astype(float), sigma=(blur_v_sigma, blur_h_sigma), mode='nearest')
+
+        # Compute the Hessian matrix
+        H_out = hessian_matrix(blurred_img, sigma=hessian_sigma, mode='nearest')
+
+        # Compute the eigenvalues of the Hessian matrix
+        lambda1, lambda2 = hessian_matrix_eigvals(H_out)
+
+        # Ridge detection based on eigenvalues
+        ridges = np.abs(lambda2)  # Use the second eigenvalue for ridges
+
+        # Display the results (this will work as in your notebook)
+        display(blurred_img, ridges, clear=True)
+
+    @classmethod
+    def run_interactive(cls, input_img):
+        interact(cls.interactive_image_preview, 
+                 input_img=fixed(input_img),
+                 blur_v_sigma=FloatSlider(min=0, max=10, step=0.5, value=0, description='blur_v_sigma'),
+                 blur_h_sigma=FloatSlider(min=0, max=10, step=0.5, value=0, description='blur_h_sigma'),		 
+                 hessian_sigma=FloatSlider(min=0, max=10, step=0.5, value=0, description='hessian_sigma'))
         
