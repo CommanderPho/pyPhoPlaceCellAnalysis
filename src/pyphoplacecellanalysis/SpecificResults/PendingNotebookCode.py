@@ -93,6 +93,35 @@ def blend_images(images: list, cmap=None) -> np.ndarray:
 	combined_image = np.clip(combined_image, 0, 255)  # Ensure pixel values are within valid range
 	return combined_image.astype(np.uint8)
 
+def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
+	""" Sample multiple pg.ImageItems overlayed on one another
+	
+	# Example usage:
+	image1 = np.random.rand(100, 100) * 100  # Example image 1
+	image2 = np.random.rand(100, 100) * 100  # Example image 2
+	image3 = np.random.rand(100, 100) * 100  # Example image 3
+
+	image1
+	# Define the threshold
+
+	_out = visualize_multiple_image_items([image1, image2, image3], threshold=50)
+
+	"""
+	app = pg.mkQApp('visualize_multiple_image_items')  # Initialize the Qt application
+	win = pg.GraphicsLayoutWidget(show=True)
+	view = win.addViewBox()
+	view.setAspectLocked(True)
+	
+	for img in images:
+		if threshold is not None:
+			# Create a masked array, masking values below the threshold
+			img = np.ma.masked_less(img, threshold)
+
+		image_item = pg.ImageItem(img)
+		view.addItem(image_item)
+
+	# QtGui.QApplication.instance().exec_()
+	return app, win, view
 
 
 # ==================================================================================================================== #
