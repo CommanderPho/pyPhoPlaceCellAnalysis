@@ -1020,6 +1020,7 @@ class TransitionMatrixComputations:
         
         num_states = n_x_bins
         sequence_likelihood = np.zeros((sequence_length, ))
+        sequence_bin_maximal_likelihood = np.zeros((sequence_length, ))
         
         ## Start from the initial constrained sequences:
         assert initial_P_x is not None
@@ -1035,25 +1036,18 @@ class TransitionMatrixComputations:
                 # a_sequence_probability = [current_state_likelihood] # list-style
                 sequence_likelihood[0] = current_state_likelihood
             else:
-                ## Begin sequence generation:
+                ## Test sequence
+                an_order: int = (sequence_i-1) # (sequence_i-1): markov order
                 # len_initial_constrained_sequence: int = 1 # len(a_sequence) # 1
 
                 # ## (Initial Position , Increasing Order) Dependent:
-                # fixed_initial_state = current_state ## capture the initial state
-                # for an_order in range(sequence_length - len_initial_constrained_sequence):
-                #     next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, fixed_initial_state, :]) # always `initial_state` with increasing timesteps
-                #     next_state_likelihood = transition_matrix_mat[an_order, fixed_initial_state, next_state] # always `initial_state`
-                #     a_sequence.append(next_state)
-                #     a_sequence_probability.append(next_state_likelihood)
-
+                # sequence_likelihood[sequence_i] = transition_matrix_mat[an_order, test_posterior_most_likely_index_sequence[0], current_state] 
+                
                 # (Fixed Order, Previous Timestep's Position) Dependent:
-                # for an_order in range(sequence_length - len_initial_constrained_sequence):
-                # next_state = np.random.choice(num_states, p = transition_matrix_mat[0, current_state, :])
                 sequence_likelihood[sequence_i] = transition_matrix_mat[0, test_posterior_most_likely_index_sequence[sequence_i-1], current_state] # (sequence_i-1): previous timestep's state
-                # a_sequence.append(current_state)
-                # a_sequence_probability.append(next_state_likelihood)  # list-style
-                # sequence_likelihoods[sequence_i] = next_state_likelihood
-                # current_state = next_state
+                ## get the most likely likelihood:
+                maximally_likely_likelihood = np.nanmax(transition_matrix_mat[0, test_posterior_most_likely_index_sequence[sequence_i-1], :], axis=-1) # most likely state
+                sequence_bin_maximal_likelihood[sequence_i] = maximally_likely_likelihood
 
                 # # TODO: (All time lags, All Positions) Dependent:
                 # for a_max_order in range(sequence_length - len_initial_constrained_sequence):
@@ -1077,7 +1071,7 @@ class TransitionMatrixComputations:
                 #     a_sequence_probability.append(next_state_likelihood)
                 #     current_state = next_state
                 
-        return sequence_likelihood, num_states, sequence_length
+        return sequence_likelihood, sequence_bin_maximal_likelihood, num_states, sequence_length
        
 
 
