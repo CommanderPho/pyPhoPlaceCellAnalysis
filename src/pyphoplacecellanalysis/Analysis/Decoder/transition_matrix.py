@@ -808,7 +808,7 @@ class TransitionMatrixComputations:
     # Sampling Sequences                                                                                                   #
     # ==================================================================================================================== #
     @classmethod
-    def sample_sequences(cls, transition_matrix_mat: NDArray, sequence_length: int, num_sequences: int, initial_P_x: Optional[NDArray]=None, initial_state: Optional[int]=None) -> NDArray:
+    def sample_sequences(cls, transition_matrix_mat: NDArray, sequence_length: int, num_sequences: int, initial_P_x: Optional[NDArray]=None, initial_state: Optional[int]=None) -> Tuple[NDArray, NDArray, int]:
         """ Generates sample sequences given a transition_matrix_mat of order O
 
         USage 1:
@@ -818,7 +818,7 @@ class TransitionMatrixComputations:
             initial_state = 0  # Starting from state 0
             sequence_length = 10  # Length of each sequence
             num_sequences = 1000  # Number of sequences to generate        
-            sequences, num_states = TransitionMatrixComputations.sample_sequences(T_mat.copy(), initial_state=10, sequence_length=sequence_length, num_sequences=num_sequences) # (1000, 10)
+            sequences, sequence_likelihoods, num_states = TransitionMatrixComputations.sample_sequences(T_mat.copy(), initial_state=10, sequence_length=sequence_length, num_sequences=num_sequences) # (1000, 10)
             sequences
         
         Usage 2:
@@ -828,7 +828,7 @@ class TransitionMatrixComputations:
 
             sequence_length = 10  # Length of each sequence
             num_sequences = 1000  # Number of sequences to generate
-            sequences, num_states = TransitionMatrixComputations.sample_sequences(T_mat.copy(), sequence_length=sequence_length, num_sequences=num_sequences, initial_P_x=probability_normalized_occupancy) # (1000, 10)
+            sequences, sequence_likelihoods, num_states = TransitionMatrixComputations.sample_sequences(T_mat.copy(), sequence_length=sequence_length, num_sequences=num_sequences, initial_P_x=probability_normalized_occupancy) # (1000, 10)
             sequences
 
 
@@ -839,6 +839,8 @@ class TransitionMatrixComputations:
         
         num_states = n_x_bins
         sequences = np.zeros((num_sequences, sequence_length), dtype=int)
+        sequence_likelihoods = np.zeros((num_sequences, sequence_length))
+        
 
         for i in range(num_sequences):
             ## Start from the initial constrained sequences:
@@ -846,24 +848,30 @@ class TransitionMatrixComputations:
                 assert initial_P_x is not None
                 assert len(initial_P_x) == num_states
                 current_state = np.random.choice(num_states, p=initial_P_x)
+                current_state_likelihood = initial_P_x[current_state]
                 a_sequence = [current_state]
-
+                a_sequence_probability = [current_state_likelihood]
+                
             else:
                 assert initial_P_x is None, "initial_P_x will not be used if initial_state is provided!"
                 current_state = initial_state
                 a_sequence = [current_state]
+                a_sequence_probability = [1.0] # specified
+                
 
             len_initial_constrained_sequence: int = len(a_sequence) # 1
             
-
             for an_order in range(sequence_length - len_initial_constrained_sequence):
                 next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, current_state, :])
+                next_state_likelihood = transition_matrix_mat[an_order, current_state, next_state]
                 a_sequence.append(next_state)
+                a_sequence_probability.append(next_state_likelihood)
                 current_state = next_state
                 
             sequences[i] = a_sequence # append to the output array
-
-        return sequences, num_states
+            sequence_likelihoods[i] = a_sequence_probability
+            
+        return sequences, sequence_likelihoods, num_states
         
 
     @classmethod
