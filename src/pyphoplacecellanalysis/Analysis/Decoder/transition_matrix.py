@@ -956,6 +956,98 @@ class TransitionMatrixComputations:
         return sequence_frames_list
 
 
+
+    @classmethod
+    def compute_arbitrary_sequence_likelihood(cls, transition_matrix_mat: NDArray, initial_P_x: NDArray, test_posterior_most_likely_index_sequence: NDArray):
+        """ Generates sample sequences given a transition_matrix_mat of order O
+
+        USage 1:
+        
+            T_mat = deepcopy(binned_x_transition_matrix_higher_order_mat_dict['long_LR']) # (200, 57, 57)
+            probability_normalized_occupancy = deepcopy(decoders_dict['long_LR'].pf.probability_normalized_occupancy) # BasePositionDecoder
+            sequence_likelihood, num_states = TransitionMatrixComputations.compute_arbitrary_sequence_likelihood(T_mat.copy(), initial_P_x=probability_normalized_occupancy, test_posterior_most_likely_index_sequence=test_posterior_most_likely_index_sequence)
+            sequence_likelihood
+        
+        Usage 2:
+        
+            T_mat = deepcopy(binned_x_transition_matrix_higher_order_mat_dict['long_LR']) # (200, 57, 57)
+            probability_normalized_occupancy = deepcopy(decoders_dict['long_LR'].pf.probability_normalized_occupancy) # BasePositionDecoder
+
+            sequence_length = 10  # Length of each sequence
+            num_sequences = 1000  # Number of sequences to generate
+            sequences, sequence_likelihoods, num_states = TransitionMatrixComputations.sample_sequences(T_mat.copy(), sequence_length=sequence_length, num_sequences=num_sequences, initial_P_x=probability_normalized_occupancy) # (1000, 10)
+            sequences
+
+
+        """
+        sequence_length: int = len(test_posterior_most_likely_index_sequence)
+        n_orders, n_x_bins, _n_x_bins2 = np.shape(transition_matrix_mat)
+        assert n_x_bins == _n_x_bins2
+        assert n_orders > sequence_length
+        
+        num_states = n_x_bins
+        sequence_likelihood = np.zeros((sequence_length, ))
+        
+        ## Start from the initial constrained sequences:
+        assert initial_P_x is not None
+        assert len(initial_P_x) == num_states
+        
+        for sequence_i in np.arange(sequence_length):
+            current_state = test_posterior_most_likely_index_sequence[sequence_i]
+            
+            if (sequence_i == 0):            
+                # sequence_i: int = 0    
+                current_state_likelihood = initial_P_x[current_state]
+                # a_sequence = [current_state]
+                # a_sequence_probability = [current_state_likelihood] # list-style
+                sequence_likelihood[0] = current_state_likelihood
+            else:
+                ## Begin sequence generation:
+                # len_initial_constrained_sequence: int = 1 # len(a_sequence) # 1
+
+                # ## (Initial Position , Increasing Order) Dependent:
+                # fixed_initial_state = current_state ## capture the initial state
+                # for an_order in range(sequence_length - len_initial_constrained_sequence):
+                #     next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, fixed_initial_state, :]) # always `initial_state` with increasing timesteps
+                #     next_state_likelihood = transition_matrix_mat[an_order, fixed_initial_state, next_state] # always `initial_state`
+                #     a_sequence.append(next_state)
+                #     a_sequence_probability.append(next_state_likelihood)
+
+                # (Fixed Order, Previous Timestep's Position) Dependent:
+                # for an_order in range(sequence_length - len_initial_constrained_sequence):
+                # next_state = np.random.choice(num_states, p = transition_matrix_mat[0, current_state, :])
+                sequence_likelihood[sequence_i] = transition_matrix_mat[0, test_posterior_most_likely_index_sequence[sequence_i-1], current_state] # (sequence_i-1): previous timestep's state
+                # a_sequence.append(current_state)
+                # a_sequence_probability.append(next_state_likelihood)  # list-style
+                # sequence_likelihoods[sequence_i] = next_state_likelihood
+                # current_state = next_state
+
+                # # TODO: (All time lags, All Positions) Dependent:
+                # for a_max_order in range(sequence_length - len_initial_constrained_sequence):
+                #     a_sub_sequence = []
+                #     a_sub_sequence_likelihoods = []
+                    
+                #     for prev_t_idx, an_order in np.arange(a_max_order):
+                #         next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, current_state, :])
+                #         next_state_likelihood = transition_matrix_mat[an_order, current_state, next_state]
+                #         a_sub_sequence.append(next_state)
+                #         a_sub_sequence_likelihoods.append(next_state_likelihood)
+                #         current_state = next_state
+                        
+                #     a_sequence.append(a_sub_sequence)
+                #     a_sequence_probability.append(a_sub_sequence_likelihoods)
+
+                # for an_order in range(sequence_length - len_initial_constrained_sequence):
+                #     next_state = np.random.choice(num_states, p = transition_matrix_mat[an_order, current_state, :])
+                #     next_state_likelihood = transition_matrix_mat[an_order, current_state, next_state]
+                #     a_sequence.append(next_state)
+                #     a_sequence_probability.append(next_state_likelihood)
+                #     current_state = next_state
+                
+        return sequence_likelihood, num_states, sequence_length
+       
+
+
     # ==================================================================================================================== #
     # Expected Position/Velocity                                                                                           #
     # ==================================================================================================================== #
