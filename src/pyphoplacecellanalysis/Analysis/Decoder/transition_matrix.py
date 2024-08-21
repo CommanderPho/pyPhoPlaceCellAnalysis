@@ -25,6 +25,9 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import Basic
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+
 # Custom Type Definitions ____________________________________________________________________________________________ #
 T = TypeVar('T')
 DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]] # Use like `v: DecoderListDict[NDArray]`
@@ -435,6 +438,214 @@ class TransitionMatrixComputations:
 
         predicited_posteriors = np.hstack(predicited_posteriors) # (n_x, n_predicted_time_bins)
         return predicited_posteriors
+
+    @classmethod
+    def agreement_with_observation(cls, binned_x_transition_matrix_higher_order_list_dict: List[NDArray], active_decoded_results: Dict[str, DecodedFilterEpochsResult], transition_matrix_order_start_idx:int=1, transition_matrix_order_growth_factor:float=1.0, debug_print=False):
+        """ Computes the degree of agreement between predicition and observation for a set of transition matricies
+        
+        
+        """
+        # INPUTS: active_decoded_results, binned_x_transition_matrix_higher_order_list_dict, makov_assumed_binned_x_transition_matrix_higher_order_list_dict, expected_velocity_list_dict, transition_matrix_t_bin_size
+
+        # SINGLE DECODER: ____________________________________________________________________________________________________ #
+        # single decoder for now
+        a_decoder_name = 'long_LR'
+        # a_decoder_name = 'long_RL'
+        a_binned_x_transition_matrix_higher_order_list: List[NDArray] = deepcopy(binned_x_transition_matrix_higher_order_list_dict[a_decoder_name])
+        # single-decoder
+
+        an_epoch_idx: int = 1 #2 ## SINGLE EPOCH
+        # markov_order_idx: int = 1 ## SINGLE MARKOV ORDER
+
+        # V = expected_velocity_list_dict['long_LR'][0].in_combined
+        # V = np.stack([v.in_combined for v in expected_velocity_list_dict['long_LR']])
+
+        predicited_posteriors_list_dict = {}
+        predicited_posteriors_agreement_with_observation_list_dict = {}
+
+        # for a_decoder_name, a_binned_x_transition_matrix_higher_order_list in binned_x_transition_matrix_higher_order_list_dict.items():
+        # decoder_laps_filter_epochs_decoder_result_dict[a_decoder_name]
+
+        a_decoded_results: DecodedFilterEpochsResult = active_decoded_results[a_decoder_name]
+        # a_train_decoded_results.
+        # V = np.stack([v.in_combined for v in a_velocity_tuple_list]) # Stack over orders. This doesn't make much sense actually
+        # # V
+        # display(np.atleast_2d(V[markov_order_idx]).T)
+
+        # a_decoded_results.validate_time_bins()
+
+        # an_epoch_idx: int # ## SINGLE EPOCH
+        test_posterior = deepcopy(a_decoded_results.p_x_given_n_list[an_epoch_idx])
+        print(f'np.shape(test_posterior): {np.shape(test_posterior)}')
+
+        # ## Traditional
+        # predicited_posteriors: NDArray = TransitionMatrixComputations._perform_forward_prediction(a_binned_x_transition_matrix_higher_order_list, test_posterior=test_posterior, transition_matrix_order_growth_factor=3.0) # (n_pos_bins, (n_time_bins - 1))
+
+        # growth_order_factors = np.linspace(start=1.0, stop=3.0, num=5)
+        # several_predicited_posteriors: NDArray = [TransitionMatrixComputations._perform_forward_prediction(a_binned_x_transition_matrix_higher_order_list, test_posterior=test_posterior, transition_matrix_order_growth_factor=G) for G in growth_order_factors] # (n_pos_bins, (n_time_bins - 1))
+
+        # agreement_with_observation = [TransitionMatrixComputations._likelihood_of_observation(test_posterior[:, (a_predicted_timestamp_index + 1)], a_predicted_posterior) for a_predicted_timestamp_index, a_predicted_posterior in enumerate(predicited_posteriors.T)]
+        # agreement_with_observation = np.array(agreement_with_observation)
+
+        # ==================================================================================================================== #
+        # Expanding `_perform_forward_prediction` because it seems to be returning almost entirely the same things:            #
+        # ==================================================================================================================== #
+
+        debug_print = False
+        transition_matrix_order_start_idx = 1
+        transition_matrix_order_growth_factor = 1.0
+
+        ## INPUTS: a_binned_x_transition_matrix_higher_order_list, test_posterior, transition_matrix_order_start_idx, transition_matrix_order_growth_factor
+        n_time_bins: int = np.shape(test_posterior)[1]
+        n_predicted_time_bins: int = n_time_bins - 1
+        if debug_print:
+            print(f'np.shape(test_posterior): {np.shape(test_posterior)}, n_time_bins: {n_time_bins}, n_predicted_time_bins: {n_predicted_time_bins}')
+
+        # # Only use the first posterior
+        # an_observed_posterior = np.atleast_2d(test_posterior[:, 0]).T # (n_x, 1)
+        # n_predicted_time_bins: int = 5 # arrbitrary number of time bins to predict in the future
+
+        specific_observation_t_bin_indicies = np.arange(n_time_bins-1) # all time bins except the last
+        all_t_bins_predicited_corresponding_t_bins = []
+        all_t_bins_predicited_posteriors = []
+        all_t_bins_agreement_with_observation = []
+
+        should_empty_fill_outputs = True # if `should_empty_fill_outputs == True`, all outputs will be the same size with np.nan values filling the "missing" entries.
+
+        for a_specific_t_bin_idx in specific_observation_t_bin_indicies:
+            # # Only use a specific posterior
+            an_observed_posterior = np.atleast_2d(test_posterior[:, a_specific_t_bin_idx]).T # (n_x, 1)
+            n_predicted_time_bins: int = ((n_time_bins-a_specific_t_bin_idx) - 1) # number of time bins to predict computed by how many remain in the current epoch after the specific_t_bin_idx (in the future)
+
+            # """ Takes a single observation time bin and returns its best prediction for all future bins
+
+            # """
+            ## INPUTS: n_predicted_time_bins, an_observed_posterior
+            an_observed_posterior = np.atleast_2d(an_observed_posterior) # (n_x, 1)
+            if np.shape(an_observed_posterior)[-1] != 1:
+                # last dimension should be 1 (n_x, 1), transpose it
+                an_observed_posterior = an_observed_posterior.T
+                
+            n_xbins: int = np.shape(an_observed_posterior)[0]
+            if debug_print:
+                print(f'Single observation at a_specific_t_bin_idx = {a_specific_t_bin_idx}:\n\tnp.shape(an_observed_posterior): {np.shape(an_observed_posterior)}, n_predicted_time_bins: {n_predicted_time_bins}')
+
+            predicited_posteriors = []
+            # for a_tbin_idx in np.arange(start=1, stop=n_time_bins):
+            for i in np.arange(n_predicted_time_bins):
+                a_start_rel_tbin_idx = i + 1 # a_start_rel_tbin_idx: relative to the current observation start t_bin (a_start_rel_tbin_idx == 0 at the observation time)
+                
+                # an_observed_posterior = np.atleast_2d(test_posterior[:, i]).T # (n_x, 1)
+                # an_actual_observed_next_step_posterior = np.atleast_2d(test_posterior[:, a_tbin_idx]).T # (n_x, 1)
+
+                if transition_matrix_order_growth_factor is not None:
+                    transition_matrix_order_idx: int = transition_matrix_order_start_idx + int(round(transition_matrix_order_growth_factor * a_start_rel_tbin_idx))
+                else:
+                    ## NOTE: transition_matrix_order does seem to do the identity transformation
+                    transition_matrix_order_idx: int = transition_matrix_order_start_idx + a_start_rel_tbin_idx
+                    # transition_matrix_order: int = transition_matrix_order_idx + 1 ## order is index + 1
+                    
+                if debug_print:
+                    print(f'\t{i = }, {a_start_rel_tbin_idx = }, {transition_matrix_order_idx = }')
+                    
+                ## single time-bin
+                a_trans_prob_mat = a_binned_x_transition_matrix_higher_order_list[transition_matrix_order_idx] # (n_x, n_x)
+                a_next_t_predicted_pos_probs = a_trans_prob_mat @ an_observed_posterior # (n_x, 1)
+
+                predicited_posteriors.append(a_next_t_predicted_pos_probs)
+
+            predicited_posteriors = np.hstack(predicited_posteriors) # (n_x, n_predicted_time_bins)
+            # ## OUTPUTS: predicited_posteriors
+            # predicited_posteriors_list_dict[a_decoder_name] = predicited_posteriors
+
+            ## Compute the agreement of this time bin with observation:
+            agreement_with_observation = []
+            for a_predicted_timestamp_index, a_predicted_posterior in enumerate(predicited_posteriors.T):
+                a_predicted_timestamp = a_predicted_timestamp_index + 1
+                # a_predicted_posterior = np.atleast_2d(a_predicted_posterior).T
+                an_observed_posterior_single_t_bin = test_posterior[:, a_predicted_timestamp]
+                if debug_print:
+                    print(f'\t {a_predicted_timestamp} - np.shape(an_observed_posterior_single_t_bin): {np.shape(an_observed_posterior_single_t_bin)}, np.shape(a_predicted_posterior): {np.shape(a_predicted_posterior)}')
+                agreement_with_observation.append(TransitionMatrixComputations._likelihood_of_observation(an_observed_posterior_single_t_bin, a_predicted_posterior))
+            agreement_with_observation = np.array(agreement_with_observation)
+            if debug_print:
+                print(agreement_with_observation)
+
+            ## Build outputs:
+            if should_empty_fill_outputs:
+                n_fill_bins: int = a_specific_t_bin_idx+1
+                pre_prediction_start_timebins = np.arange(n_fill_bins) # observation is at index `a_specific_t_bin_idx`, so to get the full range before the first prediction (inclusive) we need to do +1
+                fill_arr = np.full((n_xbins, n_fill_bins), fill_value=np.nan)
+                all_t_bins_predicited_corresponding_t_bins.append(np.arange(n_predicted_time_bins + n_fill_bins))
+                predicited_posteriors = np.concatenate((fill_arr, predicited_posteriors), axis=-1)
+                agreement_with_observation = np.concatenate((np.full((n_fill_bins,), fill_value=np.nan), agreement_with_observation))
+                if debug_print:
+                    print(f'\tnp.shape(agreement_with_observation): {np.shape(agreement_with_observation)}')
+            else:
+                all_t_bins_predicited_corresponding_t_bins.append((np.arange(n_predicted_time_bins)+a_specific_t_bin_idx))
+            if debug_print:    
+                print(f'\tnp.shape(predicited_posteriors): {np.shape(predicited_posteriors)}')
+            all_t_bins_predicited_posteriors.append(predicited_posteriors)
+            
+            ## OUTPUTS: agreement_with_observation
+            all_t_bins_agreement_with_observation.append(agreement_with_observation)
+            
+
+            # Aggregate over all predictors we have for the next timestep
+            
+
+            # END Expanding `_perform_forward_prediction` ________________________________________________________________________________________________________________ #
+
+
+            ## only for this epoch:
+            # predicited_posteriors_agreement_with_observation_list_dict[a_decoder_name] = agreement_with_observation
+
+            # agreement_with_observation
+
+            # # # Compare real:
+            # ## Observed posteriors:
+            # observed_posteriors = deepcopy(test_posterior[:, 1:])
+
+            # assert np.shape(observed_posteriors) == np.shape(predicited_posteriors)
+            # _prediction_observation_diff = observed_posteriors - predicited_posteriors
+            # _prediction_observation_diff
+
+
+        ## Construct into 3D arrays for visualization in Napari and future operations
+        ## INPUTS: all_t_bins_predicited_corresponding_t_bins, all_t_bins_predicited_posteriors, all_t_bins_agreement_with_observation
+        all_t_bins_predicited_posteriors: NDArray = np.stack(all_t_bins_predicited_posteriors) # (n_predicted_t_bins, n_x_bins, n_t_bins), single posterior (n_x_bins, n_t_bins)
+        all_t_bins_agreement_with_observation: NDArray = np.stack(all_t_bins_agreement_with_observation) # (n_predicted_t_bins, n_t_bins)
+        all_t_bins_predicited_corresponding_t_bins: NDArray = np.stack(all_t_bins_predicited_corresponding_t_bins) # (n_predicted_t_bins, n_t_bins)
+
+        ## OUTPUTS: all_t_bins_predicited_posteriors, all_t_bins_agreement_with_observation, all_t_bins_predicited_corresponding_t_bins
+        # all_t_bins_predicited_posteriors.shape: (30, 57, 31) (n_t_prediction_bins, n_x_bins, n_t_bins)
+        # test_posterior.shape: (57, 31)
+
+        n_past_observations: NDArray = np.sum(np.logical_not(np.isnan(all_t_bins_agreement_with_observation)), axis=0) # (n_t_bins,)  -- sum over each predicted time bin to see how many valid past predictions we have # e.g. [ 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30]
+        ## aggregate over all possible predictions to determine the observed likelihood for each real time bin
+        collided_across_predictions_observation_likelihoods = np.nansum(all_t_bins_agreement_with_observation, axis=0) # (n_t_bins,)
+        # collided_across_predictions_observation_likelihoods
+
+        ## Average across all prediction timesteps and renormalize
+        # all_t_bins_predicited_posteriors # TypeError: Invalid shape (30, 57, 31) for image data
+
+        _arr: NDArray = np.nansum(deepcopy(all_t_bins_predicited_posteriors), axis=0) # (n_x_bins, n_t_bins)
+        ## Divide by the number of observations to prevent over-representation:
+        _arr = _arr / n_past_observations
+
+        ## re normalize over first position
+        _arr = _arr / np.nansum(_arr, axis=0, keepdims=True)
+        # _arr
+
+        # INPUTS: n_past_observations
+
+        # `collided_across_prediction_position_likelihoods` - this isn't "fair" because it includes the predictions from t+1 timesteps which are very close to the actual observed positions. Mostly exploring how to combine across time bin lags.
+        # collided_across_prediction_position_likelihoods = np.nansum(all_t_bins_predicited_posteriors, axis=-1) # (n_t_prediction_bins, n_x_bins)
+        collided_across_prediction_position_likelihoods = np.nansum(all_t_bins_predicited_posteriors, axis=0) # (n_t_prediction_bins, n_x_bins)
+        return (all_t_bins_predicited_posteriors, all_t_bins_agreement_with_observation, all_t_bins_predicited_corresponding_t_bins), collided_across_prediction_position_likelihoods
+
+
+
 
     # ==================================================================================================================== #
     # Plot/Display                                                                                                         #
