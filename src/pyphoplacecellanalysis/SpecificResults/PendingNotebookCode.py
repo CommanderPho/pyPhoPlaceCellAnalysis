@@ -40,6 +40,61 @@ DecoderName = NewType('DecoderName', str)
 import matplotlib.pyplot as plt
 
 
+
+
+
+# ==================================================================================================================== #
+# 2024-08-21 Plotting Generated Transition Matrix Sequences                                                            #
+# ==================================================================================================================== #
+from matplotlib.colors import Normalize
+
+def apply_colormap(image: np.ndarray, color: tuple) -> np.ndarray:
+	colored_image = np.zeros((*image.shape, 3), dtype=np.float32)
+	for i in range(3):
+		colored_image[..., i] = image * color[i]
+	return colored_image
+
+def blend_images(images: list, cmap=None) -> np.ndarray:
+	""" Tries to pre-combine images to produce an output image of the same size
+	
+	# 'coolwarm'
+	images = [a_seq_mat.todense().T for i, a_seq_mat in enumerate(sequence_frames_sparse)]
+	blended_image = blend_images(images)
+	# blended_image = blend_images(images, cmap='coolwarm')
+	blended_image
+
+	# blended_image = Image.fromarray(blended_image, mode="RGB")
+	# # blended_image = get_array_as_image(blended_image, desired_height=100, desired_width=None, skip_img_normalization=True)
+	# blended_image
+
+
+	"""
+	if cmap is None:
+		# Non-colormap mode:
+		# Ensure images are in the same shape
+		combined_image = np.zeros_like(images[0], dtype=np.float32)
+		
+		for img in images:
+			combined_image += img.astype(np.float32)
+
+	else:
+		# colormap mode
+		# Define a colormap (blue to red)
+		cmap = plt.get_cmap(cmap)
+		norm = Normalize(vmin=0, vmax=len(images) - 1)
+		
+		combined_image = np.zeros((*images[0].shape, 3), dtype=np.float32)
+		
+		for i, img in enumerate(images):
+			color = cmap(norm(i))[:3]  # Get RGB color from colormap
+			colored_image = apply_colormap(img, color)
+			combined_image += colored_image    
+
+	combined_image = np.clip(combined_image, 0, 255)  # Ensure pixel values are within valid range
+	return combined_image.astype(np.uint8)
+
+
+
 # ==================================================================================================================== #
 # 2024-08-16 - Image Processing Techniques                                                                             #
 # ==================================================================================================================== #
