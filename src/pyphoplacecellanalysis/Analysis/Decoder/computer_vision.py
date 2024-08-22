@@ -161,6 +161,9 @@ class ComputerVisionComputations:
 
         # Display the results (this will work as in your notebook)
         display(blurred_img, ridges, clear=True)
+        
+        return ridges
+
 
     @classmethod
     def run_interactive(cls, input_img):
@@ -169,4 +172,32 @@ class ComputerVisionComputations:
                  blur_v_sigma=FloatSlider(min=0, max=10, step=0.5, value=0, description='blur_v_sigma'),
                  blur_h_sigma=FloatSlider(min=0, max=10, step=0.5, value=0, description='blur_h_sigma'),		 
                  hessian_sigma=FloatSlider(min=0, max=10, step=0.5, value=0, description='hessian_sigma'))
+        
+
+    @classmethod
+    def interactive_binarization(cls, ridges, ridge_binarization_threshold):
+        ridge_binary = ridges > ridge_binarization_threshold
+        # cls._display_binarization(ridge_binarization_threshold, ridge_binary)
+        # display(ridge_binary, clear=False)
+        
+        # # Store these values if needed
+        # cls.user_ridge_binarization_threshold = ridge_binarization_threshold
+        # cls.user_ridge_binary = ridge_binary
+
+        return ridge_binary
+    
+
+    # @staticmethod
+    # def _display_binarization(threshold, binary_image):
+    #     plt.figure(figsize=(8, 8))
+    #     plt.imshow(binary_image, cmap='gray')
+    #     plt.title(f'Ridge Binarization (Threshold: {threshold})')
+    #     plt.axis('off')
+    #     plt.show()
+
+    @classmethod
+    def run_binarization_interactive(cls, ridges):
+        interact(cls.interactive_binarization, 
+                 ridges=fixed(ridges),
+                 ridge_binarization_threshold=FloatSlider(min=0, max=np.nanmax(ridges), step=np.nanmax(ridges)/100, value=0, description='Binarization Threshold'))
         
