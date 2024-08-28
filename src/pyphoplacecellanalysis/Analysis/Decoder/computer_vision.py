@@ -63,8 +63,7 @@ class ComputerVisionComputations:
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
     def export_decoded_posteriors_as_images(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, # decoder_ripple_filter_epochs_decoder_result_dict: DecoderResultDict,
-                                             posterior_out_folder:Path='output/_temp_individual_posteriors',
-                                  should_export_separate_color_and_greyscale: bool = True, desired_height=None, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+                                             posterior_out_folder:Path='output/_temp_individual_posteriors', should_export_separate_color_and_greyscale: bool = True, desired_height=None, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
         """Save the transitiion matrix info to a file
         
         Usage:
@@ -128,13 +127,13 @@ class ComputerVisionComputations:
         if should_export_separate_color_and_greyscale:
             return (posterior_out_folder, posterior_out_folder_greyscale, posterior_out_folder_color), _save_out_paths
         else:
-            return posterior_out_folder, _save_out_paths
+            return (posterior_out_folder, ), _save_out_paths
                 
         
     @classmethod
     @function_attributes(short_name=None, tags=['export', 'images'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
-                                                         _save_context: IdentifyingContext, parent_output_folder: Path, desired_height=None):
+                                                         _save_context: IdentifyingContext, parent_output_folder: Path, should_export_separate_color_and_greyscale: bool = True, desired_height=None):
         """
         
         Usage:
@@ -147,19 +146,19 @@ class ComputerVisionComputations:
         """
         def _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, a_parent_output_folder: Path) -> IdentifyingContext:
             """ saves a single set of named epochs, like 'laps' or 'ripple' 
-            captures nothing
+            captures: desired_height, should_export_separate_color_and_greyscale, 
             """
             out_paths = {}
             for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
                 # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
                 _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)                    
-                posterior_out_folder = a_parent_output_folder.joinpath(epochs_name).resolve()
-                posterior_out_folder.mkdir(parents=True, exist_ok=True)
-                posterior_out_folder = posterior_out_folder.joinpath(a_decoder_name).resolve()
+                posterior_out_folder = a_parent_output_folder.joinpath(epochs_name, a_decoder_name).resolve()
+                # posterior_out_folder.mkdir(parents=True, exist_ok=True)
+                # posterior_out_folder = posterior_out_folder.joinpath(a_decoder_name).resolve()
                 posterior_out_folder.mkdir(parents=True, exist_ok=True)
                 # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
-                an_out_path = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height)
-                out_paths[a_decoder_name] = an_out_path
+                (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, should_export_separate_color_and_greyscale=should_export_separate_color_and_greyscale)
+                out_paths[a_decoder_name] = an_out_posterior_out_folder
                 
             return out_paths
 
@@ -167,7 +166,6 @@ class ComputerVisionComputations:
         # parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
         assert parent_output_folder.exists(), f"parent_output_folder: {parent_output_folder} does not exist"
         
-    
         out_paths = {'laps': None, 'ripple': None}
         out_paths['laps'] = _subfn_perform_export_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', a_parent_output_folder=parent_output_folder)
         out_paths['ripple'] = _subfn_perform_export_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', a_parent_output_folder=parent_output_folder)
