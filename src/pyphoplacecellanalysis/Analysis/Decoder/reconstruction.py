@@ -405,7 +405,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
        
     """
     p_x_given_n: NDArray = non_serialized_field()
-    epoch_info_tuple: Tuple = non_serialized_field()
+    epoch_info_tuple: Tuple = non_serialized_field() # EpochTuple
 
     most_likely_positions: NDArray = non_serialized_field()
     most_likely_position_indicies: NDArray = non_serialized_field()
@@ -498,7 +498,116 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         image_raw, path_raw = raw_tuple
         return image_raw, path_raw
 
+
+                
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    # def to_hdf(self, file_path):
+    #     with h5py.File(file_path, 'w') as f:
+    #         for attribute, value in self.__dict__.items():
+    #             if isinstance(value, pd.DataFrame):
+    #                 value.to_hdf(file_path, key=attribute)
+    #             elif isinstance(value, np.ndarray):
+    #                 f.create_dataset(attribute, data=value)
+    #             # ... handle other attribute types as needed ...    
+
+    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path
+        enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.
+
+
+        Usage:
+            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+            _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+            _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+        """
+        import h5py
         
+        assert not isinstance(file_path, (str, Path)), f"pass an already open HDF5 file handle. You passed type(file_path): {type(file_path)}, file_path: {file_path}"
+        f = file_path
+        if debug_print and enable_hdf_testing_mode:
+            print(f'type(f): {type(f)}, f: {f}') # type(f): <class 'h5py._hl.files.File'>, f: <HDF5 file "decoded_epoch_posteriors.h5" (mode r+)>
+        # super().to_hdf(file_path, key=key, debug_print=debug_print, enable_hdf_testing_mode=enable_hdf_testing_mode, **kwargs)
+        # handle custom properties here
+
+        attribute_type_fields = ['nbins', 'epoch_data_index', 'n_xbins']
+        dataset_type_fields = ['most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges'] # 'p_x_given_n', 
+        container_type_fields = ['time_bin_container', 'marginal_x', 'marginal_y']
+        
+        # 'p_x_given_n':
+        epoch_id_identifier_str: str = f'{key}/p_x_given_n'
+        if self.epoch_data_index is not None:
+            epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+        else:
+            epoch_id_str = f"{epoch_id_identifier_str}"
+        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        f.create_dataset(epoch_id_str, data=img_data)
+        
+        for a_field_name in dataset_type_fields:
+            a_val = getattr(self, a_field_name)
+            if a_val is not None:
+                ## valid value
+                a_curr_field_epoch_id_identifier_str: str = f'{key}/{a_field_name}'
+                if self.epoch_data_index is not None:
+                    a_curr_field_epoch_id_str = f"{a_curr_field_epoch_id_identifier_str}[{self.epoch_data_index}]"
+                else:
+                    a_curr_field_epoch_id_str = f"{a_curr_field_epoch_id_identifier_str}"
+
+                # img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+                f.create_dataset(a_curr_field_epoch_id_str, data=a_val) # TypeError: No conversion path for dtype: dtype('<U24')
+                
+
+        ## Custom derived:
+        # 't_bin_centers':
+        t_bin_centers = deepcopy(self.time_bin_container.centers)
+        epoch_id_identifier_str: str = f'{key}/t_bin_centers'
+        if self.epoch_data_index is not None:
+            epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+        else:
+            epoch_id_str = f"{epoch_id_identifier_str}"
+        f.create_dataset(epoch_id_str, data=t_bin_centers)
+         
+        ## Attributes:
+        group = f[key]
+        group.attrs['nbins'] = self.nbins
+        group.attrs['n_xbins'] = self.n_xbins
+        # group.attrs['ndim'] = self.ndim
+
+        epoch_info_tuple = deepcopy(self.epoch_info_tuple) # EpochTuple(Index=28, start=971.8437469999772, stop=983.9541530000279, label='28', duration=12.110406000050716, lap_id=29, lap_dir=1, score=0.36769430044232587, velocity=1.6140523749028528, intercept=1805.019565924132, speed=1.6140523749028528, wcorr=-0.9152062701244238, P_decoder=0.6562437078530542, pearsonr=-0.7228173157676305, travel=0.0324318935144031, coverage=0.19298245614035087, jump=0.0005841121495327102, sequential_correlation=16228.563177472019, monotonicity_score=16228.563177472019, laplacian_smoothness=16228.563177472019, longest_sequence_length=22, longest_sequence_length_ratio=0.4583333333333333, direction_change_bin_ratio=0.19148936170212766, congruent_dir_bins_ratio=0.574468085106383, total_congruent_direction_change=257.92556950947574, total_variation=326.1999849678664, integral_second_derivative=7423.7044320722935, stddev_of_diff=8.368982188902695)
+        epoch_info_tuple_included_fields = [k for k in dir(epoch_info_tuple) if not k.startswith('_')] # ['Index', 'P_decoder', 'congruent_dir_bins_ratio', 'count', 'coverage', 'direction_change_bin_ratio', 'duration', 'index', 'integral_second_derivative', 'intercept', 'jump', 'label', 'lap_dir', 'lap_id', 'laplacian_smoothness', 'longest_sequence_length', 'longest_sequence_length_ratio', 'monotonicity_score', 'pearsonr', 'score', 'sequential_correlation', 'speed', 'start', 'stddev_of_diff', 'stop', 'total_congruent_direction_change', 'total_variation', 'travel', 'velocity', 'wcorr']
+        
+
+        # self.position.to_hdf(file_path=file_path, key=f'{key}/pos')
+        # if self.epochs is not None:
+        #     self.epochs.to_hdf(file_path=file_path, key=f'{key}/epochs') #TODO 2023-07-30 11:13: - [ ] What if self.epochs is None?
+        # else:
+        #     # if self.epochs is None
+        #     pass
+        # self.spikes_df.spikes.to_hdf(file_path, key=f'{key}/spikes')
+        # self.ratemap.to_hdf(file_path, key=f'{key}/ratemap')
+
+        # Open the file with h5py to add attributes to the group. The pandas.HDFStore object doesn't provide a direct way to manipulate groups as objects, as it is primarily intended to work with datasets (i.e., pandas DataFrames)
+        # with h5py.File(file_path, 'r+') as f:
+        #     ## Unfortunately, you cannot directly assign a dictionary to the attrs attribute of an h5py group or dataset. The attrs attribute is an instance of a special class that behaves like a dictionary in some ways but not in others. You must assign attributes individually
+        #     group = f[key]
+        #     group.attrs['position_srate'] = self.position_srate
+        #     group.attrs['ndim'] = self.ndim
+
+        #     # can't just set the dict directly
+        #     # group.attrs['config'] = str(self.config.to_dict())  # Store as string if it's a complex object
+        #     # Manually set the config attributes
+        #     config_dict = self.config.to_dict()
+        #     group.attrs['config/speed_thresh'] = config_dict['speed_thresh']
+        #     group.attrs['config/grid_bin'] = config_dict['grid_bin']
+        #     group.attrs['config/grid_bin_bounds'] = config_dict['grid_bin_bounds']
+        #     group.attrs['config/smooth'] = config_dict['smooth']
+        #     group.attrs['config/frate_thresh'] = config_dict['frate_thresh']
+
+
+    @classmethod
+    def read_hdf(cls, file_path, key: str, **kwargs) -> "PfND":
+        """ Reads the data from the key in the hdf5 file at file_path """
+        raise NotImplementedError("read_hdf not implemented")
+
 
 @custom_define(slots=False, repr=False)
 class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
