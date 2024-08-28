@@ -113,6 +113,13 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     def dockWidth(self, value):
         self.ui.spinBox_Width.setValue(int(round(value)))
 
+    @property
+    def contentsFrameWidget(self):
+        """The contentsFrameWidget property."""
+        return self.ui.contentsFrame
+    # @extendedLabel.setter
+    # def extendedLabel(self, value):
+    #     self.ui.contentsFrame = value
 
 
     @property

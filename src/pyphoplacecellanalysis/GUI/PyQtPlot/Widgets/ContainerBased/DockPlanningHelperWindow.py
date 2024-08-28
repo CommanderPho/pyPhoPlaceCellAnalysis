@@ -224,7 +224,8 @@ class DockPlanningHelperWindow:
 
 
     def perform_create_new_dock_widget(self, dock_id_str:str=None, active_dock_add_location:Union[str, Tuple[str, str]]='bottom', dockSize=None, autoOrientation=False):
-        """ 
+        """ Creaets a new DockPlanningHelper widget
+        
         a_dock_helper_widget, a_dock_config, a_dock_widget = _out.perform_create_new_dock_widget()
         
         """
@@ -254,7 +255,7 @@ class DockPlanningHelperWindow:
         assert extant_config is None
         assert extant_dock_widget is None
         
-        ## make new:
+        ## make new widget:
         a_dock_helper_widget = DockPlanningHelperWidget(dock_title=dock_id_str, dock_id=dock_id_str, defer_show=True)
         
         ## connections:
