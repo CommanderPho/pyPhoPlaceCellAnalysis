@@ -21,7 +21,7 @@ from neuropy.utils.mixins.binning_helpers import transition_matrix
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder #typehinting only
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, SingleEpochDecodedResult #typehinting only
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
@@ -737,3 +737,172 @@ class ComputerVisionComputations:
         # imv.roiClicked()
         
         return app, win, imv
+    
+
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================== #
+# ComputerVisionPipeline                                                                                               #
+# ==================================================================================================================== #
+
+
+def remove_small_regions(img, min_size):
+    from scipy.ndimage import label
+    
+    # Step 1: Label connected components
+    labeled_img, num_features = label(img)
+
+    # Step 2: Calculate the size of each connected component
+    component_sizes = np.bincount(labeled_img.ravel())
+
+    # Step 3: Create a mask for large components
+    large_components = component_sizes >= min_size
+    large_components_mask = large_components[labeled_img]
+
+    # Step 4: Return the image with small regions removed
+    filtered_img = img * large_components_mask
+
+    return filtered_img
+
+
+
+
+
+@define(slots=False, eq=False)
+class ComputerVisionPipeline:
+    """ 
+    from pyphoplacecellanalysis.Analysis.Decoder.computer_vision import ComputerVisionPipeline
+    """
+    a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = field()
+    
+
+
+    @classmethod
+    def _get_data(cls, active_epoch_idx: int):
+        """ captures: decoder_ripple_filter_epochs_decoder_result_dict, 
+        
+        """
+        # a_decoder_decoded_epochs_result.filter_epochs
+        from pyphocorehelpers.plotting.media_output_helpers import img_data_to_greyscale
+        
+        a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_ripple_filter_epochs_decoder_result_dict['long_LR']
+        num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
+        # active_epoch_idx: int = 6 #28
+        active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=active_epoch_idx)
+        most_likely_position_indicies = deepcopy(active_captured_single_epoch_result.most_likely_position_indicies)
+        most_likely_position_indicies = np.squeeze(most_likely_position_indicies)
+        t_bin_centers = deepcopy(active_captured_single_epoch_result.time_bin_container.centers)
+        t_bin_indicies = np.arange(len(np.squeeze(most_likely_position_indicies)))
+        # most_likely_position_indicies
+        p_x_given_n = deepcopy(active_captured_single_epoch_result.marginal_x.p_x_given_n)
+        # p_x_given_n_image = active_captured_single_epoch_result.get_posterior_as_image(skip_img_normalization=False, export_grayscale=True)
+        p_x_given_n_image = img_data_to_greyscale(p_x_given_n)
+
+        # active_captured_single_epoch_result.epoch_info_tuple # EpochTuple(Index=28, start=971.8437469999772, stop=983.9541530000279, label='28', duration=12.110406000050716, lap_id=29, lap_dir=1, score=0.36769430044232587, velocity=1.6140523749028528, intercept=1805.019565924132, speed=1.6140523749028528, wcorr=-0.9152062701244238, P_decoder=0.6562437078530542, pearsonr=-0.7228173157676305, travel=0.0324318935144031, coverage=0.19298245614035087, jump=0.0005841121495327102, sequential_correlation=16228.563177472019, monotonicity_score=16228.563177472019, laplacian_smoothness=16228.563177472019, longest_sequence_length=22, longest_sequence_length_ratio=0.4583333333333333, direction_change_bin_ratio=0.19148936170212766, congruent_dir_bins_ratio=0.574468085106383, total_congruent_direction_change=257.92556950947574, total_variation=326.1999849678664, integral_second_derivative=7423.7044320722935, stddev_of_diff=8.368982188902695)
+
+        return p_x_given_n, p_x_given_n_image
+
+    @classmethod
+    def _process_CV(cls, img):
+        ## Find smallest non-zero value
+        # p_x_given_n_image
+
+        img = deepcopy(img)
+
+        img_stage_outputs = []
+        img_stage_outputs.append(img)
+
+        smallest_nonzero_bw_mask, masked_img = ComputerVisionComputations.smallest_non_zero_values_binarization(img, non_included_index_value=0)
+        # smallest_nonzero_bw_mask
+        img_stage_outputs.append(smallest_nonzero_bw_mask)
+        # masked_img
+
+        bw_top_values_mask, masked_img = ComputerVisionComputations.top_N_values_binarization(img, top_n=3, non_included_index_value=0)
+        # bw_top_values_mask
+        # masked_img
+        img_stage_outputs.append(bw_top_values_mask)
+
+        # # Display the results
+        # for col in range(img.shape[1]):
+        #     print(f"Column {col}:")
+        #     for idx in range(top_n):
+        #         if not np.isnan(top_values[idx, col]):
+        #             print(f"Index: {top_indices[idx, col]}, Value: {top_values[idx, col]}")
+                    
+
+        # Remove small regions
+        # filtered_img = remove_small_regions(masked_img, min_size=3)
+        filtered_img = remove_small_regions(bw_top_values_mask, min_size=5)
+        # filtered_img
+        img_stage_outputs.append(filtered_img)
+
+        final_image = deepcopy(filtered_img)
+
+        return final_image, img_stage_outputs
+
+
+    @classmethod
+    def _run_all(cls, mw, active_epoch_idx: int): # mw: CustomMatplotlibWidget
+        # a_decoder_decoded_epochs_result.filter_epochs
+        print(f'active_epoch_idx: {active_epoch_idx}')
+        p_x_given_n, p_x_given_n_image = cls._get_data(active_epoch_idx=active_epoch_idx)
+        final_image, img_stage_outputs = cls._process_CV(img=p_x_given_n_image)
+
+        num_imgs = len(img_stage_outputs)
+        print(f'num_imgs: {num_imgs}')
+        ax_dict = mw.plots['ax_dict']
+        assert len(ax_dict) == num_imgs
+        
+        # display(widgets.HBox((p_x_given_n_image, final_image)), clear=True)
+        # display(p_x_given_n_image, final_image, clear=True)
+        # fig = mw.getFigure()
+        # Clear all axes
+        # for ax in fig.axes:
+        #     ax.clear()
+            
+        # mw.draw()
+        # axs = mw.axes
+        # # Clear all axes
+        # for ax in fig.axes:
+        #     ax.clear()
+
+        nrows, ncols = 1, num_imgs  # Adjust these based on your layout
+
+        for i, an_img in enumerate(img_stage_outputs):
+            # subplot = mw.getFigure().add_subplot(1, num_imgs, (i + 1))
+            subplot = ax_dict[f"img_stage_outputs[{i}]"]
+            # # Calculate the subplot position
+            # position = (nrows, ncols, (i + 1))            
+            # # Check if the subplot exists
+            # # if fig.axes and len(fig.axes) > i:
+            # if mw.axes and len(mw.axes) > i:
+            #     subplot = mw.axes[i]
+            #     subplot.clear()  # Clear existing subplot for new image
+            # else:
+            #     subplot = fig.add_subplot(*position)  # Create a new subplot
+            # print(f"img_stage_outputs[{i}]: an_img: {an_img}\n {subplot}")
+            subplot.clear()  # Clear existing subplot for new image
+            
+            subplot.imshow(an_img)
+
+            
+            # subplot = mw.getFigure().add_subplot(122)
+            # subplot.imshow(p_x_given_n_image)
+
+        # subplot.plot(x,y)
+        # mw.setWindowTitle(f'ComputerVisionPipeline: active_epoch_idx: {active_epoch_idx}')
+        mw.update()
+        mw.draw()
+
+        # display(mw.getFigure())
+        # mw.show()        
+        
