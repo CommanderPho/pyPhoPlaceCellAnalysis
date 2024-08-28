@@ -152,8 +152,8 @@ class ComputerVisionComputations:
     # Save/Load                                                                                                            #
     # ==================================================================================================================== #
     @classmethod
-    @function_attributes(short_name=None, tags=['transition_matrix', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
-    def save_decoded_posteriors_to_HDF5(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, save_path:Path='decoded_epoch_posteriors.h5', out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+    @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'output', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-28 02:38', related_items=['load_decoded_posteriors_from_HDF5'])
+    def save_decoded_posteriors_to_HDF5(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, save_path:Path='decoded_epoch_posteriors.h5', allow_append:bool=False, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
         """Save the transitiion matrix info to a file
         
         _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_transition_matricies')
@@ -170,8 +170,17 @@ class ComputerVisionComputations:
         if out_context is None:
             out_context = IdentifyingContext()
 
+        if not allow_append:
+            file_mode = 'w' 
+        else:
+            file_mode = 'r+' # 'x' #
+            
         # Save to .h5 file
-        with h5py.File(save_path, 'w') as f:
+        with h5py.File(save_path, file_mode) as f: #  
+            # r Readonly, file must exist (default)
+            # r+ Read/write, file must exist 
+            # w Create file, truncate if exists 
+            # w- or x Create file, fail if exists a Read/write if exists, create otherwise
             if out_context is not None:
                 # add context to the file
                 if not isinstance(out_context, dict):
@@ -187,78 +196,25 @@ class ComputerVisionComputations:
                     
             ## BEGIN MAIN OUTPUT
             num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
+            num_required_zero_padding: int = len(str(num_filter_epochs))
             
-            _save_out_paths = []
             for i in np.arange(num_filter_epochs):
                 active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
-                _curr_context = out_context.overwriting_context(epoch_idx=i)
+                epoch_data_idx_str: str = f"{i:0{num_required_zero_padding}d}"
+                # _curr_context = out_context.overwriting_context(epoch_idx=i)
+                _curr_context = out_context.overwriting_context(epoch_idx=epoch_data_idx_str)
                 _curr_key: str = _curr_context.get_description(separator='/')
                 if not _curr_key.startswith('/'):
                     _curr_key = "/" + _curr_key
                 # active_captured_single_epoch_result.to_hdf(save_path, key=_curr_key, debug_print=True, enable_hdf_testing_mode=True)
-                active_captured_single_epoch_result.to_hdf(f, key=_curr_key, debug_print=True, enable_hdf_testing_mode=True)
-
-                # if should_export_separate_color_and_greyscale:
-                #     _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_color, export_grayscale=False, skip_img_normalization=False, desired_height=1024)
-                #     _save_out_paths.append(posterior_save_path)
-                #     _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_greyscale, export_grayscale=True, skip_img_normalization=False, desired_height=1024)
-                #     _save_out_paths.append(posterior_save_path)	
-                # else:
-                #     # Greyscale only:
-                #     _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder, export_grayscale=True, skip_img_normalization=False, desired_height=1024)
-                #     _save_out_paths.append(posterior_save_path)
-                    
-                # if i > 25 and i < 30:
-                    # _posterior_image
-                
-
-
-
-
-
-
-            # for a_name, an_array_list in binned_x_transition_matrix_higher_order_list_dict.items():
-            #     decoder_prefix: str = a_name
-            #     if isinstance(an_array_list, NDArray):
-            #         ## 3D NDArray version:
-            #         assert np.ndim(an_array_list) == 3, f"np.ndim(an_array_list): {np.ndim(an_array_list)}, np.shape(an_array_list): {np.shape(an_array_list)}"
-            #         n_markov_orders, n_xbins, n_xbins2 = np.shape(an_array_list)
-            #         assert n_xbins == n_xbins2, f"n_xbins: {n_xbins} != n_xbins2: {n_xbins2}" 
-            #         a_dset = f.create_dataset(f'{decoder_prefix}/binned_x_transition_matrix_higher_order_mat', data=an_array_list)
-            #         a_dset.attrs['decoder_name'] = a_name
-            #         a_dset.attrs['max_markov_order'] = n_markov_orders
-            #         a_dset.attrs['n_xbins'] = n_xbins
-
-            #     else:
-            #         # list
-            #         assert isinstance(an_array_list, (list, tuple)), f"type(an_array_list): {type(an_array_list)}\nan_array_list: {an_array_list}\n"
-            #         # Determine how much zero padding is needed so that the array entries sort correctly
-            #         max_markov_order: int = np.max([len(an_array_list) for an_array_list in binned_x_transition_matrix_higher_order_list_dict.values()])
-            #         if debug_print:
-            #             print(f'max_markov_order: {max_markov_order}')
-            #         padding_length: int = len(str(max_markov_order)) + 1 ## how long is the string?
-            #         if debug_print:
-            #             print(f'padding_length: {padding_length}')
-                        
-            #         for markov_order, array in enumerate(an_array_list):
-            #             _markov_order_str: str = f"{markov_order:0{padding_length}d}" # Determine how much zero padding is needed so that the array entries sort correctly
-            #             a_dset = f.create_dataset(f'{decoder_prefix}/array_{_markov_order_str}', data=array)
-            #             a_dset.attrs['decoder_name'] = a_name
-            #             a_dset.attrs['markov_order'] = markov_order
-                    
-                                
-            #     # Add metadata
-            #     f.attrs['decoder_name'] = a_name
-
-            
-
-
+                active_captured_single_epoch_result.to_hdf(f, key=_curr_key, debug_print=debug_print, enable_hdf_testing_mode=False, required_zero_padding=num_required_zero_padding)
+        
         return save_path
     
 
     @classmethod
-    @function_attributes(short_name=None, tags=['transition_matrix', 'load'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
-    def load_decoded_posteriors_from_HDF5(cls, load_path: Path) -> DecoderListDict[NDArray]:
+    @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'load'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=['save_decoded_posteriors_to_HDF5'])
+    def load_decoded_posteriors_from_HDF5(cls, load_path: Path, debug_print=True) -> Dict[types.DecoderName, Dict[str, Dict]]:
         """
         Load the transition matrix info from a file
         
@@ -270,21 +226,63 @@ class ComputerVisionComputations:
             load_path = Path(load_path).resolve()
 
         import h5py
-        binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray] = {}
+        from pyphocorehelpers.Filesystem.HDF5.hdf5_file_helpers import HDF5_Helper
+
+        # Usage
+        found_groups = HDF5_Helper.find_groups_by_name(load_path, 'save_decoded_posteriors_to_HDF5')
+        if debug_print:
+            print(found_groups) # ['kdiba/gor01/one/2006-6-08_14-26-15/save_decoded_posteriors_to_HDF5']
+        assert len(found_groups) == 1, f"{found_groups}"
+        _save_key: str = found_groups[0]
+        if debug_print:
+            print(f'_save_key: {_save_key}')
+
+        # leaf_datasets = get_leaf_datasets(load_path)
+        # print(leaf_datasets)
+
+        out_dict: Dict = {}
 
         with h5py.File(load_path, 'r') as f:
-            for decoder_prefix in f.keys():
-                arrays_list = []
-                group = f[decoder_prefix]
-                for dataset_name in group.keys():
-                    array = group[dataset_name][()]
-                    markov_order = group[dataset_name].attrs['markov_order']
-                    arrays_list.append((markov_order, array))
+            
+            main_save_group = f[_save_key]
+            if debug_print:
+                print(f'main_save_group: {main_save_group}')
+            
+            for decoder_prefix in main_save_group.keys():
+                if debug_print:
+                    print(f'decoder_prefix: {decoder_prefix}')
                 
-                arrays_list.sort(key=lambda x: x[0])  # Sort by markov_order
-                binned_x_transition_matrix_higher_order_list_dict[decoder_prefix] = [array for _, array in arrays_list]
-
-        return binned_x_transition_matrix_higher_order_list_dict
+                decoder_group = main_save_group[decoder_prefix]
+                for epochs_name in decoder_group.keys():
+                    if debug_print:
+                        print(f'\tepochs_name: {epochs_name}')
+                    if epochs_name not in out_dict:
+                        out_dict[epochs_name] = {}
+                        
+                    decoder_epochtype_group = decoder_group[epochs_name]
+                    
+                    # all epochs
+                    arrays_list = []
+                    for dataset_name in decoder_epochtype_group.keys():
+                        if debug_print:
+                            print(f'\t\tdataset_name: {dataset_name}')
+                        # array = decoder_epochtype_group[dataset_name] #[()]
+                        
+                        
+                        # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[()]"]
+                        array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
+                        if debug_print:
+                            print(f'\t\t\tarray: {type(array)}')
+                        # markov_order = group[dataset_name].attrs['index']
+                        # arrays_list.append((markov_order, array))
+                        arrays_list.append(array)
+                
+                    # arrays_list.sort(key=lambda x: x[0])  # Sort by markov_order
+                    # out_dict[decoder_prefix] = [array for _, array in arrays_list]
+                    # if decoder_prefix not in out_dict[epochs_name]:
+                        # out_dict[epochs_name][decoder_prefix] = arrays_list
+                    out_dict[epochs_name][decoder_prefix] = arrays_list
+            return out_dict
 
 
 
