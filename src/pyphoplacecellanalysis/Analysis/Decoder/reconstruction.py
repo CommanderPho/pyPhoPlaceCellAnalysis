@@ -2,6 +2,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union, Optional
 from attrs import define, field, Factory
+from datetime import datetime
 from neuropy.analyses import Epoch
 from neuropy.core import Ratemap # for BasePositionDecoder
 from neuropy.core.epoch import ensure_dataframe
@@ -510,7 +511,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
     #                 f.create_dataset(attribute, data=value)
     #             # ... handle other attribute types as needed ...    
 
-    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, **kwargs):
+    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, required_zero_padding=None, leafs_include_epoch_idx:bool=False, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path
         enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.
 
@@ -521,6 +522,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
         """
         import h5py
+        from pyphocorehelpers.plotting.media_output_helpers import img_data_to_greyscale, get_array_as_image
         
         assert not isinstance(file_path, (str, Path)), f"pass an already open HDF5 file handle. You passed type(file_path): {type(file_path)}, file_path: {file_path}"
         f = file_path
@@ -529,51 +531,92 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         # super().to_hdf(file_path, key=key, debug_print=debug_print, enable_hdf_testing_mode=enable_hdf_testing_mode, **kwargs)
         # handle custom properties here
 
+        if self.epoch_data_index is not None:
+            if required_zero_padding is not None:
+                epoch_data_idx_str: str = f"{self.epoch_data_index:0{required_zero_padding}d}"    
+            else:
+                epoch_data_idx_str: str = f"{self.epoch_data_index:0{len(str(self.epoch_data_index))}d}"
+        else:
+            epoch_data_idx_str = None
+        # OUTPUTS: epoch_data_idx_str
+        def _subfn_get_key_str(variable_name):
+            """ captures: key, epoch_data_idx_str, leafs_include_epoch_idx 
+            """
+            _temp_epoch_id_identifier_str: str = f'{key}/{variable_name}'
+            if (epoch_data_idx_str is not None) and leafs_include_epoch_idx:
+                return f"{_temp_epoch_id_identifier_str}[{epoch_data_idx_str}]"
+            else:
+                return f"{_temp_epoch_id_identifier_str}"
+        
+
         attribute_type_fields = ['nbins', 'epoch_data_index', 'n_xbins']
         dataset_type_fields = ['most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges'] # 'p_x_given_n', 
         container_type_fields = ['time_bin_container', 'marginal_x', 'marginal_y']
         
+        # Get current date and time
+        current_time = datetime.now().isoformat()
+
         # 'p_x_given_n':
-        epoch_id_identifier_str: str = f'{key}/p_x_given_n'
-        if self.epoch_data_index is not None:
-            epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
-        else:
-            epoch_id_str = f"{epoch_id_identifier_str}"
-        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
-        f.create_dataset(epoch_id_str, data=img_data)
+        # epoch_id_identifier_str: str = f'{key}/p_x_given_n'
+        # epoch_id_str = _subfn_get_key_str('p_x_given_n')
         
+        # img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        p_x_given_n = deepcopy(self.marginal_x.p_x_given_n)
+
+        f.create_dataset(_subfn_get_key_str('p_x_given_n'), data=p_x_given_n.astype(float))
+
+        # p_x_given_n_image = active_captured_single_epoch_result.get_posterior_as_image(skip_img_normalization=False, export_grayscale=True)
+        p_x_given_n_image = img_data_to_greyscale(p_x_given_n)
+        f.create_dataset(_subfn_get_key_str('p_x_given_n_grey'), data=p_x_given_n_image.astype(float))
+        
+
+
+        f.attrs['creation_date'] = current_time
+        
+        ## Dataset type fields:
         for a_field_name in dataset_type_fields:
             a_val = getattr(self, a_field_name)
             if a_val is not None:
                 ## valid value
                 a_curr_field_epoch_id_identifier_str: str = f'{key}/{a_field_name}'
-                if self.epoch_data_index is not None:
-                    a_curr_field_epoch_id_str = f"{a_curr_field_epoch_id_identifier_str}[{self.epoch_data_index}]"
+                if (epoch_data_idx_str is not None) and leafs_include_epoch_idx:
+                    a_curr_field_epoch_id_str = f"{a_curr_field_epoch_id_identifier_str}[{epoch_data_idx_str}]"
                 else:
                     a_curr_field_epoch_id_str = f"{a_curr_field_epoch_id_identifier_str}"
 
                 # img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
                 f.create_dataset(a_curr_field_epoch_id_str, data=a_val) # TypeError: No conversion path for dtype: dtype('<U24')
-                
+                f.attrs['creation_date'] = current_time
 
         ## Custom derived:
         # 't_bin_centers':
         t_bin_centers = deepcopy(self.time_bin_container.centers)
         epoch_id_identifier_str: str = f'{key}/t_bin_centers'
-        if self.epoch_data_index is not None:
-            epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+        if (epoch_data_idx_str is not None) and leafs_include_epoch_idx:
+            epoch_id_str = f"{epoch_id_identifier_str}[{epoch_data_idx_str}]"
         else:
             epoch_id_str = f"{epoch_id_identifier_str}"
         f.create_dataset(epoch_id_str, data=t_bin_centers)
-         
+        f.attrs['creation_date'] = current_time
+        
         ## Attributes:
         group = f[key]
+        group.attrs['creation_date'] = current_time
         group.attrs['nbins'] = self.nbins
         group.attrs['n_xbins'] = self.n_xbins
         # group.attrs['ndim'] = self.ndim
 
         epoch_info_tuple = deepcopy(self.epoch_info_tuple) # EpochTuple(Index=28, start=971.8437469999772, stop=983.9541530000279, label='28', duration=12.110406000050716, lap_id=29, lap_dir=1, score=0.36769430044232587, velocity=1.6140523749028528, intercept=1805.019565924132, speed=1.6140523749028528, wcorr=-0.9152062701244238, P_decoder=0.6562437078530542, pearsonr=-0.7228173157676305, travel=0.0324318935144031, coverage=0.19298245614035087, jump=0.0005841121495327102, sequential_correlation=16228.563177472019, monotonicity_score=16228.563177472019, laplacian_smoothness=16228.563177472019, longest_sequence_length=22, longest_sequence_length_ratio=0.4583333333333333, direction_change_bin_ratio=0.19148936170212766, congruent_dir_bins_ratio=0.574468085106383, total_congruent_direction_change=257.92556950947574, total_variation=326.1999849678664, integral_second_derivative=7423.7044320722935, stddev_of_diff=8.368982188902695)
-        epoch_info_tuple_included_fields = [k for k in dir(epoch_info_tuple) if not k.startswith('_')] # ['Index', 'P_decoder', 'congruent_dir_bins_ratio', 'count', 'coverage', 'direction_change_bin_ratio', 'duration', 'index', 'integral_second_derivative', 'intercept', 'jump', 'label', 'lap_dir', 'lap_id', 'laplacian_smoothness', 'longest_sequence_length', 'longest_sequence_length_ratio', 'monotonicity_score', 'pearsonr', 'score', 'sequential_correlation', 'speed', 'start', 'stddev_of_diff', 'stop', 'total_congruent_direction_change', 'total_variation', 'travel', 'velocity', 'wcorr']
+        epoch_info_tuple_included_fields = [k for k in dir(epoch_info_tuple) if ((not k.startswith('_')) and (k not in ['index', 'count']))] # ['Index', 'P_decoder', 'congruent_dir_bins_ratio', 'count', 'coverage', 'direction_change_bin_ratio', 'duration', 'index', 'integral_second_derivative', 'intercept', 'jump', 'label', 'lap_dir', 'lap_id', 'laplacian_smoothness', 'longest_sequence_length', 'longest_sequence_length_ratio', 'monotonicity_score', 'pearsonr', 'score', 'sequential_correlation', 'speed', 'start', 'stddev_of_diff', 'stop', 'total_congruent_direction_change', 'total_variation', 'travel', 'velocity', 'wcorr']
+        
+        issue_fields = ['is_user_annotated_epoch', 'is_valid_epoch']
+        for a_field_name in epoch_info_tuple_included_fields:
+            a_val = getattr(epoch_info_tuple, a_field_name)
+            if (a_val is not None):
+                ## valid value
+                group.attrs[a_field_name] = a_val
+
+
         
 
         # self.position.to_hdf(file_path=file_path, key=f'{key}/pos')
