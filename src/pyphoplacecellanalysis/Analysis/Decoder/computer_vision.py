@@ -477,6 +477,38 @@ class ComputerVisionComputations:
         
 
 
+    # ==================================================================================================================== #
+    # Binarizations                                                                                                        #
+    # ==================================================================================================================== #
+
+    @classmethod
+    def smallest_non_zero_values_binarization(cls, img, non_included_index_value=0):
+        """ Very inclusive
+        
+        """
+        _original_img = None
+        # original_dtype = img.dtype
+        if np.issubdtype(img.dtype, np.integer):
+            _original_img = deepcopy(img)
+            ## convert to float
+            img = (img / 255.0)
+            
+
+        is_non_zero = np.nonzero(img)
+        min_non_zero_value: float = np.nanmin(img[is_non_zero]) # float or int
+        smallest_nonzero_bw_mask = (img > min_non_zero_value)
+            
+        # Apply mask to create the masked image
+        if _original_img is not None:
+            masked_img = deepcopy(_original_img)
+        else:
+            masked_img = deepcopy(img)
+
+        # masked_img[np.logical_not(bw_top_values_mask)] = non_included_index_value # 0.0
+        masked_img[~smallest_nonzero_bw_mask] = non_included_index_value # 0.0
+        
+        return smallest_nonzero_bw_mask, masked_img
+    
 
     @classmethod
     def top_N_values_binarization(cls, img, top_n:int=3, non_included_index_value=0):
