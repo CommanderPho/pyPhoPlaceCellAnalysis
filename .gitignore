@@ -69,3 +69,5 @@ tests/test_raster_Functions_spikes_df.pkl
 src/pyphoplacecellanalysis/External/test.hdf5
 *.autosave
 **/__pycache__
+**/.venv*
+
