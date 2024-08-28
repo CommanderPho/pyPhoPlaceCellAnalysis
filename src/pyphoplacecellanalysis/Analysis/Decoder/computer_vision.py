@@ -218,6 +218,44 @@ class ComputerVisionComputations:
     
 
     @classmethod
+    def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path):
+        """
+        
+        Usage:
+        
+            save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
+            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
+            out_contexts = ComputerVisionComputations.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=save_path)
+            out_contexts
+
+        """
+        def _subfn_perform_save_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, save_path: Path) -> IdentifyingContext:
+            """ saves a single set of named epochs, like 'laps' or 'ripple' 
+            captures nothing
+            """
+            for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
+                # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
+                _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)
+                print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}')
+                if not save_path.exists():
+                    print(f'\t file does not exist, so setting allow_append = False')
+                    allow_append = False
+                else:
+                    print(f'\tsave_path exists, so allow_append = True')
+                    allow_append = True
+                save_path = cls.save_decoded_posteriors_to_HDF5(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, save_path=save_path, allow_append=allow_append)
+            
+            return _specific_save_context
+
+        out_contexts = {'laps': None, 'ripple': None}
+        out_contexts['laps'] = _subfn_perform_save_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', save_path=save_path)
+        out_contexts['ripple'] = _subfn_perform_save_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', save_path=save_path)
+        return out_contexts
+
+
+
+
+    @classmethod
     @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'load'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=['save_decoded_posteriors_to_HDF5'])
     def load_decoded_posteriors_from_HDF5(cls, load_path: Path, debug_print=True) -> Dict[types.DecoderName, Dict[KnownEpochsName, Dict]]:
         """
