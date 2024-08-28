@@ -28,32 +28,20 @@ from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
-
 from skimage.feature import hessian_matrix, hessian_matrix_eigvals
 from scipy.ndimage import gaussian_filter
-from ipywidgets import interact, FloatSlider, IntSlider, fixed
+
 from copy import deepcopy
 import numpy as np
 
-import cv2
+# import cv2
 from PIL import Image
 
-from IPython.display import display
 
 # Custom Type Definitions ____________________________________________________________________________________________ #
-T = TypeVar('T')
-DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]] # Use like `v: DecoderListDict[NDArray]`
-
-
-DecoderResultDict: TypeAlias = Dict[types.DecoderName, DecodedFilterEpochsResult] # Use like `v: DecoderListDict[NDArray]`
-
-aclu_index: TypeAlias = int # an integer index that is an aclu
-DecoderName = NewType('DecoderName', str)
 
 # Define the type alias
 KnownEpochsName = Literal['laps', 'ripple', 'other']
-
-
 
 
 @define(slots=False, eq=False)
@@ -297,8 +285,6 @@ class ComputerVisionComputations:
         return out_contexts
 
 
-
-
     @classmethod
     @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'load'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=['save_decoded_posteriors_to_HDF5'])
     def load_decoded_posteriors_from_HDF5(cls, load_path: Path, debug_print=True) -> Dict[types.DecoderName, Dict[KnownEpochsName, Dict]]:
@@ -409,6 +395,8 @@ class ComputerVisionComputations:
 
     @classmethod
     def interactive_image_preview(cls, input_img, blur_v_sigma, blur_h_sigma, hessian_sigma):
+        from IPython.display import display
+        
         # Perform Gaussian blur
         blurred_img = gaussian_filter(input_img.astype(float), sigma=(blur_v_sigma, blur_h_sigma), mode='nearest')
 
@@ -429,6 +417,8 @@ class ComputerVisionComputations:
 
     @classmethod
     def run_interactive(cls, input_img):
+        from ipywidgets import interact, FloatSlider, IntSlider, fixed
+        
         interact(cls.interactive_image_preview, 
                  input_img=fixed(input_img),
                  blur_v_sigma=FloatSlider(min=0, max=10, step=0.5, value=0, description='blur_v_sigma'),
@@ -459,6 +449,8 @@ class ComputerVisionComputations:
 
     @classmethod
     def run_binarization_interactive(cls, ridges):
+        from ipywidgets import interact, FloatSlider, IntSlider, fixed
+        
         interact(cls.interactive_binarization, 
                  ridges=fixed(ridges),
                  ridge_binarization_threshold=FloatSlider(min=0, max=np.nanmax(ridges), step=np.nanmax(ridges)/100, value=0, description='Binarization Threshold'))
