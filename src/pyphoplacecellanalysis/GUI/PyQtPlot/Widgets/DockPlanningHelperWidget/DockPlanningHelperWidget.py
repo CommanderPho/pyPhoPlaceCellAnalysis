@@ -1,6 +1,6 @@
 # DockPlanningHelperWidget.py
 # Generated from c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\DockPlanningHelperWidget\DockPlanningHelperWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
-from typing import Dict
+from typing import Dict, Union
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
 ## IMPORTS:
@@ -26,6 +26,7 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     sigRefresh = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial
     
     sigCreateNewDock = QtCore.pyqtSignal(object, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
+    # sigCreateNewDock = QtCore.pyqtSignal(object, Union[str, tuple[str, str]]) # signal emitted when the mapping from the temporal window to the spatial layout is changed
     
     sigClose = QtCore.pyqtSignal() # Called when the window is closing. 
     
@@ -164,6 +165,7 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         
         self.ui.btnAddWidgetRight.clicked.connect(self.on_click_create_new_dock_right)
         self.ui.btnAddWidgetBelow.clicked.connect(self.on_click_create_new_dock_below)
+        self.ui.btnAddWidgetAbove.clicked.connect(self.on_click_create_new_dock_tab_on_top_of)
         
         # self.ui.spinBox_Width.valueChanged.connect(self.on_values_updated)
 
@@ -276,6 +278,15 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
         self.sigCreateNewDock.emit(self, 'right')
 
+
+    def on_click_create_new_dock_tab_on_top_of(self):
+        # [self.embedding_dock_item, 'bottom']
+        print(f'DockPlanningHelperWidget.on_click_create_new_dock_tab_on_top_of()')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
+        
+        # self.sigCreateNewDock.emit(self, ('above', self.identifier,))
+        self.sigCreateNewDock.emit(self, f'above, {self.identifier}')
+        
     # def __str__(self):
     #      return 
 

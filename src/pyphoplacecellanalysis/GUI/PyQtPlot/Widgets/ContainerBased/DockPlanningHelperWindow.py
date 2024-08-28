@@ -223,7 +223,7 @@ class DockPlanningHelperWindow:
         
 
 
-    def perform_create_new_dock_widget(self, dock_id_str:str=None, active_dock_add_location:str='bottom', dockSize=None, autoOrientation=False):
+    def perform_create_new_dock_widget(self, dock_id_str:str=None, active_dock_add_location:Union[str, Tuple[str, str]]='bottom', dockSize=None, autoOrientation=False):
         """ 
         a_dock_helper_widget, a_dock_config, a_dock_widget = _out.perform_create_new_dock_widget()
         
@@ -236,6 +236,14 @@ class DockPlanningHelperWindow:
         if active_dock_add_location is None:
             active_dock_add_location:str = 'bottom'
             
+        # if isinstance(active_dock_add_location, str):
+        #     # try to convert to tuple:
+        #     _split_active_dock_add_location = active_dock_add_location.split(', ', maxsplit=2)
+        #     if len(_split_active_dock_add_location) == 2:
+        #         active_dock_add_location = tuple(_split_active_dock_add_location) # use a tuple
+        #         print(f'active_dock_add_location: {active_dock_add_location}')
+        #         assert len(active_dock_add_location) == 2
+                        
         if dockSize is None:
             dockSize = (300,600)
             
@@ -259,6 +267,9 @@ class DockPlanningHelperWindow:
         self.dock_helper_widgets[dock_id_str] = a_dock_helper_widget
         self.dock_configs[dock_id_str] = CustomDockDisplayConfig(showCloseButton=False)
         self.dock_widgets[dock_id_str] = self.root_dockAreaWindow.add_display_dock(identifier=dock_id_str, widget=a_dock_helper_widget, dockSize=dockSize, dockAddLocationOpts=active_dock_add_location, display_config=self.dock_configs[dock_id_str], autoOrientation=autoOrientation)
+        
+        # embedded_child_widget, dDisplayItem = self.dock_widgets[dock_id_str]
+
         return self.dock_helper_widgets[dock_id_str], self.dock_configs[dock_id_str], self.dock_widgets[dock_id_str]
 
 
@@ -278,7 +289,26 @@ class DockPlanningHelperWindow:
             log_string = child_widget.rebuild_output()
             print(f'\tchild_widget: {log_string}') # TypeError: __str__ returned non-string (type NoneType)
             new_dock_config = child_widget.rebuild_config()
-            new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
+            if isinstance(relative_location, str):
+                # try to convert to tuple:
+                _split_active_dock_add_location = relative_location.split(', ', maxsplit=2)
+                if len(_split_active_dock_add_location) == 2:
+                    rel_loc, rel_dock_id = _split_active_dock_add_location
+                    rel_dock_item = self.root_dockAreaWindow.find_display_dock(rel_dock_id)
+                    assert rel_dock_item is not None, f"rel_dock_id: '{rel_dock_id}' does not exist. relative_location: {relative_location}"
+                    # relative_location_tuple = tuple(_split_active_dock_add_location) # use a tuple
+                    relative_location_tuple = (rel_loc, rel_dock_item) # use a tuple
+                    print(f'relative_location_tuple: {relative_location_tuple}')
+                    assert len(relative_location_tuple) == 2
+                    new_dock_config.setdefault('dockAddLocationOpts', relative_location_tuple)
+                else:
+                    # not parsable 
+                    new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
+            else:
+                    raise NotImplementedError(f'relative_location: {relative_location}')
+
+
+            # new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
             new_dock_config['widget'] = child_widget
             print(f'\t creating new child widget with config: {new_dock_config}\n')
             a_dock_helper_widget, a_dock_config, a_dock_widget = self.perform_create_new_dock_widget(active_dock_add_location=new_dock_config.get('dockAddLocationOpts', None), dockSize=new_dock_config.get('dockSize', None), autoOrientation=new_dock_config.get('autoOrientation', None))
