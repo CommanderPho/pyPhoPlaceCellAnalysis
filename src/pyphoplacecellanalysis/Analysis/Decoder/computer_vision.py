@@ -76,7 +76,7 @@ class ComputerVisionComputations:
     @function_attributes(short_name=None, tags=['transition_matrix', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
     def export_decoded_posteriors_as_images(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, # decoder_ripple_filter_epochs_decoder_result_dict: DecoderResultDict,
                                              posterior_out_folder:Path='output/_temp_individual_posteriors',
-                                  should_export_separate_color_and_greyscale: bool = True, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+                                  should_export_separate_color_and_greyscale: bool = True, desired_height=None, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
         """Save the transitiion matrix info to a file
         
         Usage:
@@ -103,13 +103,6 @@ class ComputerVisionComputations:
 
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 
-        # a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict['long_LR']
-        # epochs_name='laps'
-        # a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_ripple_filter_epochs_decoder_result_dict['long_LR']
-        # epochs_name='ripple'
-
-
-
         if not isinstance(posterior_out_folder, Path):
             posterior_out_folder = Path(posterior_out_folder).resolve()
 
@@ -129,33 +122,31 @@ class ComputerVisionComputations:
         for i in np.arange(num_filter_epochs):
             active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
 
+            if desired_height is None:
+                ## set to 1x
+                desired_height = active_captured_single_epoch_result.n_xbins # 1 pixel for each xbin
+
             if should_export_separate_color_and_greyscale:
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_color, export_grayscale=False, skip_img_normalization=False, desired_height=1024)
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_color, export_grayscale=False, skip_img_normalization=False, desired_height=desired_height)
                 _save_out_paths.append(posterior_save_path)
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_greyscale, export_grayscale=True, skip_img_normalization=False, desired_height=1024)
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_greyscale, export_grayscale=True, skip_img_normalization=False, desired_height=desired_height)
                 _save_out_paths.append(posterior_save_path)	
             else:
                 # Greyscale only:
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder, export_grayscale=True, skip_img_normalization=False, desired_height=1024)
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder, export_grayscale=True, skip_img_normalization=False, desired_height=desired_height)
                 _save_out_paths.append(posterior_save_path)
-                
-            # if i > 25 and i < 30:
-                # _posterior_image
-                
-        # 
+        # end for
 
         if should_export_separate_color_and_greyscale:
-            _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_color, export_grayscale=False, skip_img_normalization=False, desired_height=1024)
-            _save_out_paths.append(posterior_save_path)
-            _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_greyscale, export_grayscale=True, skip_img_normalization=False, desired_height=1024)
             return (posterior_out_folder, posterior_out_folder_greyscale, posterior_out_folder_color), _save_out_paths
         else:
             return posterior_out_folder, _save_out_paths
                 
         
     @classmethod
+    @function_attributes(short_name=None, tags=['export', 'images'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
-                                                         _save_context: IdentifyingContext, parent_output_folder: Path):
+                                                         _save_context: IdentifyingContext, parent_output_folder: Path, desired_height=None):
         """
         
         Usage:
@@ -179,7 +170,7 @@ class ComputerVisionComputations:
                 posterior_out_folder = posterior_out_folder.joinpath(a_decoder_name).resolve()
                 posterior_out_folder.mkdir(parents=True, exist_ok=True)
                 # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
-                an_out_path = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder)
+                an_out_path = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height)
                 out_paths[a_decoder_name] = an_out_path
                 
             return out_paths
@@ -262,7 +253,8 @@ class ComputerVisionComputations:
     
 
     @classmethod
-    def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path):
+    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True):
         """
         
         Usage:
@@ -293,6 +285,12 @@ class ComputerVisionComputations:
                 
             return _sub_out_contexts
 
+
+        if save_path.exists() and should_overwrite_extant_file:
+            print(f'\tsave_path "{save_path}" exists and should_overwrite_extant_file==True, so removing file...')
+            save_path.unlink(missing_ok=False)
+            print(f'\t successfully removed.')
+            
         out_contexts = {'laps': None, 'ripple': None}
         out_contexts['laps'] = _subfn_perform_save_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', save_path=save_path)
         out_contexts['ripple'] = _subfn_perform_save_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', save_path=save_path)
