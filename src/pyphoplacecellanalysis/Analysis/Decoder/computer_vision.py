@@ -47,6 +47,8 @@ DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]] # Use like `v: Dec
 
 DecoderResultDict: TypeAlias = Dict[types.DecoderName, DecodedFilterEpochsResult] # Use like `v: DecoderListDict[NDArray]`
 
+aclu_index: TypeAlias = int # an integer index that is an aclu
+DecoderName = NewType('DecoderName', str)
 
 # Define the type alias
 KnownEpochsName = Literal['laps', 'ripple', 'other']
@@ -217,13 +219,16 @@ class ComputerVisionComputations:
 
     @classmethod
     @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'load'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=['save_decoded_posteriors_to_HDF5'])
-    def load_decoded_posteriors_from_HDF5(cls, load_path: Path, debug_print=True) -> Dict[types.DecoderName, Dict[str, Dict]]:
+    def load_decoded_posteriors_from_HDF5(cls, load_path: Path, debug_print=True) -> Dict[types.DecoderName, Dict[KnownEpochsName, Dict]]:
         """
         Load the transition matrix info from a file
         
         load_path = Path('output/transition_matrix_data.h5')
-        binned_x_transition_matrix_higher_order_list_dict = ComputerVisionComputations.load_decoded_posteriors_from_HDF5(load_path)
-        binned_x_transition_matrix_higher_order_list_dict
+        _out_dict = ComputerVisionComputations.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=False)
+        ripple_0_img = _out_dict['long_LR']['ripple']['p_x_given_n_grey'][0]
+        lap_0_img = _out_dict['long_LR']['laps']['p_x_given_n_grey'][0]
+        lap_0_img
+        
         """
         if not isinstance(load_path, Path):
             load_path = Path(load_path).resolve()
@@ -260,20 +265,20 @@ class ComputerVisionComputations:
             for decoder_prefix in main_save_group.keys():
                 if debug_print:
                     print(f'decoder_prefix: {decoder_prefix}')
-                
+                if decoder_prefix not in out_dict:
+                    out_dict[decoder_prefix] = {}
+
                 decoder_group = main_save_group[decoder_prefix]
-                for epochs_name in decoder_group.keys():
+                for known_epochs_name in decoder_group.keys():
                     if debug_print:
-                        print(f'\tepochs_name: {epochs_name}')
-                    if epochs_name not in out_dict:
-                        out_dict[epochs_name] = {}
+                        print(f'\tknown_epochs_name: {known_epochs_name}')
+                    if known_epochs_name not in out_dict[decoder_prefix]:
+                        out_dict[decoder_prefix][known_epochs_name] = {}
                         
-                    decoder_epochtype_group = decoder_group[epochs_name]
+                    decoder_epochtype_group = decoder_group[known_epochs_name]
                     
-                    # all epochs
-                    # arrays_list = []
-                    
-                    out_dict[epochs_name][decoder_prefix] = {k:list() for k in dataset_type_fields} # allocate a dict of empty lists for each item in `dataset_type_fields`
+                    ## allocate outputs:
+                    out_dict[decoder_prefix][known_epochs_name] = {k:list() for k in dataset_type_fields} # allocate a dict of empty lists for each item in `dataset_type_fields`
                     
                     for dataset_name in decoder_epochtype_group.keys():
                         if debug_print:
@@ -292,7 +297,7 @@ class ComputerVisionComputations:
                             if debug_print:
                                 print(f'\t\t\t\tarray: {type(array)}')
                             
-                            out_dict[epochs_name][decoder_prefix][leaf_data_key].append(array) #
+                            out_dict[decoder_prefix][known_epochs_name][leaf_data_key].append(array) #
                             
                         # array = decoder_epochtype_group[dataset_name] #[()]
                         
