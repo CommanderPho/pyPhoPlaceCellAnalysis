@@ -153,6 +153,50 @@ class ComputerVisionComputations:
             return posterior_out_folder, _save_out_paths
                 
         
+    @classmethod
+    def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
+                                                         _save_context: IdentifyingContext, parent_output_folder: Path):
+        """
+        
+        Usage:
+        
+            save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
+            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
+            out_contexts = ComputerVisionComputations.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=save_path)
+            out_contexts
+
+        """
+        def _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, a_parent_output_folder: Path) -> IdentifyingContext:
+            """ saves a single set of named epochs, like 'laps' or 'ripple' 
+            captures nothing
+            """
+            out_paths = {}
+            for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
+                # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
+                _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)                    
+                posterior_out_folder = a_parent_output_folder.joinpath(epochs_name).resolve()
+                posterior_out_folder.mkdir(parents=True, exist_ok=True)
+                posterior_out_folder = posterior_out_folder.joinpath(a_decoder_name).resolve()
+                posterior_out_folder.mkdir(parents=True, exist_ok=True)
+                # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
+                an_out_path = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder)
+                out_paths[a_decoder_name] = an_out_path
+                
+            return out_paths
+
+
+        # parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
+        assert parent_output_folder.exists(), f"parent_output_folder: {parent_output_folder} does not exist"
+        
+    
+        out_paths = {'laps': None, 'ripple': None}
+        out_paths['laps'] = _subfn_perform_export_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', a_parent_output_folder=parent_output_folder)
+        out_paths['ripple'] = _subfn_perform_export_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', a_parent_output_folder=parent_output_folder)
+        return out_paths
+
+
+
+
     # ==================================================================================================================== #
     # Save/Load                                                                                                            #
     # ==================================================================================================================== #
@@ -229,10 +273,11 @@ class ComputerVisionComputations:
             out_contexts
 
         """
-        def _subfn_perform_save_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, save_path: Path) -> IdentifyingContext:
+        def _subfn_perform_save_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, save_path: Path) -> Dict[types.DecoderName, IdentifyingContext]:
             """ saves a single set of named epochs, like 'laps' or 'ripple' 
             captures nothing
             """
+            _sub_out_contexts = {}
             for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
                 # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
                 _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)
@@ -243,9 +288,10 @@ class ComputerVisionComputations:
                 else:
                     print(f'\tsave_path exists, so allow_append = True')
                     allow_append = True
-                save_path = cls.save_decoded_posteriors_to_HDF5(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, save_path=save_path, allow_append=allow_append)
-            
-            return _specific_save_context
+                an_out_path = cls.save_decoded_posteriors_to_HDF5(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, save_path=save_path, allow_append=allow_append)
+                _sub_out_contexts[a_decoder_name] = _specific_save_context
+                
+            return _sub_out_contexts
 
         out_contexts = {'laps': None, 'ripple': None}
         out_contexts['laps'] = _subfn_perform_save_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', save_path=save_path)
