@@ -784,17 +784,20 @@ class ComputerVisionPipeline:
     """
     a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = field()
     
+    @property
+    def num_filter_epochs(self) -> int:
+        """The num_filter_epochs: int  property."""
+        return self.a_decoder_decoded_epochs_result.num_filter_epochs 
 
 
-    @classmethod
-    def _get_data(cls, active_epoch_idx: int):
+    def _get_data(self, active_epoch_idx: int):
         """ captures: decoder_ripple_filter_epochs_decoder_result_dict, 
         
         """
         # a_decoder_decoded_epochs_result.filter_epochs
         from pyphocorehelpers.plotting.media_output_helpers import img_data_to_greyscale
         
-        a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_ripple_filter_epochs_decoder_result_dict['long_LR']
+        a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = deepcopy(self.a_decoder_decoded_epochs_result)
         num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
         # active_epoch_idx: int = 6 #28
         active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=active_epoch_idx)
@@ -850,12 +853,11 @@ class ComputerVisionPipeline:
         return final_image, img_stage_outputs
 
 
-    @classmethod
-    def _run_all(cls, mw, active_epoch_idx: int): # mw: CustomMatplotlibWidget
+    def _run_all(self, mw, active_epoch_idx: int): # mw: CustomMatplotlibWidget
         # a_decoder_decoded_epochs_result.filter_epochs
         print(f'active_epoch_idx: {active_epoch_idx}')
-        p_x_given_n, p_x_given_n_image = cls._get_data(active_epoch_idx=active_epoch_idx)
-        final_image, img_stage_outputs = cls._process_CV(img=p_x_given_n_image)
+        p_x_given_n, p_x_given_n_image = self._get_data(active_epoch_idx=active_epoch_idx)
+        final_image, img_stage_outputs = self._process_CV(img=p_x_given_n_image)
 
         num_imgs = len(img_stage_outputs)
         print(f'num_imgs: {num_imgs}')
