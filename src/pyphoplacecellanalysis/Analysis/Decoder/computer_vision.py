@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix, csr_matrix
 
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar, NewType, Literal
 from typing_extensions import TypeAlias  # "from typing_extensions" in Python 3.9 and earlier
 from nptyping import NDArray
 from scipy.ndimage import gaussian_filter1d
@@ -47,6 +47,9 @@ DecoderListDict: TypeAlias = Dict[types.DecoderName, List[T]] # Use like `v: Dec
 
 DecoderResultDict: TypeAlias = Dict[types.DecoderName, DecodedFilterEpochsResult] # Use like `v: DecoderListDict[NDArray]`
 
+
+# Define the type alias
+KnownEpochsName = Literal['laps', 'ripple', 'other']
 
 
 
@@ -219,11 +222,17 @@ class ComputerVisionComputations:
         Load the transition matrix info from a file
         
         load_path = Path('output/transition_matrix_data.h5')
-        binned_x_transition_matrix_higher_order_list_dict = TransitionMatrixComputations.load_transition_matrices(load_path)
+        binned_x_transition_matrix_higher_order_list_dict = ComputerVisionComputations.load_decoded_posteriors_from_HDF5(load_path)
         binned_x_transition_matrix_higher_order_list_dict
         """
         if not isinstance(load_path, Path):
             load_path = Path(load_path).resolve()
+
+        assert load_path.exists(), f"load_path: '{load_path}' does not exist!"
+
+        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+        attribute_type_fields = ['nbins', 'epoch_data_index', 'n_xbins', 'creation_date']
+        
 
         import h5py
         from pyphocorehelpers.Filesystem.HDF5.hdf5_file_helpers import HDF5_Helper
@@ -262,29 +271,49 @@ class ComputerVisionComputations:
                     decoder_epochtype_group = decoder_group[epochs_name]
                     
                     # all epochs
-                    arrays_list = []
+                    # arrays_list = []
+                    
+                    out_dict[epochs_name][decoder_prefix] = {k:list() for k in dataset_type_fields} # allocate a dict of empty lists for each item in `dataset_type_fields`
+                    
                     for dataset_name in decoder_epochtype_group.keys():
                         if debug_print:
                             print(f'\t\tdataset_name: {dataset_name}')
+                            
+                        ## the lowest-level group before the data itself
+                        dataset_final_group = decoder_epochtype_group[dataset_name]
+                        # dataset_type_fields
+                        
+                        for leaf_data_key, leaf_data in dataset_final_group.items():
+                            if debug_print:
+                                print(f'\t\t\tleaf_data_key: {leaf_data_key}')
+                            # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
+                            # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
+                            array = leaf_data[()] # should get the NDArray
+                            if debug_print:
+                                print(f'\t\t\t\tarray: {type(array)}')
+                            
+                            out_dict[epochs_name][decoder_prefix][leaf_data_key].append(array) #
+                            
                         # array = decoder_epochtype_group[dataset_name] #[()]
                         
                         
                         # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[()]"]
-                        array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
-                        if debug_print:
-                            print(f'\t\t\tarray: {type(array)}')
+                        # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
+                        # if debug_print:
+                        #     print(f'\t\t\tarray: {type(array)}')
                         # markov_order = group[dataset_name].attrs['index']
                         # arrays_list.append((markov_order, array))
-                        arrays_list.append(array)
+                        # arrays_list.append(array)
                 
                     # arrays_list.sort(key=lambda x: x[0])  # Sort by markov_order
                     # out_dict[decoder_prefix] = [array for _, array in arrays_list]
                     # if decoder_prefix not in out_dict[epochs_name]:
                         # out_dict[epochs_name][decoder_prefix] = arrays_list
-                    out_dict[epochs_name][decoder_prefix] = arrays_list
-            return out_dict
+                    # out_dict[epochs_name][decoder_prefix] = arrays_list
+                    
+        # END open
 
-
+        return out_dict
 
     # ==================================================================================================================== #
     # Interactive                                                                                                          #

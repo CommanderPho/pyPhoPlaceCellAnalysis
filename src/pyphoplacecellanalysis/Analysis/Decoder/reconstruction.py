@@ -569,35 +569,22 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         p_x_given_n_image = img_data_to_greyscale(p_x_given_n)
         f.create_dataset(_subfn_get_key_str('p_x_given_n_grey'), data=p_x_given_n_image.astype(float))
         
-
-
-        f.attrs['creation_date'] = current_time
+        # f.attrs['creation_date'] = current_time
         
         ## Dataset type fields:
         for a_field_name in dataset_type_fields:
             a_val = getattr(self, a_field_name)
             if a_val is not None:
                 ## valid value
-                a_curr_field_epoch_id_identifier_str: str = f'{key}/{a_field_name}'
-                if (epoch_data_idx_str is not None) and leafs_include_epoch_idx:
-                    a_curr_field_epoch_id_str = f"{a_curr_field_epoch_id_identifier_str}[{epoch_data_idx_str}]"
-                else:
-                    a_curr_field_epoch_id_str = f"{a_curr_field_epoch_id_identifier_str}"
-
                 # img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
-                f.create_dataset(a_curr_field_epoch_id_str, data=a_val) # TypeError: No conversion path for dtype: dtype('<U24')
-                f.attrs['creation_date'] = current_time
+                f.create_dataset(_subfn_get_key_str(a_field_name), data=a_val) # TypeError: No conversion path for dtype: dtype('<U24')
+                # f.attrs['creation_date'] = current_time
 
         ## Custom derived:
         # 't_bin_centers':
         t_bin_centers = deepcopy(self.time_bin_container.centers)
-        epoch_id_identifier_str: str = f'{key}/t_bin_centers'
-        if (epoch_data_idx_str is not None) and leafs_include_epoch_idx:
-            epoch_id_str = f"{epoch_id_identifier_str}[{epoch_data_idx_str}]"
-        else:
-            epoch_id_str = f"{epoch_id_identifier_str}"
-        f.create_dataset(epoch_id_str, data=t_bin_centers)
-        f.attrs['creation_date'] = current_time
+        f.create_dataset(_subfn_get_key_str('t_bin_centers'), data=t_bin_centers)
+        # f.attrs['creation_date'] = current_time
         
         ## Attributes:
         group = f[key]
@@ -617,33 +604,6 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
                 group.attrs[a_field_name] = a_val
 
 
-        
-
-        # self.position.to_hdf(file_path=file_path, key=f'{key}/pos')
-        # if self.epochs is not None:
-        #     self.epochs.to_hdf(file_path=file_path, key=f'{key}/epochs') #TODO 2023-07-30 11:13: - [ ] What if self.epochs is None?
-        # else:
-        #     # if self.epochs is None
-        #     pass
-        # self.spikes_df.spikes.to_hdf(file_path, key=f'{key}/spikes')
-        # self.ratemap.to_hdf(file_path, key=f'{key}/ratemap')
-
-        # Open the file with h5py to add attributes to the group. The pandas.HDFStore object doesn't provide a direct way to manipulate groups as objects, as it is primarily intended to work with datasets (i.e., pandas DataFrames)
-        # with h5py.File(file_path, 'r+') as f:
-        #     ## Unfortunately, you cannot directly assign a dictionary to the attrs attribute of an h5py group or dataset. The attrs attribute is an instance of a special class that behaves like a dictionary in some ways but not in others. You must assign attributes individually
-        #     group = f[key]
-        #     group.attrs['position_srate'] = self.position_srate
-        #     group.attrs['ndim'] = self.ndim
-
-        #     # can't just set the dict directly
-        #     # group.attrs['config'] = str(self.config.to_dict())  # Store as string if it's a complex object
-        #     # Manually set the config attributes
-        #     config_dict = self.config.to_dict()
-        #     group.attrs['config/speed_thresh'] = config_dict['speed_thresh']
-        #     group.attrs['config/grid_bin'] = config_dict['grid_bin']
-        #     group.attrs['config/grid_bin_bounds'] = config_dict['grid_bin_bounds']
-        #     group.attrs['config/smooth'] = config_dict['smooth']
-        #     group.attrs['config/frate_thresh'] = config_dict['frate_thresh']
 
 
     @classmethod
