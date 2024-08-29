@@ -40,6 +40,22 @@ DecoderName = NewType('DecoderName', str)
 import matplotlib.pyplot as plt
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
+# Create a function to modify the colormap's alpha channel
+def create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.1):
+    # Get the base colormap
+    cmap = pg.colormap.get(cmap_name, source='matplotlib')
+    
+    # Create a lookup table with the desired number of points (default 256)
+    lut = cmap.getLookupTable(alpha=True)
+    
+    # Modify the alpha values
+    alpha_channel = lut[:, 3]  # Extract the alpha channel (4th column)
+    alpha_channel = np.linspace(lower_bound_alpha, 1, len(alpha_channel))  # Linear alpha gradient from lower_bound_alpha to 1
+    lut[:, 3] = (alpha_channel * 255).astype(np.uint8)  # Convert to 0-255 range
+    
+    return lut
+
+
 
 @function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-29 03:26', related_items=[])
 def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_scored_tuning_map_matrix, max_num_columns=5, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
@@ -78,7 +94,8 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
 
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
-    cmap = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+    # cmap = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+    cmap = create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.1) # prepare a linear color map
 
     image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
     # image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(x_range, y_range)
@@ -92,6 +109,8 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
     subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
     page_idx = 0 # page_idx is zero here because we only have one page:
 
+    plot_data_array = []
+    
     img_item_array = []
     other_components_array = []
     plot_array = []
@@ -147,8 +166,12 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
 
         # Update the image:
         img_item.setImage(image, rect=image_bounds_extent, autoLevels=False) # rect: [x, y, w, h]
-        img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
-
+        img_item.setOpacity(0.5)  # Set transparency for overlay
+        if isinstance(cmap, NDArray):
+            img_item.setLookupTable(cmap, update=False)
+        else:
+            img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+     
         curr_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
         # Sets only the panning limits:
         curr_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
@@ -159,14 +182,19 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
             curr_plot.setYLink(prev_plot_item)
             
         # Interactive Color Bar:
-        bar = pg.ColorBarItem(values= (0, 1), colorMap=cmap, width=5, interactive=False) # prepare interactive color bar
-        # Have ColorBarItem control colors of img and appear in 'plot':
-        bar.setImageItem(img_item, insert_in=curr_plot)
-
+        if not isinstance(cmap, NDArray):
+            bar = pg.ColorBarItem(values=(0, 1), colorMap=cmap, width=5, interactive=False) # prepare interactive color bar
+            # Have ColorBarItem control colors of img and appear in 'plot':
+            bar.setImageItem(img_item, insert_in=curr_plot)
+        else:
+            bar = None
+            
         img_item_array.append(img_item)
         plot_array.append(curr_plot)
         other_components_array.append({'color_bar':bar}) # note this is a list of Dicts, one for every image
-        
+        plot_data_array.append({'image_bounds_extent': image_bounds_extent, 'x_range': x_range, 'y_range': y_range}) # note this is a list of Dicts, one for every image
+
+
     # Post images loop:
     enable_show = False
 
@@ -178,16 +206,18 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
 
     ## Hide all colorbars, they aren't needed:
     for i, a_plot_components_dict in enumerate(other_components_array):
-        a_plot_components_dict['color_bar'].setEnabled(False)
-        a_plot_components_dict['color_bar'].hide()
+        if a_plot_components_dict.get('color_bar', None) is not None:
+            a_plot_components_dict['color_bar'].setEnabled(False)
+            a_plot_components_dict['color_bar'].hide()
 
-    other_components_array[0]['color_bar'].setEnabled(False)
-    other_components_array[0]['color_bar'].hide()
+    if other_components_array[0].get('color_bar', None) is not None:
+        other_components_array[0]['color_bar'].setEnabled(False)
+        other_components_array[0]['color_bar'].hide()
 
     if not defer_show:
         parent_root_widget.show()
         
-    return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array
+    return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array
 
 
 
