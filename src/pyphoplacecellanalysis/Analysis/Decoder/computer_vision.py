@@ -892,10 +892,9 @@ class ComputerVisionPipeline:
             # else:
             #     subplot = fig.add_subplot(*position)  # Create a new subplot
             # print(f"img_stage_outputs[{i}]: an_img: {an_img}\n {subplot}")
-            subplot.clear()  # Clear existing subplot for new image
+            # subplot.clear()  # Clear existing subplot for new image
             
             subplot.imshow(an_img)
-
             
             # subplot = mw.getFigure().add_subplot(122)
             # subplot.imshow(p_x_given_n_image)
