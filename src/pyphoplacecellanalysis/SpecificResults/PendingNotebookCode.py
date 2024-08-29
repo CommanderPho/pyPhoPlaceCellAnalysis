@@ -56,8 +56,10 @@ def create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.1):
     return lut
 
 
+from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
 
-@function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-29 03:26', related_items=[])
+@function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['plot_trial_to_trial_reliability_all_decoders_image_stack'], creation_date='2024-08-29 03:26', related_items=[])
 def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_scored_tuning_map_matrix, max_num_columns=5, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
     """ plots the reliability across laps for each decoder
     
@@ -197,12 +199,13 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
 
     # Post images loop:
     enable_show = False
-
+    
     if parent_root_widget is not None:
         if enable_show:
             parent_root_widget.show()
-        
-        parent_root_widget.setWindowTitle('pyqtplot image array')
+
+        parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_image_array')       
+
 
     ## Hide all colorbars, they aren't needed:
     for i, a_plot_components_dict in enumerate(other_components_array):
@@ -220,6 +223,102 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
     return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array
 
 
+@function_attributes(short_name=None, tags=['reliability', 'decoders', 'all'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
+def plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
+    """ Calls `plot_trial_to_trial_reliability_image_array` for each decoder's reliability from lap-top-lap, overlaying the results as different color heatmaps
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_trial_to_trial_reliability_all_decoders_image_stack
+    
+        directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = deepcopy(a_trial_by_trial_result.directional_active_lap_pf_results_dicts)
+        drop_below_threshold = 0.0000001
+        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, additional_img_items_dict, legend_layout = plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts, active_one_step_decoder=deepcopy(a_pf2D_dt), drop_below_threshold=drop_below_threshold)
+
+
+    """
+    from neuropy.utils.matplotlib_helpers import _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
+    
+    ## Usage:
+
+
+    ## first decoder:
+    a_decoder_name = 'long_LR'
+    active_trial_by_trial_activity_obj = directional_active_lap_pf_results_dicts[a_decoder_name]
+    active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
+    app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array = plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, drop_below_threshold=drop_below_threshold)
+
+    # Extract the heatmaps from the other decoders
+    ## INPUTS: directional_active_lap_pf_results_dicts
+    additional_heatmaps_data = {}
+    additional_cmap_names = {}
+    additional_cmaps = {}
+
+    additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), ['red', 'purple', 'green', 'orange'] ))
+
+    for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
+        if decoder_name != 'long_LR':
+            ## we already did 'long_LR', so skip that one    
+            # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
+            additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
+            # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+
+    additional_cmap_names['long_LR'] = 'Reds'
+    additional_cmap_names['long_RL'] = 'Purples'
+    additional_cmap_names['short_LR'] = 'Greens'
+    additional_cmap_names['short_RL'] = 'Oranges'
+
+    additional_cmaps = {k: create_transparent_colormap(cmap_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
+
+    # Overlay additional heatmaps if provided
+    ## INPUTS: additional_heatmaps, additional_cmaps, plot_array
+    ## UPDATES: plot_array
+    additional_img_items_dict = {}
+
+    if additional_heatmaps_data:
+        for i, (decoder_name, heatmap_matrix) in enumerate(additional_heatmaps_data.items()):
+            if decoder_name not in additional_img_items_dict:
+                additional_img_items_dict[decoder_name] = []
+            cmap = additional_cmaps[decoder_name]
+            # Assuming heatmap_matrix is of shape (n_neurons, n_xbins, n_ybins)
+            for a_linear_index in range(len(plot_array)):
+                curr_image_bounds_extent = plot_data_array[a_linear_index]['image_bounds_extent']
+                # print(f'curr_image_bounds_extent[{a_linear_index}]: {curr_image_bounds_extent}')
+                additional_image = np.squeeze(heatmap_matrix[a_linear_index, :, :])
+                # additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=occupancy, drop_below_threshold=drop_below_threshold)
+                additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=None, drop_below_threshold=None) # , occupancy=occupancy, drop_below_threshold=drop_below_threshold !! occupancy is not correct,it's the global one I think
+                # print(f'\tadditional_image: {np.shape(additional_image)}')
+                additional_img_item = pg.ImageItem(image=additional_image, levels=(0, 1))
+                # Update the image:
+                # additional_img_item.setImage(additional_image, autoLevels=False) # rect: [x, y, w, h] , rect=image_bounds_extent
+                additional_img_item.setImage(additional_image, rect=curr_image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] 
+                additional_img_item.setOpacity(0.5)  # Set transparency for overlay
+                if isinstance(cmap, NDArray):
+                    additional_img_item.setLookupTable(cmap, update=False)
+                else:
+                    additional_img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+                    
+                plot_array[a_linear_index].addItem(additional_img_item)
+                additional_img_items_dict[decoder_name].append(additional_img_item)
+
+
+    ## Add the legend below all the rows:
+    root_render_widget.nextRow()
+    # Create a layout for the legend at the new row
+    # Add a layout for the legend at the bottom, spanning all columns
+    # legend_layout = root_render_widget.addLayout(row=root_render_widget.rowCount(), col=0, colspan=root_render_widget.columnCount())
+    legend_layout = root_render_widget.addLayout()  # Automatically places in the next available row
+
+    # Add labels for each entry in the legend
+    for i, (label, color) in enumerate(additional_legend_entries):
+        legend_text = pg.LabelItem(label, color=color)
+        # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
+        legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
+        
+    parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
+
+    return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, additional_img_items_dict, legend_layout
+
+
 
 
 
@@ -229,79 +328,79 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
 from matplotlib.colors import Normalize
 
 def apply_colormap(image: np.ndarray, color: tuple) -> np.ndarray:
-	colored_image = np.zeros((*image.shape, 3), dtype=np.float32)
-	for i in range(3):
-		colored_image[..., i] = image * color[i]
-	return colored_image
+    colored_image = np.zeros((*image.shape, 3), dtype=np.float32)
+    for i in range(3):
+        colored_image[..., i] = image * color[i]
+    return colored_image
 
 def blend_images(images: list, cmap=None) -> np.ndarray:
-	""" Tries to pre-combine images to produce an output image of the same size
-	
-	# 'coolwarm'
-	images = [a_seq_mat.todense().T for i, a_seq_mat in enumerate(sequence_frames_sparse)]
-	blended_image = blend_images(images)
-	# blended_image = blend_images(images, cmap='coolwarm')
-	blended_image
+    """ Tries to pre-combine images to produce an output image of the same size
+    
+    # 'coolwarm'
+    images = [a_seq_mat.todense().T for i, a_seq_mat in enumerate(sequence_frames_sparse)]
+    blended_image = blend_images(images)
+    # blended_image = blend_images(images, cmap='coolwarm')
+    blended_image
 
-	# blended_image = Image.fromarray(blended_image, mode="RGB")
-	# # blended_image = get_array_as_image(blended_image, desired_height=100, desired_width=None, skip_img_normalization=True)
-	# blended_image
+    # blended_image = Image.fromarray(blended_image, mode="RGB")
+    # # blended_image = get_array_as_image(blended_image, desired_height=100, desired_width=None, skip_img_normalization=True)
+    # blended_image
 
 
-	"""
-	if cmap is None:
-		# Non-colormap mode:
-		# Ensure images are in the same shape
-		combined_image = np.zeros_like(images[0], dtype=np.float32)
-		
-		for img in images:
-			combined_image += img.astype(np.float32)
+    """
+    if cmap is None:
+        # Non-colormap mode:
+        # Ensure images are in the same shape
+        combined_image = np.zeros_like(images[0], dtype=np.float32)
+        
+        for img in images:
+            combined_image += img.astype(np.float32)
 
-	else:
-		# colormap mode
-		# Define a colormap (blue to red)
-		cmap = plt.get_cmap(cmap)
-		norm = Normalize(vmin=0, vmax=len(images) - 1)
-		
-		combined_image = np.zeros((*images[0].shape, 3), dtype=np.float32)
-		
-		for i, img in enumerate(images):
-			color = cmap(norm(i))[:3]  # Get RGB color from colormap
-			colored_image = apply_colormap(img, color)
-			combined_image += colored_image    
+    else:
+        # colormap mode
+        # Define a colormap (blue to red)
+        cmap = plt.get_cmap(cmap)
+        norm = Normalize(vmin=0, vmax=len(images) - 1)
+        
+        combined_image = np.zeros((*images[0].shape, 3), dtype=np.float32)
+        
+        for i, img in enumerate(images):
+            color = cmap(norm(i))[:3]  # Get RGB color from colormap
+            colored_image = apply_colormap(img, color)
+            combined_image += colored_image    
 
-	combined_image = np.clip(combined_image, 0, 255)  # Ensure pixel values are within valid range
-	return combined_image.astype(np.uint8)
+    combined_image = np.clip(combined_image, 0, 255)  # Ensure pixel values are within valid range
+    return combined_image.astype(np.uint8)
 
 def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
-	""" Sample multiple pg.ImageItems overlayed on one another
-	
-	# Example usage:
-	image1 = np.random.rand(100, 100) * 100  # Example image 1
-	image2 = np.random.rand(100, 100) * 100  # Example image 2
-	image3 = np.random.rand(100, 100) * 100  # Example image 3
+    """ Sample multiple pg.ImageItems overlayed on one another
+    
+    # Example usage:
+    image1 = np.random.rand(100, 100) * 100  # Example image 1
+    image2 = np.random.rand(100, 100) * 100  # Example image 2
+    image3 = np.random.rand(100, 100) * 100  # Example image 3
 
-	image1
-	# Define the threshold
+    image1
+    # Define the threshold
 
-	_out = visualize_multiple_image_items([image1, image2, image3], threshold=50)
+    _out = visualize_multiple_image_items([image1, image2, image3], threshold=50)
 
-	"""
-	app = pg.mkQApp('visualize_multiple_image_items')  # Initialize the Qt application
-	win = pg.GraphicsLayoutWidget(show=True)
-	view = win.addViewBox()
-	view.setAspectLocked(True)
-	
-	for img in images:
-		if threshold is not None:
-			# Create a masked array, masking values below the threshold
-			img = np.ma.masked_less(img, threshold)
+    """
+    app = pg.mkQApp('visualize_multiple_image_items')  # Initialize the Qt application
+    win = pg.GraphicsLayoutWidget(show=True)
+    view = win.addViewBox()
+    view.setAspectLocked(True)
+    
+    for img in images:
+        if threshold is not None:
+            # Create a masked array, masking values below the threshold
+            img = np.ma.masked_less(img, threshold)
 
-		image_item = pg.ImageItem(img)
-		view.addItem(image_item)
+        image_item = pg.ImageItem(img)
+        view.addItem(image_item)
 
-	# QtGui.QApplication.instance().exec_()
-	return app, win, view
+    # QtGui.QApplication.instance().exec_()
+    return app, win, view
 
 
 # ==================================================================================================================== #
