@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=42000m
+#SBATCH --mem=48000m
 #SBATCH --time=12:00:00
 #SBATCH --account=kdiba1
 #SBATCH --partition=standard
@@ -20,10 +20,14 @@ exec > >(tee -a slurm_%x-%j.log) 2>&1
 #}
 
 # Run the Python script
-python '{{ python_script_path }}'
+python '{{ python_script_path }}' || exit $?
 
-# Deactivate the virtual environment when done (optional here but good practice)
-deactivate
+# Capture the exit status of the Python script
+{# exit_code=$? #}
 
+{# # Deactivate the virtual environment when done (optional here but good practice)
+deactivate #}
 
+# Exit with the captured exit code
+{# exit $exit_code #}
 

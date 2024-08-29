@@ -1,5 +1,16 @@
 #!/bin/bash
 
+{# Future, monitor signal handlers
+function signal_handler {
+  # Save program state and exit
+  (...)
+  exit
+}
+
+trap signal_handler TERM
+(...)
+#}
+
 # Set job name and log file
 job_name="job_{{ curr_session_context }}"
 
@@ -13,7 +24,7 @@ export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 sh '/home/halechr/repos/Spike3D/.venv/bin/activate'
 
 # Run the Python script
-python '{{ python_script_path }}'
+python '{{ python_script_path }}' || exit $?
 
 # Deactivate the virtual environment when done (optional here but good practice)
-deactivate
+{# deactivate #}
