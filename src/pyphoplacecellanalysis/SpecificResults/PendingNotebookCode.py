@@ -38,6 +38,156 @@ epoch_split_key: TypeAlias = str # a string that describes a split epoch, such a
 DecoderName = NewType('DecoderName', str)
 
 import matplotlib.pyplot as plt
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+
+
+@function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-29 03:26', related_items=[])
+def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_scored_tuning_map_matrix, max_num_columns=5, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
+    """ plots the reliability across laps for each decoder
+    
+    ## Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_trial_to_trial_reliability_image_array
+
+        directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = deepcopy(a_trial_by_trial_result.directional_active_lap_pf_results_dicts)
+
+        ## first decoder:
+        a_decoder_name = 'long_LR'
+        active_trial_by_trial_activity_obj = directional_active_lap_pf_results_dicts[a_decoder_name]
+        active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
+        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array = plot_trial_to_trial_reliability_image_array(active_one_step_decoder=deepcopy(a_pf2D_dt), z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix)
+
+    
+    """
+    from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
+    from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_common import pyqtplot_common_setup
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
+    from neuropy.utils.matplotlib_helpers import _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
+
+    # Get flat list of images:
+    # images = active_one_step_decoder.ratemap.normalized_tuning_curves # (78, 57, 6)	- (n_neurons, n_xbins, n_ybins)
+    occupancy = active_one_step_decoder.ratemap.occupancy # (57, 6) - (n_xbins, n_ybins)
+    # Need to go from (n_epochs, n_neurons, n_pos_bins) -> (n_neurons, n_xbins, n_ybins)
+    images = z_scored_tuning_map_matrix.transpose(1, 2, 0) # (71, 57, 22)
+    xbin_edges=active_one_step_decoder.xbin
+    ybin_edges=active_one_step_decoder.ybin
+    # images=images
+    # occupancy=occupancy
+    root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'pyqtplot_plot_image_array: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget) ## 🚧 TODO: BUG: this makes a new QMainWindow to hold this item, which is inappropriate if it's to be rendered as a child of another control
+
+    pg.setConfigOptions(imageAxisOrder='col-major') # this causes the placefields to be rendered horizontally, like they were in _temp_pyqtplot_plot_image_array
+
+    # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
+    # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+    cmap = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+
+    image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
+    # image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(x_range, y_range)
+    # print(f'image_aspect_ratio: {image_aspect_ratio} - xScale/yScale: {float(image_width_height_tuple.width) / float(image_width_height_tuple.height)}')
+
+    # Compute Images:
+    included_unit_indicies = np.arange(np.shape(images)[0]) # include all unless otherwise specified
+    nMapsToShow = len(included_unit_indicies)
+
+    # Paging Management: Constrain the subplots values to just those that you need
+    subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
+    page_idx = 0 # page_idx is zero here because we only have one page:
+
+    img_item_array = []
+    other_components_array = []
+    plot_array = []
+
+    for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
+        # Need to convert to page specific:
+        curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
+        curr_page_relative_row = np.mod(curr_row, page_grid_sizes[page_idx].num_rows)
+        curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
+        is_first_column = (curr_page_relative_col == 0)
+        is_first_row = (curr_page_relative_row == 0)
+        is_last_column = (curr_page_relative_col == (page_grid_sizes[page_idx].num_columns-1))
+        is_last_row = (curr_page_relative_row == (page_grid_sizes[page_idx].num_rows-1))
+        if debug_print:
+            print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
+
+        neuron_IDX = curr_included_unit_index
+        curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
+        curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
+
+        # # Pre-filter the data:
+        image = _scale_current_placefield_to_acceptable_range(np.squeeze(images[a_linear_index,:,:]), occupancy=occupancy, drop_below_threshold=drop_below_threshold)
+
+        # Build the image item:
+        img_item = pg.ImageItem(image=image, levels=(0,1))
+        #     # Viewbox version:
+        #     # vb = layout.addViewBox(lockAspect=False)
+        #     # # Build the ImageItem (which I'm guessing is like pg.ImageView) to add the image
+        #     # imv = pg.ImageItem() # Create it with the current image
+        #     # vb.addItem(imv) # add the item to the view box: why do we need the wrapping view box?
+        #     # vb.autoRange()
+        
+        # # plot mode:
+        curr_plot = root_render_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string 
+        curr_plot.setObjectName(curr_plot_identifier_string)
+        curr_plot.showAxes(False)
+        if is_last_row:
+            curr_plot.showAxes('x', True)
+            curr_plot.showAxis('bottom', show=True)
+        else:
+            curr_plot.showAxes('x', False)
+            curr_plot.showAxis('bottom', show=False)
+            
+        if is_first_column:
+            curr_plot.showAxes('y', True)
+            curr_plot.showAxis('left', show=True)
+        else:
+            curr_plot.showAxes('y', False)
+            curr_plot.showAxis('left', show=False)
+        
+        curr_plot.hideButtons() # Hides the auto-scale button
+        curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
+
+        # Update the image:
+        img_item.setImage(image, rect=image_bounds_extent, autoLevels=False) # rect: [x, y, w, h]
+        img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+
+        curr_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
+        # Sets only the panning limits:
+        curr_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
+        # Link Axes to previous item:
+        if a_linear_index > 0:
+            prev_plot_item = plot_array[a_linear_index-1]
+            curr_plot.setXLink(prev_plot_item)
+            curr_plot.setYLink(prev_plot_item)
+            
+        # Interactive Color Bar:
+        bar = pg.ColorBarItem(values= (0, 1), colorMap=cmap, width=5, interactive=False) # prepare interactive color bar
+        # Have ColorBarItem control colors of img and appear in 'plot':
+        bar.setImageItem(img_item, insert_in=curr_plot)
+
+        img_item_array.append(img_item)
+        plot_array.append(curr_plot)
+        other_components_array.append({'color_bar':bar}) # note this is a list of Dicts, one for every image
+        
+    # Post images loop:
+    enable_show = False
+
+    if parent_root_widget is not None:
+        if enable_show:
+            parent_root_widget.show()
+        
+        parent_root_widget.setWindowTitle('pyqtplot image array')
+
+    ## Hide all colorbars, they aren't needed:
+    for i, a_plot_components_dict in enumerate(other_components_array):
+        a_plot_components_dict['color_bar'].setEnabled(False)
+        a_plot_components_dict['color_bar'].hide()
+
+    other_components_array[0]['color_bar'].setEnabled(False)
+    other_components_array[0]['color_bar'].hide()
+
+    if not defer_show:
+        parent_root_widget.show()
+        
+    return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array
 
 
 
