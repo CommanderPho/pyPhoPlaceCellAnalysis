@@ -641,7 +641,50 @@ class ComputerVisionComputations:
 
         return moments, hu_moments, (theta, cov_Ixy)
      
+    @classmethod
+    def intensity_orientation(cls, img, moments, figsize=(15,8)):
+        
+        #m00, m10, m01, m11, m20, m02,
+        center = np.array(img.shape[:2])/2
+        
+        # centroid
+        x_, y_ =  moments["m10"]/(moments["m00"] + 1e-5), moments["m01"]/(moments["m00"] + 1e-5)
+        
+        # second order central moments
+        mup_20 = moments["mu20"]/moments["m00"] - x_**2
+        mup_02 = moments["mu02"]/moments["m00"] - y_**2
+        mup_11 = moments["mu11"]/moments["m00"] - x_*y_
 
+        # angle
+        theta = np.arctan(2*mup_11/(mup_20 - mup_02))/2
+        print("intensity orientation %.3f deg, centroid (%.2f, %.2f)"%((theta*180/np.pi), x_, y_))
+        
+        
+        # intensity covariance
+        cov_Ixy = np.array([[mup_20, mup_11],[mup_11, mup_02]])
+        print("cov I(x,y)\n", cov_Ixy)
+        
+        # eigen vectors and values
+        evals, evecs = np.linalg.eig(cov_Ixy)
+        
+        print("evals\n", evals)
+        print("evecs\n", evecs)
+
+        plt.figure(figsize=figsize)
+        plt.imshow(img)
+
+        for e, v in zip(evals, evecs):
+            plt.plot([x_, np.sqrt(np.abs(e))*v[0]+x_], [y_, np.sqrt(np.abs(e))*v[1]+y_], 'r-', lw=2)
+
+        plt.scatter(x_, y_, color="yellow")
+        plt.annotate("I(x,y) centroid",[ x_+15, y_-10], color="yellow" )
+
+        plt.xticks([0, x_, img.shape[1]], [0, int(x_), img.shape[1]])
+        plt.yticks([0, y_, img.shape[0]], [0, int(y_), img.shape[0]])
+
+        plt.grid()
+        plt.show()
+        
 
     @classmethod
     def imshow(cls, img: NDArray, xbin_edges=None, ybin_edges=None):
@@ -773,8 +816,32 @@ def remove_small_regions(img, min_size):
 
     return filtered_img
 
+from skimage.feature import hessian_matrix, hessian_matrix_eigvals
+
+def detect_ridges(gray, sigma=1.0):
+    H_elems = hessian_matrix(gray, sigma=sigma, order='rc')
+    maxima_ridges, minima_ridges = hessian_matrix_eigvals(H_elems)
+    return maxima_ridges, minima_ridges
+
+def plot_images(*images):
+    images = list(images)
+    n = len(images)
+    fig, ax = plt.subplots(ncols=n, sharey=True)
+    for i, img in enumerate(images):
+        ax[i].imshow(img, cmap='gray')
+        ax[i].axis('off')
+    plt.subplots_adjust(left=0.03, bottom=0.03, right=0.97, top=0.97)
+    plt.show()
 
 
+from skimage import data, img_as_float
+# from skimage.metrics import structural_similarity as ssim
+# from skimage.metrics import mean_squared_error
+from skimage import color
+from skimage.filters import meijering, sato, frangi, hessian
+from skimage import transform
+from skimage.color import rgb2gray
+from skimage.feature import match_descriptors, plot_matches, SIFT
 
 
 @define(slots=False, eq=False)
@@ -859,6 +926,115 @@ class ComputerVisionPipeline:
         p_x_given_n, p_x_given_n_image = self._get_data(active_epoch_idx=active_epoch_idx)
         final_image, img_stage_outputs = self._process_CV(img=p_x_given_n_image)
 
+
+        # ==================================================================================================================== #
+        # SIFT                                                                                                                 #
+        # ==================================================================================================================== #
+        # descriptor_extractor = SIFT()
+
+        # descriptor_extractor.detect_and_extract(p_x_given_n_image)
+        # keypoints1 = descriptor_extractor.keypoints
+        # descriptors1 = descriptor_extractor.descriptors
+
+        # descriptor_extractor.detect_and_extract(img2)
+        # keypoints2 = descriptor_extractor.keypoints
+        # descriptors2 = descriptor_extractor.descriptors
+
+        # descriptor_extractor.detect_and_extract(img3)
+        # keypoints3 = descriptor_extractor.keypoints
+        # descriptors3 = descriptor_extractor.descriptors
+
+        # matches12 = match_descriptors(
+        #     descriptors1, descriptors2, max_ratio=0.6, cross_check=True
+        # )
+        # matches13 = match_descriptors(
+        #     descriptors1, descriptors3, max_ratio=0.6, cross_check=True
+        # )
+        # fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(11, 8))
+
+        # plt.gray()
+
+        # plot_matches(ax[0, 0], img1, img2, keypoints1, keypoints2, matches12)
+        # ax[0, 0].axis('off')
+        # ax[0, 0].set_title("Original Image vs. Flipped Image\n" "(all keypoints and matches)")
+
+        # plot_matches(ax[1, 0], img1, img3, keypoints1, keypoints3, matches13)
+        # ax[1, 0].axis('off')
+        # ax[1, 0].set_title(
+        #     "Original Image vs. Transformed Image\n" "(all keypoints and matches)"
+        # )
+
+        # plot_matches(
+        #     ax[0, 1], img1, img2, keypoints1, keypoints2, matches12[::15], only_matches=True
+        # )
+        # ax[0, 1].axis('off')
+        # ax[0, 1].set_title(
+        #     "Original Image vs. Flipped Image\n" "(subset of matches for visibility)"
+        # )
+
+        # plot_matches(
+        #     ax[1, 1], img1, img3, keypoints1, keypoints3, matches13[::15], only_matches=True
+        # )
+        # ax[1, 1].axis('off')
+        # ax[1, 1].set_title(
+        #     "Original Image vs. Transformed Image\n" "(subset of matches for visibility)"
+        # )
+
+        # plt.tight_layout()
+        # plt.show()
+
+
+        # ==================================================================================================================== #
+        # Ridge operators                                                                                                      #
+        # ==================================================================================================================== #
+
+        # def original(image, **kwargs):
+        #     """Return the original image, ignoring any kwargs."""
+        #     return image
+
+        # image = deepcopy(p_x_given_n_image)
+        # cmap = plt.cm.gray
+
+        # plt.rcParams["axes.titlesize"] = "medium"
+        # axes = plt.figure(figsize=(10, 4)).subplots(2, 9)
+        # for i, black_ridges in enumerate([True, False]):
+        #     for j, (func, sigmas) in enumerate(
+        #         [
+        #             (original, None),
+        #             (meijering, [1]),
+        #             (meijering, range(1, 5)),
+        #             (sato, [1]),
+        #             (sato, range(1, 5)),
+        #             (frangi, [1]),
+        #             (frangi, range(1, 5)),
+        #             (hessian, [1]),
+        #             (hessian, range(1, 5)),
+        #         ]
+        #     ):
+        #         result = func(image, black_ridges=black_ridges, sigmas=sigmas)
+        #         axes[i, j].imshow(result, cmap=cmap)
+        #         if i == 0:
+        #             title = func.__name__
+        #             if sigmas:
+        #                 title += f"\n\N{GREEK SMALL LETTER SIGMA} = {list(sigmas)}"
+        #             axes[i, j].set_title(title)
+        #         if j == 0:
+        #             axes[i, j].set_ylabel(f'{black_ridges = }')
+        #         axes[i, j].set_xticks([])
+        #         axes[i, j].set_yticks([])
+
+        # plt.tight_layout()
+        # plt.show()
+
+
+        # ==================================================================================================================== #
+        # Plot                                                                                                                 #
+        # ==================================================================================================================== #
+        # a, b = detect_ridges(p_x_given_n_image, sigma=3.0)
+
+        # plot_images(p_x_given_n_image, a, b)
+
+        ## OUTPUT:
         num_imgs = len(img_stage_outputs)
         print(f'num_imgs: {num_imgs}')
         ax_dict = mw.plots['ax_dict']
