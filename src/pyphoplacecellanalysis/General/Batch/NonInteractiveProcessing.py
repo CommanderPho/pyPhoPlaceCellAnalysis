@@ -482,7 +482,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 # ==================================================================================================================== #
 # Batch Programmatic Figures - 2022-12-08 Batch Programmatic Figures (Currently only Jonathan-style)                                                                                           #
 # ==================================================================================================================== #
-@function_attributes(short_name='batch_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+@function_attributes(short_name='batch_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures'], input_requires=[], output_provides=[], uses=[], used_by=['batch_perform_all_plots'], creation_date='2023-03-28 04:46')
 def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
     """ programmatically generates and saves the batch figures 2022-12-07 
         curr_active_pipeline is the pipeline for a given session with all computations done.

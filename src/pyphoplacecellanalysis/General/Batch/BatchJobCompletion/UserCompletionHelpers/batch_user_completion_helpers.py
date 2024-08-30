@@ -23,7 +23,14 @@ from attrs import make_class
 
 SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path', 'fail_on_exception'])
 
-"""
+
+# ==================================================================================================================== #
+# batch_user_completion_helpers                                                                                        #
+# ==================================================================================================================== #
+""" This file contains custom user-defined functions to be executed at the end of a batch pipeline run (after the rest of the computations are done). Can be used to define post-hoc corrections, perform exports of results to file, etc.
+
+
+
 from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import 
 
 a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path, True)
