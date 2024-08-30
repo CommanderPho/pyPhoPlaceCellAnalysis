@@ -24,6 +24,8 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.DecoderPlotSelectorControls.DecoderPl
 # MOVED IN TO `_single_context_nested_docks`
 # from pyphoplacecellanalysis.GUI.Qt.Widgets.FigureFormatConfigControls.FigureFormatConfigControls import FigureFormatConfigControls # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import pyqtplot_plot_image_array # for context_nested_docks/single_context_nested_docks
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+
 
 
 class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -102,7 +104,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
     @function_attributes(short_name='trial_to_trial_reliability', tags=['trial-to-trial-reliability', 'display'], is_global=True, input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-30 13:27', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']))
-    def _display_trial_to_trial_reliability(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, drop_below_threshold = 0.0000001, **kwargs):
+    def _display_trial_to_trial_reliability(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, drop_below_threshold = 0.0000001, save_figure=False, **kwargs):
         """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18)
         NOTE: Ignores `active_config` because context_nested_docks is for all contexts
 
@@ -123,7 +125,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         """
         from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_trial_to_trial_reliability_all_decoders_image_stack
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TrialByTrialActivityWindow
         assert owning_pipeline_reference is not None
         #
         if include_includelist is None:
@@ -157,14 +159,21 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         ## INPUTS: a_pf2D_dt, z_scored_tuning_map_matrix
         # directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = deepcopy(directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts)
         
-        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, additional_img_items_dict, legend_layout = plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts, 
+        _a_trial_by_trial_window = TrialByTrialActivityWindow.plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts, 
                                                                                                                                                                                                                               active_one_step_decoder=deepcopy(active_pf_dt),
                                                                                                                                                                                                                                 drop_below_threshold=drop_below_threshold)
-        out_items = {'parent_root_widget': parent_root_widget, 'app': app, 'root_render_widget': root_render_widget, 'plot_array':plot_array, 'img_item_array':img_item_array, 'other_components_array':other_components_array, 'plot_data_array':plot_data_array, 'additional_img_items_dict':additional_img_items_dict, 'legend_layout':legend_layout}
-
+ 
         # **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs)
+    
+        final_context = owning_pipeline_reference.build_display_context_for_session(display_fn_name='trial_to_trial_reliability')
+        if save_figure:
+            saved_figure_paths = owning_pipeline_reference.output_figure(final_context, _a_trial_by_trial_window.root_render_widget)
+            _a_trial_by_trial_window.plot_data.saved_figure_paths = saved_figure_paths
+        else:
+            saved_figure_paths = []
 
-        return out_items
+        return _a_trial_by_trial_window
+    
 
 
 
