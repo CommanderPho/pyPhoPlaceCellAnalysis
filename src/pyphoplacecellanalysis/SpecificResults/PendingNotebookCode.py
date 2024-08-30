@@ -223,7 +223,7 @@ def plot_trial_to_trial_reliability_image_array(active_one_step_decoder, z_score
     return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array
 
 
-@function_attributes(short_name=None, tags=['reliability', 'decoders', 'all'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
+@function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
 def plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
     """ Calls `plot_trial_to_trial_reliability_image_array` for each decoder's reliability from lap-top-lap, overlaying the results as different color heatmaps
     
