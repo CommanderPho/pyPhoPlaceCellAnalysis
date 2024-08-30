@@ -42,6 +42,23 @@ Usage:
 
 """
 
+def apply_LR_to_RL_adjustment(an_RL_color):
+    """ applies a consistent visual transformation to a color that represents LR direction to get the corresponding RL color. 
+    General the RL colors look darker, slightly less saturated
+
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import apply_LR_to_RL_adjustment
+    color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': long_epoch_config.apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                    'short_LR': short_epoch_config['brush'].color(), 'short_RL': long_epoch_config.apply_LR_to_RL_adjustment(short_epoch_config['brush'].color()}
+
+
+    """
+    from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color
+
+    # RL_adjustment_kwargs = dict(hue_shift=0.0, saturation_scale=0.35, value_scale=1.0)
+    # RL_adjustment_kwargs = dict(hue_shift=0.01, saturation_scale=0.75, value_scale=0.5)
+    RL_adjustment_kwargs = dict(hue_shift=0.18, saturation_scale=1.0, value_scale=1.0)
+    return build_adjusted_color(an_RL_color, **RL_adjustment_kwargs)
+
 
 class DisplayColorsEnum:
     """ Hardcoded Theme Colors for visual consistancy - 2023-10-18
@@ -153,6 +170,9 @@ class DisplayColorsEnum:
         return formatted_title_strings_dict
 
 
+
+
+
 @define(slots=False, repr=False)
 class DisplayConfig:
     """ Holds display properties for a given configuration """
@@ -200,6 +220,24 @@ class LongShortDisplayConfigManager:
             cls._instance = super().__new__(cls)
         return cls._instance
 
+    @classmethod
+    def apply_LR_to_RL_adjustment(cls, an_RL_color):
+        """ applies a consistent visual transformation to a color that represents LR direction to get the corresponding RL color. 
+        General the RL colors look darker, slightly less saturated
+
+        color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': long_epoch_config.apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                     'short_LR': short_epoch_config['brush'].color(), 'short_RL': long_epoch_config.apply_LR_to_RL_adjustment(short_epoch_config['brush'].color()}
+
+  
+        """
+        from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color
+
+        # RL_adjustment_kwargs = dict(hue_shift=0.0, saturation_scale=0.35, value_scale=1.0)
+        RL_adjustment_kwargs = dict(hue_shift=0.01, saturation_scale=0.75, value_scale=0.5)
+        return build_adjusted_color(an_RL_color, **RL_adjustment_kwargs)
+
+
+
 # Access configurations
 long_short_display_config_manager = LongShortDisplayConfigManager()
 
@@ -244,8 +282,6 @@ class PlottingHelpers:
         required_epoch_bar_height = ax.get_ylim()[-1]
         output_dict["divider_line"] = ax.vlines(t_split, ymin=0, ymax=required_epoch_bar_height, color=(0,0,0,.25), zorder=25) # divider should be in very front
         return output_dict
-
-
 
 
     @function_attributes(short_name=None, tags=['pyqtgraph', 'helper', 'long_short', 'regions', 'rectangles'], input_requires=['pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers.build_pyqtgraph_epoch_indicator_regions'], output_provides=[], uses=[], used_by=[], creation_date='2023-04-19 19:04')
@@ -315,4 +351,5 @@ class PlottingHelpers:
         else:
             print(f'WARN: build_only == True so fig.update_layout(...) will not be called.')
         return output_dict
+
 
