@@ -141,31 +141,27 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
             print(f'\t done.')
 
         ## unpack either way:
-        any_decoder_neuron_IDs = directional_trial_by_trial_activity_result.any_decoder_neuron_IDs
+        # any_decoder_neuron_IDs = directional_trial_by_trial_activity_result.any_decoder_neuron_IDs
         # active_pf_dt = directional_trial_by_trial_activity_result.active_pf_dt # PfND_TimeDependent, this version does not work!
-        # directional_lap_epochs_dict = directional_trial_by_trial_activity_result.directional_lap_epochs_dict
         directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts # : Dict[str, Epoch]
         ## OUTPUTS: directional_trial_by_trial_activity_result, directional_active_lap_pf_results_dicts
-
-
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         active_pf_dt = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D_dt']) # PfND_TimeDependent
 
-        # (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        # active_pf_dt = deepcopy(long_LR_results.pf2D_dt) # "PfND_TimeDependent"
-
         ## Uses `plot_trial_to_trial_reliability_all_decoders_image_stack` to plot the reliability trial-by-trial indicators over time
-
         ## INPUTS: a_pf2D_dt, z_scored_tuning_map_matrix
         # directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = deepcopy(directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts)
         
         _a_trial_by_trial_window = TrialByTrialActivityWindow.plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts, 
-                                                                                                                                                                                                                              active_one_step_decoder=deepcopy(active_pf_dt),
-                                                                                                                                                                                                                                drop_below_threshold=drop_below_threshold)
- 
+                                                                                                                        active_one_step_decoder=deepcopy(active_pf_dt),
+                                                                                                                        drop_below_threshold=drop_below_threshold)
+
         # **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs)
     
         final_context = owning_pipeline_reference.build_display_context_for_session(display_fn_name='trial_to_trial_reliability')
+        footer_annotation_text = final_context.get_description(separator='\t|\t')
+        _a_trial_by_trial_window.ui.lblFooter.setText(footer_annotation_text, size='12pt', bold=True) # update the footer
+
         if save_figure:
             saved_figure_paths = owning_pipeline_reference.output_figure(final_context, _a_trial_by_trial_window.root_render_widget)
             _a_trial_by_trial_window.plot_data.saved_figure_paths = saved_figure_paths

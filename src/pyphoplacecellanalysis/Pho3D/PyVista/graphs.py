@@ -15,128 +15,6 @@ Used in:
 
 """
 
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
-
-def adjust_saturation(rgb, saturation_factor: float):
-    """ adjusts the rgb colors by the saturation_factor by converting to HSV space.
-    
-    """
-    import matplotlib.colors as mcolors
-    import colorsys
-    # Convert RGB to HSV
-    hsv = mcolors.rgb_to_hsv(rgb)
-
-    if np.ndim(hsv) < 3:
-        # Multiply the saturation by the saturation factor
-        hsv[:, 1] *= saturation_factor
-        
-        # Clip the saturation value to stay between 0 and 1
-        hsv[:, 1] = np.clip(hsv[:, 1], 0, 1)
-        
-    else: 
-        # Multiply the saturation by the saturation factor
-        hsv[:, :, 1] *= saturation_factor
-        # Clip the saturation value to stay between 0 and 1
-        hsv[:, :, 1] = np.clip(hsv[:, :, 1], 0, 1)
-    
-    # Convert back to RGB
-    return mcolors.hsv_to_rgb(hsv)
-
-def desaturate_colormap(cmap, desaturation_factor: float):
-    """
-    Desaturate a colormap by a given factor.
-
-    Parameters:
-    - cmap: A Matplotlib colormap instance.
-    - desaturation_factor: A float between 0 and 1, with 0 being fully desaturated (greyscale)
-      and 1 being fully saturated (original colormap colors).
-
-    Returns:
-    - new_cmap: A new Matplotlib colormap instance with desaturated colors.
-
-    Usage:
-        # Load the existing 'viridis' colormap
-        viridis = plt.cm.get_cmap('viridis')
-        # Create a desaturated version of 'viridis'
-        desaturation_factors = np.linspace(start=1.0, stop=0.0, num=6)
-        desaturated_viridis = [desaturate_colormap(viridis, a_desaturation_factor) for a_desaturation_factor in desaturation_factors]
-        for a_cmap in desaturated_viridis:
-            display(a_cmap)
-
-            
-    """
-    # Get the colormap colors and the number of entries in the colormap
-    cmap_colors = cmap(np.arange(cmap.N))
-    
-    # Convert RGBA to RGB
-    cmap_colors_rgb = cmap_colors[:, :3]
-    
-    # Create an array of the same shape filled with luminance values
-    # The luminance of a color is a weighted average of the R, G, and B values
-    # These weights are based on how the human eye perceives color intensity
-    luminance = np.dot(cmap_colors_rgb, [0.299, 0.587, 0.114]).reshape(-1, 1)
-    
-    # Create a grayscale version of the colormap
-    grayscale_cmap = np.hstack([luminance, luminance, luminance])
-    
-    # Blend the original colormap with the grayscale version
-    blended_cmap = desaturation_factor * cmap_colors_rgb + (1 - desaturation_factor) * grayscale_cmap
-    
-    # Add the alpha channel back and create a new colormap
-    new_cmap_colors = np.hstack([blended_cmap, cmap_colors[:, 3:]])
-    new_cmap = plt.matplotlib.colors.ListedColormap(new_cmap_colors)
-    
-    return new_cmap
-
-
-
-
-# Define a function to create the colormap
-def make_saturating_red_cmap(time: float, N_colors:int=256, min_alpha: float=0.0, max_alpha: float=0.82, debug_print:bool=False):
-    """ time is between 0.0 and 1.0 
-    
-    Usage: Test Example:
-        from pyphoplacecellanalysis.Pho3D.PyVista.graphs import make_saturating_red_cmap
-
-        n_time_bins = 5
-        cmaps = [make_saturating_red_cmap(float(i) / float(n_time_bins - 1)) for i in np.arange(n_time_bins)]
-        for cmap in cmaps:
-            cmap
-            
-    Usage:
-        # Example usage
-        # You would replace this with your actual data and timesteps
-        data = np.random.rand(10, 10)  # Sample data
-        n_timesteps = 5  # Number of timesteps
-
-        # Plot data with increasing red for each timestep
-        fig, axs = plt.subplots(1, n_timesteps, figsize=(15, 3))
-        for i in range(n_timesteps):
-            time = i / (n_timesteps - 1)  # Normalize time to be between 0 and 1
-            # cmap = make_timestep_cmap(time)
-            cmap = make_red_cmap(time)
-            axs[i].imshow(data, cmap=cmap)
-            axs[i].set_title(f'Timestep {i+1}')
-        plt.show()
-
-    """
-    colors = np.array([(0, 0, 0), (1, 0, 0)]) # np.shape(colors): (2, 3)
-    if debug_print:
-        print(f'np.shape(colors): {np.shape(colors)}')
-    # Apply a saturation change
-    saturation_factor = float(time) # 0.5  # Increase saturation by 1.5 times
-    adjusted_colors = adjust_saturation(colors, saturation_factor)
-    if debug_print:
-        print(f'np.shape(adjusted_colors): {np.shape(adjusted_colors)}')
-    adjusted_colors = adjusted_colors.tolist()
-    ## Set the alpha of the first color to 0.0 and of the final color to 0.82
-    adjusted_colors = [[*v, max_alpha] for v in adjusted_colors]
-    adjusted_colors[0][-1] = min_alpha
-
-    # n_bins = [2]  # Discretizes the interpolation into bins
-    return LinearSegmentedColormap.from_list('CustomMap', adjusted_colors, N=N_colors)
-
 
 
 
@@ -385,6 +263,7 @@ def plot_3d_binned_bars_timeseries(p, xbin, ybin, t_bins, data, zScalingFactor=1
     Usage:
         plotActors, data_dict = plot_3d_binned_data(pActiveTuningCurvesPlotter, active_epoch_placefields2D.ratemap.xbin, active_epoch_placefields2D.ratemap.ybin, active_epoch_placefields2D.ratemap.occupancy)
     """
+    from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
 
     assert np.ndim(data) > 2, f"np.ndim(data): {np.ndim(data)} but it should be a 3D timeseries"
     n_xbins, n_ybins, n_tbins = np.shape(data)
@@ -393,13 +272,12 @@ def plot_3d_binned_bars_timeseries(p, xbin, ybin, t_bins, data, zScalingFactor=1
     all_plotActors_dict = {}
     all_data_dict = {}
 
-    from pyphoplacecellanalysis.Pho3D.PyVista.graphs import make_saturating_red_cmap
-    cmaps = [make_saturating_red_cmap((float(i) / float(n_tbins - 1)), min_alpha=0.75, max_alpha=1.0) for i in np.arange(n_tbins)] # pretty good
+    cmaps = [ColormapHelpers.make_saturating_red_cmap((float(i) / float(n_tbins - 1)), min_alpha=0.75, max_alpha=1.0) for i in np.arange(n_tbins)] # pretty good
 
     # # Load the existing 'viridis' colormap
     # viridis = plt.cm.get_cmap('viridis')
     # desaturation_factors = np.linspace(start=1.0, stop=0.1, num=n_tbins)
-    # cmaps = [desaturate_colormap(viridis, a_desaturation_factor) for a_desaturation_factor in desaturation_factors]
+    # cmaps = [ColormapHelpers.desaturate_colormap(viridis, a_desaturation_factor) for a_desaturation_factor in desaturation_factors]
         
     for t_bin_idx, t_value in enumerate(t_bins):
         a_plot_name: str = f"plot_3d_binned_bars[{t_value}]"
