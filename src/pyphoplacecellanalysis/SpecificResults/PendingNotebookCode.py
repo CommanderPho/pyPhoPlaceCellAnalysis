@@ -40,42 +40,8 @@ DecoderName = NewType('DecoderName', str)
 import matplotlib.pyplot as plt
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
-
-
 from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 
-
-
-
-
-# Create a function to modify the colormap's alpha channel
-def create_transparent_colormap(cmap_name: Optional[str]=None, color_literal_name: Optional[str]=None, lower_bound_alpha=0.1):
-    # Get the base colormap
-    assert (cmap_name is not None) or (color_literal_name is not None)
-    if color_literal_name is not None:
-        assert cmap_name is None
-        cmap = pg.ColorMap(np.array([0.0, 1.0]), np.array([pg.mkColor(color_literal_name).getRgb()[:3] + (0,), pg.mkColor(color_literal_name).getRgb()[:3] + (255,)], dtype=np.ubyte))
-    else:
-        assert cmap_name is not None
-        cmap = pg.colormap.get(cmap_name, source='matplotlib')
-
-    # Create a lookup table with the desired number of points (default 256)
-    lut = cmap.getLookupTable(alpha=True)
-    
-    # Modify the alpha values
-    alpha_channel = lut[:, 3]  # Extract the alpha channel (4th column)
-    alpha_channel = np.linspace(lower_bound_alpha, 1, len(alpha_channel))  # Linear alpha gradient from lower_bound_alpha to 1
-    lut[:, 3] = (alpha_channel * 255).astype(np.uint8)  # Convert to 0-255 range
-    
-    return lut
-
-
-# import inspect
-
-# def varargs_to_dict(*args):
-#     frame = inspect.currentframe().f_back
-#     arg_names = [name for name, val in frame.f_locals.items() if val in args]
-#     return dict(zip(arg_names, args))
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
@@ -109,7 +75,7 @@ class TrialByTrialActivityWindow:
 
     @function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['plot_trial_to_trial_reliability_all_decoders_image_stack'], creation_date='2024-08-29 03:26', related_items=[])
     @classmethod
-    def plot_trial_to_trial_reliability_image_array(cls, active_one_step_decoder, z_scored_tuning_map_matrix, max_num_columns=5, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
+    def _plot_trial_to_trial_reliability_image_array(cls, active_one_step_decoder, z_scored_tuning_map_matrix, max_num_columns=5, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
         """ plots the reliability across laps for each decoder
         
         ## Usage:
@@ -129,6 +95,7 @@ class TrialByTrialActivityWindow:
         from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_common import pyqtplot_common_setup
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
         from neuropy.utils.matplotlib_helpers import _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
+        from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
 
         # Get flat list of images:
         # images = active_one_step_decoder.ratemap.normalized_tuning_curves # (78, 57, 6)	- (n_neurons, n_xbins, n_ybins)
@@ -146,7 +113,7 @@ class TrialByTrialActivityWindow:
         # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
         # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
         # cmap = pg.colormap.get('gray','matplotlib') # prepare a linear color map
-        cmap = create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.1) # prepare a linear color map
+        cmap = ColormapHelpers.create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.01) # prepare a linear color map
 
         image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
         # image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(x_range, y_range)
@@ -165,6 +132,21 @@ class TrialByTrialActivityWindow:
         img_item_array = []
         other_components_array = []
         plot_array = []
+
+        # ==================================================================================================================== #
+        # Header Title                                                                                                        #
+        # ==================================================================================================================== #
+        
+        # Create a title label item
+        lblTitle = pg.LabelItem(justify='center')
+        lblTitle.setText('TrialByTrialActivity - trial_to_trial_reliability_image_array', size='16pt') # , bold=True
+
+        # Add the title label to the first row, spanning all columns
+        root_render_widget.addItem(lblTitle, row=0, col=0, colspan=max_num_columns)  # Adjust colspan based on number of columns
+        plots_start_row_idx: int = 1
+        # root_render_widget.nextRow()
+        
+
 
         for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
             # Need to convert to page specific:
@@ -195,7 +177,7 @@ class TrialByTrialActivityWindow:
             #     # vb.autoRange()
             
             # # plot mode:
-            curr_plot = root_render_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string 
+            curr_plot = root_render_widget.addPlot(row=(curr_row + plots_start_row_idx), col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string 
             curr_plot.setObjectName(curr_plot_identifier_string)
             curr_plot.showAxes(False)
             if is_last_row:
@@ -266,10 +248,25 @@ class TrialByTrialActivityWindow:
             other_components_array[0]['color_bar'].setEnabled(False)
             other_components_array[0]['color_bar'].hide()
 
+
+        # ==================================================================================================================== #
+        # Footer Label                                                                                                       #
+        # ==================================================================================================================== #
+    
+        # Create a label item for the footer
+        lblFooter = pg.LabelItem(justify='left')
+        lblFooter.setText('Footer Text Here')
+
+        footer_row_idx: int = (curr_row + plots_start_row_idx) + 1
+        # Add the footer label below the plots
+        # root_render_widget.addItem(footer, row=2, col=0)
+        root_render_widget.addItem(lblFooter, row=footer_row_idx, col=0, colspan=max_num_columns)
+
         if not defer_show:
             parent_root_widget.show()
             
-        return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array
+                    
+        return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter)
 
 
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
@@ -290,7 +287,7 @@ class TrialByTrialActivityWindow:
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, long_short_display_config_manager
         from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import apply_LR_to_RL_adjustment
-
+        from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
 
         ## Usage:
         
@@ -300,7 +297,7 @@ class TrialByTrialActivityWindow:
         a_decoder_name = 'long_LR'
         active_trial_by_trial_activity_obj = directional_active_lap_pf_results_dicts[a_decoder_name]
         active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
-        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array = cls.plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, drop_below_threshold=drop_below_threshold)
+        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, drop_below_threshold=drop_below_threshold)
 
         # Extract the heatmaps from the other decoders
         ## INPUTS: directional_active_lap_pf_results_dicts
@@ -323,7 +320,7 @@ class TrialByTrialActivityWindow:
                         'short_LR': short_epoch_config['brush'].color(), 'short_RL': apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
         additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
-        additional_cmaps = {k: create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
+        additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
 
         # additional_cmaps = {name: pg.ColorMap(np.array([0.0, 1.0]), np.array([pg.mkColor(color).getRgb()[:3] + (0,), pg.mkColor(color).getRgb()[:3] + (255,)], dtype=np.ubyte)) for name, color in additional_cmap_names.items()}
 
@@ -399,7 +396,8 @@ class TrialByTrialActivityWindow:
                                             color_dict=color_dict,
                                             # **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']},
                                             )
-        _obj.ui = PhoUIContainer(name=name, app=app, root_render_widget=root_render_widget, parent_root_widget=parent_root_widget, controlled_references=None) # , **utility_controls_ui_dict, **info_labels_widgets_dict
+        _obj.ui = PhoUIContainer(name=name, app=app, root_render_widget=root_render_widget, parent_root_widget=parent_root_widget,
+                                 lblTitle=lblTitle, lblFooter=lblFooter, controlled_references=None) # , **utility_controls_ui_dict, **info_labels_widgets_dict
         _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, **param_kwargs)
 
 
