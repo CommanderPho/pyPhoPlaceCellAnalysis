@@ -2,6 +2,10 @@ from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
 
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 from neuropy.utils.dynamic_container import overriding_dict_with # required for _display_2d_placefield_result_plot_raw
 
 from pyphocorehelpers.function_helpers import function_attributes
@@ -94,6 +98,77 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
         # return master_dock_win, app, out_items
         return {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+
+
+    @function_attributes(short_name='trial_to_trial_reliability', tags=['trial-to-trial-reliability', 'display'], is_global=True, input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-30 13:27', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']))
+    def _display_trial_to_trial_reliability(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, drop_below_threshold = 0.0000001, **kwargs):
+        """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18)
+        NOTE: Ignores `active_config` because context_nested_docks is for all contexts
+
+        Input:
+            owning_pipeline_reference: A reference to the pipeline upon which this display function is being called
+
+        Usage:
+
+        display_output = active_display_output | curr_active_pipeline.display('_display_context_nested_docks', active_identifying_filtered_session_ctx, enable_gui=False, debug_print=False) # returns {'master_dock_win': master_dock_win, 'app': app, 'out_items': out_items}
+        master_dock_win = display_output['master_dock_win']
+        app = display_output['app']
+        out_items = display_output['out_items']
+
+        curr_active_pipeline.reload_default_display_functions()
+        _out = curr_active_pipeline.display(display_function='_display_trial_to_trial_reliability', active_session_configuration_context=None)
+
+
+        """
+        from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_trial_to_trial_reliability_all_decoders_image_stack
+        assert owning_pipeline_reference is not None
+        #
+        if include_includelist is None:
+            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
+
+        directional_trial_by_trial_activity_result: TrialByTrialActivityResult = owning_pipeline_reference.global_computation_results.computed_data.get('TrialByTrialActivity', None)
+        if directional_trial_by_trial_activity_result is None:
+            # if `KeyError: 'TrialByTrialActivity'` recompute
+            print(f'TrialByTrialActivity is not computed, computing it...')
+            owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['trial_by_trial_metrics'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            directional_trial_by_trial_activity_result = owning_pipeline_reference.global_computation_results.computed_data.get('TrialByTrialActivity', None) ## try again to get the result
+            assert directional_trial_by_trial_activity_result is not None, f"directional_trial_by_trial_activity_result is None even after forcing recomputation!!"
+            print(f'\t done.')
+
+        ## unpack either way:
+        any_decoder_neuron_IDs = directional_trial_by_trial_activity_result.any_decoder_neuron_IDs
+        # active_pf_dt = directional_trial_by_trial_activity_result.active_pf_dt # PfND_TimeDependent, this version does not work!
+        # directional_lap_epochs_dict = directional_trial_by_trial_activity_result.directional_lap_epochs_dict
+        directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts # : Dict[str, Epoch]
+        ## OUTPUTS: directional_trial_by_trial_activity_result, directional_active_lap_pf_results_dicts
+
+
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        active_pf_dt = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D_dt']) # PfND_TimeDependent
+
+        # (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # active_pf_dt = deepcopy(long_LR_results.pf2D_dt) # "PfND_TimeDependent"
+
+        ## Uses `plot_trial_to_trial_reliability_all_decoders_image_stack` to plot the reliability trial-by-trial indicators over time
+
+        ## INPUTS: a_pf2D_dt, z_scored_tuning_map_matrix
+        # directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = deepcopy(directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts)
+        
+        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, additional_img_items_dict, legend_layout = plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts, 
+                                                                                                                                                                                                                              active_one_step_decoder=deepcopy(active_pf_dt),
+                                                                                                                                                                                                                                drop_below_threshold=drop_below_threshold)
+        out_items = {'parent_root_widget': parent_root_widget, 'app': app, 'root_render_widget': root_render_widget, 'plot_array':plot_array, 'img_item_array':img_item_array, 'other_components_array':other_components_array, 'plot_data_array':plot_data_array, 'additional_img_items_dict':additional_img_items_dict, 'legend_layout':legend_layout}
+
+        # **overriding_dict_with(lhs_dict={'enable_gui': False, 'debug_print': False}, **kwargs)
+
+        return out_items
+
+
+
+
 
 # ==================================================================================================================== #
 # Private Display Helpers                                                                                              #
