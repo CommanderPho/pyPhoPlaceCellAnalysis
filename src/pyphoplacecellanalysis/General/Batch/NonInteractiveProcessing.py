@@ -683,6 +683,13 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         print(f'batch_extended_programmatic_figures(...): "_display_directional_track_remapping_diagram" failed with error: {e}\n skipping.')
 
 
+    try:
+        _out = curr_active_pipeline.display('_display_trial_to_trial_reliability', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
+    except BaseException as e:
+        print(f'batch_extended_programmatic_figures(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
+
+
+
 
 
 
