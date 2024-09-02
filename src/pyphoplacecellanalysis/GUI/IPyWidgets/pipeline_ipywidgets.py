@@ -4,10 +4,9 @@ from IPython.display import display
 import matplotlib
 
 from pathlib import Path
-from silx.gui import qt
-from silx.gui.dialog.ImageFileDialog import ImageFileDialog
-from silx.gui.dialog.DataFileDialog import DataFileDialog
-import silx.io
+
+# from silx.gui.dialog.ImageFileDialog import ImageFileDialog
+# import silx.io
 
 from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
 from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
@@ -53,6 +52,12 @@ def saveFile(on_save_file_callback, caption:str="Save as..", startDir=None, sugg
 
 
 def openDialogAtHome():
+    """
+    
+    """
+    from silx.gui import qt
+    from silx.gui.dialog.DataFileDialog import DataFileDialog
+    
     # Clear the dialog
     path = qt.QDir.homePath()
     # dialog = self.createDialog()
