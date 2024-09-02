@@ -1806,8 +1806,8 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
 
     ## Find the files:
     h5_files = find_HDF5_files(collected_outputs_directory)
-    h5_sessions = find_most_recent_files(found_session_export_paths=h5_files)
-
+    h5_sessions, h5_filtered_parsed_paths_df = find_most_recent_files(found_session_export_paths=h5_files)
+    
     ## INPUTS: h5_sessions, session_dict, cuttoff_date, known_bad_session_strs
     if known_bad_session_strs is None:
         known_bad_session_strs = []
@@ -2281,7 +2281,7 @@ def _old_process_csv_files(csv_sessions, t_delta_dict, cuttoff_date=None, known_
 
 
 
-def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> None:
+def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, **additional_columns) -> bool:
     try:
         # loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
         df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'])
@@ -2299,11 +2299,12 @@ def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, s
 
         ## update dict:
         loaded_dict[loaded_dict_key] = df ## it's being overwritten here
+        return True
 
     except BaseException as e:
         if debug_print:
             print(f'session "{session_name}", file_path: "{file_path}" - did not fully work. (error "{e}". Skipping.')
-
+        return False
 
 @function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=['_new_df_process_and_load_exported_file', 'recover_user_annotation_and_is_valid_columns'], used_by=[], creation_date='2024-07-11 17:11', related_items=[])
 def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict, cuttoff_date=None, known_bad_session_strs=[], debug_print=False):
@@ -2373,32 +2374,39 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         if curr_session_t_delta is None:
             print(f'WARN: curr_session_t_delta is None for session_str = "{session_str}"')
 
+        _is_file_valid = True # shouldn't mark unknown files as invalid
         # Process each file type with its corresponding details
         if file_type == 'laps_marginals_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         elif file_type == 'ripple_marginals_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         elif file_type == 'laps_time_bin_marginals_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
         elif file_type == 'ripple_time_bin_marginals_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
         elif file_type == 'laps_simple_pf_pearson_merged_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         elif file_type == 'ripple_simple_pf_pearson_merged_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         elif file_type == 'laps_weighted_corr_merged_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_wcorr_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_wcorr_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         elif file_type == 'ripple_weighted_corr_merged_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_wcorr_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_wcorr_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         elif file_type == 'laps_all_scores_merged_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_all_scores_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_all_scores_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         elif file_type == 'ripple_all_scores_merged_df':
-            _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_all_scores_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_all_scores_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
         else:
             print(f'File type {file_type} not implemented.')
+            # _is_file_valid = False # shouldn't mark unknown files as invalid
             # File type neuron_replay_stats_df not implemented.
             # File type laps_marginals_df not implemented.
             # continue
+            
+        if (not _is_file_valid):
+            excluded_or_outdated_files_list.append(row['path']) ## mark file for exclusion/removal
+            
+        ## END FOR    
 
     ## OUTPUTS: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict,
     
@@ -2412,6 +2420,30 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         excluded_or_outdated_files_list,
     )
 
+@function_attributes(short_name=None, tags=['archive', 'cleanup', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 11:30', related_items=[])
+def archive_old_files(collected_outputs_directory: Path, excluded_or_outdated_files_list: List[Path], is_dry_run: bool=False):
+    """ moves old files that didn't meet the inclusion criteria into an archive directory.
+    """
+    ## INPUTS: collected_outputs_directory, excluded_or_outdated_files_list
+    
+    assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
+    # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
+    print(f'collected_outputs_directory: "{collected_outputs_directory}"')
+
+    # Create a 'figures' subfolder if it doesn't exist
+    archive_folder: Path = collected_outputs_directory.joinpath('OLD').resolve()
+    archive_folder.mkdir(parents=False, exist_ok=True)
+    assert archive_folder.exists()
+    print(f'\tarchive_folder: "{archive_folder}"')
+
+    for a_file_path in excluded_or_outdated_files_list:
+        ## move the file to the archive folder
+        # a_file_path.stem
+        print(f'copying "{a_file_path}" to "{archive_folder}"...')
+        if (not is_dry_run):
+            shutil.move(a_file_path, archive_folder)
+
+    return archive_folder
 
 # ==================================================================================================================== #
 # Visualizations                                                                                                       #
