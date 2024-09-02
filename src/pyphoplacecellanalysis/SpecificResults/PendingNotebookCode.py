@@ -1499,6 +1499,7 @@ def compute_all_replay_epoch_variations(curr_active_pipeline) -> Dict[str, Epoch
 # ---------------------------------------------------------------------------- #
 #                      2024-06-15 - Significant Remapping                      #
 # ---------------------------------------------------------------------------- #
+@function_attributes(short_name=None, tags=['remapping'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-15 00:00', related_items=[])
 def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Dict, x_midpoint: float=72.0):
     """ yanked from `_perform_long_short_endcap_analysis to compute within the batch processing notebook
 

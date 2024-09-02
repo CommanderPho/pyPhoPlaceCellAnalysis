@@ -1565,15 +1565,19 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds:float=0.0005,
                                                                              save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False) -> dict:
-    """  Export the pipeline's HDF5 as 'pipeline_results.h5'
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
-    
-    Results can be extracted from batch output by 
-    
-    # Extracts the callback results 'determine_session_t_delta_completion_function':
-    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+    """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine, and exports it as several output files:
 
-
+    Output Files:
+        if save_pickle:
+            PKL Output:     f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
+        
+        if save_hdf:
+            HDF5 Output:    f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
+        
+        if save_across_session_hdf:
+            Across Session HDF5 Output: f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
+        
+    
     """
     import sys
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str

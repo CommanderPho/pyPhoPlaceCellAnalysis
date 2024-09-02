@@ -42,6 +42,7 @@ Usage:
 
 """
 
+@function_attributes(short_name=None, tags=['pyqtgraph', 'color'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-29 00:00', related_items=[])
 def apply_LR_to_RL_adjustment(an_RL_color):
     """ applies a consistent visual transformation to a color that represents LR direction to get the corresponding RL color. 
     General the RL colors look darker, slightly less saturated
@@ -141,6 +142,7 @@ class DisplayColorsEnum:
         
 
     @classmethod
+    @function_attributes(short_name=None, tags=['pyqtgraph', 'title', 'format'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 15:14', related_items=[])
     def get_pyqtgraph_formatted_title_dict(cls, is_dark_bg: bool = True) -> Dict:
         """ 
         
