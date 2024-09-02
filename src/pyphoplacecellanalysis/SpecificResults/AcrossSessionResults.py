@@ -2339,10 +2339,12 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True) # ensures all are sorted ascending except for export_datetime, which are sorted decending so the first value is the most recent.
 
+    excluded_or_outdated_files_list = []
     for index, row in parsed_csv_files_df.iterrows():
         session_str = str(row['session'])
         if session_str in known_bad_session_strs:
             print(f'Skipping "{session_str}" because it is in known_bad_session_strs.')
+            excluded_or_outdated_files_list.append(row['path']) ## mark file for exclusion/removal
             continue
         
         custom_replay_name = row['custom_replay_name']
@@ -2357,6 +2359,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         if cuttoff_date is not None:
             if export_datetime < cuttoff_date:
                 print(f'Skipping "{session_str}" because export_datetime = "{export_datetime}" is less than cuttoff_date = "{cuttoff_date}".')
+                excluded_or_outdated_files_list.append(row['path']) ## mark file for exclusion/removal
                 continue
             
         path = Path(row['path']).resolve()
@@ -2406,6 +2409,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     return (
         (final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict),
         (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df),
+        excluded_or_outdated_files_list,
     )
 
 
