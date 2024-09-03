@@ -34,6 +34,7 @@ from datetime import datetime
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import  convert_filelist_to_new_parent
+from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 # NeuroPy (Diba Lab Python Repo) Loading
@@ -2449,6 +2450,7 @@ def archive_old_files(collected_outputs_directory: Path, excluded_or_outdated_fi
 # Visualizations                                                                                                       #
 # ==================================================================================================================== #
 
+@metadata_attributes(short_name=None, tags=['across-session', 'visualizations', 'figure', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-07-21 00:00', related_items=[])
 class AcrossSessionsVisualizations:
     # 2023-07-21 - Across Sessions Aggregate Figure: __________________________________________________________________________________ #
 
@@ -2504,6 +2506,7 @@ class AcrossSessionsVisualizations:
 
 
     @classmethod
+    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
     def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results: pd.DataFrame, num_sessions:int, save_figure=True, include_axes_lines:bool=True, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
@@ -2547,6 +2550,7 @@ class AcrossSessionsVisualizations:
         final_context = DisplaySpecifyingIdentifyingContext.init_from_context(final_context, display_dict={})
 
         scatter_plot_kwargs = dict(zorder=5)
+        scatter_plot_kwargs['point_colors'] = '#33333333'
         if 'has_pf_color' in long_short_fr_indicies_analysis_results:
             scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['has_pf_color'].to_numpy() #.to_list() # edgecolors=(r, g, b, 1)
 
@@ -2554,7 +2558,8 @@ class AcrossSessionsVisualizations:
         fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', **scatter_plot_kwargs) #  markeredgewidth=1.5,
         
         if include_axes_lines:
-
+            # Plots axes lines at the zero and extremes of the x and y axis.
+            
             # _boundary_line_kwargs = dict(linestyle='--', )
             _boundary_line_kwargs = dict(linestyle='-', )
             _line_kwargs = dict(zorder=1)
@@ -2576,7 +2581,6 @@ class AcrossSessionsVisualizations:
             
             long_color = 'crimson'
             short_color = 'royalblue'
-
 
             ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
             ax.axvline(x=0.0, color='grey', linestyle='-', **_line_kwargs)  # Vertical line at x = 0
@@ -2613,6 +2617,7 @@ class AcrossSessionsVisualizations:
 
 
     @classmethod
+    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
     def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table, num_sessions:int, save_figure=True, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
@@ -2640,18 +2645,20 @@ class AcrossSessionsVisualizations:
 
         # (fig_L, ax_L, active_display_context_L), (fig_S, ax_S, active_display_context_S), _perform_write_to_file_callback = _plot_session_long_short_track_firing_rate_figures(owning_pipeline_reference, jonathan_firing_rate_analysis_result, defer_render=defer_render)
 
+        common_scatter_kwargs = dict(point_colors='#33333333')
+        
         ## Long Track Replay|Laps FR Figure
         neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
         x_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
         y_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()}
-        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'))
+        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), **common_scatter_kwargs)
 
 
         ## Short Track Replay|Laps FR Figure
         neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
         x_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
         y_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()}
-        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'))
+        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), **common_scatter_kwargs)
 
         ## Fit both the axes:
         fit_both_axes(ax_L, ax_S)

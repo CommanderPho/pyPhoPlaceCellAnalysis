@@ -1859,8 +1859,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             # point_colors = [f'{i}' for i in list(x_frs_index.keys())] 
     else:
         # point_colors = None
-        point_colors = '#33333333'
-    
+        # point_colors = '#33333333'
+        point_colors = scatter_params.pop('point_colors', '#33333333')
+        
     fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
 
     xlabel_kwargs = {}
@@ -2470,7 +2471,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
-def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, swap_xy_axis=True, defer_render=False):
+def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, swap_xy_axis=True, defer_render=False, **scatter_params):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
@@ -2504,7 +2505,8 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
                 point_colors = neurons_colors
                 # point_colors = [f'{i}' for i in list(x_frs_index.keys())] 
         else:
-            point_colors = None
+            point_colors = scatter_params.pop('point_colors', None)
+            # point_colors = None
             # point_colors = 'black'
         
         point_hover_labels = [f'{i}' for i in list(x_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints. Don't do anything I don't think. , enable_hover_labels=False
@@ -2519,7 +2521,7 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
             xlabel_kwargs = dict(loc='left')
             ylabel_kwargs = dict(loc='bottom')
 
-        scatter_plot = ax.scatter(x_frs_dict.values(), y_frs_dict.values(), c=point_colors) # , s=10, alpha=0.5
+        scatter_plot = ax.scatter(x_frs_dict.values(), y_frs_dict.values(), c=point_colors, **scatter_params) # , s=10, alpha=0.5
         plt.xlabel(xlabel_str, fontsize=16, **xlabel_kwargs)
         plt.ylabel(ylabel_str, fontsize=16, **ylabel_kwargs)
         
