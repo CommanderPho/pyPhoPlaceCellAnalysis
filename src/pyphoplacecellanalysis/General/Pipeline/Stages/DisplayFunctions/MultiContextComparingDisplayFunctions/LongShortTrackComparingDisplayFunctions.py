@@ -1798,7 +1798,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, **scatter_params):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, enable_histograms=True, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
 
@@ -1838,8 +1838,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta -}-\\theta_{\\Delta +}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
     # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta -}-R_{\\Delta +}}{R_{\\Delta +} + R_{\\Delta -}}$'
 
-    pre_delta_str: str = f'🔚'
-    post_delta_str: str = f'➽'
+    # pre_delta_str: str = f'🠴'
+    pre_delta_str: str = f'◅'
+    post_delta_str: str = f'►'
 
     # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\multimap}-\\theta_{\\hookrightarrow}}{\\theta_{\\hookrightarrow} + \\theta_{\\multimap}}$'
     # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\multimap}-R_{\\hookrightarrow}}{R_{\\hookrightarrow} + R_{\\multimap}}$'
@@ -1858,7 +1859,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
                                                                                 
 
     scatter_params = dict(zorder=5) | scatter_params
-    
+
 
     # Optionally swap the x and y axes:
     if swap_xy_axis:
@@ -1898,8 +1899,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ylabel_kwargs = dict(loc='bottom')
 
     scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
-    plt.xlabel(xlabel_str, fontsize=16, **xlabel_kwargs)
-    plt.ylabel(ylabel_str, fontsize=16, **ylabel_kwargs)
+    plt.xlabel(xlabel_str, fontsize=18, **xlabel_kwargs)
+    plt.ylabel(ylabel_str, fontsize=18, **ylabel_kwargs)
 
     ## Non-flexitext version:
     # plt.title('long ($L$)|short($S$) firing rate indicies')
@@ -1946,8 +1947,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
     # # Call the function above. All the magic happens there.
     # add_value_labels(ax, labels=x_labels) # 
-        
-
+    
     if include_axes_lines:
         # Plots axes lines at the zero and extremes of the x and y axis.
         
@@ -1975,6 +1975,46 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ax.set_xlim(-1.01, 1.01)  # Set x-axis limits from 0 to 1
         ax.set_ylim(-1.01, 1.01)  # Set y-axis limits from 0 to 1
         
+
+    if enable_histograms:
+        
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        # Set aspect of the main Axes.
+        ax.set_aspect(1.)
+
+        # create new Axes on the right and on the top of the current Axes
+        divider = make_axes_locatable(ax)
+        # below height and pad are in inches
+        ax_histx = divider.append_axes("top", 1.2, pad=0.1, sharex=ax)
+        ax_histy = divider.append_axes("right", 1.2, pad=0.1, sharey=ax)
+
+        # make some labels invisible
+        ax_histx.xaxis.set_tick_params(labelbottom=False)
+        ax_histy.yaxis.set_tick_params(labelleft=False)
+
+        x = x_frs_index.values
+        y = y_frs_index.values
+
+        # now determine nice limits by hand:
+        binwidth = 0.075
+        xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
+        lim = (int(xymax/binwidth) + 1)*binwidth
+
+        bins = np.arange(-lim, lim + binwidth, binwidth)
+        ax_histx.hist(x, bins=bins)
+        ax_histy.hist(y, bins=bins, orientation='horizontal')
+
+        ax_histx.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+        ax_histy.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+
+        # the xaxis of ax_histx and yaxis of ax_histy are shared with ax,
+        # thus there is no need to manually adjust the xlim and ylim of these
+        # axis.
+
+        # ax_histx.set_yticks([0, 50, 100])
+        # ax_histy.set_xticks([0, 50, 100])
+
 
     return fig, ax, scatter_plot
 

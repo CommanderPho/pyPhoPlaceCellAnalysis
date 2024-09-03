@@ -977,10 +977,12 @@ def PAPER_FIGURE_figure_3(curr_active_pipeline, defer_render=False, save_figure=
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['stats', 'binomial', 'FRI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-10 16:55', related_items=[])
-def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table):
+def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table, x_col_name='x_frs_index', y_col_name='y_frs_index', extra_required_columns=['neuron_uid']):
     """ Performs a binomial test to see if the number of entries above/below the y=x diagnoal were greater than would be expected by chance.
 
     Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_perform_diagonal_line_binomial_test
+
         binom_test_chance_result = pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysis_table)
         binom_test_chance_result
 
@@ -988,10 +990,11 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
     # Drop column: 'index'
     # long_short_fr_indicies_analysis_table = long_short_fr_indicies_analysis_table.drop(columns=['index'])
     # Drop rows with missing data in columns: 'x_frs_index', 'y_frs_index', 'neuron_uid'
-    long_short_fr_indicies_analysis_table = long_short_fr_indicies_analysis_table.dropna(subset=['x_frs_index', 'y_frs_index', 'neuron_uid'])
+    # extra_required_columns = ['neuron_uid']
+    long_short_fr_indicies_analysis_table = long_short_fr_indicies_analysis_table.dropna(subset=[x_col_name, y_col_name, *extra_required_columns])
 
     ## Find the values above/below the main y=x diagonal:
-    x_minus_y_diff = (long_short_fr_indicies_analysis_table['x_frs_index'] - long_short_fr_indicies_analysis_table['y_frs_index'])
+    x_minus_y_diff = (long_short_fr_indicies_analysis_table[x_col_name] - long_short_fr_indicies_analysis_table[y_col_name])
     assert np.sum(np.logical_not(np.isfinite(x_minus_y_diff))) == 0, f"ERROR: contains {np.sum(np.logical_not(np.isfinite(x_minus_y_diff)))} non-finite values"
     ## Find the counts for each:
     n_total = len(x_minus_y_diff) # 856
