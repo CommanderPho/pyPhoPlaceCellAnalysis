@@ -638,6 +638,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         
 
     # _display_directional_merged_pf_decoded_epochs ______________________________________________________________________ #
+    # this open the Yellow-Blue plots and various marginals
     try:
         # # Interactive-mode parameters:
         # _interactive_mode_kwargs = dict(should_use_MatplotlibTimeSynchronizedWidget=True, scrollable_figure=True, defer_render=False)

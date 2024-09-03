@@ -3116,7 +3116,7 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
     return final_decoder_results_dict
 
 ## INPUTS: output_full_directional_merged_decoders_result, sweep_params_idx: int = -1
-@function_attributes(short_name=None, tags=['context', 'param_sweep', 'sweep'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-03 00:00', related_items=['CustomDecodeEpochsResult', '_do_custom_decode_epochs', '_do_custom_decode_epochs_dict', 'CustomDecodeEpochsResult'])
+@function_attributes(short_name=None, tags=['context', 'param_sweep', 'sweep'], input_requires=[], output_provides=[], uses=['DecodedEpochSlicesPaginatedFigureController'], used_by=[], creation_date='2024-04-03 00:00', related_items=['CustomDecodeEpochsResult', '_do_custom_decode_epochs', '_do_custom_decode_epochs_dict', 'CustomDecodeEpochsResult'])
 def _show_sweep_result(output_full_directional_merged_decoders_result=None, global_measured_position_df: pd.DataFrame=None, xbin=None, active_context: IdentifyingContext=None, sweep_params_idx: int = -1, sweep_key_name: str="desired_shared_decoding_time_bin_size", debug_print=False, **kwargs):
     """2024-04-03 - Interactively show the lap decoding performance for a single time bin size:
 
