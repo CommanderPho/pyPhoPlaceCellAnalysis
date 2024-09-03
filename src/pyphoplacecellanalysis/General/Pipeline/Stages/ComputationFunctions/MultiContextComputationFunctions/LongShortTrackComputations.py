@@ -2108,6 +2108,10 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     if temp_save_filename is not None:
         print(f'temp_save_filename: {temp_save_filename}')
 
+
+    ## Now have the epoch periods to calculate the firing rates for, next compute the firing rates.
+        
+
     # x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
 
 

@@ -1798,7 +1798,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, **scatter_params):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
 
@@ -1829,9 +1829,36 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{L_{R}-S_{R}}{L_{R} + S_{R}}$'
     
 
-    ## 2023-10-06 - Consistent "\\Delta +"/"\\Delta -" notation
-    laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta +}-\\theta_{\\Delta -}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
-    replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta +}-R_{\\Delta -}}{R_{\\Delta +} + R_{\\Delta -}}$'
+    # ## 2023-10-06 - Consistent "\\Delta +"/"\\Delta -" notation
+    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta +}-\\theta_{\\Delta -}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
+    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta +}-R_{\\Delta -}}{R_{\\Delta +} + R_{\\Delta -}}$'
+        
+
+    ## 2024-09-03 - The x_frs_index/y_frs_index series returned from the computation are always LONG-SHORT. Must fix "Delta" notation to fix that. Consistent "\\Delta +"/"\\Delta -" notation
+    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta -}-\\theta_{\\Delta +}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
+    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta -}-R_{\\Delta +}}{R_{\\Delta +} + R_{\\Delta -}}$'
+
+    pre_delta_str: str = f'🔚'
+    post_delta_str: str = f'➽'
+
+    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\multimap}-\\theta_{\\hookrightarrow}}{\\theta_{\\hookrightarrow} + \\theta_{\\multimap}}$'
+    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\multimap}-R_{\\hookrightarrow}}{R_{\\hookrightarrow} + R_{\\multimap}}$'
+
+    laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{' + f'{pre_delta_str}' + '}-\\theta_{' + f'{post_delta_str}' + '}}{\\theta_{' + f'{post_delta_str}' + '} + \\theta_{' + f'{pre_delta_str}' + '}}$'
+    replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{' + f'{pre_delta_str}' + '}-R_{' + f'{post_delta_str}' + '}}{R_{' + f'{post_delta_str}' + '} + R_{' + f'{pre_delta_str}' + '}}$'
+
+    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\multimap}-\\theta_{\\hookrightarrow}}{\\theta_{\\hookrightarrow} + \\theta_{\\multimap}}$'
+    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\multimap}-R_{\\hookrightarrow}}{R_{\\hookrightarrow} + R_{\\multimap}}$'
+
+    # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\mathrel{\\multimap}} - \\theta_{\\mathrel{\\hookrightarrow}}}{\\theta_{\\mathrel{\\hookrightarrow}} + \\theta_{\\mathrel{\\multimap}}}$'
+    # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\mathrel{\\multimap}} - R_{\\mathrel{\\hookrightarrow}}}{R_{\\mathrel{\\hookrightarrow}} + R_{\\mathrel{\\multimap}}}$'
+
+
+    # Replay Firing Rate Index $\frac{R_{\multimap}-R_{\mapsto}}{R_{\mapsto} + R_{\multimap}}$ \\
+                                                                                
+
+    scatter_params = dict(zorder=5) | scatter_params
+    
 
     # Optionally swap the x and y axes:
     if swap_xy_axis:
@@ -1919,6 +1946,35 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
     # # Call the function above. All the magic happens there.
     # add_value_labels(ax, labels=x_labels) # 
+        
+
+    if include_axes_lines:
+        # Plots axes lines at the zero and extremes of the x and y axis.
+        
+        # _boundary_line_kwargs = dict(linestyle='--', )
+        _boundary_line_kwargs = dict(linestyle='-', )
+        _line_kwargs = dict(zorder=1)
+        
+        long_color = 'crimson'
+        short_color = 'royalblue'
+
+        ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
+        ax.axvline(x=0.0, color='grey', linestyle='-', **_line_kwargs)  # Vertical line at x = 0
+        ax.axvline(x=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = +1
+
+        ax.axhline(y=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = -1
+        ax.axhline(y=0.0, color='grey', linestyle='-', **_line_kwargs)  # Horizontal line at y = 0
+        ax.axhline(y=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = +1
+
+        # Add y=x line:
+        ax.plot(ax.get_xlim(), ax.get_ylim(), linestyle='--', color='gray', label='y=x')
+
+        # Assuming you have an existing axis 'ax'
+        # ax.margins(x=0.01, y=0.01)  # Adds 10% margin on x-axis and 20% margin on y-axis
+        # Set precise axis limits
+        ax.set_xlim(-1.01, 1.01)  # Set x-axis limits from 0 to 1
+        ax.set_ylim(-1.01, 1.01)  # Set y-axis limits from 0 to 1
+        
 
     return fig, ax, scatter_plot
 
