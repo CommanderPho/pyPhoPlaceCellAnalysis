@@ -495,6 +495,8 @@ class DockPlanningHelperWindow:
 
 
         """
+        from pyphocorehelpers.print_helpers import generate_html_string # used for `plot_long_short_surprise_difference_plot`
+        
         is_laps: bool = self.params.is_laps
         use_plaintext_title: bool = self.params.use_plaintext_title
         if not use_plaintext_title:

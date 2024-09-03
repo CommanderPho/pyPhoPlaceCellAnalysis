@@ -38,6 +38,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel, create_tabbed_table_widget
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot, ExportFiletype
 
+from pyphocorehelpers.print_helpers import generate_html_string
 
 
 __all__ = ['RankOrderRastersDebugger']
@@ -1338,8 +1339,7 @@ class RankOrderRastersDebugger:
 # # ==================================================================================================================== #
 
 
-from pyphocorehelpers.print_helpers import generate_html_string
-from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+
 
 
 

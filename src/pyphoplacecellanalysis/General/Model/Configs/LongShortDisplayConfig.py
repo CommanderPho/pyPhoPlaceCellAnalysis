@@ -144,7 +144,7 @@ class DisplayColorsEnum:
     @classmethod
     @function_attributes(short_name=None, tags=['pyqtgraph', 'title', 'format'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 15:14', related_items=[])
     def get_pyqtgraph_formatted_title_dict(cls, is_dark_bg: bool = True) -> Dict:
-        """ 
+        """ Generates the two-color LR_Long/LR_Short/RL_Long/RL_Short labels with color formatting for pyqtgraph plots
         
         formatted_title_strings_dict = DisplayColorsEnum.get_pyqtgraph_formatted_title_dict()
 

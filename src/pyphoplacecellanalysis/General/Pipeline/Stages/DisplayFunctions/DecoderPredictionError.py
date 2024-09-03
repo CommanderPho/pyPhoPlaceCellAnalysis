@@ -893,6 +893,9 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     if (scrollable_figure and (not should_use_MatplotlibTimeSynchronizedWidget)):
         print(f'WARN: `scollable_figure` requires `MatplotlibTimeSynchronizedWidget`, but should_use_MatplotlibTimeSynchronizedWidget == False! Scrollability will be disabled.')
 
+    if params_kwargs is None:
+        params_kwargs = dict()
+        
     # 2023-01-06 - Allow switching between regular and insets view ['view', 'insets_view']
     build_fn: str = kwargs.pop('build_fn', params_kwargs.get('build_fn', 'basic_view')) # explicit `kwargs` takes priority, followed by explicit `params_kwargs`, followed by default
     if (build_fn == 'basic_view'):
