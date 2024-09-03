@@ -519,87 +519,95 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     if plot_function_name is not None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB INSET SUBPLOTS Version'
         
-    params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
-    
-    global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
-    global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
-    epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
 
-    ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end. These never get updated tho
-    epoch_durations = np.array(list(reversed(epoch_durations.tolist())))   
-
-    print("WARNING 2024-08-16 - the 'insets' version built by `stacked_epoch_slices_matplotlib_build_insets_view(...)` is not ready for paginated output as the widths cannot be updated. Furthermore there is a weird axis reversal issue.")
-    
-    # epoch_durations
-    epoch_slices_max_duration = np.max(epoch_durations) # 28.95714869396761
-    epoch_slice_relative_durations = epoch_durations / epoch_slices_max_duration # computes the relative duration/xlength foe ach epoch slice as a range from 0.0-1.0 to determine relative sizes to parent
-    # epoch_slice_relative_durations
-    inset_plot_heights = np.full((params.active_num_slices,), (100.0 / float(params.active_num_slices))) # array([11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111])
-    # inset_plot_heights
-    inset_plot_widths = epoch_slice_relative_durations * 100.0 # convert to percent width of parent
-    # inset_plot_widths.shape
-    # plots.figure_id = 'stacked_epoch_slices_INSET_matplotlib'
-    plots.figure_id = plots.name # copy the name as the figure_id
-
-    ## Build Core Figure and its single axis:
-    if not params.should_use_MatplotlibTimeSynchronizedWidget:
-        ## Basic Matplotlib Version:
-        plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False) # , constrained_layout=True, frameon=False
-        ui.mw = None
-    else:
-        ## MatplotlibTimeSynchronizedWidget-embedded Version:
-        ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name, **kwargs)
-        plots.fig = ui.mw.getFigure()
-        plots.parent_ax = plots.fig.subplots(ncols=1, nrows=1, sharex=False, sharey=False)
-
-    # Remove frames/spines:
-    plots.parent_ax.axis('off')
-    plots.fig.patch.set_visible(False)
-
-    plots.axs = [] # an empty list of core axes
-    plots.fig.suptitle(plots.name)
-    plots.parent_ax.set(xlim=(0.0, epoch_slices_max_duration), ylim=(0, float(params.active_num_slices)))
-
-    for a_slice_idx in np.arange(params.active_num_slices):
-        if debug_print:
-            print(f'a_slice_idx: {a_slice_idx}')
+    with plt.rc_context({'axes.spines.left': False, 'axes.spines.right': False, 'axes.spines.top': False, 'axes.spines.bottom': False}):
+        params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
         
-        ## Get values:
-        if debug_print:
-            print(f'plotting axis[{a_slice_idx}]: {a_slice_idx}')
-        # Create inset in data coordinates using ax.transData as transform
-        curr_percent_width="100%"
-        curr_percent_height="95%"
-        # curr_percent_width=f"{inset_plot_widths[i]}%"
-        # curr_percent_height=f"{inset_plot_heights[i]}%"
-        if debug_print:
-            print(f'\tcurr_percent_width: {curr_percent_width}, curr_percent_height: {curr_percent_height}')
-        curr_ax = inset_axes(plots.parent_ax, width=curr_percent_width, height=curr_percent_height,
-                            bbox_transform=plots.parent_ax.transData,
-                            loc='lower left', bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] #TODO 2024-08-16 04:36: - [ ] WRONG, in bottom to top order
-                            # loc='upper left', bbox_to_anchor=(0.0, -float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] 
-                            borderpad=1.0)
+        global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
+        global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
+        epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
+
+        ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end. These never get updated tho
+        epoch_durations = np.array(list(reversed(epoch_durations.tolist())))   
+
+        print("WARNING 2024-08-16 - the 'insets' version built by `stacked_epoch_slices_matplotlib_build_insets_view(...)` is not ready for paginated output as the widths cannot be updated. Furthermore there is a weird axis reversal issue.")
         
+        # epoch_durations
+        epoch_slices_max_duration = np.max(epoch_durations) # 28.95714869396761
+        epoch_slice_relative_durations = epoch_durations / epoch_slices_max_duration # computes the relative duration/xlength foe ach epoch slice as a range from 0.0-1.0 to determine relative sizes to parent
+        # epoch_slice_relative_durations
+        inset_plot_heights = np.full((params.active_num_slices,), (100.0 / float(params.active_num_slices))) # array([11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111])
+        # inset_plot_heights
+        inset_plot_widths = epoch_slice_relative_durations * 100.0 # convert to percent width of parent
+        # inset_plot_widths.shape
+        # plots.figure_id = 'stacked_epoch_slices_INSET_matplotlib'
+        plots.figure_id = plots.name # copy the name as the figure_id
 
-        # loc : str, default: 'upper right' - Location to place the inset axes. Valid locations are 'upper left', 'upper center', 'upper right', 'center left', 'center', 'center right', 'lower left', 'lower center', 'lower right'. For backward compatibility, numeric values are accepted as well. See the parameter *loc* of .Legend for details.
+        ## Build Core Figure and its single axis:
+        if not params.should_use_MatplotlibTimeSynchronizedWidget:
+            ## Basic Matplotlib Version:
+            plots.fig, plots.parent_ax = plt.subplots(num=plots.figure_id, ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=False, sharey=False) # , constrained_layout=True, frameon=False
+            ui.mw = None
+        else:
+            ## MatplotlibTimeSynchronizedWidget-embedded Version:
+            ui.mw = MatplotlibTimeSynchronizedWidget(size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure, scrollAreaContents_MinimumHeight=params.all_plots_height, name=name, plot_function_name=plot_function_name, **kwargs)
+            plots.fig = ui.mw.getFigure()
+            plots.parent_ax = plots.fig.subplots(ncols=1, nrows=1, sharex=False, sharey=False)
+
+        # Remove frames/spines:
+        plots.parent_ax.axis('off')
+        plots.fig.patch.set_visible(False)
+
+        plots.axs = [] # an empty list of core axes
+        plots.fig.suptitle(plots.name)
+        plots.parent_ax.set(xlim=(0.0, epoch_slices_max_duration), ylim=(0, float(params.active_num_slices)))
+
+        for a_slice_idx in np.arange(params.active_num_slices):
+            if debug_print:
+                print(f'a_slice_idx: {a_slice_idx}')
+            
+            ## Get values:
+            if debug_print:
+                print(f'plotting axis[{a_slice_idx}]: {a_slice_idx}')
+            # Create inset in data coordinates using ax.transData as transform
+            curr_percent_width="100%"
+            curr_percent_height="95%"
+            # curr_percent_width=f"{inset_plot_widths[i]}%"
+            # curr_percent_height=f"{inset_plot_heights[i]}%"
+            if debug_print:
+                print(f'\tcurr_percent_width: {curr_percent_width}, curr_percent_height: {curr_percent_height}')
+            curr_ax = inset_axes(plots.parent_ax, width=curr_percent_width, height=curr_percent_height,
+                                bbox_transform=plots.parent_ax.transData,
+                                loc='lower left', bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] #TODO 2024-08-16 04:36: - [ ] WRONG, in bottom to top order
+                                # loc='upper left', bbox_to_anchor=(0.0, -float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] 
+                                borderpad=1.0)
+            
+
+            # loc : str, default: 'upper right' - Location to place the inset axes. Valid locations are 'upper left', 'upper center', 'upper right', 'center left', 'center', 'center right', 'lower left', 'lower center', 'lower right'. For backward compatibility, numeric values are accepted as well. See the parameter *loc* of .Legend for details.
 
 
+            
+            curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
+            curr_ax.tick_params(labelleft=False, labelbottom=False)
+            curr_ax.set_title('') # remove the title
+            curr_ax.axis('off') # remove the box and spines
+            # Optional: Hide ticks if desired
+            curr_ax.tick_params(left=False, right=False, top=False, bottom=True)
+            # curr_ax.spines['top'].set_visible(False)
+            # curr_ax.spines['right'].set_visible(False)
+            # curr_ax.spines['left'].set_visible(False)
+            # curr_ax.spines['bottom'].set_visible(False)
+            
+
+            # Appends:
+            plots.axs.append(curr_ax)
         
-        curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
-        curr_ax.tick_params(labelleft=False, labelbottom=False)
-        curr_ax.set_title('') # remove the title
-        curr_ax.axis('off') # remove the box and spines
-
-        # Appends:
-        plots.axs.append(curr_ax)
-    
-
-    plots.axs.reverse()
-    
-    if params.should_use_MatplotlibTimeSynchronizedWidget:
-        ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
-        ui.mw.draw()
-        ui.mw.show()
+        plots.axs.reverse()
+        
+        if params.should_use_MatplotlibTimeSynchronizedWidget:
+            ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
+            ui.mw.draw()
+            ui.mw.show()
         
     return params, plots_data, plots, ui
 

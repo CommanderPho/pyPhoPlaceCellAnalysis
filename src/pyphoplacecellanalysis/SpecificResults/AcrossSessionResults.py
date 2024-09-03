@@ -2555,51 +2555,8 @@ class AcrossSessionsVisualizations:
             scatter_plot_kwargs['edgecolors'] = long_short_fr_indicies_analysis_results['has_pf_color'].to_numpy() #.to_list() # edgecolors=(r, g, b, 1)
 
 
-        fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', **scatter_plot_kwargs) #  markeredgewidth=1.5,
+        fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, debug_print=True, is_centered=False, enable_hover_labels=False, enable_tiny_point_labels=False, facecolor='w', include_axes_lines=include_axes_lines, **scatter_plot_kwargs) #  markeredgewidth=1.5,
         
-        if include_axes_lines:
-            # Plots axes lines at the zero and extremes of the x and y axis.
-            
-            # _boundary_line_kwargs = dict(linestyle='--', )
-            _boundary_line_kwargs = dict(linestyle='-', )
-            _line_kwargs = dict(zorder=1)
-            # Assuming you have an existing axis 'ax'
-            # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
-            # long_color = DisplayColorsEnum.Epochs.long
-            # short_color = DisplayColorsEnum.Epochs.short
-            
-
-            # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import long_short_display_config_manager
-
-            # long_epoch_matplotlib_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
-            # short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
-        
-            # long_color = long_epoch_matplotlib_config.mpl_color
-            # short_color = short_epoch_matplotlib_config.mpl_color
-            
-            
-            
-            long_color = 'crimson'
-            short_color = 'royalblue'
-
-            ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
-            ax.axvline(x=0.0, color='grey', linestyle='-', **_line_kwargs)  # Vertical line at x = 0
-            ax.axvline(x=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = +1
-
-            ax.axhline(y=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = -1
-            ax.axhline(y=0.0, color='grey', linestyle='-', **_line_kwargs)  # Horizontal line at y = 0
-            ax.axhline(y=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = +1
-
-            # Add y=x line:
-            ax.plot(ax.get_xlim(), ax.get_ylim(), linestyle='--', color='gray', label='y=x')
-
-            # Assuming you have an existing axis 'ax'
-            # ax.margins(x=0.01, y=0.01)  # Adds 10% margin on x-axis and 20% margin on y-axis
-            # Set precise axis limits
-            ax.set_xlim(-1.01, 1.01)  # Set x-axis limits from 0 to 1
-            ax.set_ylim(-1.01, 1.01)  # Set y-axis limits from 0 to 1
-
-
         def _perform_write_to_file_callback():
             active_out_figure_path, *args_L = cls.output_figure(final_context, fig)
             return (active_out_figure_path,)
