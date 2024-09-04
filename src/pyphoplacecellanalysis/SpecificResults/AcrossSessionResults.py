@@ -503,7 +503,7 @@ class AcrossSessionsResults:
 
 
     @classmethod
-    def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, BATCH_DATE_TO_USE: str, plotting_enabled:bool):
+    def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, BATCH_DATE_TO_USE: str, plotting_enabled:bool, output_override_path=None):
         """ 2023-11-15 - called after batch computing all of the sessions and building the required output files. Loads them, processes them, and then plots them!
 
         """
@@ -527,6 +527,11 @@ class AcrossSessionsResults:
         # Hardcoded included_session_contexts:
         included_session_contexts = annotation_man.get_hardcoded_good_sessions()
 
+        if output_override_path is None:
+            output_override_path = Path('output').resolve()
+            output_override_path.mkdir(parents=True, exist_ok=True)
+            
+
         LxC_uids = []
         SxC_uids = []
 
@@ -547,7 +552,7 @@ class AcrossSessionsResults:
         # long_short_fr_indicies_analysis_table
 
         # long_short_fr_indicies_analysis_table_filename = 'output/2023-10-07_long_short_fr_indicies_analysis_table.csv'
-        long_short_fr_indicies_analysis_table_filename: str = 'output/{BATCH_DATE_TO_USE}_long_short_fr_indicies_analysis_table.csv'
+        long_short_fr_indicies_analysis_table_filename: Path = output_override_path.joinpath(f'{BATCH_DATE_TO_USE}_long_short_fr_indicies_analysis_table.csv')
         long_short_fr_indicies_analysis_table.to_csv(long_short_fr_indicies_analysis_table_filename)
         print(f'saved: {long_short_fr_indicies_analysis_table_filename}')
 
@@ -630,6 +635,9 @@ class AcrossSessionsResults:
             _out_fig_2._pipeline_file_callback_fn = curr_active_pipeline.output_figure # lambda args, kwargs: self.write_to_file(args, kwargs, curr_active_pipeline)
             _out_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)")
 
+            
+            ## 2024-09-04 - It looks like the values of `across_sessions_instantaneous_fr_dict` changed from `InstantaneousSpikeRateGroupsComputation` to Tuple[Context, InstantaneousSpikeRateGroupsComputation, inst_fr_t_bin_size]
+            
         """
         global_batch_result_inst_fr_file_path = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
         print(f'global_batch_result_inst_fr_file_path: {global_batch_result_inst_fr_file_path}')
@@ -637,7 +645,12 @@ class AcrossSessionsResults:
         across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path)
         num_sessions = len(across_sessions_instantaneous_fr_dict)
         print(f'num_sessions: {num_sessions}')
-        across_sessions_instantaneous_frs_list: List[InstantaneousSpikeRateGroupsComputation] = list(across_sessions_instantaneous_fr_dict.values())
+        # across_sessions_instantaneous_frs_list: List[InstantaneousSpikeRateGroupsComputation] = list(across_sessions_instantaneous_fr_dict.values())
+        assert np.all([len(v) == 3 for v in across_sessions_instantaneous_fr_dict.values()]), f"expected values to be tuples Tuple[Context, InstantaneousSpikeRateGroupsComputation, inst_fr_t_bin_size] but were: {list(across_sessions_instantaneous_fr_dict.values())}"
+        
+        across_sessions_instantaneous_frs_ctxts_list: List[IdentifyingContext] = [v[0] for v in across_sessions_instantaneous_fr_dict.values()]
+        across_sessions_instantaneous_frs_list: List[InstantaneousSpikeRateGroupsComputation] = [v[1] for v in across_sessions_instantaneous_fr_dict.values()]        
+        across_sessions_instantaneous_frs_t_bin_size_list: List[float] = [v[2] for v in across_sessions_instantaneous_fr_dict.values()]
         ## Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions.
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
         # _out.cell_agg_inst_fr_list = cell_agg_firing_rates_list # .shape (n_cells,)
@@ -675,15 +688,15 @@ class AcrossSessionsResults:
             animal_id = str(ctxt.animal)
             return scatter_props_dict[animal_id]
 
-        LxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.LxC_aclus) for k, v in across_sessions_instantaneous_fr_dict.items()])
-        SxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.SxC_aclus) for k, v in across_sessions_instantaneous_fr_dict.items()])
+        LxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.LxC_aclus) for k, v in zip(across_sessions_instantaneous_frs_ctxts_list, across_sessions_instantaneous_frs_list)])
+        SxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.SxC_aclus) for k, v in zip(across_sessions_instantaneous_frs_ctxts_list, across_sessions_instantaneous_frs_list)])
 
         across_session_inst_fr_computation.LxC_aclus = LxC_aclus
         across_session_inst_fr_computation.SxC_aclus = SxC_aclus
 
         ## Scatter props:
-        LxC_scatter_props = [_return_scatter_props_fn(k) for k, v in across_sessions_instantaneous_fr_dict.items()]
-        SxC_scatter_props = [_return_scatter_props_fn(k) for k, v in across_sessions_instantaneous_fr_dict.items()]
+        LxC_scatter_props = [_return_scatter_props_fn(k) for k, v in zip(across_sessions_instantaneous_frs_ctxts_list, across_sessions_instantaneous_frs_list)]
+        SxC_scatter_props = [_return_scatter_props_fn(k) for k, v in zip(across_sessions_instantaneous_frs_ctxts_list, across_sessions_instantaneous_frs_list)]
 
         # across_session_inst_fr_computation.LxC_scatter_props = LxC_scatter_props
         # across_session_inst_fr_computation.SxC_scatter_props = SxC_scatter_props
