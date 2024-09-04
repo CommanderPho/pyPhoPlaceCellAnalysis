@@ -1479,7 +1479,7 @@ def get_only_most_recent_csv_sessions(parsed_paths_df: pd.DataFrame) -> pd.DataF
 
 
 @function_attributes(short_name=None, tags=['recent', 'parse'], input_requires=[], output_provides=[], uses=['parse_filename'], used_by=[], creation_date='2024-04-15 09:18', related_items=['convert_to_dataframe'])
-def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False) -> Dict[str, Dict[str, Tuple[Path, str, datetime]]]:
+def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:Optional[datetime]=None, debug_print: bool = False) -> Tuple[Dict[str, Dict[str, Tuple[Path, str, datetime]]], pd.DataFrame]:
     """
     Returns a dictionary representing the most recent files for each session type among a list of provided file paths.
 
@@ -1569,35 +1569,39 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     return sessions, filtered_parsed_paths_df
 
 
-@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 09:18', related_items=['find_most_recent_files'])
-def convert_to_dataframe(csv_sessions: Dict[str, Dict[str, Tuple[Path, str, datetime]]], debug_print:bool=False) -> pd.DataFrame:
-    """ Converts the outp[ut of `find_most_recent_files` into a dataframe.
+# @function_attributes(short_name=None, tags=['DEPRICATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 09:18', related_items=['find_most_recent_files'])
+# def convert_to_dataframe(csv_sessions: Dict[str, Dict[str, Tuple[Path, str, datetime]]], parse_columns: List[str], debug_print:bool=False) -> pd.DataFrame:
+#     """ Converts the outp[ut of `find_most_recent_files` into a dataframe.
 
-    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import convert_to_dataframe
+#     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import convert_to_dataframe
 
-    parsed_files_df: pd.DataFrame = convert_to_dataframe(csv_sessions)
-    parsed_files_df
+#     CSV_parse_fields = ['session', 'custom_replay_name', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime']
+#     parsed_files_df: pd.DataFrame = convert_to_dataframe(csv_sessions, parse_columns=CSV_parse_fields)
+#     parsed_files_df
 
-    """
-    _output_tuples = []
+#     CSV_parse_fields = ['session', 'custom_replay_name', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime']
+#     H5_parse_fields = ['session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime']
+    
+#     """
+#     _output_tuples = []
 
-    for session_str, a_filetype_dict in csv_sessions.items():
-        if debug_print:
-            print(f'session_str: {session_str}')
-        for file_type, parse_tuple in a_filetype_dict.items():
-            if debug_print:
-                print(f'\tfile_type: {file_type}')
-                print(f'\t\tparse_tuple: {parse_tuple}')
-            # path, decoding_time_bin_size_str, export_datetime = parse_tuple
-            if len(parse_tuple) == 5:
-                _output_tuples.append((session_str, file_type, *parse_tuple))
-            else:
-                ## don't add to the list for now
-                print(f'\tWARNING: parse tuple skipped due to inadequazte length!')
+#     for session_str, a_filetype_dict in csv_sessions.items():
+#         if debug_print:
+#             print(f'session_str: {session_str}')
+#         for file_type, parse_tuple in a_filetype_dict.items():
+#             if debug_print:
+#                 print(f'\tfile_type: {file_type}')
+#                 print(f'\t\tparse_tuple: {parse_tuple}')
+#             # path, decoding_time_bin_size_str, export_datetime = parse_tuple
+#             if len(parse_tuple) == len(parse_columns):
+#                 _output_tuples.append((session_str, file_type, *parse_tuple))
+#             else:
+#                 ## don't add to the list for now
+#                 print(f'\tWARNING: parse tuple skipped due to inadequazte length! required length (len(parse_columns)): {len(parse_columns)})\t actual_length: {len(parse_tuple)}')
 
 
-    return pd.DataFrame(_output_tuples, columns=['session', 'custom_replay_name', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime'])
-    # parsed_files_df
+#     return pd.DataFrame(_output_tuples, columns=parse_columns)
+
 
 @function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=[], used_by=['_process_and_load_exported_file'], creation_date='2024-07-09 18:19', related_items=[])
 def read_and_process_csv_file(file: str, session_name: str, curr_session_t_delta: Optional[float], time_col: str) -> pd.DataFrame:
@@ -1787,6 +1791,8 @@ def _common_cleanup_operations(a_df):
             a_df['epoch_idx'] = a_df['ripple_idx']
     return a_df
 
+
+@function_attributes(short_name=None, tags=['HDF5', 'h5', 'load'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-04 06:38', related_items=[])
 def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cuttoff_date: Optional[datetime] = None, known_bad_session_strs=None, debug_print: bool = False):
     """
 
@@ -1795,6 +1801,11 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
 
     """
     from neuropy.core.user_annotations import UserAnnotationsManager
+
+    H5_parse_fields = ['session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime']
+    # H5_parse_fields = ['session', 'decoding_time_bin_size_str', 'export_datetime']
+    # H5_parse_fields = ['session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime']
+    
 
     if collected_outputs_directory is None:
         known_collected_outputs_paths = [Path(v).resolve() for v in [r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
@@ -1808,19 +1819,19 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
     ## Find the files:
     h5_files = find_HDF5_files(collected_outputs_directory)
     h5_sessions, h5_filtered_parsed_paths_df = find_most_recent_files(found_session_export_paths=h5_files)
-    
+        
     ## INPUTS: h5_sessions, session_dict, cuttoff_date, known_bad_session_strs
     if known_bad_session_strs is None:
         known_bad_session_strs = []
 
-    parsed_h5_files_df: pd.DataFrame = convert_to_dataframe(h5_sessions)
+    # parsed_h5_files_df: pd.DataFrame = convert_to_dataframe(h5_sessions, parse_columns=H5_parse_fields)
 
     if cuttoff_date is not None:
         # 'session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime'
-        parsed_h5_files_df = parsed_h5_files_df[parsed_h5_files_df['export_datetime'] >= cuttoff_date]
+        h5_filtered_parsed_paths_df = h5_filtered_parsed_paths_df[h5_filtered_parsed_paths_df['export_datetime'] >= cuttoff_date]
 
 
-    parsed_h5_files_df = parsed_h5_files_df[np.isin(parsed_h5_files_df['session'], known_bad_session_strs, invert=True)] # drop all sessions that are in the known_bad_session_strs
+    h5_filtered_parsed_paths_df = h5_filtered_parsed_paths_df[np.isin(h5_filtered_parsed_paths_df['session'], known_bad_session_strs, invert=True)] # drop all sessions that are in the known_bad_session_strs
 
     # parsed_h5_files_df: pd.DataFrame = convert_to_dataframe(final_h5_sessions)
 
@@ -1834,7 +1845,7 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
     assert len(included_h5_paths) == len(h5_session_contexts)
 
     h5_contexts_paths_dict = dict(zip(h5_session_contexts, included_h5_paths))
-    return parsed_h5_files_df, h5_contexts_paths_dict
+    return h5_filtered_parsed_paths_df, h5_contexts_paths_dict
 
     ## OUTPUTS: parsed_h5_files_df, h5_contexts_paths_dict
     # h5_session_contexts = list(h5_contexts_paths_dict.keys())
