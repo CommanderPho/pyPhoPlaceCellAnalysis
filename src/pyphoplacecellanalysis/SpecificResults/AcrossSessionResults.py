@@ -45,7 +45,7 @@ from neuropy.utils.mixins.HDF5_representable import HDF_Converter
 from neuropy.utils.indexing_helpers import PandasHelpers
 
 from pyphocorehelpers.Filesystem.metadata_helpers import  get_file_metadata
-
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 
@@ -633,7 +633,7 @@ class AcrossSessionsResults:
         """
         global_batch_result_inst_fr_file_path = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
         print(f'global_batch_result_inst_fr_file_path: {global_batch_result_inst_fr_file_path}')
-        assert global_batch_result_inst_fr_file_path.exists()
+        Assert.path_exists(global_batch_result_inst_fr_file_path)
         across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path)
         num_sessions = len(across_sessions_instantaneous_fr_dict)
         print(f'num_sessions: {num_sessions}')
