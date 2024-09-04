@@ -2005,15 +2005,42 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ax_histx.hist(x, bins=bins)
         ax_histy.hist(y, bins=bins, orientation='horizontal')
 
-        ax_histx.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
-        ax_histy.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
-
-        # the xaxis of ax_histx and yaxis of ax_histy are shared with ax,
-        # thus there is no need to manually adjust the xlim and ylim of these
-        # axis.
-
+        # Set the tick marks and labels as desired
         # ax_histx.set_yticks([0, 50, 100])
         # ax_histy.set_xticks([0, 50, 100])
+        ax_histx.set_yticks([])
+        ax_histy.set_yticks([])
+        
+        ax_histx.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+        ax_histy.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+        
+        # ax_histx.spines[['left']].set_visible(True)
+        # ax_histy.spines[['right']].set_visible(False)
+
+        # Show only the top spine for ax_histx
+        # ax_histx.spines['right'].set_visible(True)
+        
+        # ax_histx.xaxis.set_ticks_position('none')  # Set ticks to the top
+        # ax_histx.yaxis.set_ticks_position('right')  # Hide y-axis ticks
+
+        # # # Show only the right spine for ax_histy
+        # # ax_histy.spines['left'].set_visible(True)
+        # # ax_histx.spines['top'].set_visible(True)
+        # ax_histy.yaxis.set_ticks_position('left')  # Set ticks to the right
+        ax_histy.xaxis.set_ticks_position('none')  # Hide x-axis ticks
+        ax_histy.yaxis.set_ticks_position('none')  # Hide x-axis ticks
+
+        # Set no tick labels for both axes
+        ax_histx.set_xticklabels([])  # No x-axis tick labels
+        ax_histx.set_yticklabels([])  # No y-axis tick labels
+        ax_histy.set_xticklabels([])  # No x-axis tick labels
+        ax_histy.set_yticklabels([])  # No y-axis tick labels
+
+        # Optional: Completely disable ticks if you want to remove tick marks as well
+        ax_histx.tick_params(axis='both', which='both', length=0)  # Hide all ticks
+        ax_histy.tick_params(axis='both', which='both', length=0)  # Hide all ticks
+
+
 
 
     return fig, ax, scatter_plot
