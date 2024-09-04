@@ -991,6 +991,90 @@ def copy_files_in_filelist_to_dest(filelist_text_file='fileList_GreatLakes_HDF5_
     print(f'done.')
 
 
+@function_attributes(short_name=None, tags=['copy', 'batch', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-04 09:05', related_items=[])
+def copy_session_folder_files_to_target_dir(good_session_concrete_folders, target_dir: Path, RESULT_DATE_TO_USE: str, custom_file_types_dict: Dict, debug_print=True, dry_run: bool=False):
+    """ 
+    Usage:
+        ## INPUTS: good_session_concrete_folders, target_dir, BATCH_DATE_TO_USE, custom_file_types_dict
+        from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import copy_session_folder_files_to_target_dir
+
+        custom_file_types_dict = {'recomputed_inst_fr_comps': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_recomputed_inst_fr_comps_0.0005.h5').resolve())),
+                                #   'PHONEW.evt': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{a_session_folder.context.session_name}.PHONEW.evt').resolve())),
+                                }
+
+        # target_dir: Path = Path(global_data_root_parent_path)
+        target_dir: Path = collected_outputs_directory
+        moved_files_dict_files, (filelist_path, filedict_out_path) = copy_session_folder_files_to_target_dir(good_session_concrete_folders, target_dir=target_dir, RESULT_DATE_TO_USE=BATCH_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict, dry_run=False)
+    
+    """
+    from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder, BackupMethods
+    # from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
+    from pyphocorehelpers.Filesystem.path_helpers import save_filelist_to_text_file
+    from pyphocorehelpers.Filesystem.path_helpers import copy_movedict, save_copydict_to_text_file
+
+    def _subfn_across_session_file_output_basename_fn(session_context: Optional[IdentifyingContext], session_descr: Optional[str], basename: str, *args, separator_char: str = "_"):
+        """ Captures `BATCH_DATE_TO_USE` """
+        # a_session_folder.context
+        if session_context is not None:
+            session_descr = session_context.session_name # '2006-6-07_16-40-19'
+        _filename_list = [RESULT_DATE_TO_USE, session_descr, basename]
+        if len(args) > 0:
+            _filename_list.extend([str(a_part) for a_part in args if a_part is not None])
+        return separator_char.join(_filename_list)
+
+
+    copy_file_type_dict = ConcreteSessionFolder.build_backup_copydict(good_session_concrete_folders, target_dir=target_dir, backup_mode=BackupMethods.CommonTargetDirectory, 
+                                                            rename_backup_basename_fn=_subfn_across_session_file_output_basename_fn, custom_file_types_dict=custom_file_types_dict, only_include_file_types=None) # , rename_backup_suffix=BATCH_DATE_TO_USE
+    # copy_file_type_dict
+
+    ## OUTPUT: copy_file_type_dict
+
+    ## output: moved_files_dict_files
+    ## Save copied file copydict csv:
+    custom_file_type_name: str = list(custom_file_types_dict.keys())[0]
+
+    ## INPUTS: target_dir, BATCH_DATE_TO_USE
+    moved_files_copydict_output_filename=f'{RESULT_DATE_TO_USE}_all_sessions_copydict_{custom_file_type_name}.csv'
+    moved_files_copydict_file_path = Path(target_dir).joinpath(moved_files_copydict_output_filename).resolve() # Use Default
+    print(f'moved_files_copydict_file_path: {moved_files_copydict_file_path}')
+
+    ## Can read with:
+    """
+
+    read_moved_files_dict_files = read_copydict_from_text_file(moved_files_copydict_file_path, debug_print=False)
+    read_moved_files_dict_files
+    # read_moved_files_dict_files
+    restore_moved_files_dict_files = invert_filedict(read_moved_files_dict_files)
+    restore_moved_files_dict_files
+    """
+    ## Save copied file list:
+    ## INPUTS: target_dir, BATCH_DATE_TO_USE
+    custom_filelist_output_filename=f'{RESULT_DATE_TO_USE}_all_sessions_{custom_file_type_name}_filelist.txt'
+    custom_filelist_output_file_path = Path(target_dir).joinpath(custom_filelist_output_filename).resolve() # Use Default
+    print(f'custom_filelist_output_file_path: {custom_filelist_output_file_path}')
+
+    if not dry_run:
+        print(f'PERFORMING THE MOVE....')
+        # perform the move:
+        moved_files_dict_files = copy_movedict(copy_file_type_dict)
+
+        _out_string, filedict_out_path = save_copydict_to_text_file(moved_files_dict_files, filelist_path=moved_files_copydict_file_path, debug_print=debug_print)
+        _out_string, filelist_path = save_filelist_to_text_file(list(moved_files_dict_files.values()), filelist_path=custom_filelist_output_file_path, debug_print=debug_print) # r"W:\Data\all_sessions_h5_filelist_2024-03-28_Apogee.txt"
+    
+
+    else:
+        print(f'not performing the move because dry_run==True')
+        moved_files_dict_files = None
+        filedict_out_path = moved_files_copydict_file_path
+        filelist_path = custom_filelist_output_file_path
+
+
+    ## OUTPUTS: moved_files_dict_files
+    return moved_files_dict_files, (filelist_path, filedict_out_path)
+
+
+
 
 
 class AcrossSessionTables:
