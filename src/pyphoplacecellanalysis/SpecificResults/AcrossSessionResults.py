@@ -503,20 +503,20 @@ class AcrossSessionsResults:
 
 
     @classmethod
-    def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, BATCH_DATE_TO_USE: str, plotting_enabled:bool, output_override_path=None):
+    def post_compute_all_sessions_processing(cls, global_data_root_parent_path:Path, output_path_suffix: str, plotting_enabled:bool, output_override_path=None):
         """ 2023-11-15 - called after batch computing all of the sessions and building the required output files. Loads them, processes them, and then plots them!
 
         """
         # 2023-10-04 - Load Saved across-sessions-data and testing Batch-computed inst_firing_rates:
         ## Load the saved across-session results:
-        inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl'
+        inst_fr_output_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{output_path_suffix}.pkl'
         across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list = AcrossSessionsResults.load_across_sessions_data(global_data_root_parent_path=global_data_root_parent_path, inst_fr_output_filename=inst_fr_output_filename)
         # across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path)
         num_sessions = len(across_sessions_instantaneous_fr_dict)
         print(f'num_sessions: {num_sessions}')
 
         ## Load all across-session tables from the pickles:
-        output_path_suffix: str = f'{BATCH_DATE_TO_USE}'
+        output_path_suffix: str = f'{output_path_suffix}'
         neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table = AcrossSessionTables.load_all_combined_tables(override_output_parent_path=global_data_root_parent_path, output_path_suffix=output_path_suffix) # output_path_suffix=f'2023-10-04-GL-Recomp'
         num_sessions = len(neuron_replay_stats_table.session_uid.unique().to_numpy())
         print(f'num_sessions: {num_sessions}')
@@ -552,7 +552,7 @@ class AcrossSessionsResults:
         # long_short_fr_indicies_analysis_table
 
         # long_short_fr_indicies_analysis_table_filename = 'output/2023-10-07_long_short_fr_indicies_analysis_table.csv'
-        long_short_fr_indicies_analysis_table_filename: Path = output_override_path.joinpath(f'{BATCH_DATE_TO_USE}_long_short_fr_indicies_analysis_table.csv')
+        long_short_fr_indicies_analysis_table_filename: Path = output_override_path.joinpath(f'{output_path_suffix}_long_short_fr_indicies_analysis_table.csv')
         long_short_fr_indicies_analysis_table.to_csv(long_short_fr_indicies_analysis_table_filename)
         print(f'saved: {long_short_fr_indicies_analysis_table_filename}')
 
