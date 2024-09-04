@@ -53,6 +53,14 @@ def get_file_str_if_file_exists(v:Path)->str:
     """ returns the string representation of the resolved file if it exists, or the empty string if not """
     return (str(v.resolve()) if v.exists() else '')
 
+def get_file_path_if_file_exists(v:Path)-> Optional[Path]:
+    """ returns the string representation of the resolved file if it exists, or the empty string if not """
+    if not v.exists():
+        return None
+    else:
+        return v
+
+
 @function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=['build_run_log_task_identifier', 'build_logger'], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
 def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=None, 
                             logging_root_FQDN: str = f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch',
@@ -132,7 +140,8 @@ class ConcreteSessionFolder:
         return moved_files_dict_files
 
     @classmethod
-    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, rename_backup_basename_fn: Optional[Callable]=None, skip_non_extant_src_files:bool=True, only_include_file_types=['local_pkl', 'global_pkl','h5'], debug_print=False):
+    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, rename_backup_basename_fn: Optional[Callable]=None, skip_non_extant_src_files:bool=True,
+                               only_include_file_types=['local_pkl', 'global_pkl','h5'], custom_file_types_dict=None, debug_print=False):
         """ backs up the list of backup files to a specified target_dir. 
         
         ## Usage 1:
@@ -182,11 +191,20 @@ class ConcreteSessionFolder:
             if debug_print:
                 print(f'a_session_folder: {session_descr}')
             src_files_dict = {'h5':a_session_folder.pipeline_results_h5, 'local_pkl':a_session_folder.session_pickle, 'global_pkl':a_session_folder.global_computation_result_pickle}
+            if custom_file_types_dict is not None:
+                ## add the custom filetypes if needed
+                if only_include_file_types is None:
+                    only_include_file_types = [] # empty type, we'll add the custom ones
+                    
+                for k, v in custom_file_types_dict.items():
+                    src_files_dict[k] = v(a_session_folder)
+                    only_include_file_types.append(k) ## add the custom filetype to be included
+
             for src_file_kind, src_file in src_files_dict.items():
                 if src_file_kind in (only_include_file_types or ['local_pkl', 'global_pkl','h5']):
                     if debug_print:
                         print(f'a_session_folder.src_file: {src_file}')
-                    if skip_non_extant_src_files and (not src_file.exists()):
+                    if skip_non_extant_src_files and (src_file is None) or (not src_file.exists()):
                         if debug_print:
                             print(f'src_file: "{src_file}" does not exist and skip_non_extant_src_files==True, so omitting from output copy_dict')
                     else:
