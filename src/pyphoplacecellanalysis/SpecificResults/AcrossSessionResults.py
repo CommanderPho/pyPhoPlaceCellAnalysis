@@ -1237,6 +1237,18 @@ class AcrossSessionTables:
         return v
 
 
+    @classmethod
+    def make_all_combined_output_directory(cls, override_output_parent_path:Optional[Path]=None, output_path_suffix:Optional[str]=None) -> Path:
+        # Build the output paths:
+        out_parent_path: Path = override_output_parent_path or Path('output/across_session_results')
+        out_parent_path = out_parent_path.resolve()
+
+        if output_path_suffix is not None:
+            out_parent_path = out_parent_path.joinpath(output_path_suffix).resolve()
+
+        out_parent_path.mkdir(parents=True, exist_ok=True)
+        return out_parent_path
+
 
 
     @classmethod
@@ -1262,13 +1274,7 @@ class AcrossSessionTables:
         # neuron_replay_stats_table = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(neuron_replay_stats_table, active_context=curr_active_pipeline.get_session_context(), aclu_column_name=None)
 
         # Build the output paths:
-        out_parent_path: Path = override_output_parent_path or Path('output/across_session_results')
-        out_parent_path = out_parent_path.resolve()
-
-        if output_path_suffix is not None:
-            out_parent_path = out_parent_path.joinpath(output_path_suffix).resolve()
-
-        out_parent_path.mkdir(parents=True, exist_ok=True)
+        out_parent_path = cls.make_all_combined_output_directory(override_output_parent_path=override_output_parent_path, output_path_suffix=output_path_suffix)
 
         across_session_outputs = {'neuron_identities_table': neuron_identities_table,
         'long_short_fr_indicies_analysis_table': long_short_fr_indicies_analysis_table,
