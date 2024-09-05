@@ -1133,6 +1133,181 @@ def add_extra_spike_rate_trends(curr_active_pipeline) -> InstantaneousSpikeRateG
 
 
 
+# ==================================================================================================================== #
+# 2024-09-05 Firing Rate Regression Lines                                                                              #
+# ==================================================================================================================== #
+from sklearn.linear_model import LinearRegression
+
+class LongShortFRRegression:
+    """
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LongShortFRRegression
+    import matplotlib
+    from neuropy.utils.matplotlib_helpers import matplotlib_configuration_update
+
+    _bak = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+
+    (model_L, model_S), (fig, ax) = LongShortFRRegression.compute_laps_replay_regression(neuron_replay_stats_table)
+    (model_L, model_S), (fig, ax) = LongShortFRRegression.compute_laps_replay_opposite_regression(neuron_replay_stats_table)
+
+    """
+    @classmethod
+    def compute_regression_line(cls, X, y, name: str, ax=None):
+        from neuropy.utils.matplotlib_helpers import build_or_reuse_figure
+
+        # Fit the regression model
+        model = LinearRegression()
+        model.fit(X, y)
+
+        # Make predictions
+        y_pred = model.predict(X)
+
+        # Plot the results
+        if ax is None:
+            # fig = build_or_reuse_figure(fignum=kwargs.pop('fignum', None), fig=kwargs.pop('fig', None), fig_idx=kwargs.pop('fig_idx', 0), figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True) # , clear=True
+            fig, ax = plt.subplots()
+        else:
+            fig = plt.gcf()
+            
+        # plt.figure(clear=True)
+        ax.scatter(X, y, label=f'Data {name}', alpha=0.7) # , color='blue'
+        ax.plot(X, y_pred, label=f'Regression {name}', alpha=0.7) # , color='red'
+        plt.xlabel('Non-Replay Mean')
+        plt.ylabel('Replay Mean')
+        plt.legend()
+        # ax.show()
+
+        # Retrieve the slope
+        slope = model.coef_[0]
+        
+        # Print the slope
+        print("Slope:", slope)
+        
+        return model, (fig, ax)
+
+    @classmethod
+    def compute_laps_replay_regression(cls, neuron_replay_stats_table, long_replay_mean_col, long_non_replay_mean_col, short_replay_mean_col, short_non_replay_mean_col):
+        
+        # Specify columns to convert to float
+        columns_to_convert = [long_replay_mean_col, long_non_replay_mean_col, short_replay_mean_col, short_non_replay_mean_col]
+
+        # Convert specified columns to float
+        neuron_replay_stats_table[columns_to_convert] = neuron_replay_stats_table[columns_to_convert].astype(float)
+
+        # Long Track Replay|Laps FR Figure
+        cleaned_df = neuron_replay_stats_table.dropna(subset=[long_replay_mean_col, long_non_replay_mean_col], inplace=False, how='any')
+        np.sum(cleaned_df[[long_replay_mean_col, long_non_replay_mean_col, short_replay_mean_col, short_non_replay_mean_col]].isna())
+
+        X = cleaned_df[[long_non_replay_mean_col]].to_numpy().astype(float)
+        y = cleaned_df[long_replay_mean_col].to_numpy().astype(float)
+
+        assert np.sum(np.isnan(X)) == 0
+        assert np.sum(np.isnan(y)) == 0
+
+        model_L, (fig, ax) = cls.compute_regression_line(X, y, name='long')
+
+        # Short Track Replay|Laps FR Figure
+        cleaned_df = neuron_replay_stats_table.dropna(subset=[short_replay_mean_col, short_non_replay_mean_col], inplace=False, how='any')[[short_replay_mean_col, short_non_replay_mean_col]]
+        cleaned_df[[short_replay_mean_col, short_non_replay_mean_col]] = cleaned_df[[short_replay_mean_col, short_non_replay_mean_col]].astype(float)
+        cleaned_df = cleaned_df.dropna(subset=[short_replay_mean_col, short_non_replay_mean_col], inplace=False, how='any')
+
+        X = cleaned_df[[short_non_replay_mean_col]].to_numpy().astype(float)
+        y = cleaned_df[short_replay_mean_col].to_numpy().astype(float)
+
+        assert np.sum(np.isnan(X)) == 0
+        assert np.sum(np.isnan(y)) == 0
+
+        model_S, (fig, ax) = cls.compute_regression_line(X, y, name='short', ax=ax)
+        ax.set_aspect(1.)
+        plt.title('Non-PBE/PBE Firing Rate Gain Factor Regression for Long+Short')
+
+        slopes_string = '\n'.join([f"{a_name}: {model.coef_[0]:.4f}" for a_name, model in dict(zip(('Long', 'Short'), (model_L, model_S))).items()])
+        
+        ax.text(0.05, 0.95, f'Slope:\n{slopes_string}', transform=ax.transAxes, fontsize=12,
+                verticalalignment='bottom', bbox=dict(boxstyle='round,pad=0.3', edgecolor='black', facecolor='white'))
+        
+        fig.show()
+
+        return (model_L, model_S), (fig, ax)
+
+
+
+
+    @classmethod
+    def compute_laps_replay_opposite_regression(cls, neuron_replay_stats_table):
+        ## INPUTS: neuron_replay_stats_table
+
+        ## Long Track Replay|Laps FR Figure
+        # Specify columns to convert to float
+        columns_to_convert = ['long_replay_mean', 'long_non_replay_mean', 'short_replay_mean', 'short_non_replay_mean']
+
+        # Convert specified columns to float
+        neuron_replay_stats_table[columns_to_convert] = neuron_replay_stats_table[columns_to_convert].astype(float)
+
+
+
+        # first oness ________________________________________________________________________________________________________ #
+        cleaned_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'short_non_replay_mean'], inplace=False, how='any')
+        # Drop rows with NaN values
+        # cleaned_df = neuron_replay_stats_df.dropna(subset=['long_replay_mean', 'long_non_replay_mean'])
+        # np.sum(cleaned_df[['long_replay_mean', 'long_non_replay_mean', 'short_replay_mean', 'short_non_replay_mean']].isna())
+
+        # Extract data
+        # X = neuron_replay_stats_df['long_replay_mean'].values.astype(float)
+        # X = cleaned_df[['long_replay_mean']].values.astype(float)
+        # y = cleaned_df['long_non_replay_mean'].values.astype(float)
+
+        X = cleaned_df[['long_replay_mean']].to_numpy().astype(float)
+        y = cleaned_df['short_non_replay_mean'].to_numpy().astype(float)
+
+        # X.dtype
+        assert np.sum(np.isnan(X)) == 0
+        assert np.sum(np.isnan(y)) == 0
+
+        # X.shape
+        # y.shape
+        
+        model_L, (fig, ax) = cls.compute_regression_line(X, y, name='long') # Slope: 0.3690231851911259
+
+        ## Short Track Replay|Laps FR Figure
+        # cleaned_df.dtypes
+        cleaned_df = neuron_replay_stats_table.dropna(subset=['short_replay_mean', 'long_non_replay_mean'], inplace=False, how='any')[['short_replay_mean', 'long_non_replay_mean']]
+        cleaned_df[['short_replay_mean', 'long_non_replay_mean']] = cleaned_df[['short_replay_mean', 'long_non_replay_mean']].astype(float)
+        # cleaned_df.dtypes
+        cleaned_df = cleaned_df.dropna(subset=['short_replay_mean', 'long_non_replay_mean'], inplace=False, how='any')
+        # cleaned_df
+        # cleaned_df.dtypes
+
+        X = cleaned_df[['short_replay_mean']].to_numpy().astype(float)
+        y = cleaned_df['long_non_replay_mean'].to_numpy().astype(float)
+
+        assert np.sum(np.isnan(X)) == 0
+        assert np.sum(np.isnan(y)) == 0
+        # fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), **common_scatter_kwargs)
+
+        model_S, (fig, ax) = cls.compute_regression_line(X, y, name='short', ax=ax) # Slope: 0.3690231851911259
+        # Set aspect of the main Axes.
+        ax.set_aspect(1.)
+        plt.title('Long/Short Opposite Gain Factor Regression')
+        
+            # Retrieve the slope
+        slopes_string = '\n'.join([f"{a_name}: {model.coef_[0]:.4f}" for a_name, model in dict(zip(('Long', 'Short'), (model_L, model_S))).items()])
+        
+            # Add slope text to the plot
+        ax.text(0.05, 0.95, f'Slope:\n{slopes_string}', transform=ax.transAxes, fontsize=12,
+                verticalalignment='bottom', bbox=dict(boxstyle='round,pad=0.3', edgecolor='black', facecolor='white'))
+        
+        
+        fig.show()
+        # Slope: 0.3374416368231605
+
+        return (model_L, model_S), (fig, ax)
+
+
+
+
+
+
+
 
 
 # ==================================================================================================================== #
