@@ -1185,8 +1185,10 @@ class LongShortFRRegression:
         return model, (fig, ax)
 
     @classmethod
-    def compute_laps_replay_regression(cls, neuron_replay_stats_table, long_replay_mean_col, long_non_replay_mean_col, short_replay_mean_col, short_non_replay_mean_col):
+    def compute_laps_replay_regression(cls, neuron_replay_stats_table: pd.DataFrame, long_replay_mean_col: str = 'long_replay_mean', long_non_replay_mean_col: str = 'long_non_replay_mean', short_replay_mean_col: str = 'short_replay_mean', short_non_replay_mean_col: str = 'short_non_replay_mean') -> tuple:
+        """ computes the laps vs. replay 
         
+        """        
         # Specify columns to convert to float
         columns_to_convert = [long_replay_mean_col, long_non_replay_mean_col, short_replay_mean_col, short_non_replay_mean_col]
 
