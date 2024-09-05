@@ -639,6 +639,8 @@ class AcrossSessionsResults:
             ## 2024-09-04 - It looks like the values of `across_sessions_instantaneous_fr_dict` changed from `InstantaneousSpikeRateGroupsComputation` to Tuple[Context, InstantaneousSpikeRateGroupsComputation, inst_fr_t_bin_size]
             
         """
+        from pyphoplacecellanalysis.General.Batch.runBatch import BatchResultDataframeAccessor
+        
         global_batch_result_inst_fr_file_path = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
         print(f'global_batch_result_inst_fr_file_path: {global_batch_result_inst_fr_file_path}')
         Assert.path_exists(global_batch_result_inst_fr_file_path)
@@ -1139,6 +1141,12 @@ class AcrossSessionTables:
         for col in AcrossSessionTables.float_columns:
             if col in neuron_replay_stats_table.columns:
                 neuron_replay_stats_table[col] = pd.to_numeric(neuron_replay_stats_table[col], errors='coerce')
+                
+                
+        # Specify columns to convert to float
+        columns_to_convert = AcrossSessionTables.float_columns # ['long_replay_mean', 'long_non_replay_mean']
+        neuron_replay_stats_table[columns_to_convert] = neuron_replay_stats_table[columns_to_convert].astype(float) # Convert specified columns to float
+
         return neuron_replay_stats_table
 
 
