@@ -568,7 +568,7 @@ class AcrossSessionsResults:
         ## Plotting:
         graphics_output_dict = {}
         if plotting_enabled:
-            matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            # matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
 
             long_short_fr_indicies_analysis_table.plot.scatter(x='long_pf_peak_x', y='x_frs_index', title='Pf Peak position vs. LapsFRI', ylabel='Lap FRI')
             long_short_fr_indicies_analysis_table.plot.scatter(x='long_pf_peak_x', y='y_frs_index', title='Pf Peak position vs. ReplayFRI', ylabel='Replay FRI')
