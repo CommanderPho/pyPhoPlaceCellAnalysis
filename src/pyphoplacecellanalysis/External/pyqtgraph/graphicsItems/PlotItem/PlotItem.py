@@ -80,6 +80,15 @@ class PlotItem(GraphicsWidget):
     sigXRangeChanged     wrapped from :class:`ViewBox <pyqtgraph.ViewBox>`
     sigRangeChanged      wrapped from :class:`ViewBox <pyqtgraph.ViewBox>`
     ==================== =======================================================================
+    
+    
+    
+            
+    # Layout: 4 rows x 3 columns, all elements in (item, row, column) format _____________________________________________ #
+    
+        (self.titleLabel, 0, 1)
+        (self.vb, 2, 1)
+    
     """
     
     sigRangeChanged = QtCore.Signal(object, object)    ## Emitted when the ViewBox range has changed
@@ -110,6 +119,10 @@ class PlotItem(GraphicsWidget):
                         for its axes. The dict keys must be axis names ('left', 'bottom', 'right', 'top')
                         and the values must be instances of AxisItem (or at least compatible with AxisItem).
         ==============  ==========================================================================================
+        
+
+        
+        
         """
         
         GraphicsWidget.__init__(self, parent)
@@ -1191,8 +1204,8 @@ class PlotItem(GraphicsWidget):
             self.layout.setRowFixedHeight(0, 0)
             self.titleLabel.setMaximumHeight(0)
         else:
-            self.titleLabel.setMaximumHeight(30)
-            self.layout.setRowFixedHeight(0, 30)
+            self.titleLabel.setMaximumHeight(20)
+            self.layout.setRowFixedHeight(0, 20) # 2024-09-05 16:23 !! IMPORTANT: this is where the height of the title is set to a fixed 30px independent of the title size!
             self.titleLabel.setVisible(True)
             self.titleLabel.setText(title, **args)
 

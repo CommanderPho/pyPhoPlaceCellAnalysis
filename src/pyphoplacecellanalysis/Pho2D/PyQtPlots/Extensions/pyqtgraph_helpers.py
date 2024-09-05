@@ -12,6 +12,32 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore, QtGu
 from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.PhoMainAppWindowBase import PhoMainAppWindowBase # for pyqtplot_plot_image
 
 
+# Function to set small titles with minimal padding
+@function_attributes(short_name=None, tags=['title', 'IMPORTANT', 'pyqtgraph', 'title', 'spacing'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-05 16:43', related_items=[])
+def set_small_title(plotItem: pg.PlotItem, title_row_fixed_height: int = 10):
+    """ Adjusts the size and padding of the plotItem's title. Removes the excessive margins that are present by default.
+    title_row_fixed_height: int = 10 - the height of the title row in px, (default 30)
+    
+    Usage:
+        
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import set_small_title
+
+        title_row_fixed_height: int = 10 #the height of the title row in px, (default 30)
+        for newPlotItem in _a_trial_by_trial_window.plots['plot_array']:
+            set_small_title(newPlotItem, title_row_fixed_height)
+
+
+    """
+    plotItem.layout.setRowMinimumHeight(0, title_row_fixed_height)
+    plotItem.layout.setRowMaximumHeight(0, title_row_fixed_height)
+    plotItem.layout.setRowFixedHeight(0, title_row_fixed_height) # 0 is the fixed row index in the plotItem's layout
+    plotItem.layout.setRowPreferredHeight(0, title_row_fixed_height)
+
+
+
+
+
+
 def pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, debug_print=False):
     """ Returns the proper bounds for the image, and the proper x_range and y_range given the margin.
     Used by pyqtplot_plot_image_array(...) to plot binned data.

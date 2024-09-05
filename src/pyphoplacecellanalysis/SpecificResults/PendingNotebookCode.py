@@ -93,10 +93,13 @@ class TrialByTrialActivityWindow:
         """
         from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
         from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_common import pyqtplot_common_setup
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
-        from neuropy.utils.matplotlib_helpers import _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent, set_small_title
+        from neuropy.utils.matplotlib_helpers import _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
-
+        
+        
+        title_row_fixed_height: int = 10
+        
         # Get flat list of images:
         # images = active_one_step_decoder.ratemap.normalized_tuning_curves # (78, 57, 6)	- (n_neurons, n_xbins, n_ybins)
         occupancy = active_one_step_decoder.ratemap.occupancy # (57, 6) - (n_xbins, n_ybins)
@@ -176,10 +179,20 @@ class TrialByTrialActivityWindow:
             #     # vb.addItem(imv) # add the item to the view box: why do we need the wrapping view box?
             #     # vb.autoRange()
             
+            formatted_title: str = cls.build_formatted_title_string(title=curr_cell_identifier_string)   
+            
             # # plot mode:
-            curr_plot = root_render_widget.addPlot(row=(curr_row + plots_start_row_idx), col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string 
+            curr_plot: pg.PlotItem = root_render_widget.addPlot(row=(curr_row + plots_start_row_idx), col=curr_col, title=formatted_title) # , name=curr_plot_identifier_string 
             curr_plot.setObjectName(curr_plot_identifier_string)
             curr_plot.showAxes(False)
+            curr_plot.setDefaultPadding(0.0)  # plot without padding data range
+
+            # Set the plot title:
+            curr_plot.setTitle(formatted_title)    
+            set_small_title(curr_plot, title_row_fixed_height)
+            curr_plot.setMouseEnabled(x=False, y=False)
+            ## Common formatting:    
+        
             if is_last_row:
                 curr_plot.showAxes('x', True)
                 curr_plot.showAxis('bottom', show=True)
@@ -199,7 +212,7 @@ class TrialByTrialActivityWindow:
 
             # Update the image:
             img_item.setImage(image, rect=image_bounds_extent, autoLevels=False) # rect: [x, y, w, h]
-            img_item.setOpacity(0.5)  # Set transparency for overlay
+            img_item.setOpacity(1.0)  # Set transparency for overlay
             if isinstance(cmap, NDArray):
                 img_item.setLookupTable(cmap, update=False)
             else:
@@ -267,7 +280,12 @@ class TrialByTrialActivityWindow:
             
                     
         return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter)
-
+    
+    
+    @classmethod
+    def build_formatted_title_string(cls, title: str) -> str:
+        return f"<span style = 'font-size : 12px;' >{title}</span>"
+    
 
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
     @classmethod
