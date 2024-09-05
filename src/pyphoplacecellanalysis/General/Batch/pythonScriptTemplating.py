@@ -39,7 +39,9 @@ def get_batch_neptune_kwargs():
 
 
 class ProcessingScriptPhases(Enum):
-    """ 
+    """ These phases keep track of groups of computations to run.
+
+    
     from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import ProcessingScriptPhases
 
 
