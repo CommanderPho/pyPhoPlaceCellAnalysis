@@ -1898,7 +1898,7 @@ def _fr_index(long_fr, short_fr):
     return ((long_fr - short_fr) / (long_fr + short_fr))
 
 
-@function_attributes(short_name=None, tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-09-07 19:49', related_items=[])
+@function_attributes(short_name=None, tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=['_epoch_unit_avg_firing_rates', 'SpikeRateTrends'], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-09-07 19:49', related_items=[])
 def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneous_time_bin_size_seconds: Optional[float]=None, save_path=None, **kwargs):
     """A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
 
@@ -1917,10 +1917,10 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
 
     Aims to replace:
 
-        x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
+        x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl' ## OLD VERSION
 
     With:
-        x_frs_index, y_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays)}, save_path=temp_save_filename)
+        x_frs_index, y_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays)}, save_path=temp_save_filename) ## NEW VERSION
 
 
 
@@ -1976,9 +1976,6 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
             # Compute the single-dimensional firing rate index for the custom epochs and add it as a column to the dataframe:
             # custom_InstSpikeRateTrends_df['custom_frs_index'] = _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)
 
-
-        
-    
     # long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs = [np.array(list(fr_dict.values())) for fr_dict in [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]]	
 
     # Save a backup of the data:
@@ -2023,6 +2020,17 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
     Returns:
         _type_: _description_
+        
+        # all_results_dict keys:
+            ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays', 'long_non_replays', 'short_non_replays', 'global_non_replays', # epochs
+            'long_mean_laps_frs', 'short_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_replays_frs', 'long_mean_non_replays_frs', 'short_mean_non_replays_frs',  # raw mean firing rate variables 
+            'long_mean_laps_all_frs', 'short_mean_laps_all_frs', 'long_mean_replays_all_frs', 'short_mean_replays_all_frs', 'long_mean_non_replays_all_frs', 'short_mean_non_replays_all_frs', # each epoch array of firing rates
+            'laps_frs_index', 'replays_frs_index', 'non_replays_frs_index', 'x_frs_index', 'y_frs_index', 'z_frs_index', # fri variables  
+            'long_short_fr_indicies_df', # dataframe
+            ]
+
+
+
     """
     from neuropy.core.epoch import Epoch
     from neuropy.utils.dynamic_container import DynamicContainer # for instantaneous firing rate versions
@@ -2059,7 +2067,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
     active_context = active_identifying_session_ctx.adding_context(collision_prefix='fn', fn_name='long_short_firing_rate_indicies')
 
-    spikes_df = curr_active_pipeline.sess.spikes_df # TODO: CORRECTNESS: should I be using this spikes_df instead of the filtered ones?
+    spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df) # TODO: CORRECTNESS: should I be using this spikes_df instead of the filtered ones?
 
     # Get existing laps from session:
     # long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -2110,12 +2118,8 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
 
     ## Now have the epoch periods to calculate the firing rates for, next compute the firing rates.
-        
-
-    # x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
-
-
-    x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, save_path=temp_save_filename)
+    x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)},
+                                                                                                                           instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, save_path=temp_save_filename)
 
     all_results_dict.update(updated_all_results_dict) # append the results dict
     
@@ -3000,6 +3004,9 @@ def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, ke
 @custom_define(slots=False)
 class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ class to handle spike rate computations
+
+    Appears to only be for the XxC (LxC, SxC) cells.
+    
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
 
