@@ -2004,8 +2004,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         lim = (int(xymax/binwidth) + 1)*binwidth
 
         bins = np.arange(-lim, lim + binwidth, binwidth)
-        ax_histx.hist(x, bins=bins)
-        ax_histy.hist(y, bins=bins, orientation='horizontal')
+        ax_histx.hist(x, bins=bins, color='black')
+        ax_histy.hist(y, bins=bins, orientation='horizontal', color='black')
 
         # Set the tick marks and labels as desired
         # ax_histx.set_yticks([0, 50, 100])
@@ -2043,7 +2043,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ax_histy.tick_params(axis='both', which='both', length=0)  # Hide all ticks
 
 
-
+    ax.set_yticks([-1, 0, 1])
+    ax.set_xticks([-1, 0, 1])
+    ax.set_xticklabels(["-1.0", "0.0", "+1.0"])  # No x-axis tick labels
+    ax.set_yticklabels(["-1.0", "0.0", "+1.0"])  # No y-axis tick labels
 
     return fig, ax, scatter_plot
 

@@ -1350,7 +1350,7 @@ class AcrossSessionTables:
 
     @classmethod
     def build_all_known_tables(cls, included_session_contexts, included_h5_paths, should_restore_native_column_types:bool=True):
-        """ Extracts the neuron identities table from across the .h5 files.
+        """ Extracts the neuron identities table from across the **.h5** files.
         One row for each neuron.
 
         Usage:
