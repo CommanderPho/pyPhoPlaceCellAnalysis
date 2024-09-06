@@ -194,7 +194,9 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
     should_include_plotRaw_v_time_spikes = kwargs.get('should_include_spikes', True) # whether the plot should include plotRaw_v_time-spikes, should be set to False to plot completely with the new all spikes mode
     use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
 
-
+    # position_plot_kwargs = {'color': '#393939c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {}) # passed into `active_epoch_placefields1D.plotRaw_v_time`
+    position_plot_kwargs = {'color': '#757575c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {}) # passed into `active_epoch_placefields1D.plotRaw_v_time`
+    
     # suptitle_params = dict(fontsize='22')
     # title_params = dict(fontsize='16')
     suptitle_params = dict(fontsize='14')
@@ -233,7 +235,7 @@ def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefi
     # spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':'#1420ffcc', 'markeredgecolor':'#1420ffcc', 'zorder':10}
     spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGB, 'markeredgecolor':spikes_color_RGB, 'zorder':10}
     active_epoch_placefields1D.plotRaw_v_time(placefield_cell_index, ax=ax_activity_v_time, spikes_alpha=spikes_alpha,
-            position_plot_kwargs={'color': '#393939c8', 'linewidth': 1.0, 'zorder':5},
+            position_plot_kwargs=position_plot_kwargs,
             spike_plot_kwargs=spike_plot_kwargs,
             should_include_labels=should_include_labels, should_include_trajectory=should_include_trajectory, should_include_spikes=should_include_plotRaw_v_time_spikes,
             use_filtered_positions=use_filtered_positions,

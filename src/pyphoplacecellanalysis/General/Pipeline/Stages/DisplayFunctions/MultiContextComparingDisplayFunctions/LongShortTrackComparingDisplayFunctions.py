@@ -1322,7 +1322,9 @@ class PhoJonathanPlotHelpers:
         from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_single_cell_1D_placecell_validation
 
         # gridspec mode:
-        curr_fig.set_facecolor('0.65') # light grey
+        # curr_fig.set_facecolor('0.65') # light grey
+        curr_fig.set_facecolor('1.0') # white
+        curr_fig.patch.set_alpha(0)  # Set figure background to clear
 
         # num_gridspec_columns = 8 # hardcoded
         # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
