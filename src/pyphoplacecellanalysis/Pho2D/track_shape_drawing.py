@@ -1613,6 +1613,8 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.6)
     # , mutation_scale=10
 
+    ## need to take both to str, or both to int
+    both_aclus = [str(v) for v in both_aclus]
 
     for idx, aclu_val in enumerate(active_aclus):
         # aclu_val: int = int(aclu_val)
