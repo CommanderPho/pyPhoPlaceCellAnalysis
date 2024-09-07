@@ -2728,15 +2728,14 @@ class AcrossSessionsVisualizations:
         
         ## Long Track Replay|Laps FR Figure
         neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
-        x_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
-        y_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()}
+        x_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()} 
+        y_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
         fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), **common_scatter_kwargs)
-
 
         ## Short Track Replay|Laps FR Figure
         neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
-        x_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
-        y_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()}
+        x_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()} 
+        y_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
         fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), **common_scatter_kwargs)
 
         ## Fit both the axes:

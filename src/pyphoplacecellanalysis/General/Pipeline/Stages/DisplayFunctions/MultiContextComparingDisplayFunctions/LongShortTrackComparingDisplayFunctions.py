@@ -2599,7 +2599,7 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
-def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_context, neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, swap_xy_axis=True, defer_render=False, **scatter_params):
+def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'Replay Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, **scatter_params):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
@@ -2611,25 +2611,14 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
         """
         
         # Optionally swap the x and y axes so laps is on the x-axis:
-        if swap_xy_axis:
-            _y_frs_dict = deepcopy(y_frs_dict)
-            y_frs_dict = deepcopy(x_frs_dict)
-            x_frs_dict = _y_frs_dict
-            ylabel_str = 'Replay Firing Rate (Hz)'
-            xlabel_str = 'Laps Firing Rate (Hz)'
-        else:
-            xlabel_str = 'Replay Firing Rate (Hz)'
-            ylabel_str = 'Laps Firing Rate (Hz)'
-            
-
         if neurons_colors is not None:
             if isinstance(neurons_colors, dict):
-                point_colors = [neurons_colors[aclu] for aclu in list(x_frs_dict.keys())]
+                point_colors = [neurons_colors[aclu] for aclu in list(laps_frs_dict.keys())]
             else:
                 # otherwise assumed to be an array with the same length as the number of points
                 assert isinstance(neurons_colors, np.ndarray)
                 assert np.shape(point_colors)[0] == 4 # (4, n_neurons)
-                assert np.shape(point_colors)[1] == len(x_frs_dict)
+                assert np.shape(point_colors)[1] == len(laps_frs_dict)
                 point_colors = neurons_colors
                 # point_colors = [f'{i}' for i in list(x_frs_index.keys())] 
         else:
@@ -2637,7 +2626,7 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
             # point_colors = None
             # point_colors = 'black'
         
-        point_hover_labels = [f'{i}' for i in list(x_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints. Don't do anything I don't think. , enable_hover_labels=False
+        point_hover_labels = [f'{i}' for i in list(laps_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints. Don't do anything I don't think. , enable_hover_labels=False
         fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True)
         
         # TODO 2023-05-25 - build the display context:
@@ -2649,7 +2638,7 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
             xlabel_kwargs = dict(loc='left')
             ylabel_kwargs = dict(loc='bottom')
 
-        scatter_plot = ax.scatter(x_frs_dict.values(), y_frs_dict.values(), c=point_colors, **scatter_params) # , s=10, alpha=0.5
+        scatter_plot = ax.scatter(laps_frs_dict.values(), replays_frs_dict.values(), c=point_colors, **scatter_params) # , s=10, alpha=0.5
         plt.xlabel(xlabel_str, fontsize=16, **xlabel_kwargs)
         plt.ylabel(ylabel_str, fontsize=16, **ylabel_kwargs)
         
@@ -2666,20 +2655,16 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
         ## Need to extract the track name ('maze1') for the title in this plot. 
         track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
         # TODO: do we want to convert this into "long" or "short"?
-        flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> replay|laps <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
+        flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|replay <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
         footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
         if enable_tiny_point_labels:
             text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
-            texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
-            # texts = [ax.text(x, y, label, ha='center', va='center', fontsize=8) for i, (x, y, label) in enumerate(zip(x_frs_dict.values(), y_frs_dict.values(), point_hover_labels))]
+            texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(laps_frs_dict.values(), replays_frs_dict.values(), point_hover_labels))]
         else:
             texts = []
                     
-        ## get current axes:
-        # ax = plt.gca()
-
         if is_centered:
             ## The "spines" are the vertical and horizontal "axis" bars where the tick marks are drawn.
             ax.spines[['left', 'bottom']].set_position('center')
@@ -2688,7 +2673,6 @@ def _plot_single_track_firing_rate_compare(x_frs_dict, y_frs_dict, active_contex
             # Hide the right and top spines (box components)
             ax.spines[['right', 'top']].set_visible(False)
     
-
         if not defer_render:
             fig.show()
 
@@ -2720,15 +2704,15 @@ def _plot_session_long_short_track_firing_rate_figures(curr_active_pipeline, jon
 
     ## Long Track Replay|Laps FR Figure
     neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df.dropna(subset=['long_replay_mean', 'long_non_replay_mean'], inplace=False)
-    x_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
-    y_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()}
+    x_frs = {k:v for k,v in neuron_replay_stats_df['long_non_replay_mean'].items()} 
+    y_frs = {k:v for k,v in neuron_replay_stats_df['long_replay_mean'].items()}
     fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=long_epoch_context)
 
 
     ## Short Track Replay|Laps FR Figure
     neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df.dropna(subset=['short_replay_mean', 'short_non_replay_mean'], inplace=False)
-    x_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
-    y_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()}
+    x_frs = {k:v for k,v in neuron_replay_stats_df['short_non_replay_mean'].items()} 
+    y_frs = {k:v for k,v in neuron_replay_stats_df['short_replay_mean'].items()}
     fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=short_epoch_context)
 
     ## Fit both the axes:
