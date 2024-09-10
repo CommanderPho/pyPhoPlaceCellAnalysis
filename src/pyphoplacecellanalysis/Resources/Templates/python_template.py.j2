@@ -74,7 +74,7 @@ if neptuner.run is None:
     neptuner.figures = neptuner.outputs['figures']
 
 neptuner_run: AutoValueConvertingNeptuneRun = neptuner.run
-
+neptuner_run.sync()
 {% endif %}
 
 curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True)
@@ -92,6 +92,7 @@ for k, v in {'final_log_file_path': final_log_file_path.as_posix()}.items():
         neptuner_run[f'parameters/{k}'] = v
     except BaseException as err:
         print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+neptuner_run.sync()
 {% endif %}
 
 
@@ -211,6 +212,8 @@ for k, v in dict(local_computations_override_file=local_computations_override_fi
         neptuner_run[f'parameters/{k}'] = v
     except BaseException as err:
         print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+
+neptuner_run.sync()
 {% endif %}
 
 with open(final_log_file_path, 'w') as f:
@@ -232,6 +235,7 @@ with open(final_log_file_path, 'w') as f:
                 neptuner_run[f'outputs/{k}'] = stringify_unsupported(v)
             except BaseException as err:
                 print(f'neptune error: {err} for key "{k}" (post `run_specific_batch`). Skipping and continuing')
+        neptuner_run.sync()
         {% endif %}
 
 
@@ -261,9 +265,11 @@ with open(final_log_file_path, 'w') as f:
 
 
 {% if should_use_neptune_logging %}
+neptuner_run.sync()
 try:
     ## Upload the log file:
     neptuner_run[f"outputs/log"].upload(Path(final_log_file_path).resolve().as_posix())
+    neptuner_run.sync()
 except BaseException as err:
     print(f'neptune error: {err} while trying to upload log file at path "{final_log_file_path}". Skipping and continuing')
 
