@@ -606,7 +606,7 @@ class AcrossSessionsResults:
         saveData(global_batch_result_inst_fr_file_path, across_sessions_instantaneous_fr_dict)
 
     @classmethod
-    def load_across_sessions_data(cls, global_data_root_parent_path:Path, inst_fr_output_filename:str='across_session_result_long_short_inst_firing_rate.pkl'):
+    def load_across_sessions_data(cls, global_data_root_parent_path:Path, inst_fr_output_filename:str='across_session_result_long_short_inst_firing_rate.pkl') -> Tuple[InstantaneousSpikeRateGroupsComputation, Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation], List[InstantaneousSpikeRateGroupsComputation]]:
         """ Load the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation)
 
             To correctly aggregate results across sessions, it only makes sense to combine entries at the `.cell_agg_inst_fr_list` variable and lower (as the number of cells can be added across sessions, treated as unique for each session).
@@ -1362,6 +1362,17 @@ class AcrossSessionTables:
         long_short_fr_indicies_analysis_table = AcrossSessionTables.build_long_short_fr_indicies_analysis_table(included_session_contexts, included_h5_paths, should_restore_native_column_types=should_restore_native_column_types)
         neuron_replay_stats_table = AcrossSessionTables.build_neuron_replay_stats_table(included_session_contexts, included_h5_paths, should_restore_native_column_types=should_restore_native_column_types)
 
+        ## Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
+        try:
+            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./EXTERNAL/sessions_experiment_datetime_df.csv")
+            neuron_identities_table = _callback_add_df_columns(neuron_identities_table, session_id_column_name='session_uid')
+            neuron_replay_stats_table = _callback_add_df_columns(neuron_replay_stats_table, session_id_column_name='session_uid')
+            long_short_fr_indicies_analysis_table = _callback_add_df_columns(long_short_fr_indicies_analysis_table, session_id_column_name='session_uid')
+
+        except BaseException as e:
+            print(f'failed to load and apply the sessions rank CSV to tables. Error: {e}')
+            raise e
+        
         return neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table
 
 
@@ -1409,6 +1420,31 @@ def build_session_t_delta(t_delta_csv_path: Path):
     print(f'earliest_delta_aligned_t_start: {earliest_delta_aligned_t_start}, latest_delta_aligned_t_end: {latest_delta_aligned_t_end}')
     t_delta_dict = t_delta_df.to_dict(orient='index')
     return t_delta_df, t_delta_dict, (earliest_delta_aligned_t_start, latest_delta_aligned_t_end)
+
+@function_attributes(short_name=None, tags=['experience_rank', 'session_order', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-10 02:49', related_items=[])
+def load_and_apply_session_experience_rank_csv(csv_path="./EXTERNAL/sessions_experiment_datetime_df.csv"):
+    """Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_and_apply_session_experience_rank_csv
+    
+    """
+    if isinstance(csv_path, str):
+        csv_path = Path(csv_path).resolve()
+        
+    assert csv_path.exists(), f"csv_path: '{csv_path}' does not exist!"
+    sessions_df: pd.DataFrame = pd.read_csv(csv_path) # KDibaOldDataSessionFormatRegisteredClass.find_all_existing_sessions(global_data_root_parent_path=global_data_root_parent_path).sort_values(['session_datetime'])
+    experience_rank_map_dict = dict(zip(sessions_df['session_uid'].values, sessions_df['experience_rank'].values))
+    experience_orientation_rank_map_dict = dict(zip(sessions_df['session_uid'].values, sessions_df['experience_orientation_rank'].values))
+
+    def _callback_add_df_columns(df, session_id_column_name: str = 'session_uid'):
+        """ captures `experience_rank_map_dict`, `experience_orientation_rank_map_dict` """
+        assert session_id_column_name in df.columns, f"session_id_column_name: '{session_id_column_name}' not in df.columns: {list(df.columns)}"
+        df['session_experience_rank'] = df[session_id_column_name].map(experience_rank_map_dict)
+        df['session_experience_orientation_rank'] = df[session_id_column_name].map(experience_orientation_rank_map_dict)
+        return df
+
+    return sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns
 
 
 @function_attributes(short_name=None, tags=['csv', 'filesystem', 'discovery'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:19', related_items=[])
@@ -1464,66 +1500,6 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, O
             export_file_type = export_file_type[1:-1]
 
     return export_datetime, session_str, custom_replay_name, export_file_type, decoding_time_bin_size_str
-
-
-def _OLD_parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, str]:
-    """
-    # from the found_session_export_paths, get the most recently exported laps_csv, ripple_csv (by comparing `export_datetime`) for each session (`session_str`)
-    a_export_filename: str = "2024-01-12_0420PM-kdiba_pin01_one_fet11-01_12-58-54-(laps_marginals_df).csv"
-    export_datetime = "2024-01-12_0420PM"
-    session_str = "kdiba_pin01_one_fet11-01_12-58-54"
-    export_file_type = "(laps_marginals_df)" # .csv
-
-    # return laps_csv, ripple_csv
-    laps_csv = Path("C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-12_0828PM-kdiba_pin01_one_fet11-01_12-58-54-(laps_marginals_df).csv").resolve()
-    ripple_csv = Path("C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2024-01-12_0828PM-kdiba_pin01_one_fet11-01_12-58-54-(ripple_marginals_df).csv").resolve()
-
-    """
-    filename = path.stem   # Get filename without extension
-    decoding_time_bin_size_str = None
-
-    pattern = r"(?P<export_datetime_str>.*_\d{2}\d{2}[APMF]{2})-(?P<session_str>.*)-(?P<export_file_type>\(?.+\)?)(?:_tbin-(?P<decoding_time_bin_size_str>[^)]+))"
-    match = re.match(pattern, filename)
-
-    if match is not None:
-        # export_datetime_str, session_str, export_file_type = match.groups()
-        export_datetime_str, session_str, export_file_type, decoding_time_bin_size_str = match.group('export_datetime_str'), match.group('session_str'), match.group('export_file_type'), match.group('decoding_time_bin_size_str')
-        # parse the datetime from the export_datetime_str and convert it to datetime object
-        export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d_%I%M%p")
-    else:
-        if debug_print:
-            print(f'did not match pattern with time.')
-        # day_date_only_pattern = r"(.*(?:_\d{2}\d{2}[APMF]{2})?)-(.*)-(\(.+\))"
-        day_date_only_pattern = r"(\d{4}-\d{2}-\d{2})-(.*)-(\(?.+\)?)" #
-        day_date_only_match = re.match(day_date_only_pattern, filename) # '2024-01-04-kdiba_gor01_one_2006-6-08_14-26'
-        if day_date_only_match is not None:
-            export_datetime_str, session_str, export_file_type = day_date_only_match.groups()
-            # print(export_datetime_str, session_str, export_file_type)
-            # parse the datetime from the export_datetime_str and convert it to datetime object
-            export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
-        else:
-            # Try H5 pattern:
-            # matches '2024-01-04-kdiba_gor01_one_2006-6-08_14-26'
-            day_date_with_variant_suffix_pattern = r"(?P<export_datetime_str>\d{4}-\d{2}-\d{2})_?(?P<variant_suffix>[^-_]*)-(?P<session_str>.+?)_(?P<export_file_type>[A-Za-z_]+)"
-            day_date_with_variant_suffix_match = re.match(day_date_with_variant_suffix_pattern, filename) # '2024-01-04-kdiba_gor01_one_2006-6-08_14-26',
-            if day_date_with_variant_suffix_match is not None:
-                export_datetime_str, session_str, export_file_type = day_date_with_variant_suffix_match.group('export_datetime_str'), day_date_with_variant_suffix_match.group('session_str'), day_date_with_variant_suffix_match.group('export_file_type')
-                # parse the datetime from the export_datetime_str and convert it to datetime object
-                try:
-                    export_datetime = datetime.strptime(export_datetime_str, "%Y-%m-%d")
-                except ValueError as e:
-                    print(f'ERR: Could not parse date "{export_datetime_str}" of filename: "{filename}"') # 2024-01-18_GL_t_split_df
-                    return None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
-            else:
-                print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
-                return None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
-
-
-    if export_file_type[0] == '(' and export_file_type[-1] == ')':
-        # Trim the brackets from the file type if they're present:
-        export_file_type = export_file_type[1:-1]
-
-    return export_datetime, session_str, export_file_type, decoding_time_bin_size_str
 
 
 top_level_parts_separators = ['-', '__']

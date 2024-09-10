@@ -1427,6 +1427,9 @@ class RankOrderAnalyses:
             actually_included_epoch_aclus = epoch_spikes_active_aclus[is_epoch_aclu_included_in_template] # note this must be strictly smaller than the template aclus, AND strictly less than the epoch_active_aclus.
             actually_included_epoch_ranks = epoch_spikes_active_ranks[is_epoch_aclu_included_in_template]
 
+
+            ## ONLY one aclu remaining after chopping results in erronious spearman
+
             #TODO 2023-11-22 11:30: - [ ] Does chopping the template down vs. leaving those entries in there change the spearman?
 
             # long_pf_peak_ranks, short_pf_peak_ranks
