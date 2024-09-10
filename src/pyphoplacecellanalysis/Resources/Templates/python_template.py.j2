@@ -32,6 +32,9 @@ script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
 curr_session_context = {{ curr_session_context }}
 curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
 
+session_ctxt_key:str = curr_session_context.get_description(separator='|', subset_includelist=['animal','exper_name','session_name'])
+
+
 {% if should_use_neptune_logging %}
 
 # ==================================================================================================================== #
@@ -62,6 +65,8 @@ if neptuner.run is None:
         neptuner.run[k] = v # add the properties to the run
 
     neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple())) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
+    neptuner.run["sys/group_tags"].add([session_ctxt_key])
+
     # session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
     neptuner.run['session_descriptor_string'] = curr_session_context.get_description() # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
     neptuner.outputs = neptuner.run['outputs']
