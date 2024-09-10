@@ -6335,7 +6335,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     def _display_directional_merged_pf_decoded_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
                                                     single_plot_fixed_height=50.0, max_num_lap_epochs: int = 25, max_num_ripple_epochs: int = 45, size=(15,7), dpi=72, constrained_layout=True, scrollable_figure=True,
                                                     skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, **kwargs):
-            """ Renders to windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
+            """ Renders two windows, one with the decoded laps and another with the decoded ripple posteriors, computed using the merged pseudo-2D decoder.
 
             """
             from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
@@ -6828,9 +6828,8 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
         time_bin_containers = pseudo2D_decoder_continuously_decoded_result.time_bin_containers[0]
         time_window_centers = time_bin_containers.centers
-        p_x_given_n.shape # (62, 4, 209389)
+        # p_x_given_n.shape # (62, 4, 209389)
 
-        
         ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
         assert p_x_given_n.shape[1] == 4, f"expected the 4 pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
         split_pseudo2D_posteriors_dict = {k:np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(('long_LR', 'long_RL', 'short_LR', 'short_RL'))}
