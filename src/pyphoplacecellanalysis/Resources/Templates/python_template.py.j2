@@ -31,6 +31,7 @@ script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
 
 curr_session_context = {{ curr_session_context }}
 curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
+script_type: str = Path(script_file_path).resolve().stem.split('_')[0] # 'run_kdiba_gor01_one_2006-6-07_11-26-53', either ['run', 'figures']
 
 session_ctxt_key:str = curr_session_context.get_description(separator='|', subset_includelist=['animal','exper_name','session_name'])
 
@@ -57,15 +58,15 @@ if neptuner.run is None:
     # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
     neptuner.run = AutoValueConvertingNeptuneRun(project=neptuner.project_name, api_token=neptuner.api_token, dependencies="infer", source_files=[script_file_path])
 
-    params = {"script_file_path": script_file_path, "script_file_parent_path": script_file_parent_path.as_posix(), "curr_session_context": str(curr_session_context.get_description()), "curr_session_basedir": curr_session_basedir.resolve().as_posix()}
+    params = {"script_file_path": script_file_path, "script_file_parent_path": script_file_parent_path.as_posix(), "curr_session_context": str(curr_session_context.get_description()), "curr_session_basedir": curr_session_basedir.resolve().as_posix(), "script_type": script_type}
     neptuner.run["parameters"] = params
 
     # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
     for k, v in curr_session_context.to_dict().items():
         neptuner.run[k] = v # add the properties to the run
 
-    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple())) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
-    neptuner.run["sys/group_tags"].add([session_ctxt_key])
+    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
+    neptuner.run["sys/group_tags"].add([session_ctxt_key, script_type])
 
     # session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
     neptuner.run['session_descriptor_string'] = curr_session_context.get_description() # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
