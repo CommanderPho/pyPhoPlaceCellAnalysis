@@ -2491,7 +2491,7 @@ def save_posterior_to_video(a_decoder_continuously_decoded_result: DecodedFilter
 
 @function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-23 00:00', related_items=[])
 def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, laps_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point,
-     parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9, debug_print:bool=True):
+     parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9, export_all_raw_marginals_separately:bool = False, debug_print:bool=True):
     """ 2024-01-23 - Writes the posteriors out to file 
     
     Usage:
@@ -2531,7 +2531,20 @@ def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, lap
             # raw_tuple.append(_sub_raw_tuple)
             # an_image = get_array_as_image(img_data[i], desired_height=100, desired_width=None, skip_img_normalization=True)
         # output_img = get_array_as_image_stack(imgs=[get_array_as_image(an_img, desired_height=100, desired_width=None, skip_img_normalization=True) for an_img in img_data], offset=10, single_image_alpha_level=0.5)
-        output_img = get_array_as_image_stack(imgs=[get_array_as_image(np.atleast_2d(np.squeeze(img_data[:,:, i])).T, desired_height=100, desired_width=None, skip_img_normalization=False) for i in np.arange(n_curr_epoch_time_bins)],
+        img_data_array = [np.atleast_2d(np.squeeze(img_data[:,:, i])).T for i in np.arange(n_curr_epoch_time_bins)]        
+        # imgs_array = [get_array_as_image(np.atleast_2d(np.squeeze(img_data[:,:, i])).T, desired_height=100, desired_width=None, skip_img_normalization=False) for i in np.arange(n_curr_epoch_time_bins)]
+        imgs_array = [get_array_as_image(img_data_array[i], desired_height=100, desired_width=None, skip_img_normalization=False) for i in np.arange(n_curr_epoch_time_bins)]
+        
+        if export_all_raw_marginals_separately:
+            _sub_img_parent_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_raw_marginal').resolve()
+            _sub_img_parent_path.mkdir(parents=False, exist_ok=True)
+            for i, (img_data_array, an_img) in enumerate(zip(img_data_array, imgs_array)):
+                _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_marginal_dir_{i}.png').resolve()
+                # _sub_raw_tuple = save_array_as_image(an_img, desired_height=100, desired_width=None, skip_img_normalization=True, out_path=_sub_img_path)
+                # Save image to file
+                an_img.save(_sub_img_path)
+                
+        output_img = get_array_as_image_stack(imgs=imgs_array,
                                               offset=25, single_image_alpha_level=0.5,
                                               should_add_border=True, border_size=1, border_color=(255, 255, 255),
                                               should_add_shadow=True, shadow_offset=1, shadow_color=(255,255,255,100))
