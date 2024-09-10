@@ -216,8 +216,32 @@ for k, v in dict(local_computations_override_file=local_computations_override_fi
 neptuner_run.sync()
 {% endif %}
 
+
+{% if should_use_neptune_logging %}
+for k, v in {'final_log_file_path': final_log_file_path.as_posix()}.items():
+    try:
+        neptuner_run[f'parameters/{k}'] = v
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+neptuner_run.sync()
+{% endif %}
+
+
+{% if should_use_file_redirected_output_logging %}
 with open(final_log_file_path, 'w') as f:
     with redirect_stdout(f), redirect_stderr(f):
+
+{% else %}
+from contextlib import contextmanager
+
+@contextmanager
+def noop_context():
+    yield
+
+with noop_context():
+    with noop_context():
+
+{% endif %}
         run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
                                                         curr_session_context=curr_session_context,
                                                         curr_session_basedir=curr_session_basedir,
@@ -244,7 +268,9 @@ with open(final_log_file_path, 'w') as f:
 
         new_print(f'/* script_file_parent_path: {script_file_parent_path} __________________________________________________________________________________ */')
         new_print(f'/* script_file_path: {script_file_path} __________________________________________________________________________________ */')
+        {% if should_use_file_redirected_output_logging %}
         new_print(f'/* log_file_path: {final_log_file_path} __________________________________________________________________________________ */')
+        {% endif %}
         new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
         new_print(f'/* local_computations_override_file: {local_computations_override_file} __________________________________________________________________________________ */')
         new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
