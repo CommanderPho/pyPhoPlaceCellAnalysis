@@ -2489,7 +2489,7 @@ def save_posterior_to_video(a_decoder_continuously_decoded_result: DecodedFilter
 
 
 
-@function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-23 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=['save_marginals_arrays_as_image'], creation_date='2024-01-23 00:00', related_items=[])
 def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, laps_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point,
      parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'lap', epoch_id: int = 9, export_all_raw_marginals_separately:bool = False, debug_print:bool=True):
     """ 2024-01-23 - Writes the posteriors out to file 
@@ -2538,11 +2538,28 @@ def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, lap
         if export_all_raw_marginals_separately:
             _sub_img_parent_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_raw_marginal').resolve()
             _sub_img_parent_path.mkdir(parents=False, exist_ok=True)
-            for i, (img_data_array, an_img) in enumerate(zip(img_data_array, imgs_array)):
-                _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_marginal_dir_{i}.png').resolve()
+            for i, (an_img_data, an_img) in enumerate(zip(img_data_array, imgs_array)):
+                _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_raw_marginal_{i}.png').resolve()
                 # _sub_raw_tuple = save_array_as_image(an_img, desired_height=100, desired_width=None, skip_img_normalization=True, out_path=_sub_img_path)
-                # Save image to file
-                an_img.save(_sub_img_path)
+                an_img.save(_sub_img_path) # Save image to file
+                if debug_print:
+                    print(f'i: {i}, np.shape(an_img_data): {np.shape(an_img_data)}') # n_x_bins, n_decoders
+                _decoder_prob_arr = np.sum(an_img_data, axis=1) # get the four-tuple of decoder probabilities
+                if debug_print:
+                    print(f'\t_decoder_prob_arr: {_decoder_prob_arr}')
+                _decoder_prob_img = get_array_as_image(np.atleast_2d(_decoder_prob_arr).T, desired_height=100, desired_width=None, skip_img_normalization=False)
+                _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_marginal_decoder_{i}.png').resolve()
+                _decoder_prob_img.save(_sub_img_path) # Save image to file
+                
+                _long_arr = np.sum(an_img_data[[0,1], :], axis=0)
+                _short_arr = np.sum(an_img_data[[2,3], :], axis=0)
+                # print(f'\tnp.shape(_long_arr): {np.shape(_long_arr)}')
+                ## Compute marginal:
+                _long_any: float = np.sum(_long_arr)
+                _short_any: float = np.sum(_short_arr)
+                if debug_print:
+                    print(f'\t_long_any: {_long_any}, _short_any: {_short_any}')
+                
                 
         output_img = get_array_as_image_stack(imgs=imgs_array,
                                               offset=25, single_image_alpha_level=0.5,
@@ -2579,3 +2596,57 @@ def save_posterior(raw_posterior_laps_marginals, laps_directional_marginals, lap
 
     return raw_tuple, marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple
     
+
+@function_attributes(short_name=None, tags=['export','marginal', 'pseudo2D', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['save_posterior'], used_by=[], creation_date='2024-09-10 00:06', related_items=[])
+def save_marginals_arrays_as_image(directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'ripple', epoch_ids=None, export_all_raw_marginals_separately: bool=True, debug_print=False):
+    """ Exports all the raw_merged pseudo2D posteriors and their marginals out to image files.
+    
+    Usage: 
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import save_marginals_arrays_as_image
+        directional_merged_decoders_result.perform_compute_marginals()
+        parent_array_as_image_output_folder = Path('output/Exports/array_as_image').resolve()
+        parent_array_as_image_output_folder.mkdir(parents=True, exist_ok=True)
+        assert parent_array_as_image_output_folder.exists()
+        save_marginals_arrays_as_image(directional_merged_decoders_result=directional_merged_decoders_result, parent_array_as_image_output_folder=parent_array_as_image_output_folder, epoch_id_identifier_str='ripple', epoch_ids=[31])
+
+    """
+    assert epoch_id_identifier_str in ['ripple', 'lap']
+    # active_marginals_df: pd.DataFrame = deepcopy(ripple_all_epoch_bins_marginals_df)
+    active_marginals_df: pd.DataFrame = deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)
+    # ripple_filter_epochs_decoder_result = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
+    # ripple_filter_epochs_decoder_result = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
+    active_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
+
+    raw_posterior_active_marginals = deepcopy(active_filter_epochs_decoder_result.p_x_given_n_list)
+
+    collapsed_per_lap_epoch_marginal_track_identity_point = active_marginals_df[['P_Long', 'P_Short']].to_numpy().astype(float)
+    collapsed_per_lap_epoch_marginal_dir_point = active_marginals_df[['P_LR', 'P_RL']].to_numpy().astype(float)
+
+    ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = directional_merged_decoders_result.ripple_directional_marginals_tuple
+    # directional_merged_decoders_result.ripple_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
+    ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = directional_merged_decoders_result.ripple_track_identity_marginals_tuple
+
+    # raw_posterior_laps_marginals
+    # raw_posterior_active_marginals = directional_merged_decoders_result.build_non_marginalized_raw_posteriors(active_filter_epochs_decoder_result)
+    # raw_posterior_active_marginals
+
+    # INPUTS:
+    # raw_posterior_laps_marginals = deepcopy(raw_posterior_laps_marginals)
+    # active_directional_marginals = deepcopy(laps_directional_marginals)
+    # active_track_identity_marginals = deepcopy(laps_track_identity_marginals)
+    # raw_posterior_active_marginals = deepcopy(raw_posterior_laps_marginals)
+    active_directional_marginals = deepcopy(ripple_directional_marginals)
+    active_track_identity_marginals = deepcopy(ripple_track_identity_marginals)
+
+    assert parent_array_as_image_output_folder.exists()
+
+    if epoch_ids is None:
+        epoch_ids = np.arange(active_filter_epochs_decoder_result.num_filter_epochs)
+
+    for epoch_id in epoch_ids:
+        raw_tuple, marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple = save_posterior(raw_posterior_active_marginals, active_directional_marginals,
+                                                                            active_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point,
+                                                                                    parent_array_as_image_output_folder=parent_array_as_image_output_folder, epoch_id_identifier_str=epoch_id_identifier_str, epoch_id=epoch_id, export_all_raw_marginals_separately=export_all_raw_marginals_separately, 
+                                                                                    debug_print=debug_print)
+        
