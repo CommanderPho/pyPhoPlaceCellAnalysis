@@ -328,7 +328,7 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
                 # first iteration only
                 out = BasicBinnedImageRenderingWindow(pfmap, active_xbins, active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string, wants_crosshairs=wants_crosshairs, color_map=color_map, color_bar_mode=color_bar_mode, scrollability_mode=scrollability_mode)
             else:
-                out.add_data(row=curr_page_relative_row, col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string)
+                out.add_data(row=(out.params.plot_row_offset + curr_page_relative_row), col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string)
         
     # ## Debugging only:
     # out.plots_data.included_unit_neuron_IDs = included_unit_neuron_IDs
