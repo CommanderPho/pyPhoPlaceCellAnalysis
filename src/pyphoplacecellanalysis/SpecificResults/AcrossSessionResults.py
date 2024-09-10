@@ -36,6 +36,7 @@ from datetime import datetime
 from pyphocorehelpers.Filesystem.path_helpers import  convert_filelist_to_new_parent
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.assertion_helpers import Assert
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -1364,7 +1365,7 @@ class AcrossSessionTables:
 
         ## Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
         try:
-            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./EXTERNAL/sessions_experiment_datetime_df.csv")
+            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./EXTERNAL/sessions_experiment_datetime_df.csv", session_uid_str_sep='|')
             neuron_identities_table = _callback_add_df_columns(neuron_identities_table, session_id_column_name='session_uid')
             neuron_replay_stats_table = _callback_add_df_columns(neuron_replay_stats_table, session_id_column_name='session_uid')
             long_short_fr_indicies_analysis_table = _callback_add_df_columns(long_short_fr_indicies_analysis_table, session_id_column_name='session_uid')
@@ -1422,20 +1423,32 @@ def build_session_t_delta(t_delta_csv_path: Path):
     return t_delta_df, t_delta_dict, (earliest_delta_aligned_t_start, latest_delta_aligned_t_end)
 
 @function_attributes(short_name=None, tags=['experience_rank', 'session_order', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-10 02:49', related_items=[])
-def load_and_apply_session_experience_rank_csv(csv_path="./EXTERNAL/sessions_experiment_datetime_df.csv"):
+def load_and_apply_session_experience_rank_csv(csv_path="./EXTERNAL/sessions_experiment_datetime_df.csv", session_uid_str_sep: str = '|'):
     """Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
     
     Usage:
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_and_apply_session_experience_rank_csv
-    
+
+        all_session_experiment_experience_csv_path = Path("./EXTERNAL/sessions_experiment_datetime_df.csv").resolve()
+        Assert.path_exists(all_session_experiment_experience_csv_path)
+        sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv(all_session_experiment_experience_csv_path, session_uid_str_sep='_')
+        all_sessions_all_scores_ripple_df = _callback_add_df_columns(all_sessions_all_scores_ripple_df, session_id_column_name='session_name')
+
     """
     if isinstance(csv_path, str):
         csv_path = Path(csv_path).resolve()
         
     assert csv_path.exists(), f"csv_path: '{csv_path}' does not exist!"
     sessions_df: pd.DataFrame = pd.read_csv(csv_path) # KDibaOldDataSessionFormatRegisteredClass.find_all_existing_sessions(global_data_root_parent_path=global_data_root_parent_path).sort_values(['session_datetime'])
-    experience_rank_map_dict = dict(zip(sessions_df['session_uid'].values, sessions_df['experience_rank'].values))
-    experience_orientation_rank_map_dict = dict(zip(sessions_df['session_uid'].values, sessions_df['experience_orientation_rank'].values))
+            
+    session_uid_strs = sessions_df['session_uid'].values
+            
+    if session_uid_str_sep != '|':
+        ## replace the default separator character '|' with the user provided one
+        session_uid_strs = [k.replace('|', session_uid_str_sep) for k in session_uid_strs]
+        
+    experience_rank_map_dict = dict(zip(session_uid_strs, sessions_df['experience_rank'].values))
+    experience_orientation_rank_map_dict = dict(zip(session_uid_strs, sessions_df['experience_orientation_rank'].values))
 
     def _callback_add_df_columns(df, session_id_column_name: str = 'session_uid'):
         """ captures `experience_rank_map_dict`, `experience_orientation_rank_map_dict` """
@@ -2406,7 +2419,7 @@ def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, s
         return False
 
 @function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=['_new_df_process_and_load_exported_file', 'recover_user_annotation_and_is_valid_columns'], used_by=[], creation_date='2024-07-11 17:11', related_items=[])
-def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict, cuttoff_date=None, known_bad_session_strs=[], debug_print=False):
+def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict, cuttoff_date=None, known_bad_session_strs=[], all_session_experiment_experience_csv_path:Path=None, debug_print=False):
     """  NEW `parsed_csv_files_df1-based approach 2024-07-11 
     # We now have the correct and parsed filepaths for each of the exported .csvs, now we need to actually load them and concatenate them toggether across sessions.
     # Extract each of the separate files from the sessions:
@@ -2435,6 +2448,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
 
     final_sessions_loaded_laps_all_scores_dict = {}
     final_sessions_loaded_ripple_all_scores_dict = {}
+    
+    sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./EXTERNAL/sessions_experiment_datetime_df.csv")
     
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True) # ensures all are sorted ascending except for export_datetime, which are sorted decending so the first value is the most recent.
@@ -2512,6 +2527,18 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     ## Build across_sessions join dataframes:
     all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict)
     ## OUTPUTS: all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df
+    try:
+        if all_session_experiment_experience_csv_path is None:
+            all_session_experiment_experience_csv_path = Path("./EXTERNAL/sessions_experiment_datetime_df.csv").resolve()
+            Assert.path_exists(all_session_experiment_experience_csv_path)
+        df_results = (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df)
+        sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv(all_session_experiment_experience_csv_path, session_uid_str_sep='_')
+        # all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = [_callback_add_df_columns(a_df, session_id_column_name='session_name') for a_df in (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df)]
+        df_results = [_callback_add_df_columns(a_df, session_id_column_name='session_name') for a_df in df_results]
+        all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = df_results # unpack again
+    except BaseException as e:
+        print(f'WARNING: failed to add the session_experience_rank CSV results to the dataframes. Failed with error: {e}. Skipping and continuing.') 
+        # raise e
     
     return (
         (final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict),
