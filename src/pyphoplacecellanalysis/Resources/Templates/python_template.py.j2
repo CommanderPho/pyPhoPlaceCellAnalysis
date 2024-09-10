@@ -65,7 +65,7 @@ if neptuner.run is None:
     for k, v in curr_session_context.to_dict().items():
         neptuner.run[k] = v # add the properties to the run
 
-    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
+    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type]) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
     neptuner.run["sys/group_tags"].add([session_ctxt_key, script_type])
 
     # session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
