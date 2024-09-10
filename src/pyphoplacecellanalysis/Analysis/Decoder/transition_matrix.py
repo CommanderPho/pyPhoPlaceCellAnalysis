@@ -154,8 +154,32 @@ class TransitionMatrixComputations:
         """ attempts to determine a spike transition matrix from continuously sampled events (like spike times) given a specified bin_size 
         
         #TODO 2024-08-06 08:50: - [ ] Unfinished
-        
-        
+
+        Usage:        
+            from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
+
+            test_spikes_df = deepcopy(rank_order_results.LR_laps.spikes_df)
+            a_decoder = deepcopy(track_templates.get_decoders_dict()['long_LR'])
+            filtered_pos_df: pd.DataFrame = deepcopy(a_decoder.pf.filtered_pos_df)
+            filtered_pos_df = filtered_pos_df.dropna(axis='index', how='any', subset=['binned_x']).reset_index(drop=True)
+            filtered_pos_df
+
+            # test_spikes_df = test_spikes_df.spikes.add_binned_time_column()
+
+            # [['t_rel_seconds', 'aclu', 'flat_spike_idx', 'Probe_Epoch_id']]]
+
+
+            # test_spikes_df
+            print(f'list(test_spikes_df.columns): {list(test_spikes_df.columns)}')
+
+            # spikes_columns_list = ["t_rel_seconds", "aclu", 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'neuron_IDX', 'Probe_Epoch_id']
+            spikes_columns_list = ["t_rel_seconds", "aclu"]
+            test_spikes_df = test_spikes_df[spikes_columns_list]
+            # Change column type to object for column: 'aclu'
+            test_spikes_df = test_spikes_df.astype({'aclu': 'int'}).reset_index(drop=True)
+            transition_matrix = TransitionMatrixComputations._compute_time_transition_matrix(df=test_spikes_df, bin_size=0.5) #  bin_size="0.25S"
+            transition_matrix
+
         """
         from scipy.sparse import csr_matrix
         
