@@ -21,6 +21,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Computa
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.print_helpers import strip_type_str_to_classname
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
+from neuropy.utils.indexing_helpers import NumpyHelpers
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
@@ -2237,8 +2238,14 @@ class DecoderDecodedEpochsResult(ComputedResult):
         
         ## Inputs: loaded_selections_dict, 
         ## Find epochs that are present in any of the decoders:
-        concatenated_selected_epoch_times = np.concatenate([a_start_stop_arr for a_name, a_start_stop_arr in decoder_user_selected_epoch_times_dict.items() if np.size(a_start_stop_arr)>0], axis=0) # ` if np.size(a_start_stop_arr)>0` part was added to avoid empty lists causing `ValueError: all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)`
-        any_good_selected_epoch_times: NDArray = np.unique(concatenated_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+        total_num_user_selections: int = int(np.sum([np.size(v) for v in decoder_user_selected_epoch_times_dict.values()]))
+        if total_num_user_selections > 0:
+            concatenated_selected_epoch_times = NumpyHelpers.safe_concat([a_start_stop_arr for a_name, a_start_stop_arr in decoder_user_selected_epoch_times_dict.items() if np.size(a_start_stop_arr)>0], axis=0) # ` if np.size(a_start_stop_arr)>0` part was added to avoid empty lists causing `ValueError: all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)`
+            any_good_selected_epoch_times: NDArray = np.unique(concatenated_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+        else:
+            print(f'WARNING: No user selections for this epoch')
+            any_good_selected_epoch_times: NDArray = np.atleast_2d([]) 
+            
         return decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times
 
 
