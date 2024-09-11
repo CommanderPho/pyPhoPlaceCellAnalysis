@@ -339,7 +339,7 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
 
 @function_attributes(short_name=None, tags=['plotly', 'histogram'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-28 07:01', related_items=[])
 def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
-                                          enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session', is_dark_mode: bool=True,
+                                          enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session', variable_name: str = 'P_Short', is_dark_mode: bool=True,
                                           **build_fig_kwargs):
     """ factored out of the subfunction in plot_across_sessions_scatter_results
     adds scatterplots as well
@@ -352,7 +352,6 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     figure_context_dict = {'main_plot_mode': main_plot_mode}
 
     # variable_name: str = 'P_Long'
-    variable_name: str = 'P_Short'
 
     barmode='overlay'
     # barmode='stack'
@@ -458,7 +457,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
 
         """
         is_first_item: bool = ((row == 1) and (col == 1))
-        a_hist_fig = px.histogram(histogram_data_df, y="P_Long", color="time_bin_size", **px_histogram_kwargs, title=hist_title)
+        a_hist_fig = px.histogram(histogram_data_df, y=variable_name, color="time_bin_size", **px_histogram_kwargs, title=hist_title)
 
         for a_trace in a_hist_fig.data:
             if debug_print:
@@ -861,7 +860,7 @@ def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, lates
         num_unique_time_bins: int = data_results_df.time_bin_size.nunique(dropna=True)
         print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bins}')
         enabled_time_bin_sizes = chose_bin_sizes
-        fig, figure_context = _helper_build_figure(data_results_df=data_results_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode='separate_row_per_session', title=f"{col_chosen}")
+        fig, figure_context = _helper_build_figure(data_results_df=data_results_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode='separate_row_per_session', title=f"{col_chosen}", variable_name=col_chosen)
         # 'delta_aligned_start_t', 'session_name', 'time_bin_size'
         tuples_data = data_results_df[['session_name', 'time_bin_size', 'epoch_idx', 'delta_aligned_start_t']].to_dict(orient='records')
         print(f'tuples_data: {tuples_data}')
@@ -952,8 +951,8 @@ def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, lates
 def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenated_laps_df: pd.DataFrame, concatenated_ripple_df: pd.DataFrame,
                                           earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
                                           enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session',
-                                          laps_title_prefix: str = f"Laps", ripple_title_prefix: str = f"Ripples",
-                                          save_figures=False, figure_save_extension='.png', is_dark_mode:bool=True, debug_print=False):
+                                          laps_title_prefix: str = f"Laps", ripple_title_prefix: str = f"Ripples", variable_name: str = 'P_Short',
+                                          save_figures=False, figure_save_extension='.png', is_dark_mode:bool=False, debug_print=False):
     """ takes the directory containing the .csv pairs that were exported by `export_marginals_df_csv`
 
     - Processes both ripple and laps
@@ -1002,14 +1001,14 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
     laps_title_string_suffix: str = f'{laps_num_unique_sessions} Sessions'
     laps_title: str = f"{laps_title_prefix} - {laps_title_string_suffix}"
-    fig_laps, figure_laps_context = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title, is_dark_mode=is_dark_mode)
+    fig_laps, figure_laps_context = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title, variable_name=variable_name, is_dark_mode=is_dark_mode)
 
     # Create a bubble chart for ripples
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'
     ripple_title: str = f"{ripple_title_prefix} - {ripple_title_string_suffix}"
-    fig_ripples, figure_ripples_context = _helper_build_figure(data_results_df=concatenated_ripple_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=ripple_title, is_dark_mode=is_dark_mode)
+    fig_ripples, figure_ripples_context = _helper_build_figure(data_results_df=concatenated_ripple_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=ripple_title, variable_name=variable_name, is_dark_mode=is_dark_mode)
 
     if save_figures:
         # Save the figures to the 'figures' subfolder
