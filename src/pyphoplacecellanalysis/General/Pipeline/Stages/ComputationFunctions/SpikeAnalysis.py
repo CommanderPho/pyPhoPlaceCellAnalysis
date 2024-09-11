@@ -1,8 +1,10 @@
 from attrs import define, field, asdict
+from neuropy.analyses.decoders import BinningInfo
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 from indexed import IndexedOrderedDict
-from typing import Optional, Dict, List
+from typing import Any, Optional, Dict, List, Tuple
 import itertools
 
 # from neurodsp.burst import detect_bursts_dual_threshold, compute_burst_stats
@@ -125,7 +127,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
 
     @classmethod
-    def compute_simple_time_binned_firing_rates_df(cls, active_spikes_df, time_bin_size_seconds=0.5, debug_print=False):
+    def compute_simple_time_binned_firing_rates_df(cls, active_spikes_df, time_bin_size_seconds=0.5, debug_print=False) -> Tuple[pd.DataFrame, pd.DataFrame, NDArray, BinningInfo]:
         """ This simple function computes the firing rates for each time bin. 
         Captures: debug_print
         """
@@ -135,7 +137,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         return unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info
 
     @classmethod
-    def compute_instantaneous_time_firing_rates(cls, active_spikes_df, time_bin_size_seconds=0.5, kernel=GaussianKernel(200*ms), t_start=0.0, t_stop=1000.0, included_neuron_ids=None):
+    def compute_instantaneous_time_firing_rates(cls, active_spikes_df, time_bin_size_seconds=0.5, kernel=GaussianKernel(200*ms), t_start=0.0, t_stop=1000.0, included_neuron_ids=None) -> Tuple[pd.DataFrame, Any, List[SpikeTrain]]:
         """ I think the error is actually occuring when: `time_bin_size_seconds > (t_stop - t_start)` """
         is_smaller_than_single_bin = (time_bin_size_seconds > (t_stop - t_start))
         assert not is_smaller_than_single_bin, f"ERROR: time_bin_size_seconds ({time_bin_size_seconds}) > (t_stop - t_start) ({t_stop - t_start}). Reduce the bin size or exclude this epoch."
@@ -172,6 +174,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         """Computes the average firing rate for each neuron (unit) in each epoch. 
             Usage:
             epoch_inst_fr_df_list, epoch_avg_firing_rates_list = SpikeRateTrends.compute_epochs_unit_avg_inst_firing_rates(spikes_df=filter_epoch_spikes_df_L, filter_epochs=epochs_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, debug_print=True)
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list = SpikeRateTrends.compute_epochs_unit_avg_inst_firing_rates(spikes_df=filter_epoch_spikes_df_L, filter_epochs=epochs_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, debug_print=True)
         """
         epoch_inst_fr_df_list = []
         epoch_inst_fr_signal_list = []
