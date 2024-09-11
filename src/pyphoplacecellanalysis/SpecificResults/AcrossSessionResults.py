@@ -1344,7 +1344,7 @@ class AcrossSessionTables:
 
         ## Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
         try:
-            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./EXTERNAL/sessions_experiment_datetime_df.csv", session_uid_str_sep='|')
+            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./data/sessions_experiment_datetime_df.csv", session_uid_str_sep='|')
             _loaded_tables = [_callback_add_df_columns(v, session_id_column_name='session_uid') for v in _loaded_tables]
 
         except BaseException as e:
@@ -1373,7 +1373,7 @@ class AcrossSessionTables:
 
         ## Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
         try:
-            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./EXTERNAL/sessions_experiment_datetime_df.csv", session_uid_str_sep='|')
+            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./data/sessions_experiment_datetime_df.csv", session_uid_str_sep='|')
             neuron_identities_table = _callback_add_df_columns(neuron_identities_table, session_id_column_name='session_uid')
             neuron_replay_stats_table = _callback_add_df_columns(neuron_replay_stats_table, session_id_column_name='session_uid')
             long_short_fr_indicies_analysis_table = _callback_add_df_columns(long_short_fr_indicies_analysis_table, session_id_column_name='session_uid')
@@ -1431,13 +1431,13 @@ def build_session_t_delta(t_delta_csv_path: Path):
     return t_delta_df, t_delta_dict, (earliest_delta_aligned_t_start, latest_delta_aligned_t_end)
 
 @function_attributes(short_name=None, tags=['experience_rank', 'session_order', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-10 02:49', related_items=[])
-def load_and_apply_session_experience_rank_csv(csv_path="./EXTERNAL/sessions_experiment_datetime_df.csv", session_uid_str_sep: str = '|', novel_experience_rank_requirement: int= 2):
+def load_and_apply_session_experience_rank_csv(csv_path="./data/sessions_experiment_datetime_df.csv", session_uid_str_sep: str = '|', novel_experience_rank_requirement: int= 2):
     """Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank', 'is_novel_exposure'] columns to the tables:
     
     Usage:
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_and_apply_session_experience_rank_csv
 
-        all_session_experiment_experience_csv_path = Path("./EXTERNAL/sessions_experiment_datetime_df.csv").resolve()
+        all_session_experiment_experience_csv_path = Path("./data/sessions_experiment_datetime_df.csv").resolve()
         Assert.path_exists(all_session_experiment_experience_csv_path)
         sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv(all_session_experiment_experience_csv_path, session_uid_str_sep='_')
         all_sessions_all_scores_ripple_df = _callback_add_df_columns(all_sessions_all_scores_ripple_df, session_id_column_name='session_name')
@@ -2458,7 +2458,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     final_sessions_loaded_laps_all_scores_dict = {}
     final_sessions_loaded_ripple_all_scores_dict = {}
     
-    sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./EXTERNAL/sessions_experiment_datetime_df.csv")
+    sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./data/sessions_experiment_datetime_df.csv")
     
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True) # ensures all are sorted ascending except for export_datetime, which are sorted decending so the first value is the most recent.
@@ -2538,7 +2538,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     ## OUTPUTS: all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df
     try:
         if all_session_experiment_experience_csv_path is None:
-            all_session_experiment_experience_csv_path = Path("./EXTERNAL/sessions_experiment_datetime_df.csv").resolve()
+            all_session_experiment_experience_csv_path = Path("./data/sessions_experiment_datetime_df.csv").resolve()
             Assert.path_exists(all_session_experiment_experience_csv_path)
         df_results = (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df)
         sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv(all_session_experiment_experience_csv_path, session_uid_str_sep='_')
