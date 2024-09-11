@@ -309,7 +309,11 @@ class BatchSessionCompletionHandler:
 
     @classmethod
     def post_compute_validate(cls, curr_active_pipeline) -> bool:
-        """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
+        """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. 
+        
+        NOTE: returns `was_updated`, not `is_valid` or something similar.
+        
+        """
         if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
             print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
             return False
