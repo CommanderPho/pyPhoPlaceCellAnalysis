@@ -1941,7 +1941,6 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
         long_mean_epochs_all_frs, long_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, long_epochs)
         short_mean_epochs_all_frs, short_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, short_epochs)
     
-
         all_results_dict.update(dict(zip([f'long_mean_{key}_frs', f'short_mean_{key}_frs'], [long_mean_epochs_frs, short_mean_epochs_frs]))) # all variables
         all_results_dict.update(dict(zip([f'long_mean_{key}_all_frs', f'short_mean_{key}_all_frs'], [long_mean_epochs_all_frs, short_mean_epochs_all_frs]))) # all variables
 
@@ -3089,8 +3088,8 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
 
 
         # Common:
-        are_LxC_empty: bool = (len(self.LxC_aclus) == 0)
-        are_SxC_empty: bool = (len(self.SxC_aclus) == 0)
+        are_LxC_empty: bool = (self.LxC_aclus is None) or (len(self.LxC_aclus) == 0)
+        are_SxC_empty: bool = (self.SxC_aclus is None) or (len(self.SxC_aclus) == 0)
 
         # if ((len(self.LxC_aclus) == 0) or (len(self.SxC_aclus) == 0)):
         #     print(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.")

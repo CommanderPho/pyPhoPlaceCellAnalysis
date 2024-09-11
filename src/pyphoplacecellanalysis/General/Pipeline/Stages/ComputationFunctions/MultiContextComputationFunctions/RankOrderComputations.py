@@ -1494,59 +1494,70 @@ class RankOrderAnalyses:
                 print(f'\tactive_epoch_aclu_long_ranks[{epoch_id}]: {print_array(active_epoch_aclu_long_ranks)}')
                 print(f'\tactive_epoch_aclu_short_ranks[{epoch_id}]: {print_array(active_epoch_aclu_short_ranks)}')
 
-            ## PERFORM SHUFFLE HERE:
-            # On-the-fly shuffling mode using shuffle_helper:
-            epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = shuffle_helper.generate_shuffle(template_epoch_actually_included_aclus) # TODO: peformance, might be slower than pre-shuffling method. Wait, with a fixed seed are all the shuffles the same????
 
-            for i, (epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies) in enumerate(zip(epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies)):
-                #TODO 2023-11-22 12:50: - [X] Are the sizes correct since `a_shuffled_IDXs` doesn't know the size of the template?
+            # detect invalid epochs and add them to `_omitted_epoch_ids`
+            is_invalid_epoch: bool = np.isnan(real_short_result_corr_value) or np.isnan(real_long_result_corr_value)
+            
+            if (not is_invalid_epoch):
+                
+                ## PERFORM SHUFFLE HERE:
+                # On-the-fly shuffling mode using shuffle_helper:
+                epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies = shuffle_helper.generate_shuffle(template_epoch_actually_included_aclus) # TODO: peformance, might be slower than pre-shuffling method. Wait, with a fixed seed are all the shuffles the same????
 
-                ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
-                # active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-                # long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
-                # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
-                active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(epoch_active_long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-                long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, actually_included_epoch_ranks)
-                assert np.shape(active_shuffle_epoch_aclu_long_ranks) == np.shape(actually_included_epoch_ranks)
-                long_result = (post_process_statistic_value_fn(long_rank_stats.statistic), long_rank_stats.pvalue)
-                long_spearmanr_rank_stats_results.append(long_result)
+                for i, (epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies) in enumerate(zip(epoch_specific_shuffled_aclus, epoch_specific_shuffled_indicies)):
+                    #TODO 2023-11-22 12:50: - [X] Are the sizes correct since `a_shuffled_IDXs` doesn't know the size of the template?
 
-                # active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-                # short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
-                # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
-                active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(epoch_active_short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
-                short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, actually_included_epoch_ranks)
-                assert np.shape(active_shuffle_epoch_aclu_short_ranks) == np.shape(actually_included_epoch_ranks)
-                short_result = (post_process_statistic_value_fn(short_rank_stats.statistic), short_rank_stats.pvalue)
-                short_spearmanr_rank_stats_results.append(short_result)
-            ## END for shuffle
+                    ## Get the matching components of the long/short pf ranks using epoch_ranked_fragile_linear_neuron_IDXs's first column which are the relevant indicies:
+                    # active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                    # long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, epoch_neuron_IDX_ranks)
+                    # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
+                    active_shuffle_epoch_aclu_long_ranks = relative_re_ranking(epoch_active_long_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                    long_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_long_ranks, actually_included_epoch_ranks)
+                    assert np.shape(active_shuffle_epoch_aclu_long_ranks) == np.shape(actually_included_epoch_ranks)
+                    long_result = (post_process_statistic_value_fn(long_rank_stats.statistic), long_rank_stats.pvalue)
+                    long_spearmanr_rank_stats_results.append(long_result)
 
-            long_spearmanr_rank_stats_results = np.array(long_spearmanr_rank_stats_results)
-            short_spearmanr_rank_stats_results = np.array(short_spearmanr_rank_stats_results)
+                    # active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                    # short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, epoch_neuron_IDX_ranks)
+                    # NEW 2023-11-22: epoch_active_long_pf_peak_ranks mode:
+                    active_shuffle_epoch_aclu_short_ranks = relative_re_ranking(epoch_active_short_pf_peak_ranks, epoch_specific_shuffled_indicies, disable_re_ranking=disable_re_ranking)
+                    short_rank_stats = scipy.stats.spearmanr(active_shuffle_epoch_aclu_short_ranks, actually_included_epoch_ranks)
+                    assert np.shape(active_shuffle_epoch_aclu_short_ranks) == np.shape(actually_included_epoch_ranks)
+                    short_result = (post_process_statistic_value_fn(short_rank_stats.statistic), short_rank_stats.pvalue)
+                    short_spearmanr_rank_stats_results.append(short_result)
+                ## END for shuffle
 
-            long_stats_corr_values = long_spearmanr_rank_stats_results[:,0]
-            short_stats_corr_values = short_spearmanr_rank_stats_results[:,0]
+                long_spearmanr_rank_stats_results = np.array(long_spearmanr_rank_stats_results)
+                short_spearmanr_rank_stats_results = np.array(short_spearmanr_rank_stats_results)
 
-            long_stats_z_scorer = Zscorer.init_from_values(long_stats_corr_values, real_long_result_corr_value, real_long_rank_stats.pvalue)
-            short_stats_z_scorer = Zscorer.init_from_values(short_stats_corr_values, real_short_result_corr_value, real_short_rank_stats.pvalue)
+                long_stats_corr_values = long_spearmanr_rank_stats_results[:,0]
+                short_stats_corr_values = short_spearmanr_rank_stats_results[:,0]
 
-            is_forward_replay: bool = ((np.mean([long_stats_z_scorer.z_score_value, short_stats_z_scorer.z_score_value])) > 0.0)
+                long_stats_z_scorer = Zscorer.init_from_values(long_stats_corr_values, real_long_result_corr_value, real_long_rank_stats.pvalue) # long_stats_corr_values are all NaN, real_long_result_corr_value is NaN, 
+                short_stats_z_scorer = Zscorer.init_from_values(short_stats_corr_values, real_short_result_corr_value, real_short_rank_stats.pvalue)
 
-            # long_short_z_diff: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value))
+                is_forward_replay: bool = ((np.mean([long_stats_z_scorer.z_score_value, short_stats_z_scorer.z_score_value])) > 0.0)
 
-            always_positive_long_short_magnitude_diff: float = np.max([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)]) - np.min([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)])
-            assert (always_positive_long_short_magnitude_diff >= 0.0), f"always_positive_long_short_magnitude_diff: {always_positive_long_short_magnitude_diff}"
-            long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
-            if (always_positive_long_short_magnitude_diff > 0.0):
-                assert (np.isclose(long_or_short_polarity_multiplier, -1.0) or np.isclose(long_or_short_polarity_multiplier, 1.0)), f"long_or_short_polarity_multiplier: {long_or_short_polarity_multiplier} should equal -1 or +1"
-                long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
+                # long_short_z_diff: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value))
+
+                always_positive_long_short_magnitude_diff: float = np.max([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)]) - np.min([np.abs(long_stats_z_scorer.z_score_value), np.abs(short_stats_z_scorer.z_score_value)])
+                assert (always_positive_long_short_magnitude_diff >= 0.0), f"always_positive_long_short_magnitude_diff: {always_positive_long_short_magnitude_diff}"
+                long_or_short_polarity_multiplier: float = np.sign(np.abs(long_stats_z_scorer.z_score_value) - np.abs(short_stats_z_scorer.z_score_value)) # -1 if short is bigger, +1 if long is bigger
+                if (always_positive_long_short_magnitude_diff > 0.0):
+                    assert (np.isclose(long_or_short_polarity_multiplier, -1.0) or np.isclose(long_or_short_polarity_multiplier, 1.0)), f"long_or_short_polarity_multiplier: {long_or_short_polarity_multiplier} should equal -1 or +1"
+                    long_short_z_diff: float = long_or_short_polarity_multiplier * always_positive_long_short_magnitude_diff
+                else:
+                    long_short_z_diff: float = 0.0 # the value is exactly zero. Surprising.
+
+                long_short_naive_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value # `long_short_naive_z_diff` was the old pre-2023-12-07 way of calculating the z-score diff.
+                # epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay)
+                epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer=long_stats_z_scorer, short_stats_z_scorer=short_stats_z_scorer, long_short_z_diff=long_short_z_diff, long_short_naive_z_diff=long_short_naive_z_diff, is_forward_replay=is_forward_replay)
+
             else:
-                long_short_z_diff: float = 0.0 # the value is exactly zero. Surprising.
-
-            long_short_naive_z_diff: float = long_stats_z_scorer.z_score_value - short_stats_z_scorer.z_score_value # `long_short_naive_z_diff` was the old pre-2023-12-07 way of calculating the z-score diff.
-            # epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer, short_stats_z_scorer, long_short_z_diff, long_short_naive_z_diff, is_forward_replay)
-            epoch_ranked_aclus_stats_dict[epoch_id] = LongShortStatsItem(long_stats_z_scorer=long_stats_z_scorer, short_stats_z_scorer=short_stats_z_scorer, long_short_z_diff=long_short_z_diff, long_short_naive_z_diff=long_short_naive_z_diff, is_forward_replay=is_forward_replay)
-
+                ## invalid epoch
+                print(f'WARNING: invalid epoch {epoch_id}')
+                _omitted_epoch_ids.append(epoch_id)
+                
         ## END for epoch_id
 
         # Extract the results:
@@ -1642,6 +1653,9 @@ class RankOrderAnalyses:
             n_variables = np.shape(real_stacked_arrays)[1]
             assert n_variables == len(combined_variable_names)
 
+
+            n_valid_shuffles = np.shape(valid_stacked_arrays)[0]
+
             quantile_result_column_suffix: str = 'percentile'
             quantile_result_column_names = [f'{decoder_name_to_column_name_prefix_map[a_column_name]}_{quantile_result_column_suffix}' for a_column_name in combined_variable_names]
             # print(f'quantile_result_column_names: {quantile_result_column_names}') # quantile_result_column_names: ['LR_Short_spearman_percentile', 'LR_Short_pearson_percentile', 'RL_Short_spearman_percentile', 'LR_Long_spearman_percentile', 'RL_Long_spearman_percentile', 'LR_Long_pearson_percentile', 'RL_Long_pearson_percentile', 'RL_Short_pearson_percentile']
@@ -1657,8 +1671,12 @@ class RankOrderAnalyses:
                 assert n_epochs == np.shape(valid_stacked_arrays)[-2] # penultimate element
                 assert n_variables == np.shape(valid_stacked_arrays)[-1]		
                 a_result_column_name: str = quantile_result_column_names[variable_IDX] # column name with the suffix '_percentile' added to it
-                results_quantile_value[a_result_column_name] = np.array([compute_percentile(real_stacked_arrays[epoch_IDX, variable_IDX], np.squeeze(valid_stacked_arrays[:, epoch_IDX, variable_IDX])) for epoch_IDX in np.arange(n_epochs)]) # real_stacked_arrays based version
+                if n_valid_shuffles > 0:
+                    results_quantile_value[a_result_column_name] = np.array([compute_percentile(real_stacked_arrays[epoch_IDX, variable_IDX], np.squeeze(valid_stacked_arrays[:, epoch_IDX, variable_IDX])) for epoch_IDX in np.arange(n_epochs)]) # real_stacked_arrays based version
                 # results_quantile_value[a_column_name] = np.array([compute_percentile(real_values[epoch_IDX], np.squeeze(valid_stacked_arrays[:, epoch_IDX, variable_IDX])) for epoch_IDX in np.arange(n_epochs)]) # working df-based version
+                else:
+                    print(f'WARNING: .percentiles_computations(...): no valid shuffles detected (valid_stacked_arrays is empty) so results_quantile_value will be an array of all NaNs')
+                    results_quantile_value[a_result_column_name] = np.array([np.nan for epoch_IDX in np.arange(n_epochs)]) # ALL NANs
 
             # Add old columns for compatibility:
             for old_col_name, new_col_name in zip(['LR_Long_percentile', 'RL_Long_percentile', 'LR_Short_percentile', 'RL_Short_percentile'], ['LR_Long_pearson_percentile', 'RL_Long_pearson_percentile', 'LR_Short_pearson_percentile', 'RL_Short_pearson_percentile']):
@@ -1680,7 +1698,7 @@ class RankOrderAnalyses:
         ## 2023-12-23 Method:        
         output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles = rank_order_results.ripple_new_output_tuple        
         # recover from the valid stacked arrays: `valid_stacked_arrays`
-        quantile_results_dict_ripple = compute_percentiles_from_shuffle_results(combined_variable_names, valid_stacked_arrays, real_stacked_arrays)
+        quantile_results_dict_ripple = compute_percentiles_from_shuffle_results(combined_variable_names, valid_stacked_arrays, real_stacked_arrays) # valid_stacked_arrays is empty throwing a division by zero error
         
         # new_LR_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['long_LR_spearman_Z'][0], shuffled_results_output_dict['short_LR_spearman_Z'][0])])
         # new_RL_results_quantile_values = np.array([(compute_percentile(long_stats_z_scorer.real_value, long_stats_z_scorer.original_values), compute_percentile(short_stats_z_scorer.real_value, short_stats_z_scorer.original_values)) for long_stats_z_scorer, short_stats_z_scorer in zip(shuffled_results_output_dict['short_LR_spearman_Z'][0], shuffled_results_output_dict['short_RL_spearman_Z'][0])])
@@ -1942,8 +1960,8 @@ class RankOrderAnalyses:
             rank_order_results.laps_combined_epoch_stats_df['Long_BestDir_spearman'] = laps_evts_long_best_dir_raw_stats_values
             rank_order_results.laps_combined_epoch_stats_df['Short_BestDir_spearman'] = laps_evts_short_best_dir_raw_stats_values
             
-        except (AttributeError, KeyError, IndexError, ValueError, ZeroDivisionError):
-            raise
+        except (AttributeError, KeyError, IndexError, ValueError, ZeroDivisionError) as e:
+            raise e
             laps_result_tuple = None
 
 
@@ -1978,10 +1996,15 @@ class RankOrderAnalyses:
         LR_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), odd_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, debug_print=False)
         RL_outputs = cls.compute_shuffled_rankorder_analyses(deepcopy(spikes_df), deepcopy(global_replays), even_shuffle_helper, rank_alignment=rank_alignment, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, debug_print=False)
 
-        ripple_evts_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((LR_outputs.long_z_score, LR_outputs.short_z_score), (RL_outputs.long_z_score, RL_outputs.short_z_score))]
-        print(f'ripple_evts_paired_tests: {ripple_evts_paired_tests}')
-        # [TtestResult(statistic=3.5572800536164495, pvalue=0.0004179523066872734, df=415),
-        #  TtestResult(statistic=3.809779392137816, pvalue=0.0001601254566506359, df=415)]
+        try:
+            ripple_evts_paired_tests = [pho_stats_paired_t_test(long_z_score_values, short_z_score_values) for long_z_score_values, short_z_score_values in zip((LR_outputs.long_z_score, LR_outputs.short_z_score), (RL_outputs.long_z_score, RL_outputs.short_z_score))]
+            print(f'ripple_evts_paired_tests: {ripple_evts_paired_tests}')
+            # [TtestResult(statistic=3.5572800536164495, pvalue=0.0004179523066872734, df=415),
+            #  TtestResult(statistic=3.809779392137816, pvalue=0.0001601254566506359, df=415)]
+        except Exception as e:
+            print(f'error in ripples paired t-test: {e}. Skipping.')
+            # raise e
+            ripple_evts_paired_tests = None
 
         return (LR_outputs, RL_outputs, ripple_evts_paired_tests)
 
@@ -2402,7 +2425,7 @@ class RankOrderAnalyses:
 
 
         # _new_perform_efficient_shuffle method: _____________________________________________________________________________ #
-        shuffled_dfs, shuffled_stats_dfs = cls._new_perform_efficient_shuffle(track_templates, active_selected_spikes_df, decoder_aclu_peak_map_dict, num_shuffles=num_shuffles)
+        shuffled_dfs, shuffled_stats_dfs = cls._new_perform_efficient_shuffle(track_templates, active_selected_spikes_df, decoder_aclu_peak_map_dict, num_shuffles=num_shuffles) # divide by zeros happening here
         output_active_epoch_computed_values = shuffled_stats_dfs
 
         # Build the output `stacked_arrays`: _________________________________________________________________________________ #
@@ -2488,7 +2511,7 @@ def validate_has_rank_order_results(curr_active_pipeline, computation_filter_nam
     # LR_short_relative_real_p_values = np.array([x.short_stats_z_scorer.real_p_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
     # LR_short_relative_real_values = np.array([x.short_stats_z_scorer.real_value for x in rank_order_results.LR_ripple.ranked_aclus_stats_dict.values()])
 
-    LR_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.LR_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks)
+    LR_template_epoch_actually_included_aclus = [v[1] for v in rank_order_results.LR_ripple.extra_info_dict.values()] # (template_epoch_neuron_IDXs, template_epoch_actually_included_aclus, epoch_neuron_IDX_ranks) ## ERROR: AttributeError: 'NoneType' object has no attribute 'extra_info_dict'
     LR_relative_num_cells = np.array([len(v[1]) for v in rank_order_results.LR_ripple.extra_info_dict.values()])
 
     # RL_long_relative_real_p_values = np.array([x.long_stats_z_scorer.real_p_value for x in rank_order_results.RL_ripple.ranked_aclus_stats_dict.values()])
