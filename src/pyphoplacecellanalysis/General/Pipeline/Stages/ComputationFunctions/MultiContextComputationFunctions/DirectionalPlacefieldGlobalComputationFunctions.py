@@ -6735,6 +6735,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             return False
 
     def execute(self, *args, **kwargs) -> None:
+        print(f'menu execute(): {self}')
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
@@ -6872,6 +6873,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             return False
 
     def execute(self, *args, **kwargs) -> None:
+        print(f'menu execute(): {self}')
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d

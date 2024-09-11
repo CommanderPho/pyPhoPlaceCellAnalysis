@@ -2125,6 +2125,7 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
         
     def execute(self, *args, **kwargs) -> None:
         """  """
+        print(f'menu execute(): {self}')
         # print(f'CreateNewStackedDecodedEpochSlicesPlotCommand(): {self._filter_epochs} callback')
         _out_plot_tuple = self._active_pipeline.display('_display_plot_decoded_epoch_slices', self._active_config_name, filter_epochs=self._filter_epochs, debug_test_max_num_slices=16)
         _out_params, _out_plots_data, _out_plots, _out_ui = _out_plot_tuple
@@ -2152,6 +2153,7 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     #     # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
 
     def execute(self, *args, **kwargs) -> None:
+        print(f'menu execute(): {self}')
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
@@ -2241,6 +2243,7 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
 
 
     def execute(self, *args, **kwargs) -> None:
+        print(f'menu execute(): {self}')
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
