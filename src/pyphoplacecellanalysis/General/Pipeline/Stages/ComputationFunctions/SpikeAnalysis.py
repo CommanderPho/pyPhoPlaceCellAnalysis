@@ -76,7 +76,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     
     
     @classmethod
-    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms)) -> "SpikeRateTrends":
+    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms), use_instantaneous_firing_rate=False) -> "SpikeRateTrends":
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
         if len(included_neuron_ids)>0:
@@ -101,7 +101,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
                 print(f'\tdropping {n_dropped_epochs} that are shorter than our instantaneous_time_bin_size_seconds of {instantaneous_time_bin_size_seconds}', end='\t') 
 
             print(f'{post_drop_n_epochs} remain.')
-            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel, use_instantaneous_firing_rate=use_instantaneous_firing_rate)
             _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
             _out.recompute_on_update()
@@ -117,7 +117,15 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         n_epochs = len(self.inst_fr_df_list)
         assert n_epochs > 0        
         n_cells = self.inst_fr_df_list[0].shape[1]
-        epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
+        
+        
+        is_non_instantaneous = np.all([a_signal is None for a_signal in self.inst_fr_signals_list])
+        if is_non_instantaneous:
+            epoch_agg_firing_rates_list = np.vstack([np.nanmean(a_df.to_numpy(), axis=0) for a_df in self.inst_fr_df_list])
+        else:
+            # use instantaneous version
+            epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
+            
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
         self.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
         cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
