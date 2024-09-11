@@ -1342,7 +1342,15 @@ class AcrossSessionTables:
             v.rename(columns=cls.aliases_columns_dict, inplace=True)
             _loaded_tables.append(v)
 
+        ## Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
+        try:
+            sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./EXTERNAL/sessions_experiment_datetime_df.csv", session_uid_str_sep='|')
+            _loaded_tables = [_callback_add_df_columns(v, session_id_column_name='session_uid') for v in _loaded_tables]
 
+        except BaseException as e:
+            print(f'failed to load and apply the sessions rank CSV to tables. Error: {e}')
+            raise e
+        
         return _loaded_tables
 
 
@@ -1423,8 +1431,8 @@ def build_session_t_delta(t_delta_csv_path: Path):
     return t_delta_df, t_delta_dict, (earliest_delta_aligned_t_start, latest_delta_aligned_t_end)
 
 @function_attributes(short_name=None, tags=['experience_rank', 'session_order', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-10 02:49', related_items=[])
-def load_and_apply_session_experience_rank_csv(csv_path="./EXTERNAL/sessions_experiment_datetime_df.csv", session_uid_str_sep: str = '|'):
-    """Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank'] columns to the tables:
+def load_and_apply_session_experience_rank_csv(csv_path="./EXTERNAL/sessions_experiment_datetime_df.csv", session_uid_str_sep: str = '|', novel_experience_rank_requirement: int= 2):
+    """Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank', 'is_novel_exposure'] columns to the tables:
     
     Usage:
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_and_apply_session_experience_rank_csv
@@ -1455,6 +1463,7 @@ def load_and_apply_session_experience_rank_csv(csv_path="./EXTERNAL/sessions_exp
         assert session_id_column_name in df.columns, f"session_id_column_name: '{session_id_column_name}' not in df.columns: {list(df.columns)}"
         df['session_experience_rank'] = df[session_id_column_name].map(experience_rank_map_dict)
         df['session_experience_orientation_rank'] = df[session_id_column_name].map(experience_orientation_rank_map_dict)
+        df['is_novel_exposure'] = (df['session_experience_rank'] < novel_experience_rank_requirement)
         return df
 
     return sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns
