@@ -1563,8 +1563,11 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 
 
 @function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025],
-                                                                             save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, epoch_handling_mode:str='DropShorterMode') -> dict:
+def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                                            #  instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025], epoch_handling_mode:str='DropShorterMode',
+                                                                            instantaneous_time_bin_size_seconds_list:List[float]=[1000.0], epoch_handling_mode:str='UseAllEpochsMode', # single-bin per epoch
+                                                                            save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, 
+                                                                ) -> dict:
     """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine (completely independent of the internal implementations), and exports it as several output files:
 
     Output Files:
