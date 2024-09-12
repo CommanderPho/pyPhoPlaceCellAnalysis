@@ -1094,7 +1094,7 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
 
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
-def _TEMP_copy_inst_fr_data(RESULT_DATE_TO_USE, collected_outputs_path, debug_print = False):
+def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, debug_print = False):
     """ Called on the batch processing computer (GreatLakes for example) in `ProcessBatchOutputs_*.ipynb` to collect batch-processing results from individual session folders and save `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
     
     File Outputs: `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
