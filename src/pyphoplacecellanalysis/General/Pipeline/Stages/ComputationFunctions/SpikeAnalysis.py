@@ -73,10 +73,18 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01, is_computable=False)
     kernel_width_ms: float = serialized_attribute_field(default=10.0, is_computable=False)
-    
+
     
     @classmethod
-    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms), use_instantaneous_firing_rate=False) -> "SpikeRateTrends":
+    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms),
+                                    use_instantaneous_firing_rate=False, epoch_handling_mode:str='DropShorterMode') -> "SpikeRateTrends":
+        """ the main called function
+        
+        epoch_handling_mode='DropShorterMode' - the default mode prior to 2024-09-12, drops any epochs shorter than the time_bin_size so binning works appropriately.
+        epoch_handling_mode='UseAllEpochsMode' - if you pass a time_bin_size larger than the duration of an epoch, that epoch will have only one bin (with the bin duration the length of the Epoch, meaning each epoch can have variable bin sizes. Introduced 2024-09-12.
+                `instantaneous_time_bin_size_seconds` then effectively becomes a MAXIMUM time_bin_size duration as a smaller bin size (the length of one epoch) can be used if needed
+        
+        """
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
         if len(included_neuron_ids)>0:
@@ -85,23 +93,37 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
             else:
                 filter_epochs_df = filter_epochs.to_dataframe()
                 
-            minimum_event_duration: float = instantaneous_time_bin_size_seconds # allow direct use            
-            ## Drop those less than the time bin duration
-            print(f'DropShorterMode:')
-            pre_drop_n_epochs = len(filter_epochs_df)
-            if minimum_event_duration is not None:                
-                filter_epochs_df = filter_epochs_df[filter_epochs_df['duration'] > minimum_event_duration]
-                post_drop_n_epochs = len(filter_epochs_df)
-                n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
-                print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
-            else:
-                filter_epochs_df = filter_epochs_df[filter_epochs_df['duration'] > instantaneous_time_bin_size_seconds]
-                post_drop_n_epochs = len(filter_epochs_df)
-                n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
-                print(f'\tdropping {n_dropped_epochs} that are shorter than our instantaneous_time_bin_size_seconds of {instantaneous_time_bin_size_seconds}', end='\t') 
+                
+            assert epoch_handling_mode in ['DropShorterMode', 'UseAllEpochsMode']
+                
+            if epoch_handling_mode == 'DropShorterMode':
+                minimum_event_duration: float = instantaneous_time_bin_size_seconds # allow direct use            
+                ## Drop those less than the time bin duration
+                print(f'DropShorterMode:')
+                pre_drop_n_epochs = len(filter_epochs_df)
+                if minimum_event_duration is not None:                
+                    filter_epochs_df = filter_epochs_df[filter_epochs_df['duration'] > minimum_event_duration]
+                    post_drop_n_epochs = len(filter_epochs_df)
+                    n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+                    print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
+                else:
+                    filter_epochs_df = filter_epochs_df[filter_epochs_df['duration'] > instantaneous_time_bin_size_seconds]
+                    post_drop_n_epochs = len(filter_epochs_df)
+                    n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+                    print(f'\tdropping {n_dropped_epochs} that are shorter than our instantaneous_time_bin_size_seconds of {instantaneous_time_bin_size_seconds}', end='\t') 
 
-            print(f'{post_drop_n_epochs} remain.')
-            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel, use_instantaneous_firing_rate=use_instantaneous_firing_rate)
+                print(f'{post_drop_n_epochs} remain.')
+            elif epoch_handling_mode == 'UseAllEpochsMode':
+                # Don't drop any epochs
+                print(f'UseAllEpochsMode')
+                pass
+            else:
+                raise NotImplementedError(f'epoch_handling_mode: {epoch_handling_mode} is unsupported.')
+            
+            
+            
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel,
+                                                                                                                                          use_instantaneous_firing_rate=use_instantaneous_firing_rate)
             _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
             _out.recompute_on_update()

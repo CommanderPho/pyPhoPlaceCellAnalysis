@@ -1564,7 +1564,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 
 @function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025],
-                                                                             save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False) -> dict:
+                                                                             save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False, epoch_handling_mode:str='DropShorterMode') -> dict:
     """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine (completely independent of the internal implementations), and exports it as several output files:
 
     Output Files:
@@ -1610,13 +1610,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
         try:
             print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
             _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # 3ms, 10ms
-            _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-            # _out_inst_fr_comps = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
-
-            # if not self.use_multiprocessing:
-            #     # Only modify self in non-multiprocessing mode (only shows 1 always).
-            #     self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
-            #     print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
+            _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context(), epoch_handling_mode=epoch_handling_mode)
 
             # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
             # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
@@ -1702,23 +1696,14 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
             
         return subfn_callback_outputs
         # END _subfn_single_time_bin_size_compute_and_export_session_instantaneous_spike_rates_completion_function
-        
+
+    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     callback_outputs['recomputed_inst_fr_time_bin_dict'] = {}
     for an_instantaneous_time_bin_size_seconds in instantaneous_time_bin_size_seconds_list:
         subfn_callback_outputs = _subfn_single_time_bin_size_compute_and_export_session_instantaneous_spike_rates_completion_function(instantaneous_time_bin_size_seconds=an_instantaneous_time_bin_size_seconds)
         callback_outputs['recomputed_inst_fr_time_bin_dict'][an_instantaneous_time_bin_size_seconds] = subfn_callback_outputs
 
 
-    # ## Specify the output file:
-    # common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
-    # print(f'common_file_path: {common_file_path}')
-    # InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
-
-    # callback_outputs = {
-    #  'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
-    #  'standalone_MAT_filepath': standalone_MAT_filepath,
-    #  'ripple_WCorrShuffle_df_export_CSV_path': ripple_WCorrShuffle_df_export_CSV_path,
-    # }
     across_session_results_extended_dict['compute_and_export_session_instantaneous_spike_rates_completion_function'] = callback_outputs
     
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
