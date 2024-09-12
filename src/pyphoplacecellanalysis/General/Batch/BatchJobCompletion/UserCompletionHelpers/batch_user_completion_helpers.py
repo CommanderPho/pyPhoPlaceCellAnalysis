@@ -1563,7 +1563,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 
 
 @function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds:float=0.0005,
+def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025],
                                                                              save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False) -> dict:
     """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine (completely independent of the internal implementations), and exports it as several output files:
 
@@ -1577,6 +1577,10 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
         if save_across_session_hdf:
             Across Session HDF5 Output: f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
         
+
+    ## previous `instantaneous_time_bin_size_seconds` values:
+    0.0005    
+    
     
     """
     import sys
@@ -1587,115 +1591,128 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import InstantaneousFiringRatesDataframeAccessor
 
     # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
-
-    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'compute_and_export_session_instantaneous_spike_rates_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, instantaneous_time_bin_size_seconds: {instantaneous_time_bin_size_seconds}, ...)')
-    
     callback_outputs = {
-        'recomputed_inst_fr_comps_filepath': None, #'t_end': t_end   
-        'recomputed_inst_fr_comps_h5_filepath': None,
-        'common_across_session_h5': None,
+        'recomputed_inst_fr_time_bin_dict': None,
     }
-    err = None
-
-    try:
-        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-        _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # 3ms, 10ms
-        _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-        # _out_inst_fr_comps = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
-
-        # if not self.use_multiprocessing:
-        #     # Only modify self in non-multiprocessing mode (only shows 1 always).
-        #     self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
-        #     print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
-
-        # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
-        # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
-        print(f'\t\t done (success).')
-
-    except BaseException as e:
-        exception_info = sys.exc_info()
-        err = CapturedException(e, exception_info)
-        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-        # if self.fail_on_exception:
-        #     raise e.exc
-        # _out_inst_fr_comps = None
-        _out_recomputed_inst_fr_comps = None
-        pass
-
-
-    ## standalone saving:
-    if (_out_recomputed_inst_fr_comps is not None) and save_pickle:
-        ## Pickle Saving:
-        standalone_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
-        recomputed_inst_fr_comps_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
-        print(f'recomputed_inst_fr_comps_filepath: "{recomputed_inst_fr_comps_filepath}"')
+    
+        
+    def _subfn_single_time_bin_size_compute_and_export_session_instantaneous_spike_rates_completion_function(instantaneous_time_bin_size_seconds:float):
+        print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+        print(f'compute_and_export_session_instantaneous_spike_rates_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, instantaneous_time_bin_size_seconds: {instantaneous_time_bin_size_seconds}, ...)')
+        
+        subfn_callback_outputs = {
+            'recomputed_inst_fr_comps_filepath': None, #'t_end': t_end   
+            'recomputed_inst_fr_comps_h5_filepath': None,
+            'common_across_session_h5': None,
+        }
+        err = None
 
         try:
-            saveData(recomputed_inst_fr_comps_filepath, (curr_session_context, _out_recomputed_inst_fr_comps, _out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds))
-            was_write_good = True
-            callback_outputs['recomputed_inst_fr_comps_filepath'] = recomputed_inst_fr_comps_filepath
+            print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+            _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # 3ms, 10ms
+            _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
+            # _out_inst_fr_comps = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
+
+            # if not self.use_multiprocessing:
+            #     # Only modify self in non-multiprocessing mode (only shows 1 always).
+            #     self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
+            #     print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
+
+            # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
+            # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
+            print(f'\t\t done (success).')
 
         except BaseException as e:
             exception_info = sys.exc_info()
             err = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.save_data('{recomputed_inst_fr_comps_filepath}') for {curr_session_context}")
-            recomputed_inst_fr_comps_filepath = None # set to None because it failed.
-            if self.fail_on_exception:
-                raise err.exc
-    else:
-        recomputed_inst_fr_comps_filepath = None
-
-    callback_outputs['recomputed_inst_fr_comps_filepath'] = recomputed_inst_fr_comps_filepath
+            print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+            # if self.fail_on_exception:
+            #     raise e.exc
+            # _out_inst_fr_comps = None
+            _out_recomputed_inst_fr_comps = None
+            pass
 
 
-    ## HDF5 output:
-    if (_out_recomputed_inst_fr_comps is not None) and save_hdf:
-        ## Pickle Saving:
-        standalone_h5_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
-        recomputed_inst_fr_comps_h5_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_h5_filename).resolve()
-        print(f'recomputed_inst_fr_comps_h5_filepath: "{recomputed_inst_fr_comps_h5_filepath}"')
-        try:
-            _out_recomputed_inst_fr_comps.to_hdf(recomputed_inst_fr_comps_h5_filepath, key='recomputed_inst_fr_comps', debug_print=False, enable_hdf_testing_mode=False)
-            was_write_good = True
-            callback_outputs['recomputed_inst_fr_comps_h5_filepath'] = recomputed_inst_fr_comps_h5_filepath
+        ## standalone saving:
+        if (_out_recomputed_inst_fr_comps is not None) and save_pickle:
+            ## Pickle Saving:
+            standalone_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
+            recomputed_inst_fr_comps_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
+            print(f'recomputed_inst_fr_comps_filepath: "{recomputed_inst_fr_comps_filepath}"')
 
-        except BaseException as e:
-            exception_info = sys.exc_info()
-            err = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.to_hdf('/recomputed_inst_fr_comps', '{recomputed_inst_fr_comps_h5_filepath}') for {curr_session_context}")
-            recomputed_inst_fr_comps_h5_filepath = None # set to None because it failed.
-            if self.fail_on_exception:
-                raise err.exc
-    else:
-        recomputed_inst_fr_comps_h5_filepath = None
+            try:
+                saveData(recomputed_inst_fr_comps_filepath, (curr_session_context, _out_recomputed_inst_fr_comps, _out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds))
+                was_write_good = True
+                subfn_callback_outputs['recomputed_inst_fr_comps_filepath'] = recomputed_inst_fr_comps_filepath
+
+            except BaseException as e:
+                exception_info = sys.exc_info()
+                err = CapturedException(e, exception_info)
+                print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.save_data('{recomputed_inst_fr_comps_filepath}') for {curr_session_context}")
+                recomputed_inst_fr_comps_filepath = None # set to None because it failed.
+                if self.fail_on_exception:
+                    raise err.exc
+        else:
+            recomputed_inst_fr_comps_filepath = None
+
+        subfn_callback_outputs['recomputed_inst_fr_comps_filepath'] = recomputed_inst_fr_comps_filepath
 
 
-    ## common_across_session_h5
-    if (_out_recomputed_inst_fr_comps is not None) and save_across_session_hdf:
-        common_across_session_h5_filename: str = f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
-        common_file_path = self.collected_outputs_path.resolve().joinpath(common_across_session_h5_filename).resolve()
-        print(f'common_file_path: "{common_file_path}"')
+        ## HDF5 output:
+        if (_out_recomputed_inst_fr_comps is not None) and save_hdf:
+            ## Pickle Saving:
+            standalone_h5_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
+            recomputed_inst_fr_comps_h5_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_h5_filename).resolve()
+            print(f'recomputed_inst_fr_comps_h5_filepath: "{recomputed_inst_fr_comps_h5_filepath}"')
+            try:
+                _out_recomputed_inst_fr_comps.to_hdf(recomputed_inst_fr_comps_h5_filepath, key='recomputed_inst_fr_comps', debug_print=False, enable_hdf_testing_mode=False)
+                was_write_good = True
+                subfn_callback_outputs['recomputed_inst_fr_comps_h5_filepath'] = recomputed_inst_fr_comps_h5_filepath
 
-        try:
-            InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(inst_fr_comps=_out_recomputed_inst_fr_comps, curr_active_pipeline=curr_active_pipeline, common_file_path=common_file_path)
-            callback_outputs['common_across_session_h5'] = common_file_path
+            except BaseException as e:
+                exception_info = sys.exc_info()
+                err = CapturedException(e, exception_info)
+                print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.to_hdf('/recomputed_inst_fr_comps', '{recomputed_inst_fr_comps_h5_filepath}') for {curr_session_context}")
+                recomputed_inst_fr_comps_h5_filepath = None # set to None because it failed.
+                if self.fail_on_exception:
+                    raise err.exc
+        else:
+            recomputed_inst_fr_comps_h5_filepath = None
 
-        except BaseException as e:
-            exception_info = sys.exc_info()
-            err = CapturedException(e, exception_info)
-            print(f"ERROR: encountered exception {err} while trying to perform InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(..., common_file_path='{common_file_path}') for {curr_session_context}")
-            common_file_path = None # set to None because it failed.
-            if self.fail_on_exception:
-                raise err.exc
-    else:
-        common_file_path = None
+
+        ## common_across_session_h5
+        if (_out_recomputed_inst_fr_comps is not None) and save_across_session_hdf:
+            common_across_session_h5_filename: str = f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
+            common_file_path = self.collected_outputs_path.resolve().joinpath(common_across_session_h5_filename).resolve()
+            print(f'common_file_path: "{common_file_path}"')
+
+            try:
+                InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(inst_fr_comps=_out_recomputed_inst_fr_comps, curr_active_pipeline=curr_active_pipeline, common_file_path=common_file_path)
+                subfn_callback_outputs['common_across_session_h5'] = common_file_path
+
+            except BaseException as e:
+                exception_info = sys.exc_info()
+                err = CapturedException(e, exception_info)
+                print(f"ERROR: encountered exception {err} while trying to perform InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(..., common_file_path='{common_file_path}') for {curr_session_context}")
+                common_file_path = None # set to None because it failed.
+                if self.fail_on_exception:
+                    raise err.exc
+        else:
+            common_file_path = None
+            
+        return subfn_callback_outputs
+        # END _subfn_single_time_bin_size_compute_and_export_session_instantaneous_spike_rates_completion_function
+        
+    callback_outputs['recomputed_inst_fr_time_bin_dict'] = {}
+    for an_instantaneous_time_bin_size_seconds in instantaneous_time_bin_size_seconds_list:
+        subfn_callback_outputs = _subfn_single_time_bin_size_compute_and_export_session_instantaneous_spike_rates_completion_function(instantaneous_time_bin_size_seconds=an_instantaneous_time_bin_size_seconds)
+        callback_outputs['recomputed_inst_fr_time_bin_dict'][an_instantaneous_time_bin_size_seconds] = subfn_callback_outputs
+
 
     # ## Specify the output file:
     # common_file_path = Path('output/active_across_session_scatter_plot_results.h5')
     # print(f'common_file_path: {common_file_path}')
     # InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
-
 
     # callback_outputs = {
     #  'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
