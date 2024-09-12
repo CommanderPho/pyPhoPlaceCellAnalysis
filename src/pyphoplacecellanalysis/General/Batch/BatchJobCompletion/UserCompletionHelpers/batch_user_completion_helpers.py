@@ -530,7 +530,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     ## INPUT PARAMETER: time_bin_size sweep paraemters    
     if custom_all_param_sweep_options is None:
         if desired_shared_decoding_time_bin_sizes is None:
-            desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.10, num=6)
+            desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.10, num=6) ####### <<<------ Default sweep is defined here
         # Shared time bin sizes
         custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_shared_decoding_time_bin_size=desired_shared_decoding_time_bin_sizes, use_single_time_bin_per_epoch=[False], minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]]) # with Ripples
 
@@ -1565,7 +1565,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 @function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, instantaneous_time_bin_size_seconds:float=0.0005,
                                                                              save_hdf:bool=True, save_pickle:bool=True, save_across_session_hdf:bool=False) -> dict:
-    """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine, and exports it as several output files:
+    """  Computes the `InstantaneousSpikeRateGroupsComputation` for the pipleine (completely independent of the internal implementations), and exports it as several output files:
 
     Output Files:
         if save_pickle:
