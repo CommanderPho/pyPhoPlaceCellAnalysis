@@ -1108,7 +1108,7 @@ def _combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders, 
 
     for k, a_get_file_fn in custom_file_types_dict.items():
         ## for a single time_bin_size
-        variable_name, time_bin_size_str = k.split('_')
+        *variable_name, time_bin_size_str = k.split('_')
         time_bin_size = float(time_bin_size_str)
         print(f'\ttime_bin_size: {time_bin_size}')
         across_sessions_recomputed_instantaneous_fr_dict = {}
