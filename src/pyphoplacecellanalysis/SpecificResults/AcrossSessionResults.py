@@ -1094,7 +1094,7 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
 
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
-def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, debug_print = False):
+def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list:List[float], debug_print = False):
     """ Called on the batch processing computer (GreatLakes for example) in `ProcessBatchOutputs_*.ipynb` to collect batch-processing results from individual session folders and save `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
     
     File Outputs: `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
@@ -1103,7 +1103,6 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
     from neuropy.core.user_annotations import UserAnnotationsManager
     from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
-    # from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import copy_session_folder_files_to_target_dir, AcrossSessionTables
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
 
     def _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders, collected_outputs_path, BATCH_DATE_TO_USE, custom_file_types_dict=None):
@@ -1118,7 +1117,7 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
 
         for k, a_get_file_fn in custom_file_types_dict.items():
             ## for a single time_bin_size
-            *variable_name, time_bin_size_str = k.split('_')
+            *variable_name_parts, time_bin_size_str = k.split('_')
             time_bin_size = float(time_bin_size_str)
             print(f'\ttime_bin_size: {time_bin_size}')
             across_sessions_recomputed_instantaneous_fr_dict = {}
@@ -1153,7 +1152,7 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     ## INPUTS: RESULT_DATE_TO_USE, collected_outputs_path
-    instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025]
+    # instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025]
     custom_file_types_dict = {f'recomputed_inst_fr_comps_{time_bin_size}': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_recomputed_inst_fr_comps_{time_bin_size}.pkl').resolve())) for time_bin_size in instantaneous_time_bin_size_seconds_list}
     print(f'custom_file_types_dict: {custom_file_types_dict}')
     
