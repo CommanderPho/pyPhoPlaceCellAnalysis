@@ -18,6 +18,7 @@ from neuropy.utils.misc import compute_paginated_grid_config # for paginating sh
 # pyphocorehelpers
 from pyphocorehelpers.indexing_helpers import reorder_keys_relative
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.exception_helpers import CapturedException, ExceptionPrintingContext
 
 # pyPhoPlaceCellAnalysis:
@@ -528,7 +529,7 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
 
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
-@function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+@function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_format=False, write_png=True, debug_print=False):
     """ 
     
@@ -693,7 +694,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
 
 
-
+@metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure', 'batch', 'LxC', 'SxC', 'LongShort'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-16 17:34', related_items=[])
 class BatchPhoJonathanFiguresHelper:
     """Private methods that help with batch figure generator for ClassName.
 

@@ -98,7 +98,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
-    @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
+    @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['PhoJonathanPlotHelpers', '_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
     def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_neuron_types=None, require_placefield=True, save_figure=True, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Internally calls `_make_jonathan_interactive_plot(...)`
@@ -161,7 +161,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             return graphics_output_dict
 
-    @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch', 'inefficient', 'slow'], input_requires=[], output_provides=[], uses=['PhoJonathanPlotHelpers._make_pho_jonathan_batch_plots'], used_by=['BatchPhoJonathanFiguresHelper'], creation_date='2023-04-11 03:14', is_global=True)
+    @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch', 'inefficient', 'slow'], input_requires=['jonathan_firing_rate_analysis'], output_provides=[], uses=['PhoJonathanPlotHelpers._make_pho_jonathan_batch_plots'], used_by=['BatchPhoJonathanFiguresHelper'], creation_date='2023-04-11 03:14', is_global=True)
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Stacked Jonathan-style firing-rate-across-epochs-plot. Pho's batch adaptation of the primary elements from Jonathan's interactive display.
                 Usage:
@@ -169,12 +169,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     %matplotlib qt
                     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
 
-                    graphics_output_dict = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
-                    fig, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
-                    neuron_df, rdf, aclu_to_idx, irdf = plot_data['df'], plot_data['rdf'], plot_data['aclu_to_idx'], plot_data['irdf']
-                    # Grab the output axes:
-                    curr_axs_dict = axs[0]
-                    curr_firing_rate_ax, curr_lap_spikes_ax, curr_placefield_ax = curr_axs_dict['firing_rate'], curr_axs_dict['lap_spikes'], curr_axs_dict['placefield'] # Extract variables from the `curr_axs_dict` dictionary to the local workspace
+                    graphics_output_dict: MatplotlibRenderPlots = curr_active_pipeline.display('_display_batch_pho_jonathan_replay_firing_rate_comparison', active_identifying_session_ctx)
+                    
 
             """
             if include_includelist is None:
@@ -855,6 +851,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
 # ==================================================================================================================== #
 
+@metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=['_display_jonathan_interactive_replay_firing_rate_comparison', '_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2024-09-16 17:09', related_items=[])
 class PhoJonathanPlotHelpers:
     @classmethod
     @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['make_fr', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
@@ -1001,9 +998,21 @@ class PhoJonathanPlotHelpers:
 
         if show_inter_replay_frs:
             # this would show the inter-replay firing times in orange it's frankly distracting
-            centers = (irdf["start"] + irdf["end"])/2
-            heights = make_fr(irdf)[:, aclu_to_idx[active_aclu]]
-            ax.plot(centers, heights, '.', color=colors[1]+"80", zorder=4, label='inter_replay_frs')
+            centers: NDArray = ((irdf["start"] + irdf["end"])/2.0).values
+            heights: NDArray = make_fr(irdf)[:, aclu_to_idx[active_aclu]]
+            a_color = colors[1] # (0.8666666666666667, 0.5176470588235295, 0.3215686274509804)
+            if isinstance(a_color, str):
+                a_color = a_color+"80" # add the alpha component to the hex string
+            elif isinstance(a_color, tuple):
+                if len(a_color) == 3:
+                    # add the alpha to the end
+                    a_color = (*a_color, 0.32,) # a 4-tuple
+                else:
+                    print(f'WARN: a_color is already a 4-tuple!')
+            else:
+                raise NotImplementedError(f'a_color is of an unexpected type: type(a_color): {type(a_color), }a_color: {a_color}')
+            
+            ax.plot(centers, heights, '.', color=a_color, zorder=4, label='inter_replay_frs')
 
         if include_horizontal_labels:
             ax.set_title(f"Replay firing rates for neuron {active_aclu}")

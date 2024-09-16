@@ -2578,3 +2578,43 @@ def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_w
     _out_ripple_rasters.setWindowTitle(f'Template Rasters <Controlled by DecodedEpochSlices window>')
 
     return _out_ripple_rasters, update_attached_raster_viewer_epoch_callback
+
+
+
+def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window):
+    """ Extra buttons to perform various tasks.
+    
+    
+    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import build_extra_programmatic_buttons
+    
+    build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window)
+    
+    """
+    from types import MethodType
+    from attrs import asdict, astuple
+    from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import build_programmatic_buttons, ProgrammaticButtonConfig
+
+    global_thin_button_bar_widget: ThinButtonBarWidget = paginated_multi_decoder_decoded_epochs_window.global_thin_button_bar_widget
+
+    ## INPUT: global_thin_button_bar_widget
+    button_config_list = [
+    #  dict(icon_path=':/png/gui/icons/document-open.png', name="OpenFile"),
+    #  dict(icon_path=':/png/gui/icons/document-save.png', name="SaveFile"),
+    #  dict(icon_path=':/png/gui/icons/crosshair.png', name="Crosshairs"),
+    #  dict(icon_path=':/png/gui/icons/crop.png', name="Crop"),
+    #  dict(icon_path=':/png/gui/icons/selected.png', name="Selections"),
+    #  dict(icon_path=':/png/gui/icons/view-raw.png', name="CopyAsArray"),
+    dict(icon_path=':/png/gui/icons/view-refresh.png', name="Refresh", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.refresh_current_page())), ## captures: paginated_multi_decoder_decoded_epochs_window
+    # dict(icon_path=':/png/gui/icons/nxdata-create.png', name="AddDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict))), ## captures: paginated_multi_decoder_decoded_epochs_window, decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict
+    dict(icon_path=':/png/gui/icons/mask-clear-all.png', name="RemoveDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.remove_data_overlays())), ## captures: paginated_multi_decoder_decoded_epochs_window
+    dict(icon_path=':/png/gui/icons/document-print.png', name="PrintUserAnnotations", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.print_user_annotations())), ## captures: paginated_multi_decoder_decoded_epochs_window
+    dict(icon_path=':/png/gui/icons/image-select-erase.png', name="LoadUserAnnotations", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.restore_selections_from_user_annotations())), ## captures: paginated_multi_decoder_decoded_epochs_window
+    
+
+    ]
+    button_config_dict = {v['name']:v for v in button_config_list}
+
+    new_buttons_config_dict, new_buttons_dict = build_programmatic_buttons(global_thin_button_bar_widget, button_config_dict=button_config_dict, clear_all_existing=True)
+
+
