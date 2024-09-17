@@ -137,6 +137,7 @@ class PosteriorExporting:
         """
         from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, get_array_as_image
         from pyphocorehelpers.plotting.media_output_helpers import get_array_as_image_stack, save_array_as_image_stack
+        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack
         
         
         assert parent_array_as_image_output_folder.exists()
