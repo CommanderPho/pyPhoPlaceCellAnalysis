@@ -743,7 +743,7 @@ class RankOrderRastersDebugger:
 
 
 
-    def save_figure(self, export_path: Path):
+    def save_figure(self, export_path: Path, **kwargs):
         """ Exports all four rasters to a specified file path
         
         _out_rank_order_event_raster_debugger.save_figure(export_path=export_path)
@@ -758,8 +758,8 @@ class RankOrderRastersDebugger:
         for a_decoder, a_plot in root_plots_dict.items():
             a_plot.setYRange(-0.5, float(self.max_n_neurons))
             self.get_epoch_active_aclus()
-            out_path = export_path.joinpath(f'{a_decoder}_plot.png').resolve()
-            export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0))
+            out_path = export_path.joinpath(f'{a_decoder}_raster.png').resolve()
+            export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0), **kwargs)
             save_paths.append(out_path)
     
         return save_paths
@@ -768,7 +768,7 @@ class RankOrderRastersDebugger:
 
 
     @function_attributes(short_name=None, tags=['figure', 'export', 'slider', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-21 19:49', related_items=[])
-    def export_figure_all_slider_values(self, export_path: Union[str,Path]):
+    def export_figure_all_slider_values(self, export_path: Union[str,Path], **kwargs):
         """ sweeps the rank_order_event_raster_debugger through its various slider values, exporting all four of its plots as images for each value. 
 
         Usage:
@@ -790,8 +790,8 @@ class RankOrderRastersDebugger:
             for a_decoder, a_plot in self.root_plots_dict.items():
                 curr_filename_prefix = f'Epoch{active_epoch_label}_{a_decoder}'
                 # a_plot.setYRange(-0.5, float(self.max_n_neurons))
-                out_path = export_path.joinpath(f'{curr_filename_prefix}_plot.png').resolve()
-                export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0))
+                out_path = export_path.joinpath(f'{curr_filename_prefix}_raster.png').resolve()
+                export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0), **kwargs)
                 save_paths.append(out_path)
 
             all_save_paths[active_epoch_label] = save_paths
