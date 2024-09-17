@@ -1900,10 +1900,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\mathrel{\\multimap}} - \\theta_{\\mathrel{\\hookrightarrow}}}{\\theta_{\\mathrel{\\hookrightarrow}} + \\theta_{\\mathrel{\\multimap}}}$'
     # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\mathrel{\\multimap}} - R_{\\mathrel{\\hookrightarrow}}}{R_{\\mathrel{\\hookrightarrow}} + R_{\\mathrel{\\multimap}}}$'
 
-
     # Replay Firing Rate Index $\frac{R_{\multimap}-R_{\mapsto}}{R_{\mapsto} + R_{\multimap}}$ \\
                                                                                 
-
     scatter_params = dict(zorder=5) | scatter_params
 
 

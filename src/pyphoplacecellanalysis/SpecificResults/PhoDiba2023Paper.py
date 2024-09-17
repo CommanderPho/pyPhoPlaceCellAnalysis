@@ -927,7 +927,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.4)
             a_fig_container['plot_objects']['long_to_short_arrow'] = {}
 
-        if enable_hover_labels or enable_tiny_point_labels or enabled_point_connection_lines:
+        if (enable_hover_labels or enable_tiny_point_labels or enabled_point_connection_lines):
             
             for bar_idx, a_scatter_plot, x_values, y_values, active_labels in zip(np.arange(4), a_fig_container['plot_objects']['scatter_plots'], x_values_list, y_values_list, label_list): # four scatter plots ( one for each group/bar)
                 point_hover_labels = [f'{i}' for i in active_labels] # point_hover_labels will be added as tooltip annotations to the datapoints
