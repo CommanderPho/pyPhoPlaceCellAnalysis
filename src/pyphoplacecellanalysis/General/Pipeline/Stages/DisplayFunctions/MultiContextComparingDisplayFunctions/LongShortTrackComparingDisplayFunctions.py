@@ -851,7 +851,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
 # ==================================================================================================================== #
 
-@metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=['_display_jonathan_interactive_replay_firing_rate_comparison', '_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2024-09-16 17:09', related_items=[])
+@metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=['_display_jonathan_interactive_replay_firing_rate_comparison', '_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2024-09-16 17:09', related_items=['BatchPhoJonathanFiguresHelper'])
 class PhoJonathanPlotHelpers:
     @classmethod
     @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['make_fr', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])

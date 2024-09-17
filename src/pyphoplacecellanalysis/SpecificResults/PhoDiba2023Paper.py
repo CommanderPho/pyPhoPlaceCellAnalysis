@@ -1033,6 +1033,9 @@ def pho_stats_bar_graph_t_tests(across_session_inst_fr_computation):
     """ performs the statistical tests for the bar-graphs 
 
     Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_bar_graph_t_tests
+
         LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(across_session_inst_fr_computation)
 
     """

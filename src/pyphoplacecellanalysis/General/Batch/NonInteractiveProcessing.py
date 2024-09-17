@@ -529,7 +529,7 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
 
 # import matplotlib as mpl
 # import matplotlib.pyplot as plt
-@function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
+@function_attributes(short_name='batch_extended_programmatic_figures', tags=['batch', 'automated', 'session', 'display', 'figures', 'extended', 'matplotlib', 'main'], input_requires=[], output_provides=[], uses=['_display_batch_pho_jonathan_replay_firing_rate_comparison'], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_format=False, write_png=True, debug_print=False):
     """ 
     
@@ -626,7 +626,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
     ## Exports all cells to the `BatchPhoJonathanFiguresHelper` but without the top part:
     try:
-        # Relative Entropy/Surprise Results:
+        # PhoJonathan Results:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
@@ -694,9 +694,10 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
 
 
-@metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure', 'batch', 'LxC', 'SxC', 'LongShort'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-16 17:34', related_items=[])
+@metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure', 'batch', 'LxC', 'SxC', 'LongShort'], input_requires=[], output_provides=[], uses=[], used_by=['batch_programmatic_figures', 'batch_extended_programmatic_figures'],
+                     creation_date='2024-09-16 17:34', related_items=['PhoJonathanPlotHelpers'])
 class BatchPhoJonathanFiguresHelper:
-    """Private methods that help with batch figure generator for ClassName.
+    """Private methods that help with batch figure generator for PhoJonathanPlotHelpers.
 
     In .run(...) it builds the plot_kwargs (`active_kwarg_list`) ahead of time that will be passed to the specific plot function using `cls._build_batch_plot_kwargs(...)`
         It then calls `active_out_figures_list = cls._perform_batch_plot(...)` to do the plotting, getting the list of figures and output paths
