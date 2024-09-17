@@ -89,29 +89,35 @@ def build_extra_cell_info_label_string(row) -> str:
 
 
 @function_attributes(short_name=None, tags=['pf_inclusion', 'columns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-17 06:34', related_items=[])
-def add_spikes_df_placefield_inclusion_columns(curr_active_pipeline, overwrite_columns: bool=True):
+def add_spikes_df_placefield_inclusion_columns(curr_active_pipeline, global_spikes_df: pd.DataFrame, overwrite_columns: bool=True):
     """ adds columns:
     'is_included_long_pf1D', 'is_included_short_pf1D', 'is_included_global_pf1D',     
     
     Usage:
-        add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=curr_active_pipeline, overwrite_columns=True)
-    
+        global_results.sess.spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=curr_active_pipeline, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)
+
+       
     """
     # long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
     long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # non-['computed_data'] unwrapping version
 
+    # global_spikes_df = global_results.sess.spikes_df
+    
     ## Add three columns to global_results.sess.spikes_df, indicating whether each spike is included in the filtered_spikes_df for the (long, short, global) pf1Ds
-    if ('is_included_long_pf1D' not in global_results.sess.spikes_df.columns) or overwrite_columns:
-        global_results.sess.spikes_df['is_included_long_pf1D'] = False
-        global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, long_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_long_pf1D'] = True # `long_results.computed_data.pf1D.filtered_spikes_df`
-    if ('is_included_short_pf1D' not in global_results.sess.spikes_df.columns) or overwrite_columns:
-        global_results.sess.spikes_df['is_included_short_pf1D'] = False
-        global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, short_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_short_pf1D'] = True # `short_results.computed_data.pf1D.filtered_spikes_df`
-    if ('is_included_global_pf1D' not in global_results.sess.spikes_df.columns) or overwrite_columns:
-        global_results.sess.spikes_df['is_included_global_pf1D'] = False
-        global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
+    if ('is_included_long_pf1D' not in global_spikes_df.columns) or overwrite_columns:
+        global_spikes_df['is_included_long_pf1D'] = False
+        global_spikes_df.loc[np.isin(global_spikes_df.index, long_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_long_pf1D'] = True # `long_results.computed_data.pf1D.filtered_spikes_df`
+    if ('is_included_short_pf1D' not in global_spikes_df.columns) or overwrite_columns:
+        global_spikes_df['is_included_short_pf1D'] = False
+        global_spikes_df.loc[np.isin(global_spikes_df.index, short_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_short_pf1D'] = True # `short_results.computed_data.pf1D.filtered_spikes_df`
+    if ('is_included_global_pf1D' not in global_spikes_df.columns) or overwrite_columns:
+        global_spikes_df['is_included_global_pf1D'] = False
+        global_spikes_df.loc[np.isin(global_spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
+
+    return global_spikes_df
+
 
 
 
@@ -223,7 +229,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             #     global_results.sess.spikes_df['is_included_global_pf1D'] = False
             #     global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
 
-            add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, overwrite_columns=True)
+            global_results.sess.spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)            
             
             use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
             cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = PhoJonathanPlotHelpers._build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions=use_filtered_positions) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
@@ -1264,6 +1270,8 @@ class PhoJonathanPlotHelpers:
         """ Plots all spikes for a given cell from that cell's complete `active_spikes_df`
         There are three different classes of spikes: all (black), long (red), short (blue)
 
+        active_spikes_df.is_included_long_pf1D
+        active_spikes_df.is_included_short_pf1D
 
         Usage:
 
