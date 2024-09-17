@@ -799,7 +799,7 @@ class BatchPhoJonathanFiguresHelper:
 
     @classmethod
     def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10, _extra_kwargs=None):
-        """ builds the list of kwargs for all aclus. """
+        """ builds the list of kwargs for all figures (and their aclus). """
         _batch_plot_kwargs_list = [] # empty list to start
 
         _extra_kwargs = _extra_kwargs or {}
