@@ -152,6 +152,9 @@ class PosteriorExporting:
         if debug_print:
             print(f'np.shape(raw_posterior_laps_marginals[{epoch_id}]["p_x_given_n"]): {np.shape(img_data)}')
 
+        base_image_height: int = int(round(base_image_height))
+        desired_half_height: int = int(round(base_image_height/2))
+
         if np.ndim(img_data) > 2:
             n_x_bins, n_decoders, n_curr_epoch_time_bins = np.shape(img_data)
             # raw_tuple = []
@@ -190,7 +193,7 @@ class PosteriorExporting:
                     _long_any: float = np.sum(_long_arr)
                     _short_any: float = np.sum(_short_arr)
                     _direction_marginal_2tuple = np.atleast_2d(np.array([_long_any, _short_any])).T
-                    _temp_img: Image.Image = get_array_as_image(_direction_marginal_2tuple, desired_height=(base_image_height/2), desired_width=None, skip_img_normalization=False)
+                    _temp_img: Image.Image = get_array_as_image(_direction_marginal_2tuple, desired_height=desired_half_height, desired_width=None, skip_img_normalization=False)
                     _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_track_marginal_two_tuple_{i}.png').resolve()
                     _temp_img.save(_sub_img_path) # Save image to file
                     
@@ -221,22 +224,22 @@ class PosteriorExporting:
             
         _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir.png').resolve()
         img_data = epochs_directional_marginals[epoch_id]['p_x_given_n'].astype(float)
-        marginal_dir_tuple = save_array_as_image(img_data, desired_height=(base_image_height/2), desired_width=None, skip_img_normalization=True, out_path=_img_path)
+        marginal_dir_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path)
         # image_marginal_dir, path_marginal_dir = marginal_dir_tuple
 
         _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_track_identity.png').resolve()
         img_data = epochs_track_identity_marginals[epoch_id]['p_x_given_n'].astype(float)
-        marginal_track_identity_tuple = save_array_as_image(img_data, desired_height=(base_image_height/2), desired_width=None, skip_img_normalization=True, out_path=_img_path)
+        marginal_track_identity_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path)
         # image_marginal_track_identity, path_marginal_track_identity = marginal_track_identity_tuple
 
 
         _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_track_identity_point.png').resolve()
         img_data = np.atleast_2d(collapsed_per_epoch_marginal_track_identity_point[epoch_id,:]).T
-        marginal_dir_point_tuple = save_array_as_image(img_data, desired_height=(base_image_height/2), desired_width=None, skip_img_normalization=True, out_path=_img_path)
+        marginal_dir_point_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path)
 
         _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir_point.png').resolve()
         img_data = np.atleast_2d(collapsed_per_epoch_epoch_marginal_dir_point[epoch_id,:]).T
-        marginal_track_identity_point_tuple = save_array_as_image(img_data, desired_height=(base_image_height/2), desired_width=None, skip_img_normalization=True, out_path=_img_path)
+        marginal_track_identity_point_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path)
 
 
         return raw_tuple, marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple
