@@ -833,7 +833,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Replay Firing Rates (Hz)', 'Replay', 'fig_2_Replay_FR_matplotlib', active_context, defer_show, kwargs.get('title_modifier'))
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
-    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, **kwargs):
+    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, **kwargs):
         """ 
         
         title_modifier: lambda original_title: f"{original_title} (all sessions)"
@@ -855,11 +855,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                                                             title_modifier=title_modifier)
 
 
-        if enable_hover_labels or enable_tiny_point_labels:
+        if (enable_hover_labels or enable_tiny_point_labels or enabled_point_connection_lines):
             LxC_aclus = self.computation_result.LxC_aclus
             SxC_aclus = self.computation_result.SxC_aclus
-            _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
-            _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels)
+            _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines)
+            _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines)
         
         def _perform_write_to_file_callback():
             ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
@@ -933,18 +933,21 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                 point_hover_labels = [f'{i}' for i in active_labels] # point_hover_labels will be added as tooltip annotations to the datapoints
                 assert len(x_values) == len(y_values) and len(x_values) == len(point_hover_labels), f"len(x_values): {len(x_values)}, len(y_values): {len(y_values)}, len(point_hover_labels): {len(point_hover_labels)}"
                 # add static tiny labels beside each point
-                if enable_tiny_point_labels:
-                    temp_annotation_labels_list = []
+                if (enable_tiny_point_labels or enabled_point_connection_lines):
+                    if enable_tiny_point_labels:
+                        temp_annotation_labels_list = []
                     for i, (x, y, label) in enumerate(zip(x_values, y_values, point_hover_labels)):
                         # print(f'{i}, (x, y, label): ({x}, {y}, {label})')
-                        annotation_item = ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
-                        temp_annotation_labels_list.append(annotation_item)
+                        if enable_tiny_point_labels:
+                            annotation_item = ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
+                            temp_annotation_labels_list.append(annotation_item)
                         if enabled_point_connection_lines:
                             if str(label) not in a_fig_container['plot_objects']['point_connection_lines']:
                                 a_fig_container['plot_objects']['point_connection_lines'][str(label)] = [] ## create
                             a_fig_container['plot_objects']['point_connection_lines'][str(label)].append((x, y))
-
-                    a_fig_container['plot_objects']['tiny_annotation_labels'].append(temp_annotation_labels_list)
+    
+                    if enable_tiny_point_labels:
+                        a_fig_container['plot_objects']['tiny_annotation_labels'].append(temp_annotation_labels_list)
                     
                 # add hover labels:
                 # https://stackoverflow.com/questions/7908636/possible-to-make-labels-appear-when-hovering-over-a-point-in-matplotlib
