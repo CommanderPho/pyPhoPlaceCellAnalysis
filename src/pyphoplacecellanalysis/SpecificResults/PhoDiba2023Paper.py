@@ -660,7 +660,7 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 @metadata_attributes(short_name=None, tags=['figure_2', 'paper', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-06-26 21:36', related_items=[])
 @define(slots=False, repr=False)
 class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
-    """ full instantaneous firing rate computations for both Long and Short epochs
+    """ Plots the LxC/SxC bar graph containing full instantaneous firing rate computations for both Long and Short epochs
     
     Usage:
         _out_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=0.01) # 10ms
@@ -881,7 +881,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
 
     @classmethod
-    def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True):
+    def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True, enabled_point_connection_lines=True):
         """ Adds disambiguating labels to each of the scatterplot points. Important for specifying which ACLU is plotted.
 
 
@@ -917,8 +917,18 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             a_fig_container['plot_objects']['tiny_annotation_labels'] = []
         if enable_hover_labels:
             a_fig_container['plot_objects']['hover_label_objects'] = []
-        
-        if enable_hover_labels or enable_tiny_point_labels:
+        if enabled_point_connection_lines:
+            a_fig_container['plot_objects']['point_connection_lines'] = {} # aclu:(start_point, end_point)
+            # start_points = []
+            # end_points = []
+            # Draw arrows from the first set of points to the second set _________________________________________________________ #
+            # arrowprops_kwargs = dict(arrowstyle="->", alpha=0.6)
+            # arrowprops_kwargs = dict(arrowstyle="simple", alpha=0.7)
+            arrowprops_kwargs = dict(arrowstyle="fancy, head_length=0.25, head_width=0.25, tail_width=0.05", alpha=0.4)
+            a_fig_container['plot_objects']['long_to_short_arrow'] = {}
+
+        if enable_hover_labels or enable_tiny_point_labels or enabled_point_connection_lines:
+            
             for bar_idx, a_scatter_plot, x_values, y_values, active_labels in zip(np.arange(4), a_fig_container['plot_objects']['scatter_plots'], x_values_list, y_values_list, label_list): # four scatter plots ( one for each group/bar)
                 point_hover_labels = [f'{i}' for i in active_labels] # point_hover_labels will be added as tooltip annotations to the datapoints
                 assert len(x_values) == len(y_values) and len(x_values) == len(point_hover_labels), f"len(x_values): {len(x_values)}, len(y_values): {len(y_values)}, len(point_hover_labels): {len(point_hover_labels)}"
@@ -929,6 +939,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                         # print(f'{i}, (x, y, label): ({x}, {y}, {label})')
                         annotation_item = ax.annotate(label, (x, y), textcoords="offset points", xytext=(2,2), ha='left', va='bottom', fontsize=8) # , color=rect.get_facecolor()
                         temp_annotation_labels_list.append(annotation_item)
+                        if enabled_point_connection_lines:
+                            if str(label) not in a_fig_container['plot_objects']['point_connection_lines']:
+                                a_fig_container['plot_objects']['point_connection_lines'][str(label)] = [] ## create
+                            a_fig_container['plot_objects']['point_connection_lines'][str(label)].append((x, y))
+
                     a_fig_container['plot_objects']['tiny_annotation_labels'].append(temp_annotation_labels_list)
                     
                 # add hover labels:
@@ -938,6 +953,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                 if enable_hover_labels:
                     hover_label_obj = mplcursors.cursor(a_scatter_plot, hover=True).connect("add", lambda sel: sel.annotation.set_text(point_hover_labels[sel.index]))
                     a_fig_container['plot_objects']['hover_label_objects'].append(hover_label_obj)
+
+
+        if enabled_point_connection_lines:
+            for a_label, a_point_list in a_fig_container['plot_objects']['point_connection_lines'].items():
+                print(f'a_label: {a_label}, a_point_list: {a_point_list}')
+                assert len(a_point_list) == 2,f"len(a_point_list) should be 2, but it is {len(a_point_list)}"
+                (start_x, start_y), (end_x, end_y) = a_point_list
+                a_fig_container['plot_objects']['long_to_short_arrow'][a_label] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color='black'), label=str(label))
+                # plt.plot(x,y,zorder=1) 
 
         return a_fig_container
 
