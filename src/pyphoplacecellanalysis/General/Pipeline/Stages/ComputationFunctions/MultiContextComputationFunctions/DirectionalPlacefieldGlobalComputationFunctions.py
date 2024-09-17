@@ -6289,7 +6289,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             return collector
 
 
-    @function_attributes(short_name='directional_merged_pfs', tags=['display'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-04 03:27', related_items=[], is_global=True)
+    @function_attributes(short_name='directional_merged_pfs', tags=['display', 'pyqtgraph', 'heatmap'], input_requires=["global_computation_results.computed_data['DirectionalMergedDecoders']"], output_provides=[], uses=['display_all_pf_2D_pyqtgraph_binned_image_rendering'], used_by=[], creation_date='2024-01-04 03:27', related_items=[], is_global=True)
     def _display_directional_merged_pfs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
                                         plot_all_directions=True, plot_long_directional=False, plot_short_directional=False, **kwargs):
         """ Plots the merged pseduo-2D pfs/ratemaps. Plots: All-Directions, Long-Directional, Short-Directional in seperate windows. 
