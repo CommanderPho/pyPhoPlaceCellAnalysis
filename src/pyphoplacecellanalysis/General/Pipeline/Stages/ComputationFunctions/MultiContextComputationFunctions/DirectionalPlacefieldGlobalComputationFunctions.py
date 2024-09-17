@@ -6326,11 +6326,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             names_list = [v for v in list(out_all_pf_2D_pyqtgraph_binned_image_fig.plots.keys()) if v not in ('name', 'context')]
             for a_name in names_list:
                 # Adjust the size of the text for the item by passing formatted text
-                a_plot: pg.PlotItem = out_all_pf_2D_pyqtgraph_binned_image_fig.plots[a_name].mainPlotItem # PlotItem 
+                a_plot: pg.PlotItem = out_all_pf_2D_pyqtgraph_binned_image_fig.plots[a_name].mainPlotItem # PlotItem
+                a_plot.invertY(True)  # Inverts the y-axis
                 # no clue why 2 is a good value for this...
                 a_plot.titleLabel.setMaximumHeight(2)
                 a_plot.layout.setRowFixedHeight(0, 2)
-                
 
             if not defer_render:
                 out_all_pf_2D_pyqtgraph_binned_image_fig.show()
