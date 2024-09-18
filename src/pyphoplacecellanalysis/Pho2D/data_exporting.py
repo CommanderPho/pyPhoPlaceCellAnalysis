@@ -154,50 +154,58 @@ class PosteriorExporting:
 
         base_image_height: int = int(round(base_image_height))
         desired_half_height: int = int(round(base_image_height/2))
-        get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=False, include_value_labels=include_value_labels)
-        # get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=True, include_value_labels=include_value_labels)
+        # get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=False, include_value_labels=include_value_labels)
+        get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=True, include_value_labels=include_value_labels) # do not manually normalize the image before output. 
         save_array_as_image_kwargs = dict(include_value_labels=include_value_labels, allow_override_aspect_ratio=allow_override_aspect_ratio)
 
         if np.ndim(img_data) > 2:
             n_x_bins, n_decoders, n_curr_epoch_time_bins = np.shape(img_data)
-            img_data_array = [np.atleast_2d(np.squeeze(img_data[:,:, i])).T for i in np.arange(n_curr_epoch_time_bins)]        
-            imgs_array = [get_array_as_image(img_data_array[i], desired_height=base_image_height, **get_array_as_img_kwargs) for i in np.arange(n_curr_epoch_time_bins)]            
+            # img_data_array = [np.atleast_2d(np.squeeze(img_data[:,:, i])).T for i in np.arange(n_curr_epoch_time_bins)]
+            raw_posterior_array = [np.atleast_2d(np.squeeze(img_data[:,:, i])) for i in np.arange(n_curr_epoch_time_bins)]
+                    
+            imgs_array = [get_array_as_image(raw_posterior_array[i].T, desired_height=base_image_height, **get_array_as_img_kwargs) for i in np.arange(n_curr_epoch_time_bins)]            
             if export_all_raw_marginals_separately:
                 _sub_img_parent_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_raw_marginal').resolve()
                 _sub_img_parent_path.mkdir(parents=False, exist_ok=True)
-                for i, (an_img_data, an_img) in enumerate(zip(img_data_array, imgs_array)):
+                for i, (a_single_time_bin_raw_posterior, an_img) in enumerate(zip(raw_posterior_array, imgs_array)):
                     _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_raw_marginal_{i}.png').resolve()
                     an_img.save(_sub_img_path) # Save image to file
                     _out_save_tuples.append((an_img, _sub_img_path))
                     
                     if debug_print:
-                        print(f'i: {i}, np.shape(an_img_data): {np.shape(an_img_data)}') # n_x_bins, n_decoders
-                    _decoder_prob_arr = np.sum(an_img_data, axis=1) # get the four-tuple of decoder probabilities
-                    _decoder_prob_arr = _decoder_prob_arr / np.nansum(_decoder_prob_arr) # normalize
-
+                        print(f'i: {i}, np.shape(a_single_time_bin_raw_posterior): {np.shape(a_single_time_bin_raw_posterior)}') # (n_x_bins, n_decoders)
+                    _decoder_prob_arr = np.sum(a_single_time_bin_raw_posterior, axis=0) # get the four-tuple of decoder probabilities ... should this be axis=0? ... no because it's transposed... how confusing
+                    # _decoder_prob_arr = _decoder_prob_arr / np.nansum(_decoder_prob_arr) # normalize
                     if debug_print:
-                        print(f'\t_decoder_prob_arr: {_decoder_prob_arr}')
+                        print(f'\tnp.shape(_decoder_prob_arr): {np.shape(_decoder_prob_arr)}, _decoder_prob_arr: {_decoder_prob_arr}')
                     _decoder_prob_img: Image.Image = get_array_as_image(np.atleast_2d(_decoder_prob_arr).T, desired_height=base_image_height, **get_array_as_img_kwargs)
                     _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_marginal_decoder_{i}.png').resolve()
                     _decoder_prob_img.save(_sub_img_path) # Save image to file
                     _out_save_tuples.append((_decoder_prob_img, _sub_img_path))
                     
-                    _long_arr = np.sum(an_img_data[[0,1], :], axis=0)
-                    _short_arr = np.sum(an_img_data[[2,3], :], axis=0)
-                    if debug_print:
-                        print(f'\tnp.shape(_long_arr): {np.shape(_long_arr)}')
+                    # _long_arr = np.sum(a_single_time_bin_raw_posterior[[0,1], :], axis=0) # two long rows
+                    # _short_arr = np.sum(a_single_time_bin_raw_posterior[[2,3], :], axis=0) # the two short rows
+                    # _long_arr = np.sum(a_single_time_bin_raw_posterior[:, [0,1]], axis=1) # two long rows
+                    # _short_arr = np.sum(a_single_time_bin_raw_posterior[:, [2,3]], axis=1) # the two short rows
+                    
+                    # if debug_print:
+                    #     print(f'\tnp.shape(_long_arr): {np.shape(_long_arr)}')
 
-                    _long_arr = _long_arr / np.nansum(_long_arr) # normalize
-                    _short_arr = _short_arr / np.nansum(_short_arr) # normalize
+                    # _long_arr = _long_arr / np.nansum(_long_arr) # normalize
+                    # _short_arr = _short_arr / np.nansum(_short_arr) # normalize
 
                     ## Compute marginal:
-                    _long_any: float = np.sum(_long_arr)
-                    _short_any: float = np.sum(_short_arr)
+                    _long_any: float = np.sum(a_single_time_bin_raw_posterior[:, [2,3]]) # long are the upper-two rows
+                    _short_any: float = np.sum(a_single_time_bin_raw_posterior[:, [0,1]]) # short are the lower-two rows
+                    
+                    # _long_any: float = np.sum(_long_arr)
+                    # _short_any: float = np.sum(_short_arr)
 
                     # skipping _direction_marginal_2tuple
-                    _track_marginal_2tuple = np.atleast_2d(np.array([_long_any, _short_any])).T
+                    # _track_marginal_2tuple = np.atleast_2d(np.array([_long_any, _short_any])).T
+                    _track_marginal_2tuple = np.atleast_2d(np.array([_short_any, _long_any]))
                     # _track_marginal_2tuple = _track_marginal_2tuple / np.nansum(_track_marginal_2tuple) # normalize
-                    _temp_img: Image.Image = get_array_as_image(_track_marginal_2tuple, desired_height=desired_half_height, **get_array_as_img_kwargs)
+                    _temp_img: Image.Image = get_array_as_image(_track_marginal_2tuple.T, desired_height=desired_half_height, **get_array_as_img_kwargs)
                     _sub_img_path = _sub_img_parent_path.joinpath(f'{epoch_id_str}_track_marginal_two_tuple_{i}.png').resolve()
                     _temp_img.save(_sub_img_path) # Save image to file
                     _out_save_tuples.append((_temp_img, _sub_img_path))
@@ -228,21 +236,24 @@ class PosteriorExporting:
             
             # image_raw, path_raw = raw_tuple
             
+        # [2 x n_epoch_t_bins] matrix
         _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir.png').resolve()
         img_data = epochs_directional_marginals[epoch_id]['p_x_given_n'].astype(float)
         marginal_dir_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path, **save_array_as_image_kwargs)
         # image_marginal_dir, path_marginal_dir = marginal_dir_tuple
 
+        # [2 x n_epoch_t_bins] matrix
         _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_track_identity.png').resolve()
         img_data = epochs_track_identity_marginals[epoch_id]['p_x_given_n'].astype(float)
         marginal_track_identity_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path, **save_array_as_image_kwargs)
         # image_marginal_track_identity, path_marginal_track_identity = marginal_track_identity_tuple
 
-
+        # 2-vector
         _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_track_identity_point.png').resolve()
         img_data = np.atleast_2d(collapsed_per_epoch_marginal_track_identity_point[epoch_id,:]).T
         marginal_dir_point_tuple = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path, **save_array_as_image_kwargs)
 
+        # 2-vector
         _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}_marginal_dir_point.png').resolve()
         img_data = np.atleast_2d(collapsed_per_epoch_epoch_marginal_dir_point[epoch_id,:]).T
         marginal_track_identity_point_tuple: Tuple[Image.Image, Path] = save_array_as_image(img_data, desired_height=desired_half_height, desired_width=None, skip_img_normalization=True, out_path=_img_path, **save_array_as_image_kwargs)
@@ -274,10 +285,10 @@ class PosteriorExporting:
         raw_posterior_active_marginals: List = deepcopy(active_filter_epochs_decoder_result.p_x_given_n_list)
         if debug_print:
             print(f'len(raw_posterior_active_marginals): {len(raw_posterior_active_marginals)}')
-        collapsed_per_lap_epoch_marginal_track_identity_point = active_marginals_df[['P_Long', 'P_Short']].to_numpy().astype(float)
-        collapsed_per_lap_epoch_marginal_dir_point = active_marginals_df[['P_LR', 'P_RL']].to_numpy().astype(float)
+        collapsed_per_epoch_marginal_track_identity_point = active_marginals_df[['P_Long', 'P_Short']].to_numpy().astype(float)
+        collapsed_per_epoch_marginal_dir_point = active_marginals_df[['P_LR', 'P_RL']].to_numpy().astype(float)
         if debug_print:
-            print(f'collapsed_per_lap_epoch_marginal_track_identity_point.shape: {np.shape(collapsed_per_lap_epoch_marginal_track_identity_point)}')
+            print(f'collapsed_per_epoch_marginal_track_identity_point.shape: {np.shape(collapsed_per_epoch_marginal_track_identity_point)}')
 
         
         ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = directional_merged_decoders_result.ripple_directional_marginals_tuple
@@ -307,7 +318,7 @@ class PosteriorExporting:
             _curr_path.mkdir(exist_ok=True)
                                                      
             out_tuple_dict[epoch_id] = cls.save_posterior(raw_posterior_active_marginals, active_directional_marginals,
-                                                                                active_track_identity_marginals, collapsed_per_lap_epoch_marginal_dir_point, collapsed_per_lap_epoch_marginal_track_identity_point,
+                                                                                active_track_identity_marginals, collapsed_per_epoch_marginal_dir_point, collapsed_per_epoch_marginal_track_identity_point,
                                                                                         parent_array_as_image_output_folder=_curr_path, epoch_id_identifier_str=epoch_id_identifier_str, epoch_id=epoch_id,
                                                                                         export_all_raw_marginals_separately=export_all_raw_marginals_separately, include_value_labels=include_value_labels, allow_override_aspect_ratio=allow_override_aspect_ratio,
                                                                                         debug_print=debug_print)
@@ -315,7 +326,7 @@ class PosteriorExporting:
         
             
     @classmethod
-    def _test_export_marginals_for_figure(cls, directional_merged_decoders_result, filtered_decoder_filter_epochs_decoder_result_dict, clicked_epoch: NDArray, context_specific_root_export_path, ripple_specific_folder, epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
+    def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, ripple_specific_folder: Path, epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
         """
         
                 epoch_id_identifier_str='ripple'
@@ -371,6 +382,14 @@ class PosteriorExporting:
         if debug_print:
             print(f'epoch_ids: {epoch_ids}')
 
+        ## Sanity check:
+        if debug_print:
+            curr_epoch_result: SingleEpochDecodedResult = active_filter_epochs_decoder_result.get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
+            print(f"curr_epoch_result.epoch_info_tuple: {curr_epoch_result.epoch_info_tuple}")
+            print(f"\tnbins: {curr_epoch_result.nbins}")
+            print(f'\tactive_filter_epochs_decoder_result.decoding_time_bin_size: {active_filter_epochs_decoder_result.decoding_time_bin_size}')
+            # curr_epoch_result.time_bin_container
+
         # active_filter_epochs_decoder_result.all_directional_ripple_filter_epochs_decoder_result
         out_image_save_tuple_dict = cls.save_marginals_arrays_as_image(directional_merged_decoders_result=directional_merged_decoders_result, parent_array_as_image_output_folder=context_specific_root_export_path,
                                                           epoch_id_identifier_str=epoch_id_identifier_str, epoch_ids=epoch_ids, debug_print=True, include_value_labels=False, allow_override_aspect_ratio=allow_override_aspect_ratio,# **kwargs,
@@ -400,6 +419,9 @@ class PosteriorExporting:
         for k, v in filtered_decoder_filter_epochs_decoder_result_dict.items():
             # v: DecodedFilterEpochsResult
             a_result: SingleEpochDecodedResult = v.get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
+            print(f"{k}: filtered_decoder_filter_epochs_decoder_result_dict[{k}].decoding_time_bin_size: {v.decoding_time_bin_size}") # 0.016!! 
+            
+
             _img_path = ripple_specific_folder.joinpath(f'{epoch_id_str}_posterior_{k}.png').resolve()
             a_result.save_posterior_as_image(_img_path, colormap='Oranges', allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
             out_image_paths[k] = _img_path
