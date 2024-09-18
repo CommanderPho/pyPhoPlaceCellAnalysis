@@ -667,25 +667,36 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return deepcopy([self.time_bin_containers[an_epoch_idx].centers for an_epoch_idx in np.arange(self.num_filter_epochs)])
 
 
+    @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=['self.get_result_for_epoch_at_time'])
     def get_result_for_epoch(self, active_epoch_idx: int) -> SingleEpochDecodedResult:
         """ returns a container with the result from a single epoch. 
+        NOTE: active_epoch_idx is the "dumb-index" not a smarter epoch id or label or anything like that. See self.get_result_for_epoch_at_time(...) for smarter access.
+        
         """
         single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # a_decoder_decoded_epochs_result._test_find_fields_by_shape_metadata()
         fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'],
             ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges'])) # maps list names to single-epoch specific field names
         
-        # class_fields = self.__attrs_attrs__
-        # single_epoch_fields = [field for field in class_fields if field.name in single_epoch_field_names]
-        # values_dict = {fields_to_single_epoch_fields_dict[field.name]:getattr(self, field.name)[epoch_IDX] for field in single_epoch_fields}
-
         values_dict = {fields_to_single_epoch_fields_dict[field_name]:getattr(self, field_name)[active_epoch_idx] for field_name in single_epoch_field_names}
-
-        a_posterior = self.p_x_given_n_list[active_epoch_idx].copy()
-        active_epoch_info_tuple = tuple(ensure_dataframe(self.active_filter_epochs).itertuples(name='EpochTuple'))[active_epoch_idx]
-
+        # a_posterior = self.p_x_given_n_list[active_epoch_idx].copy()
+        active_epoch_info_tuple = tuple(ensure_dataframe(self.active_filter_epochs).itertuples(name='EpochTuple'))[active_epoch_idx] # just dumb-indexes into the epochs array
         single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult(**values_dict, epoch_info_tuple=active_epoch_info_tuple, epoch_data_index=active_epoch_idx)
-    
         return single_epoch_result
+    
+    @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-18 07:36', related_items=['self.get_result_for_epoch'])
+    def get_result_for_epoch_at_time(self, epoch_start_time: float) -> SingleEpochDecodedResult:
+        """ returns a container with the result from a single epoch, based on a start time
+        
+        
+        .get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
+        
+        """
+        filtered_v = self.filtered_by_epoch_times(included_epoch_start_times=np.atleast_1d(epoch_start_time)) # should only have 1 epoch remaining
+        assert len(filtered_v.filter_epochs) == 1, f"len(filtered_v.filter_epochs): {len(filtered_v.filter_epochs)}"
+        return filtered_v.get_result_for_epoch(active_epoch_idx=0) # 0 to indicate the first (and only) remaining epoch
+        
+    
+    
     
 
     @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=[], creation_date='2024-02-13 17:25', related_items=[])
