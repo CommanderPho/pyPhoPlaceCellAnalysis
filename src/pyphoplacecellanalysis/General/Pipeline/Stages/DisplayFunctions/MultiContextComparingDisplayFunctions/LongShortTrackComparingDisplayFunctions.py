@@ -1962,7 +1962,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     plt.suptitle('')
     fig = plt.gcf() # get figure to setup the margins on.
     text_formatter.setup_margins(fig)
-    flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:crimson, weight:bold>long ($L$)</>|<color:royalblue, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
+    flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
     footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
@@ -2005,8 +2005,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         _boundary_line_kwargs = dict(linestyle='-', )
         _line_kwargs = dict(zorder=1)
         
-        long_color = 'crimson'
-        short_color = 'royalblue'
+        long_color = 'royalblue'
+        short_color = 'crimson'
 
         ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
         ax.axvline(x=0.0, color='grey', linestyle='-', **_line_kwargs)  # Vertical line at x = 0

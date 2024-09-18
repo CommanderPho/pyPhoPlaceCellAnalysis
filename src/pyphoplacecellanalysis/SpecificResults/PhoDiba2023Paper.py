@@ -679,7 +679,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
     @classmethod
     def get_bar_colors(cls):
-        return [(1.0, 0, 0, 1), (0.65, 0, 0, 1), (0, 0, 0.65, 1), (0, 0, 1.0, 1)]    # corresponding colors
+        # return [(1.0, 0, 0, 1), (0.65, 0, 0, 1), (0, 0, 0.65, 1), (0, 0, 1.0, 1)] # corresponding colors
+        return [(0, 0, 1.0, 1), (0, 0, 0.65, 1), (0.65, 0, 0, 1), (1.0, 0, 0, 1)] # long=Blue, short=Red -- dimmer
 
 
     def compute(self, curr_active_pipeline, **kwargs):
@@ -709,7 +710,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         """
         return (f"<size:22><weight:bold>{epochs_name}</> Firing Rates\n"
                 "<size:14>for the "
-                "<color:crimson, weight:bold>Long</>/<color:royalblue, weight:bold>Short</> eXclusive Cells on each track</></>"
+                "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> eXclusive Cells on each track</></>"
                 )
 
 
@@ -789,10 +790,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         active_context = kwargs.get('active_context', None)
         assert active_context is not None
         
+        # delta_minus_str: str = '\\Delta -'        
+        # delta_plus_str: str = '\\Delta +'
+        delta_minus_str: str = '⬖'        
+        delta_plus_str: str = '⬗'
+
         var_name:str = 'Laps'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
 
-        x_labels = ['$L_x C$\t$\\theta_{\\Delta -}$', '$L_x C$\t$\\theta_{\\Delta +}$', '$S_x C$\t$\\theta_{\\Delta -}$', '$S_x C$\t$\\theta_{\\Delta +}$']
+        x_labels = ['$L_x C$\t$\\theta_{' + delta_minus_str + '}$', '$L_x C$\t$\\theta_{' + delta_plus_str + '}$', '$S_x C$\t$\\theta_{' + delta_minus_str + '}$', '$S_x C$\t$\\theta_{' + delta_plus_str + '}$']
         all_data_points = np.array([v.values for v in Fig2_Laps_FR])
         # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
 
@@ -814,10 +820,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         active_context = kwargs.get('active_context', None)
         assert active_context is not None
         
+        # delta_minus_str: str = '\\Delta -'        
+        # delta_plus_str: str = '\\Delta +'
+        delta_minus_str: str = '⬖'        
+        delta_plus_str: str = '⬗'
+        
         var_name:str = 'Replay'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
         
-        x_labels = ['$L_x C$\t$R_{\\Delta -}$', '$L_x C$\t$R_{\\Delta +}$', '$S_x C$\t$R_{\\Delta -}$', '$S_x C$\t$R_{\\Delta +}$']
+        x_labels = ['$L_x C$\t$R_{' + delta_minus_str + '}$', '$L_x C$\t$R_{' + delta_plus_str + '}$', '$S_x C$\t$R_{' + delta_minus_str + '}$', '$S_x C$\t$R_{' + delta_plus_str + '}$']
         assert len(Fig2_Replay_FR) == 4
         all_data_points = np.array([v.values for v in Fig2_Replay_FR])
         # all_scatter_props = Fig2_Replay_FR[0].LxC_scatter_props + Fig2_Replay_FR[1].LxC_scatter_props + Fig2_Replay_FR[2].SxC_scatter_props + Fig2_Replay_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
