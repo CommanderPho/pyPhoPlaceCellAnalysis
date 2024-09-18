@@ -450,7 +450,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return f"{type(self).__name__}({content}\n)"
     
     @function_attributes(short_name=None, tags=['image', 'posterior'], input_requires=[], output_provides=[], uses=['get_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
-    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False):
+    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False, **kwargs):
         """ gets the posterior as a colormapped image 
         
         Usage:
@@ -468,11 +468,11 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             epoch_id_str = f"{epoch_id_identifier_str}"
 
         img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
-        return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_grayscale=export_grayscale)
+        return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_grayscale=export_grayscale, **kwargs)
 
 
     @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['save_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
-    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=100, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False):
+    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False, **kwargs):
         """ saves the posterior to disk
         
         Usage:
@@ -486,16 +486,26 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
         if isinstance(parent_array_as_image_output_folder, str):
             parent_array_as_image_output_folder = Path(parent_array_as_image_output_folder).resolve()
-        assert parent_array_as_image_output_folder.exists()
-        
-        if self.epoch_data_index is not None:
-            epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+            
+            
+        if parent_array_as_image_output_folder.is_dir():
+            assert parent_array_as_image_output_folder.exists(), f"path '{parent_array_as_image_output_folder}' does not exist!"
+            
+            if self.epoch_data_index is not None:
+                epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+            else:
+                epoch_id_str = f"{epoch_id_identifier_str}"
+            _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}.png').resolve()
         else:
-            epoch_id_str = f"{epoch_id_identifier_str}"
+            _img_path = parent_array_as_image_output_folder.resolve() # already a direct path
+            
 
-        _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}.png').resolve()
+        if (desired_height is None) and (desired_width is None):
+            # only if the user hasn't provided a desired width OR height should we suggest a height of 100
+            desired_height = 100
+            
         img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
-        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale)
+        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale, **kwargs)
         image_raw, path_raw = raw_tuple
         return image_raw, path_raw
 
