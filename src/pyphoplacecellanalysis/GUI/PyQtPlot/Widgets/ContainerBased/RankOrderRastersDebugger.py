@@ -63,18 +63,55 @@ __all__ = ['RankOrderRastersDebugger']
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
 
 
-@metadata_attributes(short_name=None, tags=['gui', 'window', 'figure'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
+@metadata_attributes(short_name=None, tags=['gui', 'window', 'figure', '🖼️', '🎨'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
 @define(slots=False)
 class RankOrderRastersDebugger:
     """ RankOrderRastersDebugger displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
+
+
+    # Examples ___________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 
     _out = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, active_epochs_dfe, track_templates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
+    # Example 1 __________________________________________________________________________________________________________ #
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+    global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps) # .trimmed_to_non_overlapping()
+    global_laps_epochs_df = global_laps.to_dataframe()
+
+    RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = None
+    LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = None
+    _out_laps_rasters: RankOrderRastersDebugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, global_laps_epochs_df, track_templates, rank_order_results, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+    _out_laps_rasters
+
+    
+    # Example 2 __________________________________________________________________________________________________________ #    
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+    _out_ripple_rasters: RankOrderRastersDebugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, deepcopy(filtered_ripple_simple_pf_pearson_merged_df),
+                                                                                                    track_templates, None,
+                                                                                                        None, None,
+                                                                                                        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right']))),
+                                                                                                        )
+    _out_ripple_rasters.set_top_info_bar_visibility(False)
+
+    # Example 3 __________________________________________________________________________________________________________ #
+    _out = curr_active_pipeline.display('_display_directional_template_debugger')
+
+    
+    
+    # Use/Updating _______________________________________________________________________________________________________ #
 
     Updating Display Epoch:
         The `self.on_update_epoch_IDX(an_epoch_idx=0)` can be used to control which Epoch is displayed, and is synchronized across all four sorts.
 
+    Updating Continuous Displayed Time: 
+        `_out_ripple_rasters.programmatically_update_epoch_IDX_from_epoch_start_time(193.65)`
+
+    
     """
     global_spikes_df: pd.DataFrame = field(repr=False)
     active_epochs_df: pd.DataFrame = field(repr=False)
