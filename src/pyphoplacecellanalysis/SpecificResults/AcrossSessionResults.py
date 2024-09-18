@@ -729,6 +729,101 @@ class AcrossSessionsResults:
         return across_session_inst_fr_computation, across_sessions_instantaneous_fr_dict, across_sessions_instantaneous_frs_list
 
 
+class ConciseSessionIdentifiers:
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ConciseSessionIdentifiers
+    
+    
+    Factored out of `BatchResultDataframeAccessor._build_minimal_session_identifiers_list(...)` on 2024-09-18
+        
+    """
+    @function_attributes(short_name=None, tags=['concise', 'format', 'identifier'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-18 11:34', related_items=['parse_concise_abbreviated_neuron_identifying_strings'])
+    @classmethod
+    def _build_minimal_session_identifiers_list(cls, df: pd.DataFrame):
+        """Build a list of short unique identifiers for the good sessions:
+        Adds Column: ['context_minimal_name']
+        
+        ['a0s0', 'a0s1', 'a0s2', 'a0s3', 'a0s4', 'a0s5', 'a0s6', ... 'a2s10', 'a2s11', 'a2s12', 'a2s13', 'a2s14', 'a2s15', 'a2s16', 'a2s17', 'a2s18', 'a2s19']
+        
+        TODO: Critical: this 
+        #TODO 2023-07-20 21:23: - [ ] This needs to only be ran on a dataframe containing all of the sessions! If it's filtered at all, the session numbers will vary depending on how it's filtered!
+        
+        Usage:
+        
+            all_contexts_list: List[IdentifyingContext] = list(across_sessions_instantaneous_fr_dict.keys())
+            assert len(all_contexts_list) > 0 # must have at least one element
+            first_context = all_contexts_list[0]
+            context_column_names = list(first_context.keys()) # ['format_name', 'animal', 'exper_name', 'session_name']
+            expanded_context_df = pd.DataFrame.from_records([a_ctx.as_tuple() for a_ctx in all_contexts_list], columns=context_column_names)
+            context_minimal_names = expanded_context_df.batch_results._build_minimal_session_identifiers_list()
+            # print(f"context_minimal_names: {context_minimal_names}")
+            assert len(context_minimal_names) == len(all_contexts_list)
+
+            context_minimal_names_map = dict(zip(all_contexts_list, context_minimal_names))
+
+            def _build_session_dep_aclu_identifier(session_context: IdentifyingContext, session_relative_aclus: np.ndarray):
+                # return [f"{session_context}_{aclu}" for aclu in session_relative_aclus] # need very short version
+                return [f"{context_minimal_names_map[session_context]}_{aclu}" for aclu in session_relative_aclus] # need very short version
+
+            unique_animals = IdentifyingContext.find_unique_values(all_contexts_list)['animal'] # {'gor01', 'pin01', 'vvp01'}
+            # Get number of animals to plot
+            marker_list = [(5, i) for i in np.arange(len(unique_animals))] # [(5, 0), (5, 1), (5, 2)]
+            scatter_props = [{'marker': mkr} for mkr in marker_list]  # Example, you should provide your own scatter properties
+            scatter_props_dict = dict(zip(unique_animals, scatter_props))
+            # {'pin01': {'marker': (5, 0)}, 'gor01': {'marker': (5, 1)}, 'vvp01': {'marker': (5, 2)}}
+            # Pass a function that will return a set of kwargs for a given context
+            def _return_scatter_props_fn(ctxt: IdentifyingContext):
+                animal_id = str(ctxt.animal)
+                return scatter_props_dict[animal_id]
+
+            LxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.LxC_aclus) for k, v in zip(across_sessions_instantaneous_frs_ctxts_list, across_sessions_instantaneous_frs_list)])
+            SxC_aclus = np.concatenate([_build_session_dep_aclu_identifier(k, v.SxC_aclus) for k, v in zip(across_sessions_instantaneous_frs_ctxts_list, across_sessions_instantaneous_frs_list)])
+
+        
+        """
+        # Extract unique values for each column
+        unique_format_names = df['format_name'].unique()
+        unique_animals = df['animal'].unique()
+        unique_exper_names = df['exper_name'].unique()
+        unique_session_names = df['session_name'].unique()
+
+        # Create mapping to shorthand notation for each column
+        format_name_mapping = {name: f'f{i}' for i, name in enumerate(unique_format_names)}
+        animal_mapping = {name: f'a{i}' for i, name in enumerate(unique_animals)}
+        exper_name_mapping = {name: f'e{i}' for i, name in enumerate(unique_exper_names)}
+        session_name_mapping = {name: f's{i}' for i, name in enumerate(unique_session_names)}
+
+        # Create a mapping for 'session_name' within each 'animal'
+        # animal_session_mapping = {animal: {session: f'{animal[0]}{i}s{j}' for j, session in enumerate(df[df['animal'] == animal]['session_name'].unique())} for i, animal in enumerate(df['animal'].unique())} # 'g0s0'
+        animal_session_mapping = {animal: {session: f'{animal_mapping[animal]}s{j}' for j, session in enumerate(df[df['animal'] == animal]['session_name'].unique())} for i, animal in enumerate(df['animal'].unique())} # 'g0s0'
+
+        # Replace original values with shorthand notation
+        for animal, session_mapping in animal_session_mapping.items():
+            # df.loc[df['animal'] == animal, 'session_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
+            df.loc[df['animal'] == animal, 'context_minimal_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
+
+        return df['context_minimal_name']
+
+    @function_attributes(short_name=None, tags=['concise', 'abbreviated', 'parse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-18 11:31', related_items=['_build_minimal_session_identifiers_list'])
+    @classmethod
+    def parse_concise_abbreviated_neuron_identifying_strings(cls, data: List[str]) -> pd.DataFrame:
+        """ parses ['a0s0_109', 'a0s1_3', 'a0s1_29', 'a0s1_103', 'a0s3_90', 'a0s4_91', 'a0s4_95', 'a1s1_23', 'a1s2_25', 'a1s3_14', 'a1s3_30', 'a1s3_32', 'a2s0_8', 'a2s0_27', 'a2s1_27'] into ( animal_idx, session_idx, and aclu)
+        """
+        parsed_data: List[Tuple[int, int, int]] = []
+        for entry in data:
+            match = re.match(r'a(\d+)s(\d+)_(\d+)', entry)
+            if match:
+                animal_idx, session_idx, aclu = map(int, match.groups())
+                parsed_data.append((animal_idx, session_idx, aclu))
+            else:
+                raise ValueError(f"String format not recognized: {entry}")
+        
+        parsed_aclus_df = pd.DataFrame(parsed_data, columns=['animal_idx', 'session_idx', 'aclu'])
+        parsed_aclus_df['is_session_novel'] = (parsed_aclus_df['session_idx'] < 2)
+        return parsed_aclus_df
+
+
+
 # ==================================================================================================================== #
 # HDF5 Across File Aggregations                                                                                        #
 # ==================================================================================================================== #
