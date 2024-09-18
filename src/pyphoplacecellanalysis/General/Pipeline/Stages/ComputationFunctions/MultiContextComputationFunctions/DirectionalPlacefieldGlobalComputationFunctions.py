@@ -4124,8 +4124,8 @@ class EpochFilteringMode(Enum):
 
     
     """
-    DropShorter = 1
-    ConstrainDecodingTimeBinSizeToMinimum = 2
+    DropShorter = 1 # ## Drop those less than the time bin duration
+    ConstrainDecodingTimeBinSizeToMinimum = 2 # constraints the actual time_bin_size used to the minimum of the smallest epoch duration and the user's desired_time_bin_size.
 
 
 @function_attributes(short_name=None, tags=['filter_epochs', 'time_bin_size'], input_requires=[], output_provides=[], uses=['EpochFilteringMode'], used_by=['_compute_lap_and_ripple_epochs_decoding_for_decoder'], creation_date='2024-06-04 06:43', related_items=[])
@@ -4281,7 +4281,7 @@ def _compute_lap_and_ripple_epochs_decoding_for_decoder(a_directional_pf1D_Decod
     ## Decode Ripples:
     if desired_ripple_decoding_time_bin_size is not None:
         global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
-        global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode=epochs_filtering_mode)
+        global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=desired_ripple_decoding_time_bin_size, minimum_event_duration=(2.0 * desired_ripple_decoding_time_bin_size), mode=epochs_filtering_mode) # `ripple_decoding_time_bin_size` is set here! It takes a minimum value
         if use_single_time_bin_per_epoch:
             ripple_decoding_time_bin_size = None
 
