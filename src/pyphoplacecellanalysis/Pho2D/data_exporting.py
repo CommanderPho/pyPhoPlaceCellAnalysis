@@ -423,7 +423,7 @@ class PosteriorExporting:
             
 
             _img_path = ripple_specific_folder.joinpath(f'{epoch_id_str}_posterior_{k}.png').resolve()
-            a_result.save_posterior_as_image(_img_path, colormap='Oranges', allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
+            a_result.save_posterior_as_image(_img_path, colormap='Oranges', allow_override_aspect_ratio=allow_override_aspect_ratio, flip_vertical_axis=True, **kwargs)
             out_image_paths[k] = _img_path
 
         return out_image_save_tuple_dict, out_image_paths
