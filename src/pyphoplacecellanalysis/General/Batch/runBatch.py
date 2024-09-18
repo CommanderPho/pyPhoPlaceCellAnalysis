@@ -989,7 +989,8 @@ class BatchResultDataframeAccessor():
         return session_ripple_result_paths
         # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
 
-
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[],
+                          uses=['ConciseSessionIdentifiers.parse_concise_abbreviated_neuron_identifying_strings'], used_by=['AcrossSessionsResults.load_across_sessions_data'], creation_date='2024-09-18 11:39', related_items=[])
     def _build_minimal_session_identifiers_list(self):
         """Build a list of short unique identifiers for the good sessions:
         Adds Column: ['context_minimal_name']

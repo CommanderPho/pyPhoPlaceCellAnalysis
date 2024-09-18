@@ -154,8 +154,8 @@ class PosteriorExporting:
 
         base_image_height: int = int(round(base_image_height))
         desired_half_height: int = int(round(base_image_height/2))
-        # get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=False, include_value_labels=include_value_labels)
-        get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=True, include_value_labels=include_value_labels)
+        get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=False, include_value_labels=include_value_labels)
+        # get_array_as_img_kwargs = dict(desired_width=None, skip_img_normalization=True, include_value_labels=include_value_labels)
 
         if np.ndim(img_data) > 2:
             n_x_bins, n_decoders, n_curr_epoch_time_bins = np.shape(img_data)
