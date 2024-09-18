@@ -1885,8 +1885,14 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta -}-R_{\\Delta +}}{R_{\\Delta +} + R_{\\Delta -}}$'
 
     # pre_delta_str: str = f'🠴'
-    pre_delta_str: str = f'◅'
-    post_delta_str: str = f'►'
+    # pre_delta_str: str = f'◅'
+    # post_delta_str: str = f'►'
+    
+    pre_delta_str: str = f'⬖'
+    post_delta_str: str = f'⬗'
+    
+    # pre_delta_str: str = f'⋊'
+    # post_delta_str: str = f'⋉'
 
     # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\multimap}-\\theta_{\\hookrightarrow}}{\\theta_{\\hookrightarrow} + \\theta_{\\multimap}}$'
     # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\multimap}-R_{\\hookrightarrow}}{R_{\\hookrightarrow} + R_{\\multimap}}$'
