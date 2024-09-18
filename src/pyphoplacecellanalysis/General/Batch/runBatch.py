@@ -1001,30 +1001,9 @@ class BatchResultDataframeAccessor():
         #TODO 2023-07-20 21:23: - [ ] This needs to only be ran on a dataframe containing all of the sessions! If it's filtered at all, the session numbers will vary depending on how it's filtered!
         
         """
-        
-        df = self._obj
-        # Extract unique values for each column
-        unique_format_names = df['format_name'].unique()
-        unique_animals = df['animal'].unique()
-        unique_exper_names = df['exper_name'].unique()
-        unique_session_names = df['session_name'].unique()
-
-        # Create mapping to shorthand notation for each column
-        format_name_mapping = {name: f'f{i}' for i, name in enumerate(unique_format_names)}
-        animal_mapping = {name: f'a{i}' for i, name in enumerate(unique_animals)}
-        exper_name_mapping = {name: f'e{i}' for i, name in enumerate(unique_exper_names)}
-        session_name_mapping = {name: f's{i}' for i, name in enumerate(unique_session_names)}
-
-        # Create a mapping for 'session_name' within each 'animal'
-        # animal_session_mapping = {animal: {session: f'{animal[0]}{i}s{j}' for j, session in enumerate(df[df['animal'] == animal]['session_name'].unique())} for i, animal in enumerate(df['animal'].unique())} # 'g0s0'
-        animal_session_mapping = {animal: {session: f'{animal_mapping[animal]}s{j}' for j, session in enumerate(df[df['animal'] == animal]['session_name'].unique())} for i, animal in enumerate(df['animal'].unique())} # 'g0s0'
-
-        # Replace original values with shorthand notation
-        for animal, session_mapping in animal_session_mapping.items():
-            # df.loc[df['animal'] == animal, 'session_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
-            df.loc[df['animal'] == animal, 'context_minimal_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
-
-        return df['context_minimal_name']
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ConciseSessionIdentifiers        
+        df: pd.DataFrame = self._obj
+        return ConciseSessionIdentifiers._build_minimal_session_identifiers_list(df=df)
 
 
     def export_csv(self, global_data_root_parent_path: Path, csv_batch_filename:str) -> Path:
