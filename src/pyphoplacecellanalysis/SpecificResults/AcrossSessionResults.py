@@ -2850,7 +2850,7 @@ class AcrossSessionsVisualizations:
         percent_below_diagonal = float(is_below_count) / float(total_num_points)
         percent_above_diagonal = float(num_above_diagonal) / float(total_num_points)
         
-        print(f'num_above_diagonal/total_num_points: {num_above_diagonal}/{total_num_points}')        
+        print(f'num_above_diagonal/total_num_points: {num_above_diagonal}/{total_num_points}')
         print(f'percent_below_diagonal: {percent_below_diagonal * 100}%')
         print(f'percent_above_diagonal: {percent_above_diagonal * 100}%')
         

@@ -1856,6 +1856,17 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         enable_tiny_point_labels = True # add static tiny aclu labels beside each point
 
     """
+    import matplotlib
+    # from matplotlib.backends.backend_pgf import FigureCanvasPgf
+    # matplotlib.backend_bases.register_backend('pdf', FigureCanvasPgf)
+
+    # matplotlib.use('ps')
+    # from matplotlib import rc
+
+    # rc('text',usetex=True)
+    # rc('text.latex', preamble=r'\usepackage{color}')
+
+
     if enable_hover_labels:
         import mplcursors # for hover tooltips that specify the aclu of the selected point
 
@@ -1867,7 +1878,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     if isinstance(y_frs_index, dict):
         # convert to pd.Series
         y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
-                
+
     # \\theta_{\\Delta +}
 
     # ## Old L/R style strings
@@ -1884,6 +1895,13 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\Delta -}-\\theta_{\\Delta +}}{\\theta_{\\Delta +} + \\theta_{\\Delta -}}$'
     # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\Delta -}-R_{\\Delta +}}{R_{\\Delta +} + R_{\\Delta -}}$'
 
+    # pgf_with_latex = {
+    #     "text.usetex": True,            # use LaTeX to write all text
+    #     "pgf.rcfonts": False,           # Ignore Matplotlibrc
+    #     "pgf.preamble": r'\usepackage{color}'
+    # }
+    # matplotlib.rcParams.update(pgf_with_latex)
+
     # pre_delta_str: str = f'🠴'
     # pre_delta_str: str = f'◅'
     # post_delta_str: str = f'►'
@@ -1893,6 +1911,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     
     # pre_delta_str: str = f'⋊'
     # post_delta_str: str = f'⋉'
+
+    # pre_delta_str: str = '\\textcolor{red}{⬖}'
+    # post_delta_str: str = '\\textcolor{red}{⬗}'
 
     # laps_fri_label_str: str = 'Laps Firing Rate Index $\\frac{\\theta_{\\multimap}-\\theta_{\\hookrightarrow}}{\\theta_{\\hookrightarrow} + \\theta_{\\multimap}}$'
     # replays_fri_label_str: str = 'Replay Firing Rate Index $\\frac{R_{\\multimap}-R_{\\hookrightarrow}}{R_{\\hookrightarrow} + R_{\\multimap}}$'
