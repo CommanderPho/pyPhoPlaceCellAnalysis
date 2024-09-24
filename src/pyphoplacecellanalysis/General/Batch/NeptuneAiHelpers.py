@@ -10,7 +10,7 @@ import neuropy.utils.type_aliases as types
 import neptune # for logging progress and results
 from neptune.types import File
 from neptune.utils import stringify_unsupported
-from neptune.exceptions import NeptuneException
+from neptune.exceptions import NeptuneException, MissingFieldException
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -76,7 +76,33 @@ def set_environment_variables(neptune_kwargs=None, enable_neptune=True):
         os.environ["NEPTUNE_PROJECT"] = neptune_kwargs['project']
 
 
-        
+
+class KnownNeptuneProjects:
+    """ 
+    
+    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import KnownNeptuneProjects
+
+    neptune_kwargs = KnownNeptuneProjects.get_PhoDibaBatchProcessing_neptune_kwargs()
+    # or
+    neptune_kwargs = KnownNeptuneProjects.get_PhoDibaLongShortUpdated_neptune_kwargs()
+
+    """
+    @staticmethod
+    def get_PhoDibaBatchProcessing_neptune_kwargs():
+        return dict(
+            project="commander.pho/PhoDibaBatchProcessing",
+            api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
+        )
+
+
+    @staticmethod
+    def get_PhoDibaLongShortUpdated_neptune_kwargs():
+        return dict(
+            project="commander.pho/PhoDibaLongShortUpdated",
+            api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
+        )
+
+
 
 
 def capture_print_output(func):
@@ -279,8 +305,51 @@ class NeptuneRunCollectedResults:
         return _out_log_paths
 
 
+    def download_uploaded_log_files(self, neptune_logs_output_path:Path):
+        """ 
+        Usage:
+            _context_log_files_dict = neptune_run_collected_results.download_uploaded_log_files(neptune_logs_output_path=neptune_logs_output_path)
+            _context_log_files_dict
 
-@define()
+        """
+        Assert.path_exists(neptune_logs_output_path)
+
+        context_indexed_runs_list_dict: Dict[IdentifyingContext, List[AutoValueConvertingNeptuneRun]] = self.context_indexed_runs_list_dict
+        # context_indexed_runs_list_dict
+
+        ## INPUTS: context_indexed_runs_list_dict
+        _context_log_files_dict = {}
+
+        for a_ctxt, a_run_list in context_indexed_runs_list_dict.items():
+            # _parsed_run_structure_dict[a_ctxt] = {}
+            _context_log_files_dict[a_ctxt] = {}
+            curr_ctxt_num_runs: int = len(a_run_list)
+            for a_run in a_run_list:
+                a_run_id: str = a_run['sys/id'].fetch()
+                a_script_type: str = a_run['parameters/script_type'].fetch() # should be either ['figures', 'run']
+
+                a_log_file_field = a_run['outputs']['log'] # either <File field at "outputs/log"> or <Unassigned field at "outputs/log">
+                a_run_ctxt = a_ctxt.adding_context_if_missing(script_type=a_script_type, run_id=a_run_id)
+                a_log_file_basename: str = a_run_ctxt.get_description(separator='|')
+                a_log_file_filename: str = a_log_file_basename + '.log'
+                a_log_file_dest_path = neptune_logs_output_path.joinpath(a_log_file_filename).resolve()
+                # print(f'a_log_file_dest_path: {a_log_file_dest_path}')
+
+                try:
+                    _a_download_result = a_log_file_field.download(destination=a_log_file_dest_path.as_posix())
+                    _context_log_files_dict[a_ctxt][a_run_id] = a_log_file_dest_path.as_posix()
+
+                except MissingFieldException as err:
+                    # print(f'MissingFieldException for a_run.id: {a_run_id} (err: {err})')
+                    print(f'MissingFieldException for a_run.id: {a_run_id}')
+                    pass
+
+            # END FOR a_run
+        ## OUTPUTS: _context_log_files_dict
+        return _context_log_files_dict
+    
+
+@define(slots=False, repr=False)
 class Neptuner(object):
     """An object to maintain state for neptune.ai outputs.
       
@@ -445,16 +514,6 @@ class Neptuner(object):
         # Sort by column: 'sys/creation_time' (ascending)
         active_runs_table_df = active_runs_table_df.sort_values([ordering_datetime_col_name], ascending=True)
         active_runs_table_df = active_runs_table_df[active_runs_table_df[ordering_datetime_col_name] > datetime.strptime(f'{oldest_included_run_date}T00:30:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ')]
-        # active_runs_table_df = active_runs_table_df[active_runs_table_df['sys/creation_time'] > datetime.strptime('2024-09-01T00:30:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ')]
-        # active_runs_table_df = active_runs_table_df[active_runs_table_df['sys/ping_time'] > datetime.strptime('2024-09-01T00:30:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ')]
-        # active_runs_table_df 
-        # Grouped on column: 'session_descriptor_string'
-        # active_runs_table_df = active_runs_table_df.groupby(['session_descriptor_string']).count().reset_index()[['session_descriptor_string']]
-        # Performed 1 aggregation grouped on column: 'session_descriptor_string'
-        # most_recent_runs_table_df = active_runs_table_df.groupby(['session_descriptor_string']).agg(sysid_last=('sys/id', 'last')).reset_index() ## this version only has two columns: ['session_descriptor_string','sysid_last']
-        # # most_recent_runs_table_df
-        # is_run_included = np.isin(active_runs_table_df['sys/id'], most_recent_runs_table_df['sysid_last'])
-        # most_recent_runs_table_df: pd.DataFrame = deepcopy(active_runs_table_df)[is_run_included] # find only the rows that match the latest row_id
         # Group by 'session_descriptor_string' and get the most recent `n_recent_results` rows for each group
         most_recent_runs_table_df: pd.DataFrame = (
             active_runs_table_df
@@ -466,9 +525,6 @@ class Neptuner(object):
         
         return most_recent_runs_table_df
 
-        # active_runs_table_df = active_runs_table_df[is_run_included] # find only the rows that match the latest row_id
-        ## OUTPUTS: active_runs_table_df, most_recent_runs_table_df
-        # active_runs_table_df
 
     def get_most_recent_session_runs(self, oldest_included_run_date:str='2024-08-01', n_recent_results: int = 1, **kwargs) -> NeptuneRunCollectedResults: #Tuple[Dict[RunID,AutoValueConvertingNeptuneRun], pd.DataFrame, Dict[str, str]]:
         """ Main accessor method
