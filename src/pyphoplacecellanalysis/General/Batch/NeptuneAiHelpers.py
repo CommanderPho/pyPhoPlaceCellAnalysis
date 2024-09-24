@@ -163,6 +163,8 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
 
 
     def get_log_contents(self) -> str:
+        """ gets the appropriate logs to stdout and stderr for this run 
+        """
         parsed_structure = self.get_parsed_structure()
         monitoring_log_key: str = ''
         for a_monitoring_log_key in list(parsed_structure['monitoring'].keys()):
@@ -187,6 +189,9 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
         # stdout_log_df
         # <StringSeries field at "monitoring/be28f54f/stdout">
         stderr_log_df: pd.DataFrame = self[f"{monitoring_root_key}/stderr"].fetch_values(include_timestamp=True) # ['value', 'timestamp']
+        # Drop rows where 'value' contains only whitespaces or newlines
+        stderr_log_df = stderr_log_df[~stderr_log_df['value'].str.fullmatch(r'\s*')]
+        stderr_log_df['value'] = [f"<STDERR>:\t {v}" for v in stderr_log_df['value'].values] # prepend "<STDERR>:\t " to all entries in the error dict
         # stderr_log_df
 
         ## OUTPUT: stdout_log_df, stderr_log_df
