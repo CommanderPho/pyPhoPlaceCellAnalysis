@@ -91,7 +91,7 @@ def build_extra_cell_info_label_string(row) -> str:
 @function_attributes(short_name=None, tags=['pf_inclusion', 'columns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-17 06:34', related_items=[])
 def add_spikes_df_placefield_inclusion_columns(curr_active_pipeline, global_spikes_df: pd.DataFrame, overwrite_columns: bool=True):
     """ adds columns:
-    'is_included_long_pf1D', 'is_included_short_pf1D', 'is_included_global_pf1D',     
+    'is_included_long_pf1D', 'is_included_short_pf1D', 'is_included_global_pf1D', 'is_included_PBE'
     
     Usage:
         global_results.sess.spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=curr_active_pipeline, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)
@@ -115,6 +115,11 @@ def add_spikes_df_placefield_inclusion_columns(curr_active_pipeline, global_spik
     if ('is_included_global_pf1D' not in global_spikes_df.columns) or overwrite_columns:
         global_spikes_df['is_included_global_pf1D'] = False
         global_spikes_df.loc[np.isin(global_spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
+    if ('is_included_PBE' not in global_spikes_df.columns) or overwrite_columns:
+        if 'PBE_id' in global_spikes_df:
+            global_spikes_df['is_included_PBE'] = (global_spikes_df['PBE_id'] > -1) # requires 'PBE_id'
+        else:
+            print(f'global_spikes_df is missing "PBE_id" column to build global_spikes_df["is_included_PBE"]. Skipping')
 
     return global_spikes_df
 
@@ -218,22 +223,10 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             short_results = computation_results[short_epoch_name]
             global_results = computation_results[global_epoch_name]
         
-            # ## Add three columns to global_results.sess.spikes_df, indicating whether each spike is included in the filtered_spikes_df for the (long, short, global) pf1Ds
-            # if 'is_included_long_pf1D' not in global_results.sess.spikes_df.columns:
-            #     global_results.sess.spikes_df['is_included_long_pf1D'] = False
-            #     global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, long_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_long_pf1D'] = True # `long_results.computed_data.pf1D.filtered_spikes_df`
-            # if 'is_included_short_pf1D' not in global_results.sess.spikes_df.columns:
-            #     global_results.sess.spikes_df['is_included_short_pf1D'] = False
-            #     global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, short_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_short_pf1D'] = True # `short_results.computed_data.pf1D.filtered_spikes_df`
-            # if 'is_included_global_pf1D' not in global_results.sess.spikes_df.columns:
-            #     global_results.sess.spikes_df['is_included_global_pf1D'] = False
-            #     global_results.sess.spikes_df.loc[np.isin(global_results.sess.spikes_df.index, global_results.computed_data.pf1D.filtered_spikes_df.index),'is_included_global_pf1D'] = True
-
+            ## Add three columns to global_results.sess.spikes_df, indicating whether each spike is included in the filtered_spikes_df for the (long, short, global) pf1Ds
             # global_results.sess.flattened_spiketrains._spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)
             # global_results.sess.spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)            
-            
-            ## in_place
-            global_spikes_df: pd.DataFrame = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)
+            global_spikes_df: pd.DataFrame = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True) ## in_place
 
             use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
             cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = PhoJonathanPlotHelpers._build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions=use_filtered_positions) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
@@ -891,6 +884,28 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 @metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=['_display_jonathan_interactive_replay_firing_rate_comparison', '_display_batch_pho_jonathan_replay_firing_rate_comparison'], creation_date='2024-09-16 17:09', related_items=['BatchPhoJonathanFiguresHelper'])
 class PhoJonathanPlotHelpers:
     @classmethod
+    def get_default_spike_colors_dict(cls) -> Dict[str, Tuple]:
+        return {
+            'all': (0.1, 0.1, 0.1),
+            'is_included_long_pf1D': (0, 0, 1),
+            'is_included_short_pf1D': (1, 0, 0),
+            'is_included_PBE': (0.102, 0.831, 0)
+        }
+    
+    @classmethod
+    def get_default_spike_scatter_kwargs_dict(cls) -> Dict[str, Dict]:
+        default_spikes_alpha: float = 0.9
+        spike_plot_kwargs_dict = {
+            'all': {'markersize':4.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (default_spikes_alpha*0.6*0.5)), 'markeredgecolor':(0.1, 0.1, 0.1, (default_spikes_alpha*0.5)), 'zorder':10},
+            'is_included_long_pf1D': {'markersize':5.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (default_spikes_alpha*0.6)), 'markeredgecolor':(0, 0, 1, default_spikes_alpha), 'zorder':15},
+            'is_included_short_pf1D': {'markersize':5.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (default_spikes_alpha*0.6)), 'markeredgecolor':(1, 0, 0, default_spikes_alpha), 'zorder':15},
+            'is_included_PBE': {'markersize':5.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (default_spikes_alpha*0.6)), 'markeredgecolor':(0.102, 0.831, 0, default_spikes_alpha), 'zorder':15},
+        }
+        # spike_plot_kwargs_dict.update(
+        # {k:[*v, spikes_alpha] for k, v in cls.get_default_spike_colors_dict().items()}
+        return spike_plot_kwargs_dict
+
+    @classmethod
     @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['make_fr', 'LongShortDisplayConfigManager'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
     def _temp_draw_jonathan_ax(cls, t_split, time_bins, unit_specific_time_binned_firing_rates, aclu_to_idx, rdf, irdf, show_inter_replay_frs=False, colors=None, fig=None, ax=None, active_aclu:int=0, custom_replay_markers=None, include_horizontal_labels=True, include_vertical_labels=True, should_render=False):
         """ Draws the time binned firing rates and the replay firing rates for a single cell
@@ -1269,13 +1284,14 @@ class PhoJonathanPlotHelpers:
         return ax
 
     @classmethod
-    @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_simple_plot_spikes'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
+    @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['_simple_plot_spikes', 'cls.get_default_spike_colors_dict'], used_by=[], creation_date='2023-10-03 19:42', related_items=[])
     def _plot_general_all_spikes(cls, ax_activity_v_time, active_spikes_df: pd.DataFrame, time_variable_name='t', spikes_alpha=0.9, defer_render=True):
         """ Plots all spikes for a given cell from that cell's complete `active_spikes_df`
-        There are three different classes of spikes: all (black), long (red), short (blue)
+        There are three different classes of spikes: all (black), long (blue), short (red)
 
         active_spikes_df.is_included_long_pf1D
         active_spikes_df.is_included_short_pf1D
+        active_spikes_df.is_included_PBE
 
         Usage:
 
@@ -1288,18 +1304,22 @@ class PhoJonathanPlotHelpers:
                 spike_plot_kwargs=spike_plot_kwargs, should_include_labels=False
             ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
         """
-
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_spikes_df[global_results.sess.spikes_df.spikes.time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0, 0, 0), spikes_alpha=1.0) # all
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0.1, 0.1, 0.1), spikes_alpha=spikes_alpha) # all
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=cls.get_default_spike_colors_dict()['all'], spikes_alpha=spikes_alpha) # all
 
         active_long_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_long_pf1D]
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, spikes_color_RGB=(1, 0, 0), spikes_alpha=spikes_alpha, zorder=15)
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, spikes_color_RGB=cls.get_default_spike_colors_dict()['is_included_long_pf1D'], spikes_alpha=spikes_alpha, zorder=15)
 
         active_short_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_short_pf1D]
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, spikes_color_RGB=(0, 0, 1), spikes_alpha=spikes_alpha, zorder=15)
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, spikes_color_RGB=cls.get_default_spike_colors_dict()['is_included_short_pf1D'], spikes_alpha=spikes_alpha, zorder=15)
 
-        # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_global_pf1D]
+        # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_PBE]
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_global_spikes_df[time_variable_name].values, active_global_spikes_df['x'].values, spikes_color_RGB=(0, 1, 0), spikes_alpha=1.0, zorder=25, markersize=2.5)
+
+        if 'is_included_PBE' in active_spikes_df:
+            ## PBE spikes:
+            active_PBE_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_PBE]
+            ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, spikes_color_RGB=cls.get_default_spike_colors_dict()['is_included_PBE'], spikes_alpha=spikes_alpha, zorder=15)
 
         if not defer_render:
             fig = ax_activity_v_time.get_figure().get_figure() # For SubFigure
@@ -1308,7 +1328,8 @@ class PhoJonathanPlotHelpers:
         return ax_activity_v_time
 
     @classmethod
-    @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=['plot_single_cell_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
+    @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[],
+                          uses=['plot_single_cell_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
     def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split: float, time_bins: NDArray, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx: Dict, aclu: int, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
         """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
         Internally calls `plot_single_cell_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
