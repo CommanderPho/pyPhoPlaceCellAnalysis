@@ -1,7 +1,12 @@
 from copy import deepcopy
 import os
-from typing import Dict, List, Tuple
 from attrs import define, Factory, field
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias  # "from typing_extensions" in Python 3.9 and earlier
+from typing import NewType
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+
 import neptune # for logging progress and results
 from neptune.types import File
 from neptune.utils import stringify_unsupported
@@ -19,6 +24,13 @@ from pathlib import Path
 
 from neuropy.utils.result_context import IdentifyingContext
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.assertion_helpers import Assert
+
+# SessionDescriptorString: TypeAlias = str # an integer index that is an aclu
+SessionDescriptorString = NewType('SessionDescriptorString', str) # session_descriptor_string
+RunID = NewType('RunID', str) # session_descriptor_string
+
+# from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import SessionDescriptorString, RunID
 
 """
 if enable_neptune:
@@ -221,6 +233,53 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
     
 
 
+@define(slots=False, repr=False)
+class NeptuneRunCollectedResults:
+    """ 
+    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import NeptuneRunCollectedResults
+    
+    """
+    runs_table_df: pd.DataFrame = field()
+    most_recent_runs_table_df: pd.DataFrame = field()
+    runs_dict: Dict[RunID, AutoValueConvertingNeptuneRun] = field()
+
+
+    most_recent_runs_session_descriptor_string_to_context_map: Dict[SessionDescriptorString, IdentifyingContext] = field()
+    session_descriptor_indexed_runs_list_dict: Dict[SessionDescriptorString, List[AutoValueConvertingNeptuneRun]] = field()
+    context_indexed_runs_list_dict: Dict[IdentifyingContext, List[AutoValueConvertingNeptuneRun]] = field()
+
+    context_indexed_run_logs: Dict[IdentifyingContext, str] = field()
+    most_recent_runs_context_indexed_run_extra_data: Dict[IdentifyingContext, Dict] = field()
+    
+    @classmethod
+    def _perform_export_log_files_to_separate_files(cls, context_indexed_run_logs: Dict[IdentifyingContext, str], neptune_logs_output_path: Path):
+        Assert.path_exists(neptune_logs_output_path)
+        _out_log_paths = {}
+        for k, v in context_indexed_run_logs.items():
+            # session_context_path_fragment: str = k.get_description(separator='/', subset_excludelist='session_name')
+            # session_context_path_fragment: str = k.get_description(separator='/', subset_excludelist='session_name')
+            # session_context_path = neptune_logs_output_path.joinpath(session_context_path_fragment).resolve()
+            # session_context_path.mkdir(exist_ok=True, parents=True)
+
+            ## flat filename approach:
+            session_context_path_fragment: str = k.get_description(separator='=', subset_excludelist='format_name')
+            # session_context_path_fragment
+            session_context_path = neptune_logs_output_path.joinpath(f"{session_context_path_fragment}.log").resolve()
+            try:
+                _write_status: int = 0
+                with open(session_context_path, 'w') as f:
+                    _write_status = f.write(v)
+                if _write_status > 0:
+                    _out_log_paths[k] = session_context_path
+                else:
+                    print(f'WARNING: write did not fail, but _write_status is not > 0: {_write_status} for session_context_path: "{session_context_path.as_posix()}"')
+            except Exception as e:
+                raise e
+        # end for
+        return _out_log_paths
+
+
+
 @define()
 class Neptuner(object):
     """An object to maintain state for neptune.ai outputs.
@@ -411,22 +470,22 @@ class Neptuner(object):
         ## OUTPUTS: active_runs_table_df, most_recent_runs_table_df
         # active_runs_table_df
 
-    def get_most_recent_session_runs(self, **kwargs) -> Tuple[Dict[str,AutoValueConvertingNeptuneRun], pd.DataFrame, Dict[str, str]]:
+    def get_most_recent_session_runs(self, oldest_included_run_date:str='2024-08-01', n_recent_results: int = 1, **kwargs) -> NeptuneRunCollectedResults: #Tuple[Dict[RunID,AutoValueConvertingNeptuneRun], pd.DataFrame, Dict[str, str]]:
         """ Main accessor method
         
         """
         runs_table_df: pd.DataFrame = self.get_runs_table()
-        most_recent_runs_table_df: pd.DataFrame = self.get_most_recent_session_runs_table(runs_table_df=runs_table_df, **kwargs) # find only the rows that match the latest row_id
+        most_recent_runs_table_df: pd.DataFrame = self.get_most_recent_session_runs_table(runs_table_df=runs_table_df, oldest_included_run_date=oldest_included_run_date, n_recent_results=n_recent_results, **kwargs) # find only the rows that match the latest row_id
         # most_recent_runs_table_df: pd.DataFrame = self.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=2) # find only the rows that match the latest row_id
-        runs_dict: Dict[str, AutoValueConvertingNeptuneRun]  = {}
+        runs_dict: Dict[RunID, AutoValueConvertingNeptuneRun]  = {}
 
         # Iterate over each run in the DataFrame
         for run_id in most_recent_runs_table_df['sys/id']:
             try:
                 # Access the run by ID:
                 run: AutoValueConvertingNeptuneRun = AutoValueConvertingNeptuneRun(with_id=str(run_id), project=self.project_name, api_token=self.api_token,
-                                                                                    # mode="read-only",
-                                                                                    mode="sync",
+                                                                                    mode="read-only",
+                                                                                    # mode="sync",
                                                                                    )
                 runs_dict[run_id] = run
                 
@@ -444,10 +503,60 @@ class Neptuner(object):
         valid_good_column_rename_dict = {v:'_'.join(v.split('/')[1:]) for v in good_column_names if (len(v.split('/'))>1)}
         most_recent_runs_table_df = most_recent_runs_table_df.rename(columns=valid_good_column_rename_dict, inplace=False)
         original_column_names_map: Dict[str, str] = dict(zip(valid_good_column_rename_dict.values(), valid_good_column_rename_dict.keys()))
-        return runs_dict, most_recent_runs_table_df, original_column_names_map
+
+
+        session_column_individual_variables = ['format_name', 'animal', 'exper_name', 'session_name']
+        session_column_variables = ['session_descriptor_string']
+        # processing_status_column_names = ['sys/id', 'sys/hostname', 'sys/creation_time', 'sys/running_time', 'sys/ping_time', 'sys/monitoring_time', 'sys/size', 'sys/tags', 'source_code/entrypoint']
+        # processing_status_column_names = ['sys/id', 'sys/hostname', 'sys/creation_time', 'sys/running_time', 'sys/ping_time', 'sys/monitoring_time', 'sys/size', 'sys/tags', 'source_code/entrypoint']
+        processing_status_column_names = ['id', 'hostname', 'creation_time', 'running_time', 'ping_time', 'monitoring_time', 'size', 'tags', 'entrypoint']
+
+        most_recent_runs_session_descriptor_string_to_context_map: Dict[SessionDescriptorString, IdentifyingContext] = {v.session_descriptor_string:IdentifyingContext(format_name=v.format_name, animal=v.animal, exper_name=v.exper_name, session_name=v.session_name) for v in most_recent_runs_table_df[session_column_individual_variables + session_column_variables].itertuples()}
+        session_descriptor_indexed_runs_list_dict: Dict[SessionDescriptorString, List[AutoValueConvertingNeptuneRun]] = {}
+        # Iterate over each run in the DataFrame
+        for run_id, run in runs_dict.items():
+            try:
+                a_session_descriptor_string: SessionDescriptorString = SessionDescriptorString(run['session_descriptor_string'].fetch())
+                # run_logs[run_id] = log_contents_str
+                if a_session_descriptor_string not in session_descriptor_indexed_runs_list_dict:
+                    # create it
+                    session_descriptor_indexed_runs_list_dict[a_session_descriptor_string] = [run]
+                else:
+                    # append it
+                    # run_logs[a_session_descriptor_string] = f"{run_logs[a_session_descriptor_string]}\n\n\n{merged_log_contents_str}"
+                    session_descriptor_indexed_runs_list_dict[a_session_descriptor_string].append(run)
+            except Exception as e:
+                print(f"Failed to fetch session_descriptor_string for run {run_id}: {e}")
+                
+
+        # OUTPUTS: session_descriptor_indexed_runs_list_dict
+        context_indexed_runs_list_dict: Dict[IdentifyingContext, List[AutoValueConvertingNeptuneRun]] = {most_recent_runs_session_descriptor_string_to_context_map[k]:v for k, v in session_descriptor_indexed_runs_list_dict.items()} # get the IdentifyingContext indexed item
+
+        # Logging Outputs ____________________________________________________________________________________________________ #
+        run_logs: Dict[SessionDescriptorString, str] = self.get_most_recent_session_logs(runs_dict=runs_dict)
+        ## INPUTS: most_recent_runs_session_descriptor_string_to_context_map, run_logs
+        context_indexed_run_logs: Dict[IdentifyingContext, str] = {most_recent_runs_session_descriptor_string_to_context_map[k]:v for k, v in run_logs.items()} # get the IdentifyingContext indexed item
+        ## INPUTS: most_recent_runs_table_df
+        most_recent_runs_context_indexed_run_extra_data: Dict[IdentifyingContext, Dict] = {IdentifyingContext(format_name=v.format_name, animal=v.animal, exper_name=v.exper_name, session_name=v.session_name):v._asdict() for v in most_recent_runs_table_df[session_column_individual_variables + session_column_variables + processing_status_column_names].itertuples(index=False, name='SessionTuple')}
+        # most_recent_runs_context_indexed_run_extra_data # SessionTuple(format_name='kdiba', animal='pin01', exper_name='one', session_name='11-02_17-46-44', session_descriptor_string='kdiba_pin01_one_11-02_17-46-44_sess', id='LS2023-1335', hostname='gl3126.arc-ts.umich.edu', creation_time=Timestamp('2024-08-29 16:39:16.613000'), running_time=8735.629, ping_time=Timestamp('2024-09-24 08:38:06.626000'), monitoring_time=1543, size=28686905.0, tags='11-02_17-46-44,one,kdiba,pin01', entrypoint='figures_kdiba_pin01_one_11-02_17-46-44.py')
+
+        neptune_run_collected_results = NeptuneRunCollectedResults(
+            runs_table_df=runs_table_df,
+            most_recent_runs_table_df=most_recent_runs_table_df,
+            runs_dict=runs_dict,
+            most_recent_runs_session_descriptor_string_to_context_map=most_recent_runs_session_descriptor_string_to_context_map,
+            session_descriptor_indexed_runs_list_dict=session_descriptor_indexed_runs_list_dict,
+            context_indexed_runs_list_dict=context_indexed_runs_list_dict,
+            context_indexed_run_logs=context_indexed_run_logs,
+            most_recent_runs_context_indexed_run_extra_data=most_recent_runs_context_indexed_run_extra_data,
+        )
+
+        return neptune_run_collected_results
+        # return runs_dict, most_recent_runs_table_df, original_column_names_map
         
+
     @classmethod
-    def get_most_recent_session_logs(cls, runs_dict: Dict[str, AutoValueConvertingNeptuneRun], debug_print: bool = False) -> pd.DataFrame:
+    def get_most_recent_session_logs(cls, runs_dict: Dict[RunID, AutoValueConvertingNeptuneRun], debug_print: bool = False) -> Dict[SessionDescriptorString, str]:
         """ 
         Usage:
             most_recent_runs_table_df: pd.DataFrame = neptuner.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=1) # find only the rows that match the latest row_id
@@ -456,8 +565,14 @@ class Neptuner(object):
 
 
         """
+        # _separator_string: str = "\n\n\n"
+        _separator_string: str = """\n\n
+# ==================================================================================================================== #
+# LOG SEPARATOR                                                                                                        #
+# ==================================================================================================================== #
+"""
         # Dictionary to hold the paths of figures for each run
-        run_logs = {}
+        run_logs: Dict[SessionDescriptorString, str] = {}
         # Iterate over each run in the DataFrame
         for run_id, run in runs_dict.items():
             try:
@@ -474,16 +589,19 @@ class Neptuner(object):
                 # neptune_run_figures_output_path.mkdir(exist_ok=True)
                 # print(f'\tneptune_run_figures_output_path: {neptune_run_figures_output_path}')
                 
-                log_contents_str, merged_log_df = run.get_log_contents()
-                a_session_descriptor_string: str = run['session_descriptor_string'].fetch()
+                merged_log_contents_str, merged_log_df = run.get_log_contents()
+                a_session_descriptor_string: SessionDescriptorString = SessionDescriptorString(run['session_descriptor_string'].fetch())
                 
-                # run_logs[run_id] = log_contents_str
-                if a_session_descriptor_string not in run_logs:
-                    # create it
-                    run_logs[a_session_descriptor_string] = log_contents_str
-                else:
-                    # append it
-                    run_logs[a_session_descriptor_string] = f"{run_logs[a_session_descriptor_string]}\n\n\n{log_contents_str}"     
+                if len(merged_log_contents_str) > 0:
+                    # run_logs[run_id] = log_contents_str
+                    if a_session_descriptor_string not in run_logs:
+                        # create it
+                        run_logs[a_session_descriptor_string] = merged_log_contents_str
+                    else:
+                        # append it
+                        # run_logs[a_session_descriptor_string] = f"{run_logs[a_session_descriptor_string]}\n\n\n{merged_log_contents_str}"
+                        run_logs[a_session_descriptor_string] = (run_logs[a_session_descriptor_string] + _separator_string + merged_log_contents_str) #f"{run_logs[a_session_descriptor_string]}\n\n\n{merged_log_contents_str}"
+                         
 
                 # figures_paths[run_id] = neptune_run_figures_output_path
 
