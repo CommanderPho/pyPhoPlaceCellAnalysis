@@ -560,7 +560,7 @@ class PipelineWithDisplayPipelineStageMixin:
 
             # Now have both `active_session_configuration_name`, `active_session_configuration_name`
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"type(active_session_configuration_context): {type(active_session_configuration_context)}, active_session_configuration_context: {active_session_configuration_context}")
             pass # hope that it's an IdentifyingContext, but we'll check soon.
         
 
