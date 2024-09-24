@@ -208,7 +208,6 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
         # stderr_log_df.to_dict(orient='record')
 
         merged_log_df: pd.DataFrame = pd.concat((stdout_log_df, stderr_log_df)).sort_values(by='timestamp', ascending=True).reset_index(drop=True)[['value', 'timestamp']]
-        # merged_log_df
         # Drop rows where 'value' contains only whitespaces or newlines
         merged_log_df = merged_log_df[~merged_log_df['value'].str.fullmatch(r'\s*')]
         # merged_log_df
@@ -443,7 +442,7 @@ class Neptuner(object):
         return runs_dict, most_recent_runs_table_df, original_column_names_map
         
     @classmethod
-    def get_most_recent_session_logs(cls, runs_dict: Dict[str, AutoValueConvertingNeptuneRun], ordering_datetime_col_name: str = 'sys/modification_time', oldest_included_run_date:str='2024-08-01', debug_print: bool = False) -> pd.DataFrame:
+    def get_most_recent_session_logs(cls, runs_dict: Dict[str, AutoValueConvertingNeptuneRun], debug_print: bool = False) -> pd.DataFrame:
         """ 
         Usage:
             most_recent_runs_table_df: pd.DataFrame = neptuner.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=1) # find only the rows that match the latest row_id
@@ -492,7 +491,7 @@ class Neptuner(object):
 
 
     @classmethod
-    def build_interactive_session_display(cls, context_indexed_run_logs, most_recent_runs_session_descriptor_string_to_context_map, most_recent_runs_context_indexed_run_extra_data):
+    def build_interactive_session_run_logs_widget(cls, context_indexed_run_logs, most_recent_runs_session_descriptor_string_to_context_map, most_recent_runs_context_indexed_run_extra_data):
         """Creates and displays an interactive session display with a tree widget, session info, and log output.
 
         Arguments:
@@ -505,11 +504,12 @@ class Neptuner(object):
         
         Usage:
 
-            interactive_layout = Neptuner.build_interactive_session_display(context_indexed_run_logs, most_recent_runs_session_descriptor_string_to_context_map, most_recent_runs_context_indexed_run_extra_data)
+            interactive_layout = Neptuner.build_interactive_session_run_logs_widget(context_indexed_run_logs, most_recent_runs_session_descriptor_string_to_context_map, most_recent_runs_context_indexed_run_extra_data)
             display(interactive_layout)
 
         """
         from pandas import Timestamp
+        from datetime import datetime
         import ipywidgets as widgets
         from IPython.display import display
         from pyphocorehelpers.gui.Jupyter.TreeWidget import JupyterTreeWidget
@@ -524,10 +524,10 @@ class Neptuner(object):
         jupyter_tree_widget.tree.layout = widgets.Layout(min_width='300px', max_width='30%', overflow='auto', height='auto')
 
         # Content Widget ________________________________________________________________________________________________ #
-        def build_session_tuple_header_widget(a_session_tuple: Tuple):
+        def build_session_tuple_header_widget(a_session_tuple: Tuple, included_display_session_extra_data_keys: List[str]):
             """Builds a widget to display the session tuple's properties with bold keys."""
             # Create a dictionary to hold the label widgets with bold keys
-            header_label_widgets = {key: widgets.HTML(f"<b>{key}</b>: '{value}',") for key, value in a_session_tuple.items()}
+            header_label_widgets = {key: widgets.HTML(f"<b>{key}</b>: '{value}',") for key, value in a_session_tuple.items() if (key in included_display_session_extra_data_keys)}
             
             # Define a layout that enables wrapping
             box_layout = widgets.Layout(display='flex', flex_flow='row wrap', align_items='stretch', width='100%')
@@ -537,8 +537,19 @@ class Neptuner(object):
 
             # Function to update the values in the labels
             def update_header_labels_fn(new_values):
+                """ captures: included_display_session_extra_data_keys, header_label_widgets
+                """
                 for key, value in new_values.items():
-                    header_label_widgets[key].value = f"<b>{key}</b>: {value}"
+                    if key in included_display_session_extra_data_keys:
+                        # Check if the value is a pandas Timestamp or datetime object and format it
+                        if isinstance(value, (Timestamp, datetime)):
+                            # Round to the nearest minute and format the output as 'YYYY-MM-DD HH:MM'
+                            rounded_value = value.floor('T') if isinstance(value, Timestamp) else value.replace(second=0, microsecond=0)
+                            formatted_value = rounded_value.strftime('%Y-%m-%d %H:%M')
+                            header_label_widgets[key].value = f"<b>{key}</b>: {formatted_value}"
+                        else:
+                            # For non-Timestamp values, update normally
+                            header_label_widgets[key].value = f"<b>{key}</b>: {value}"
 
             return header_hbox, header_label_widgets, update_header_labels_fn
 
@@ -561,15 +572,20 @@ class Neptuner(object):
         }
 
         # Build header widget and labels
-        header_hbox, header_label_widgets, update_header_labels_fn = build_session_tuple_header_widget(a_session_tuple=empty_session_tuple)
+        # Define the keys you want to display in the header
+        display_session_extra_data_keys = ['id', 'hostname', 'creation_time', 'running_time', 'ping_time', 'monitoring_time', 'size', 'tags', 'entrypoint']
+        
+        header_hbox, header_label_widgets, update_header_labels_fn = build_session_tuple_header_widget(a_session_tuple=empty_session_tuple, included_display_session_extra_data_keys=display_session_extra_data_keys)
 
         # Create Textarea widget with a defined width for log display
         textarea = widgets.Textarea(value='<No Selection>', disabled=True, style={'font_size': '10px'}, 
-                                    layout=widgets.Layout(flex='1', width='650px', min_height='650px', height='850px'))
+                                    # layout=widgets.Layout(flex='1', width='650px', min_height='650px', height='850px'),
+                                    layout=widgets.Layout(flex='1', width='100%', min_height='650px', height='850px'),
+                                    )
 
         content_view_layout = widgets.VBox([header_hbox, textarea],
                                             # layout=widgets.Layout(min_width='400px', min_height='200px', width='auto', height='auto'),
-                                            layout=widgets.Layout(min_width='500px', max_width='70%', height='auto', overflow='auto')
+                                            layout=widgets.Layout(min_width='500px', max_width='70%', height='auto', overflow='auto') # , width='100%'
                                            )
 
         # Layout the widgets side by side
@@ -589,6 +605,11 @@ class Neptuner(object):
             """Updates the header and log content based on the selected tree node."""
             if isinstance(selected_context, dict):
                 selected_context = IdentifyingContext(**selected_context)
+            
+            # # Prevent scrolling behavior
+            # import IPython
+            # IPython.display.clear_output(wait=True)  # Clear output without scrolling
+            # display(root_box)  # Re-display the root box to maintain focus
             
             curr_context_extra_data_tuple = most_recent_runs_context_indexed_run_extra_data.get(selected_context, empty_session_tuple)
             update_header_labels_fn(curr_context_extra_data_tuple)
