@@ -730,7 +730,9 @@ class AcrossSessionsResults:
 
 
 class ConciseSessionIdentifiers:
-    """ 
+    """ Building and Parsing a minimal list of session identifiers
+    
+    
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ConciseSessionIdentifiers
     
     
@@ -1608,7 +1610,7 @@ def build_session_t_delta(t_delta_csv_path: Path):
     t_delta_dict = t_delta_df.to_dict(orient='index')
     return t_delta_df, t_delta_dict, (earliest_delta_aligned_t_start, latest_delta_aligned_t_end)
 
-@function_attributes(short_name=None, tags=['experience_rank', 'session_order', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-10 02:49', related_items=[])
+@function_attributes(short_name=None, tags=['experience_rank', 'session_order', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-10 02:49', related_items=['find_build_and_save_sessions_experiment_datetime_df_csv'])
 def load_and_apply_session_experience_rank_csv(csv_path="./data/sessions_experiment_datetime_df.csv", session_uid_str_sep: str = '|', novel_experience_rank_requirement: int= 2):
     """Load the exported sessions experience_ranks CSV and use it to add the ['session_experience_rank', 'session_experience_orientation_rank', 'is_novel_exposure'] columns to the tables:
     
