@@ -1408,13 +1408,13 @@ class PhoJonathanPlotHelpers:
             subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>'
             try:
                 # _temp_qclu_str = f'\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>'
-                _temp_qclu_str = f'\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.qclu}</></>'
+                _temp_qclu_str = f', qclu <size:10><weight:bold>{cell_neuron_extended_ids.qclu}</></>'
                 subtitle_string += _temp_qclu_str
             except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'quality'
                 pass
 
             try:
-                _temp_neuron_type_str = f'\ntype <size:10><weight:bold>{cell_neuron_extended_ids.neuron_type}</></>'
+                _temp_neuron_type_str = f', type <size:10><weight:bold>{cell_neuron_extended_ids.neuron_type}</></>'
                 subtitle_string += _temp_neuron_type_str
             except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'neuron_type'
                 pass
