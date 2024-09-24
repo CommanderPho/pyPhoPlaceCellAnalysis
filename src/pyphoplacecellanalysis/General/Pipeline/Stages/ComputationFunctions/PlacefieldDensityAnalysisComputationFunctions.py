@@ -145,6 +145,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
     active_ratemap_peaks_analysis = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', None)
     active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
     
+    provides: ['EloyAnalysis', 'SimplerNeuronMeetingThresholdFiringAnalysis', 'RatemapPeaksAnalysis', 'placefield_overlap']
+
     """
     _computationPrecidence = 2 # must be done after PlacefieldComputations and DefaultComputationFunctions
     _is_global = False
@@ -250,7 +252,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             return computation_result
         
 
-    @function_attributes(short_name='velocity_vs_pf_simplified_count_density', tags=['pf_density', 'velocity', 'simplified'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-07-06 00:00', related_items=[],
+    @function_attributes(short_name='velocity_vs_pf_simplified_count_density', tags=['pf_density', 'velocity', 'simplified'], input_requires=[], output_provides=["computed_data['SimplerNeuronMeetingThresholdFiringAnalysis']"], uses=[], used_by=[], creation_date='2022-07-06 00:00', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['SimplerNeuronMeetingThresholdFiringAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['SimplerNeuronMeetingThresholdFiringAnalysis']['sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D']), is_global=False)
     def _perform_velocity_vs_pf_simplified_count_density_computation(computation_result: ComputationResult, debug_print=False):
             """ Builds the simplified density analysis suggested by Kamran at the 2022-07-06 lab meeting related analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
@@ -306,7 +308,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             computation_result.computed_data['SimplerNeuronMeetingThresholdFiringAnalysis'] = DynamicParameters.init_from_dict({'n_neurons_meeting_firing_critiera_by_position_bins_2D': n_neurons_meeting_firing_critiera_by_position_bins_2D, 'sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D': sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D})
             return computation_result
         
-    @function_attributes(short_name='_DEP_ratemap_peaks', tags=['pf','ratemap', 'peaks', 'DEPRICATED'], input_requires=[], output_provides=[], uses=['findpeaks'], used_by=[], creation_date='2023-09-12 17:24', related_items=[],
+    @function_attributes(short_name='_DEP_ratemap_peaks', tags=['pf','ratemap', 'peaks', 'DEPRICATED'], input_requires=[], output_provides=["computed_data['RatemapPeaksAnalysis']"], uses=['findpeaks'], used_by=[], creation_date='2023-09-12 17:24', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis']['final_filtered_results']), is_global=False)
     def _DEP_perform_pf_find_ratemap_peaks_computation(computation_result: ComputationResult, debug_print=False, peak_score_inclusion_percent_threshold=0.25):
             """ Uses the `findpeaks` library to compute the topographical peak locations and information with the intent of doing an extended pf size/density analysis.
