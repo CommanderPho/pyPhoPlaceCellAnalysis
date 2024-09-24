@@ -1,6 +1,6 @@
 from copy import deepcopy
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from attrs import define, Factory, field
 import neptune # for logging progress and results
 from neptune.types import File
@@ -106,7 +106,10 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
 
     def get_parsed_structure(self) -> Dict:
         """ returns a dictionary parsed for structure
-        
+        Usage:
+            parsed_structure = run.get_parsed_structure()
+            parsed_structure
+
         """
         def _subfn_parse_structure(captured_output: str) -> dict:
             """Parses the captured printed structure into a nested dictionary."""
@@ -360,6 +363,14 @@ class Neptuner(object):
 
     @classmethod
     def get_most_recent_session_runs_table(cls, runs_table_df: pd.DataFrame, ordering_datetime_col_name: str = 'sys/modification_time', oldest_included_run_date:str='2024-08-01', n_recent_results: int = 1) -> pd.DataFrame:
+        """ 
+        Usage:
+            most_recent_runs_table_df: pd.DataFrame = neptuner.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=1) # find only the rows that match the latest row_id
+        
+            most_recent_runs_table_df: pd.DataFrame = neptuner.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=2) # find only the rows that match the latest row_id
+
+
+        """
         # Filter rows based on column: 'sys/creation_time'
         assert isinstance(oldest_included_run_date, str), f"oldest_included_run_date should be of type str (provided like '2024-08-01') but it is of type: {type(oldest_included_run_date)}, oldest_included_run_date: {oldest_included_run_date}"
         ## INPUTS: runs_table_df
@@ -396,7 +407,10 @@ class Neptuner(object):
         ## OUTPUTS: active_runs_table_df, most_recent_runs_table_df
         # active_runs_table_df
 
-    def get_most_recent_session_runs(self, **kwargs):
+    def get_most_recent_session_runs(self, **kwargs) -> Tuple[Dict[str,AutoValueConvertingNeptuneRun], pd.DataFrame]:
+        """ Main accessor method
+        
+        """
         runs_table_df: pd.DataFrame = self.get_runs_table()
         most_recent_runs_table_df: pd.DataFrame = self.get_most_recent_session_runs_table(runs_table_df=runs_table_df, **kwargs) # find only the rows that match the latest row_id
         # most_recent_runs_table_df: pd.DataFrame = self.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=2) # find only the rows that match the latest row_id
@@ -415,7 +429,52 @@ class Neptuner(object):
 
         return runs_dict, most_recent_runs_table_df
         
+    @classmethod
+    def get_most_recent_session_logs(cls, runs_dict: Dict[str, AutoValueConvertingNeptuneRun], ordering_datetime_col_name: str = 'sys/modification_time', oldest_included_run_date:str='2024-08-01', debug_print: bool = False) -> pd.DataFrame:
+        """ 
+        Usage:
+            most_recent_runs_table_df: pd.DataFrame = neptuner.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=1) # find only the rows that match the latest row_id
+        
+            most_recent_runs_table_df: pd.DataFrame = neptuner.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=2) # find only the rows that match the latest row_id
 
+
+        """
+        # Dictionary to hold the paths of figures for each run
+        run_logs = {}
+        # Iterate over each run in the DataFrame
+        for run_id, run in runs_dict.items():
+            try:
+                if debug_print:
+                    print(f'run_id: {run_id}\n\trun.get_url(): "{run.get_url()}"')
+
+                # ## make the folder for this run
+                # neptune_run_output_path = neptune_project_output_path.joinpath(str(run_id)).resolve()
+                # neptune_run_output_path.mkdir(exist_ok=True)
+                # print(f'\tneptune_run_output_path: {neptune_run_output_path}')
+                
+                # # neptune_run_figures_output_path = neptune_run_output_path.joinpath(f'figures_{run_id}').resolve()
+                # neptune_run_figures_output_path = neptune_run_output_path.joinpath(f'figures').resolve()
+                # neptune_run_figures_output_path.mkdir(exist_ok=True)
+                # print(f'\tneptune_run_figures_output_path: {neptune_run_figures_output_path}')
+                
+                log_contents_str, merged_log_df = run.get_log_contents()
+                a_session_descriptor_string: str = run['session_descriptor_string'].fetch()
+                
+                # run_logs[run_id] = log_contents_str
+                if a_session_descriptor_string not in run_logs:
+                    # create it
+                    run_logs[a_session_descriptor_string] = log_contents_str
+                else:
+                    # append it
+                    run_logs[a_session_descriptor_string] = f"{run_logs[a_session_descriptor_string]}\n\n\n{log_contents_str}"     
+
+                # figures_paths[run_id] = neptune_run_figures_output_path
+
+            except Exception as e:
+                print(f"Failed to fetch figures for run {run_id}: {e}")
+                
+        ## OUTPUTS: most_recent_runs_table_df, figures_paths
+        return run_logs
 
 # ==================================================================================================================== #
 # Independent Helper Functions                                                                                         #
