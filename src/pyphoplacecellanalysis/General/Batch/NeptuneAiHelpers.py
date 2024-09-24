@@ -1,11 +1,18 @@
+from copy import deepcopy
 import os
+from typing import Dict, List
 from attrs import define, Factory, field
 import neptune # for logging progress and results
 from neptune.types import File
 from neptune.utils import stringify_unsupported
-
+from neptune.exceptions import NeptuneException
+from datetime import datetime
+import numpy as np
 import pandas as pd
 from io import StringIO
+import io
+import re
+from contextlib import redirect_stdout, redirect_stderr
 
 import pathlib
 from pathlib import Path
@@ -60,6 +67,25 @@ def set_environment_variables(neptune_kwargs=None, enable_neptune=True):
         
 
 
+def capture_print_output(func):
+    """Captures the output of the provided function."""
+    captured_output = io.StringIO()              # Create StringIO object
+    
+    with redirect_stdout(captured_output):
+        func()                                       # Call the function to capture its output
+        return captured_output.getvalue()            # Get the captured output as a string
+
+
+def strip_ansi_escape_sequences(text: str) -> str:
+    """Removes ANSI escape sequences from the provided text."""
+    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+    return ansi_escape.sub('', text)
+
+def clean_quotes(text: str) -> str:
+    """Cleans surrounding quotes from the keys and values."""
+    return text.strip("'\"")
+
+
 class AutoValueConvertingNeptuneRun(neptune.Run):
     
     def __setitem__(self, key, value):
@@ -76,6 +102,116 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
             
         else:
             super().__setitem__(key, value)
+
+
+    def get_parsed_structure(self) -> Dict:
+        """ returns a dictionary parsed for structure
+        
+        """
+        def _subfn_parse_structure(captured_output: str) -> dict:
+            """Parses the captured printed structure into a nested dictionary."""
+            lines = captured_output.splitlines()
+            structure = {}
+            stack = [structure]  # Use a stack to manage nested dictionaries
+            last_indent = 0
+
+            for line in lines:
+                if not line.strip():  # Skip empty lines
+                    continue
+
+                # Find the current indent level (number of leading spaces)
+                current_indent = len(line) - len(line.lstrip())
+
+                # Extract key-value pair from the line
+                if ':' in line:
+                    key, value = map(str.strip, line.split(':', 1))
+                    key = clean_quotes(key)
+                    value = clean_quotes(value)
+                else:
+                    key, value = clean_quotes(line.strip()), {}
+
+                # Adjust stack for indentation changes
+                if current_indent > last_indent:
+                    # Going deeper into a new nested structure
+                    stack[-1][prev_key] = {}  # Set last key as a dictionary
+                    stack.append(stack[-1][prev_key])  # Add new nested dict to stack
+                elif current_indent < last_indent:
+                    # Going back up in the structure, pop stack
+                    stack = stack[:current_indent // 4 + 1]
+
+                # Assign the key-value pair
+                stack[-1][key] = value
+                prev_key = key
+                last_indent = current_indent
+
+            return structure
+
+        # Step 1: Capture the output from run.print_structure()
+        output = capture_print_output(self.print_structure)
+
+        # Step 2: Strip ANSI escape sequences from the captured output
+        cleaned_output = strip_ansi_escape_sequences(output)
+
+        # Step 2: Parse the captured output into a nested dictionary
+        parsed_structure = _subfn_parse_structure(cleaned_output)
+
+        # Step 3: Use the parsed structure
+        return parsed_structure
+
+
+    def get_log_contents(self) -> str:
+        parsed_structure = self.get_parsed_structure()
+        monitoring_log_key: str = ''
+        for a_monitoring_log_key in list(parsed_structure['monitoring'].keys()):
+            # a_monitoring_root_key: str = f"monitoring/{a_monitoring_log_key}"
+            a_monitoring_subkeys = parsed_structure['monitoring'][a_monitoring_log_key]
+            
+            if ('stdout' in a_monitoring_subkeys) or ('stderr' in a_monitoring_subkeys):
+                ## found matching candidate key
+                monitoring_log_key = a_monitoring_log_key
+                
+            # self[f"{monitoring_root_key}/stdout"]            
+            # 'stdout' in a_monitoring_log_key
+            
+        assert (monitoring_log_key != ''), f"monitoring_log_key was not found"
+        
+        # monitoring_log_key: str = list(parsed_structure['monitoring'].keys())[-1] # like 'be28f54f'
+        
+        # monitoring_root_key: str = "monitoring/be28f54f"
+        monitoring_root_key: str = f"monitoring/{monitoring_log_key}"
+        
+        stdout_log_df: pd.DataFrame = self[f"{monitoring_root_key}/stdout"].fetch_values(include_timestamp=True) # ['value', 'timestamp']
+        # stdout_log_df
+        # <StringSeries field at "monitoring/be28f54f/stdout">
+        stderr_log_df: pd.DataFrame = self[f"{monitoring_root_key}/stderr"].fetch_values(include_timestamp=True) # ['value', 'timestamp']
+        # stderr_log_df
+
+        ## OUTPUT: stdout_log_df, stderr_log_df
+
+        # 'monitoring':
+        #     '5f739afe':
+        #         'hostname': String
+        #         'pid': String
+        #         'tid': String
+        #     'be28f54f':
+        #         'cpu': FloatSeries
+        #         'hostname': String
+        #         'memory': FloatSeries
+        #         'pid': String
+        #         'stderr': StringSeries
+        #         'stdout': StringSeries
+        #         'tid': String
+
+        # stderr_log_df.to_dict(orient='record')
+
+        merged_log_df: pd.DataFrame = pd.concat((stdout_log_df, stderr_log_df)).sort_values(by='timestamp', ascending=True).reset_index(drop=True)[['value', 'timestamp']]
+        # merged_log_df
+        # Drop rows where 'value' contains only whitespaces or newlines
+        merged_log_df = merged_log_df[~merged_log_df['value'].str.fullmatch(r'\s*')]
+        # merged_log_df
+        log_contents_str: str = "\n".join([f"{row['timestamp']}: {row['value']}" for _, row in merged_log_df.iterrows()])
+        return log_contents_str, merged_log_df
+    
 
 
 @define()
