@@ -639,32 +639,6 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         print(f'batch_extended_programmatic_figures(...): BatchPhoJonathanFiguresHelper.run(...) failed for all cells. failed with error: {e}\n skipping.')
         
 
-    # _display_directional_merged_pf_decoded_epochs ______________________________________________________________________ #
-    # this open the Yellow-Blue plots and various marginals
-    try:
-        # # Interactive-mode parameters:
-        # _interactive_mode_kwargs = dict(should_use_MatplotlibTimeSynchronizedWidget=True, scrollable_figure=True, defer_render=False)
-        # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-        # _curr_interaction_mode_kwargs = _interactive_mode_kwargs # interactive mode
-
-        # Non-interactive:
-        _non_interactive_mode_kwargs = dict(should_use_MatplotlibTimeSynchronizedWidget=False, scrollable_figure=False, defer_render=True)
-        # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=False, backend='AGG')
-        _curr_interaction_mode_kwargs = _non_interactive_mode_kwargs # non-interactive mode
-
-        _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_epochs', curr_active_pipeline.get_session_context(),
-                    max_num_lap_epochs = 240, max_num_ripple_epochs = 500,
-                    render_directional_marginal_laps=True, render_directional_marginal_ripples=True, render_track_identity_marginal_laps=True, render_track_identity_marginal_ripples=True,
-                    # render_directional_marginal_laps=True, render_directional_marginal_ripples=False, render_track_identity_marginal_laps=False, render_track_identity_marginal_ripples=False,
-                    # constrained_layout=True, # layout='none',
-                    # build_fn='basic_view', constrained_layout=True, 
-                    build_fn='insets_view', constrained_layout=None, layout='none', # , constrained_layout=False constrained_layout=None, layout='none', # , constrained_layout=None, layout='none' extrodinarily fast
-                    **_curr_interaction_mode_kwargs, # interactive mode
-                    skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, save_figure=save_figure)
-        
-    except BaseException as e:
-        print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs" failed with error: {e}\n skipping.')
-
     # _display_directional_merged_pf_decoded_epochs_marginals ________________________________________________________________________________ #
     try:
         _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_epochs_marginals', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
@@ -690,6 +664,32 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         _out = curr_active_pipeline.display('_display_trial_to_trial_reliability', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
     except BaseException as e:
         print(f'batch_extended_programmatic_figures(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
+
+    # _display_directional_merged_pf_decoded_epochs ______________________________________________________________________ #
+    # this open the Yellow-Blue plots and various marginals
+    try:
+        # # Interactive-mode parameters:
+        # _interactive_mode_kwargs = dict(should_use_MatplotlibTimeSynchronizedWidget=True, scrollable_figure=True, defer_render=False)
+        # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+        # _curr_interaction_mode_kwargs = _interactive_mode_kwargs # interactive mode
+
+        # Non-interactive:
+        _non_interactive_mode_kwargs = dict(should_use_MatplotlibTimeSynchronizedWidget=False, scrollable_figure=False, defer_render=True)
+        # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=False, backend='AGG')
+        _curr_interaction_mode_kwargs = _non_interactive_mode_kwargs # non-interactive mode
+
+        _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_epochs', curr_active_pipeline.get_session_context(),
+                    max_num_lap_epochs = 240, max_num_ripple_epochs = 500,
+                    render_directional_marginal_laps=True, render_directional_marginal_ripples=True, render_track_identity_marginal_laps=True, render_track_identity_marginal_ripples=True,
+                    # render_directional_marginal_laps=True, render_directional_marginal_ripples=False, render_track_identity_marginal_laps=False, render_track_identity_marginal_ripples=False,
+                    # constrained_layout=True, # layout='none',
+                    build_fn='basic_view', constrained_layout=True, 
+                    # build_fn='insets_view', constrained_layout=None, layout='none', # , constrained_layout=False constrained_layout=None, layout='none', # , constrained_layout=None, layout='none' extrodinarily fast
+                    **_curr_interaction_mode_kwargs, # interactive mode
+                    skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, save_figure=save_figure)
+        
+    except BaseException as e:
+        print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs" failed with error: {e}\n skipping.')
 
 
 
