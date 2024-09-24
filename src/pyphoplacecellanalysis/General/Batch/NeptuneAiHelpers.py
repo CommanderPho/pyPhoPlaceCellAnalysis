@@ -504,7 +504,7 @@ class Neptuner(object):
         - layout: The main layout containing the tree, header, and log output.
         
         Usage:
-        
+
             interactive_layout = Neptuner.build_interactive_session_display(context_indexed_run_logs, most_recent_runs_session_descriptor_string_to_context_map, most_recent_runs_context_indexed_run_extra_data)
             display(interactive_layout)
 
@@ -521,19 +521,24 @@ class Neptuner(object):
                                                 on_selection_changed_callbacks=[],
                                                 display_on_init=False)
 
-        jupyter_tree_widget.tree.layout = widgets.Layout(min_width='200px', max_width='600px', overflow='auto', height='auto')
+        jupyter_tree_widget.tree.layout = widgets.Layout(min_width='300px', max_width='30%', overflow='auto', height='auto')
 
         # Content Widget ________________________________________________________________________________________________ #
         def build_session_tuple_header_widget(a_session_tuple: Tuple):
-            """Builds a widget to display the session tuple's properties."""
-            header_label_widgets = {key: widgets.Label(f"{key}: '{value}',") for key, value in a_session_tuple.items()}
+            """Builds a widget to display the session tuple's properties with bold keys."""
+            # Create a dictionary to hold the label widgets with bold keys
+            header_label_widgets = {key: widgets.HTML(f"<b>{key}</b>: '{value}',") for key, value in a_session_tuple.items()}
             
+            # Define a layout that enables wrapping
             box_layout = widgets.Layout(display='flex', flex_flow='row wrap', align_items='stretch', width='100%')
+            
+            # Create a Box with the custom layout
             header_hbox = widgets.Box(list(header_label_widgets.values()), layout=box_layout)
 
+            # Function to update the values in the labels
             def update_header_labels_fn(new_values):
                 for key, value in new_values.items():
-                    header_label_widgets[key].value = f"{key}: {value}"
+                    header_label_widgets[key].value = f"<b>{key}</b>: {value}"
 
             return header_hbox, header_label_widgets, update_header_labels_fn
 
@@ -562,10 +567,22 @@ class Neptuner(object):
         textarea = widgets.Textarea(value='<No Selection>', disabled=True, style={'font_size': '10px'}, 
                                     layout=widgets.Layout(flex='1', width='650px', min_height='650px', height='850px'))
 
-        content_view_layout = widgets.VBox([header_hbox, textarea], layout=widgets.Layout(min_width='500px', min_height='200px', width='auto', height='auto'))
+        content_view_layout = widgets.VBox([header_hbox, textarea],
+                                            # layout=widgets.Layout(min_width='400px', min_height='200px', width='auto', height='auto'),
+                                            layout=widgets.Layout(min_width='500px', max_width='70%', height='auto', overflow='auto')
+                                           )
 
         # Layout the widgets side by side
-        layout = widgets.HBox([jupyter_tree_widget.tree, content_view_layout], layout=widgets.Layout(min_width='500px', min_height='100px', width='auto', height='auto'))
+        root_box = widgets.HBox([jupyter_tree_widget.tree, content_view_layout],
+                            #    layout=widgets.Layout(min_width='500px', min_height='100px', width='auto', height='auto'),
+                                layout=widgets.Layout(
+                                    width='100%',  # Set the HBox to take full width
+                                    display='flex',
+                                    flex_flow='row',
+                                    justify_content='space-between',  # Ensure the tree and content view are spaced apart
+                                    overflow='auto'  # Enable overflow handling
+                                ),
+                               )
 
         # Callback function for when a tree node is selected
         def _on_tree_node_selection_changed(selected_node, selected_context):
@@ -583,7 +600,7 @@ class Neptuner(object):
         jupyter_tree_widget.on_selection_changed_callback = [_on_tree_node_selection_changed]
 
         # Return the layout for display
-        return layout
+        return root_box
 
 
 
