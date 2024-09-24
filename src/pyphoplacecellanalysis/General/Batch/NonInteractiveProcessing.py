@@ -1,7 +1,7 @@
 import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import numpy as np
 
@@ -14,6 +14,7 @@ from matplotlib.backends import backend_pdf
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for batch_load_session
 from neuropy.utils.misc import compute_paginated_grid_config # for paginating shared aclus
+from neuropy.utils.result_context import IdentifyingContext
 
 # pyphocorehelpers
 from pyphocorehelpers.indexing_helpers import reorder_keys_relative
@@ -773,6 +774,17 @@ class BatchPhoJonathanFiguresHelper:
         _batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows, _extra_kwargs=dict(disable_top_row=disable_top_row))
         active_out_figures_dict = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
         
+        # ## find the output figures from the `curr_active_pipeline.registered_output_files`
+        # exports_any_figures_to_disk: bool = (write_png or write_vector_format and (len(active_out_figures_dict)>0))
+        # if exports_any_figures_to_disk:
+        #     _found_contexts_dict: Dict[IdentifyingContext, Path] = {}
+        #     for a_figure_path, an_output_dict in curr_active_pipeline.registered_output_files.items():
+        #         a_ctxt = an_output_dict['context']
+        #         _found_contexts_dict[a_ctxt] = a_figure_path
+
+        #     relevant_figures_dict: Dict[IdentifyingContext, Path] = IdentifyingContext.matching(_found_contexts_dict, criteria={'display_fn_name': 'BatchPhoJonathanReplayFRC'})
+        #     relevant_figures_dict
+
         return active_out_figures_dict
 
     @classmethod
